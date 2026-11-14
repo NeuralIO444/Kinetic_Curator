@@ -18,7 +18,9 @@ import {
   snapshotTravelStore,
   restoreTravelStore,
   checkTravelStoreSnapshot,
+  boilStep as boilStepAt,
 } from '../engine/kineme.js'; // #1128: the living-motion floor; #1574: the travel store
+import { sanitizeWorld } from '../data/world.js'; // #2104 step 4: the standing world, read through its door
 import {
   createSurgeStore,
   pruneSurgeStore,
@@ -228,6 +230,7 @@ function livingMotion(
   reducedMotion,
   culture = null,
   fieldBreath = null,
+  worldBoilFps = 0,
 ) {
   if (slowRender) return null;
   const amounts = patternAmounts(
@@ -262,7 +265,12 @@ function livingMotion(
   return {
     seed,
     driverSec,
-    boilStep: 0,
+    // #2104 step 4 (§10 ruling 4) — the standing world's boil clock binds the mark clock: the
+    // ctx's boil channel advances on the world's grid instead of standing at 0 (its pre-world
+    // value since #1128 — production never advanced it). No world standing → 0, exactly as
+    // before. The brush-wobble driver is the channel's only reader today and its output is
+    // still unapplied (#894/#897), so this binds the clock without moving a mark.
+    boilStep: worldBoilFps > 0 ? boilStepAt(driverSec, worldBoilFps) : 0,
     amounts,
     canvasW: W,
     canvasH: H,
@@ -776,6 +784,11 @@ export function createLiveResolver() {
       );
     }
     const driverSec = driverTimeSec(driverClock, input.loopTimeMs ?? 0, input.layoutParams?.kinemeRate ?? 1);
+    // #2104 step 4 — the frame's standing world, through the door once per resolve (the input
+    // is recorded data on replay: an unrecorded or malformed world fails closed to none).
+    // Only the boil binds here; the ground, finish and pattern/cell clocks read the world
+    // from the scene contract the loop builds.
+    const worldBoilFps = sanitizeWorld(input.world)?.boilFps ?? 0;
     // #1923 — the quiet culture's field, read ONE-WAY by the marks' kineme (the last applied frame's; null = none)
     const cultureField = dishLife.field();
     // #1997 — the ferrofluid coupling's two reads, BOTH taken here, before any stage applies (the
@@ -1179,6 +1192,7 @@ export function createLiveResolver() {
           input.reducedMotion,
           cultureField,
           cultureScale, // #1923 Phase 2 slice B — the same seam object: the breath driver reads it as ctx.fieldBreath
+          worldBoilFps, // #2104 step 4: the world's boil binds the mark clock
         );
         if (frameWind === null && Number.isFinite(layoutParams.wind)) frameWind = layoutParams.wind;
         if (frameKineme === null && kineme !== null) frameKineme = kineme;
@@ -1848,6 +1862,9 @@ export function createLiveResolver() {
             input.beatDrive,
             input.assetStill,
             input.reducedMotion,
+            null,
+            null,
+            worldBoilFps, // #2104 step 4: the world's boil binds the creature floors too
           ),
         // and on the dials and ground it rests on: the same GROUND / EDGE / SNAP the marks obey (null when none)
         (e) =>
@@ -1882,6 +1899,9 @@ export function createLiveResolver() {
             input.beatDrive,
             input.assetStill,
             input.reducedMotion,
+            null,
+            null,
+            worldBoilFps, // #2104 step 4: the world's boil binds the creature floors too
           ),
         (e) =>
           creatureGround({

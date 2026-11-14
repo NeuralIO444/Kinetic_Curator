@@ -38,6 +38,7 @@ import {
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { expandCreatureInstances, davisFitOf } from '../engine/creatureRig.js'; // #1851 — creature rigs, #1945 role deal
 import { contractLight } from '../data/light.js';
+import { sanitizeWorld } from '../data/world.js'; // #2104: the Canon world record
 import {
   KINEME_KINDS,
   KINEME_TABLE_MAX,
@@ -901,6 +902,14 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       const light = contractLight(doc.light, pal);
       return light ? { light } : {};
     })(),
+    // #2104 — the ONE standing world (Canon world record), scene-level like the sun. Key
+    // omitted when no world stands, so a world-less contract (and its hash) is exactly what
+    // it was before the world existed. The record rides whole, through its door: the renderer
+    // reads the boil (pattern kinemes, cell line-boil) and the finish (the final pass) from it.
+    ...(() => {
+      const world = sanitizeWorld(doc.world);
+      return world ? { world } : {};
+    })(),
     // #594 PR3 — squash-and-stretch amount (scene-level, like the sun). Key
     // omitted at 0 so every existing contract and its hash are unchanged.
     ...(() => {
@@ -968,6 +977,14 @@ export function assertSceneContract(scene) {
   if (!Array.isArray(scene.fxWraps)) fail('fxWraps must be an array');
   if (scene.distortHeat !== undefined && !(scene.distortHeat > 0 && scene.distortHeat < 1)) {
     fail('distortHeat, when carried, must be in (0, 1) — full heat carries no key'); // #2010 P3
+  }
+  if (scene.world !== undefined) {
+    // #2104 — a carried world is a fixed point of its door (the take stamp's rule, step 3):
+    // anything the door would change is not a world record.
+    const w = sanitizeWorld(scene.world);
+    if (!w || JSON.stringify(w) !== JSON.stringify(scene.world)) {
+      fail('world, when carried, must be a world record exactly as its door writes it');
+    }
   }
   // #192: the reported shed is part of the validated shape — an FX layer
   // that loses its wrap must always be named here, never silent.

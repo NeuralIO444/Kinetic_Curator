@@ -241,9 +241,9 @@ ok(
     assert.match(
       flat(src),
       fre(
-        /e\.frames\.frame\(layer\.pattern, layer\.palette, size\.w, size\.h, layer\.pattern\.t, null, layer\.patternCulture \?\? null\)/,
+        /e\.frames\.frame\(layer\.pattern, layer\.palette, size\.w, size\.h, layer\.pattern\.t, null, layer\.patternCulture \?\? null, kinT\)/,
       ),
-      'the frame call carries the block’s pattern/palette/t — and, since #1923 slice C, its culture descriptor',
+      'the frame call carries the block’s pattern/palette/t — and, since #1923 slice C, its culture descriptor — and, since #2104 step 4, the boil kineme time',
     );
     assert.match(src, /if \(e\.key !== f\.key\)/, 'upload only on change');
     assert.match(src, /sweepPatternTextures\(\); \/\/ #1098/, 'a track that left the scene frees its texture');

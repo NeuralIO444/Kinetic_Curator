@@ -456,9 +456,9 @@ function quiltAngles(grid, drift, t) {
  * spec (draw order: tiles to the full rect, heroes over their cells, grout last). Slow (it allocates per
  * pixel). rasterQuilt is the fast one and is proven pixel-identical to this (quilt.selfcheck, rasterFast.selfcheck).
  */
-export function rasterQuiltReference(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0, movers = null) {
+export function rasterQuiltReference(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0, movers = null, kinT = t) {
   const rot = quiltAngles(grid, drift, t);
-  const xf = quiltXforms(movers, drift, t);
+  const xf = quiltXforms(movers, drift, kinT); // #2104 step 4: element kinemes on kinT, as rasterQuilt
   for (let y = 0; y < bh; y++) {
     const Y = (y + 0.5) / tileW;
     for (let x = 0; x < bw; x++) {
@@ -598,9 +598,12 @@ function quiltMovers(grid) {
  * Rasterize the quilt into a Uint32Array (RGBA, little-endian) of bw × bh. Same pixels as
  * rasterQuiltReference. Draw order is the spec's: tiles, heroes over their cells, grout last.
  */
-export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0, movers = null) {
+export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0, movers = null, kinT = t) {
   const rot = quiltAngles(grid, drift, t);
-  const xf = quiltXforms(movers, drift, t);
+  // #2104 step 4 — the element kinemes (elementXform) read kinT: the boil-quantized time while
+  // a world stands, the frame's own t otherwise (every pre-world caller). The quilt's own
+  // rotation wave above keeps smooth t — it is a mode motion, not an element kineme.
+  const xf = quiltXforms(movers, drift, kinT);
   const plan = quiltPlan(grid, bw, bh, tileW, grout);
   const { cols, rows, tiles, heroes, heroAt } = grid;
   for (let r = 0; r < rows; r++) {
@@ -635,9 +638,9 @@ export function createQuiltRaster(grid, bw, bh, tileW, grout = 0, kinMovers = nu
   return {
     base,
     movers: movers.length,
-    draw(out, drift, t) {
+    draw(out, drift, t, kinT = t) {
       const rot = quiltAngles(grid, drift, t);
-      const xf = quiltXforms(kinMovers, drift, t);
+      const xf = quiltXforms(kinMovers, drift, kinT); // #2104 step 4: element kinemes on kinT, as rasterQuilt
       out.set(base);
       if (!rot && !xf) return out;
       for (const m of movers) {
@@ -793,7 +796,7 @@ export function glyphLayout(grid, bw, bh) {
  * never enters the mark box, and a mark never reaches a seam (72% of the tile
  * at most). Ground on ground draws nothing, so there is nothing to draw.
  */
-export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0, movers = null) {
+export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0, movers = null, kinT = t) {
   const { cols, rows, tiles, groundRgba } = grid;
   const { tile, x0, y0 } = glyphLayout(grid, bw, bh);
   const count = cols * rows;
@@ -804,7 +807,9 @@ export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0, movers = null) 
     const c = i % cols;
     const r = (i / cols) | 0;
     // #1137 — this glyph's own KINEME transform (null: the original path, number for number)
-    const xe = movers && drift > 0 ? glyphXform(movers.get(i), drift, t) : null;
+    // #2104 step 4 — the transform reads kinT (boil-quantized while a world stands); the
+    // drift pulse below (glyphScale) is a mode motion and keeps smooth t.
+    const xe = movers && drift > 0 ? glyphXform(movers.get(i), drift, kinT) : null;
     if (xe && !xe.vis) continue; // blinked out: the ground shows
     const scale = xe ? glyphScale(i, count, drift, t) * xe.s : glyphScale(i, count, drift, t);
     // a turned mark needs the diagonal of its box; a bobbing one reaches |dy| tiles further down or up
@@ -864,11 +869,11 @@ function sampleMarkXf(ops, lx, ly, scale, xe) {
 }
 
 /** The REFERENCE glyph raster: every pixel of the frame, one at a time. rasterGlyph is proven identical to it. */
-export function rasterGlyphReference(buf, bw, bh, grid, drift = 0, t = 0, movers = null) {
+export function rasterGlyphReference(buf, bw, bh, grid, drift = 0, t = 0, movers = null, kinT = t) {
   const { cols, rows, tiles, groundRgba } = grid;
   const { tile, x0, y0 } = glyphLayout(grid, bw, bh);
   const count = cols * rows;
-  const xes = tiles.map((_, i) => (movers && drift > 0 ? glyphXform(movers.get(i), drift, t) : null));
+  const xes = tiles.map((_, i) => (movers && drift > 0 ? glyphXform(movers.get(i), drift, kinT) : null));
   const scales = tiles.map((_, i) =>
     xes[i] ? glyphScale(i, count, drift, t) * xes[i].s : glyphScale(i, count, drift, t),
   );
