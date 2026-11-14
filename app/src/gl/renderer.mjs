@@ -54,6 +54,7 @@ import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
 import { registerMathShaders, applyMathMod } from './effects/mathShaders.mjs';
 import { createPatternFrames, patternBytes, patternDrawSize } from '../pattern/patternSource.js'; // #1098/#1101: a PATTERN track's frame
+import { boilSec, boilStep } from '../engine/kineme.js'; // #2104 step 4: the world's boil grid, for the clocks it binds
 
 // #520 Phase 2: kept local so renderer.mjs stays browser-safe (the parity
 // harness serves only src/gl/, not src/fx/). Must match fxFilters.js.
@@ -881,11 +882,21 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     // through untouched.
     const stripK = cellFrame && stripFramesFor(it.asset) ? getCellKineme(ASSET_CELL_KINEME[it.asset]) : null;
     if (stripK) {
-      const idx = cellIndexAt(cellFrame.motionTime, {
-        period: stripK.period,
-        cells: stripK.cells,
-        shed: !!cellFrame.shed,
-      });
+      // #2104 step 4 (§10 ruling 4) — the cell library's LINE-BOIL runs on the standing
+      // world's boil clock instead of its own library period, while a world stands: the
+      // boil step picks the cell (shed still parks on cell 0, the canonical frame). Every
+      // other strip kineme keeps its period; no boil on the frame → the period path,
+      // byte-identical to before.
+      const idx =
+        stripK.id === 'line-boil' && cellFrame.boilFps
+          ? cellFrame.shed
+            ? 0
+            : boilStep(cellFrame.motionTime, cellFrame.boilFps) % stripK.cells
+          : cellIndexAt(cellFrame.motionTime, {
+              period: stripK.period,
+              cells: stripK.cells,
+              shed: !!cellFrame.shed,
+            });
       const win = cellUvWindow(cell, idx, stripK.cells);
       u0 = win.u0;
       v0 = win.v0;
@@ -1221,6 +1232,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let hands = { crooked: 0, open: 0 };
   let kinemeTable = null; // #781: the frame's kineme table (null = nothing moves)
   let kinemeTime = 0;
+  // #2104 step 4: the frame's standing world, set by renderFrameInto from the contract
+  // (absent = no world: every world read below is its pre-world value). The boil binds the
+  // pattern element kinemes and the cell library's line-boil; the finish is the final pass.
+  let worldBoilFps = 0;
+  let worldFinishGrain = 0;
   let cellShed = false; // #1431: contract.cellShed — strip assets park on cell 0
   let regionAnim = null; // #1433: contract.regionAnim — region playback state (null = pre-R2 path)
   const kinemeBuf = new Float32Array(16 * 3);
@@ -1585,7 +1601,15 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // #1431: the frame clock every strip instance in this layer (and its
     // mask bakes, which flow through here too) packs against.
     // #1433: the same frame state carries the region playback state.
-    const cellFrame = { motionTime: kinemeTime, shed: cellShed, regions: regionAnim, kinemes: kinemeTable };
+    const cellFrame = {
+      motionTime: kinemeTime,
+      shed: cellShed,
+      regions: regionAnim,
+      kinemes: kinemeTable,
+      // #2104 step 4 — the standing world's boil rides the frame clock only while a world
+      // stands, so a world-less frame's cellFrame is exactly the pre-world shape.
+      ...(worldBoilFps > 0 ? { boilFps: worldBoilFps } : {}),
+    };
     let batch = [];
     const flushNormal = () => {
       if (batch.length) {
@@ -1708,6 +1732,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // #1923 Phase 2 slice C: the coupling's TIDES descriptor rides the contract layer (absent =
     // uncoupled, the dealt frame). The drift-amplitude modes need nothing here — their bias is
     // already the block's drift value, which also drives the draw size above.
+    // #2104 step 4 (§10 ruling 4) — the pattern elements' kinemes run on the standing
+    // world's boil clock: their time is the pattern's own t snapped to the boil grid.
+    // No world → undefined → the frame source reads plain t, as before.
+    const kinT =
+      worldBoilFps > 0 && Number.isFinite(layer.pattern.t) ? boilSec(layer.pattern.t, worldBoilFps) : undefined;
     const f = e.frames.frame(
       layer.pattern,
       layer.palette,
@@ -1716,6 +1745,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       layer.pattern.t,
       null,
       layer.patternCulture ?? null,
+      kinT,
     );
     if (e.key !== f.key) {
       gl.bindTexture(gl.TEXTURE_2D, e.tex);
@@ -1776,6 +1806,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     distortHeat = Number.isFinite(contract.distortHeat) ? contract.distortHeat : 1; // #2010 P3: the shed lands on heat
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;
+    // #2104 step 4 — the contract's world (door-clean by construction): its boil grid and
+    // its finish grain ride the frame. No world on the contract → both 0 → every consumer
+    // below runs its pre-world path.
+    worldBoilFps = contract.world ? contract.world.boilFps : 0;
+    worldFinishGrain = contract.world ? Math.max(0, contract.world.finish?.grain ?? 0) : 0;
     cellShed = !!contract.cellShed; // #1431
     regionAnim = contract.regionAnim || null; // #1433
     // #1814: the frame's soak field, normalised from the payload's wet
@@ -2034,6 +2069,17 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // arrived — a mid-frame crash for a field with no producer. The renderer now
     // never reads it; wiring live text later is a deliberate change here AND in
     // sceneContract.js (whose selfcheck pins the field to [] so it can't drift in).
+    // #2104 step 4 (§10 ruling 3) — the world's FINISH is only the final pass: one grain
+    // chain appended AFTER every look's own finish chain, so a look's grain survives
+    // untouched and runs first, exactly as dealt; the world's grain lays over the whole
+    // finished frame last. Post-ACCUM like every finish (applyFinishChains runs after the
+    // buffer), never into it. No world (or a world with grain 0) → no chain, as before.
+    if (worldFinishGrain > 0) {
+      fxFinishChains.push({
+        layerId: 'world',
+        steps: compileFxShaders([{ kind: 'grain', params: { amount: worldFinishGrain } }]),
+      });
+    }
     sweepPatternTextures(); // #1098: a pattern track that left the scene frees its texture
     return { ...mRead, fxFinishChains };
   }

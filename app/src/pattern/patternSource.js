@@ -43,7 +43,7 @@ export const patternPalette = (p) => ({
  * time is left OUT of its key and the frame is reused until a parameter, the palette or the size
  * changes. A drifting pattern keys on `t` (every frame is new).
  */
-export function patternKey(pattern, palette, w, h, t = 0, image = null, culture = null) {
+export function patternKey(pattern, palette, w, h, t = 0, image = null, culture = null, kinT = t) {
   const p = sanitizePattern(pattern);
   const pal = patternPalette(palette);
   // #1798: a BLOCKS deal is a still — time never changes its pixels, whatever DRIFT says.
@@ -65,6 +65,13 @@ export function patternKey(pattern, palette, w, h, t = 0, image = null, culture 
     w,
     h,
     el,
+    // #2104 step 4 — a boil-bound frame is a function of the kineme time too: the element
+    // kinemes read kinT (the world's boil grid) while the mode motions read t. Spread only
+    // when kinT actually moves pixels (a moving pattern with elements, stepped off its own
+    // t), so every pre-world key stays byte-identical.
+    ...(p.drift > 0 && !PATTERN_FIELD_LIKE.includes(p.mode) && p.mode !== 'BLOCKS' && Number(kinT) !== time
+      ? ['B', Number(kinT) || 0]
+      : []),
     // #1795: a PICTURE frame is a function of its image too — keyed on the image's id (the bundled
     // seed by default). Spread only for PICTURE, so every other mode's key stays byte-identical.
     ...(p.mode === 'PICTURE' ? [normalizePictureImage(image).id] : []),
@@ -192,9 +199,12 @@ export function createPatternFrames() {
      * @param {object} [culture] #1923 Phase 2 slice C: the dish-life coupling's TIDES descriptor
      *   ({ coupling, grid } — the seam's level snapshot), carried on the resolved block. TIDES only;
      *   the drift-amplitude modes receive their bias already folded into the block's drift value.
+     * @param {number} [kinT] #2104 step 4: the time the ELEMENT KINEMES read — the standing
+     *   world's boil-quantized time while a world stands, the frame's own t otherwise. Only the
+     *   element transforms (elementXform) read it; mode motions (pan, pulse, growth) keep t.
      * @returns {{pixels: Uint32Array, w: number, h: number, key: string}} top row first
      */
-    frame(pattern, palette, w, h, t = 0, image = null, culture = null) {
+    frame(pattern, palette, w, h, t = 0, image = null, culture = null, kinT = t) {
       const p = sanitizePattern(pattern);
       const pal = patternPalette(palette);
       const bw = Math.max(1, Math.round(w));
@@ -234,7 +244,7 @@ export function createPatternFrames() {
                 culture.coupling,
               )
           : null;
-      const key = patternKey(p, pal, bw, bh, t, image, culture);
+      const key = patternKey(p, pal, bw, bh, t, image, culture, kinT);
       if (p.drift === 0 || p.mode === 'BLOCKS') {
         // A coupled TIDES still is NOT a still: the culture evolves under it, so it re-rasters every
         // frame (into the scratch buffer, never the drawn-once cache) and its key carries the field's
@@ -254,11 +264,11 @@ export function createPatternFrames() {
         }
         return { pixels: still, w: bw, h: bh, key };
       }
-      if (p.mode === 'QUILT') plan.quilt.draw(out, p.drift, t);
-      else if (p.mode === 'GLYPH') rasterGlyph(out, bw, bh, plan.grid, p.drift, t, plan.movers);
+      if (p.mode === 'QUILT') plan.quilt.draw(out, p.drift, t, kinT);
+      else if (p.mode === 'GLYPH') rasterGlyph(out, bw, bh, plan.grid, p.drift, t, plan.movers, kinT);
       else if (p.mode === 'TIDES') rasterTides(out, bw, bh, plan.grid, p.drift, t, tidesBias);
       else if (p.mode === 'REWRITE') rasterRewrite(out, bw, bh, plan.grid, p.drift, t);
-      else if (p.mode === 'PICTURE') rasterPicture(out, bw, bh, plan.grid, p.drift, t, plan.movers);
+      else if (p.mode === 'PICTURE') rasterPicture(out, bw, bh, plan.grid, p.drift, t, plan.movers, kinT);
       else rasterField(out, bw, bh, plan.grid, plan.tileW, panOffset(p.seed, p.drift, t));
       return { pixels: out, w: bw, h: bh, key };
     },

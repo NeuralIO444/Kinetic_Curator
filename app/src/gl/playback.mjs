@@ -12,6 +12,7 @@
 //     (homes, formed, limbs, traits, scaleMul) ride the recorded inputs exactly as they did live
 import { replayInputs } from '../engine/kernel/replay/inputLog.js';
 import { checkPerformance } from './performanceFile.mjs';
+import { sanitizeWorld } from '../data/world.js'; // #2104: a take's recorded world, stood back up in step 4
 import { checkRouteRecord, routesAt } from './routeRecord.mjs';
 import { checkGestureRecord, frozenAt } from './gestureRecord.mjs';
 import { emit, Events } from '../composition/eventBus.js';
@@ -78,7 +79,11 @@ export function startPlayback(perf) {
   // section, fires none. The take's freeze state is asserted the moment it loads — it is the authority while
   // the take plays, and the loop may be sitting in a live state the take never had.
   const gestures = checkGestureRecord(p.gestures);
-  active = { perf: p, frames, index: 0, ended: false, pendingSeek: 0, routes, gestures, gNext: 0 };
+  // #2104 step 4 — the take's recorded world (step 3 stamped and validated it for exactly
+  // this): it stands on the stage while the take plays. A take with no stamp was recorded
+  // world-less and plays world-less (null), never under a leftover live world.
+  const world = sanitizeWorld(p.world);
+  active = { perf: p, frames, index: 0, ended: false, pendingSeek: 0, routes, gestures, gNext: 0, world };
   if (gestures) {
     emit(Events.ACCUM_GESTURE, { action: 'freeze', value: frozenAt(gestures, 0) }, { cause: 'playback' });
   }
@@ -169,7 +174,11 @@ export function playbackStep(liveInput) {
   }
   // #1802 — the take's gestures re-fire as their frames play (held frames hold them too, with the picture).
   if (!held && a.gestures) fireGestures(a, playedIndex, rewind);
-  const input = held ? { ...recorded, slowRender: true } : recorded;
+  const base = held ? { ...recorded, slowRender: true } : recorded;
+  // #2104 step 4 — a take recorded since worlds ride the resolve input carries its world per
+  // frame (a landing mid-take replays exactly); an older stamped take's frames carry none,
+  // so the stamp fills in. The recorded frame object is never mutated.
+  const input = base.world !== undefined ? base : { ...base, world: a.world };
   if (!held) {
     if (a.index < a.frames.length - 1) {
       a.index += 1;
@@ -187,6 +196,10 @@ export function overlayScene(state) {
   const rec = active.frames[Math.min(active.index, active.frames.length - 1)];
   const out = { ...state };
   for (const k of SCENE_KEYS) if (rec[k] !== undefined) out[k] = rec[k];
+  // #2104 step 4 — the loop's other world readers (the contract, the ground) see the same
+  // world the resolver sees: the playing frame's own when it carries one, else the take's
+  // stamp, else none — a take never plays under the live stage's leftover world.
+  out.world = rec.world !== undefined ? rec.world : active.world;
   if (active.routes) out.audioRoutes = routesAt(active.routes, active.index); // the take's routes, not today's
   return out;
 }

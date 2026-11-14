@@ -36,6 +36,7 @@ import {
   setLiveWetSampler,
 } from './liveResolve.mjs';
 import { cultureBackgroundShift, cultureBackgroundHex } from '../engine/dishLifeCouple.mjs'; // #1923 Phase 2 slice D: the background fold's law (the seam)
+import { sanitizeWorld } from '../data/world.js'; // #2104: the standing Canon world, read through its door
 import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
 import { lastResolvedInput } from './resolveTap.mjs'; // #1949: the frame's effective input (a take's own, while one plays)
 import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
@@ -905,7 +906,13 @@ export function createLiveLoop(
           review: reviewRec.adjustment.final ?? null,
         }
       : null;
+    // #2104 — the frame's standing world, through the door once (the store's value, or the
+    // playing take's via the overlaid store view). It rides the resolve input only while a
+    // world stands, so a world-less frame's input — and any take recorded from it — carries
+    // exactly the older input shape.
+    const worldNow = sanitizeWorld(s.world);
     const resolved = resolver.resolveLayers({
+      ...(worldNow ? { world: worldNow } : {}),
       ...(dishLifeStamp ? { dishLife: dishLifeStamp } : {}),
       ...(dishFieldStamp ? { dishField: dishFieldStamp, dishFieldCoupling } : {}), // #1923 Phase 2
       ...(dishFluidStamp
@@ -1047,7 +1054,11 @@ export function createLiveLoop(
       mixSeconds,
       now: loopTimeMs,
       seed: s.seed,
-      bg: activePalette.bg,
+      // #2104 step 4 — the world's GROUND is the stage's ground: while a world stands, the
+      // tint machines soak toward the world's ground instead of the palette's bg (the wash /
+      // inject events, the frame clear and the ACCUM fade all follow this one value, the
+      // #1923 fold's own seam). White / transparent stay the performer's overrides, upstream.
+      bg: worldNow ? worldNow.ground : activePalette.bg,
       lastResolved,
     };
     const washEv = tintWash.update(tintArgs);
@@ -1069,6 +1080,7 @@ export function createLiveLoop(
         perfTier1: !!s.perfTier1,
         layers: s.layers,
         light: s.light,
+        world: worldNow, // #2104: the standing world (the contract omits the key when none stands)
         squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0),
         assetKineme: s.assetKineme,
         kinemeTime: kinemeClock.at(
@@ -2056,7 +2068,10 @@ export function createLiveLoop(
         const s = getState();
         const voiceState = resolveLiveRenderState(s);
         const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
-        let beginBg = bgMode === 'white' ? '#ffffff' : activePalette.bg;
+        // #2104 step 4 — a clear re-begins the buffer from the SHOWN background: the standing
+        // world's ground while one stands (the buildFrame ground seam above), else the palette's.
+        const beginWorld = sanitizeWorld(s.world);
+        let beginBg = bgMode === 'white' ? '#ffffff' : beginWorld ? beginWorld.ground : activePalette.bg;
         // #1923 Phase 2 slice D — a clear re-begins the buffer from the SHOWN background (the
         // buildFrame fold above), never from a second, dealt-only truth the frames would then
         // drift away from over the fade. Same gate, same law, the last published read.

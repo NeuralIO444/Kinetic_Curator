@@ -287,7 +287,7 @@ function samplePictureXf(ops, lx, ly, scale, xe) {
  * one. Only the pixels inside a cell's mark box are sampled — the same
  * culling rasterGlyph is proven with (#1101).
  */
-export function rasterPicture(buf, bw, bh, grid, drift = 0, t = 0, movers = null) {
+export function rasterPicture(buf, bw, bh, grid, drift = 0, t = 0, movers = null, kinT = t) {
   const { cols, rows, tiles, groundRgba } = grid;
   const cell = bw / cols;
   const count = cols * rows;
@@ -297,7 +297,9 @@ export function rasterPicture(buf, bw, bh, grid, drift = 0, t = 0, movers = null
     const r = (i / cols) | 0;
     const tl = tiles[i];
     // this cell's own KINEME transform (null: the untouched path, number for number)
-    const xe = movers && drift > 0 ? pictureXform(movers.get(i), drift, t) : null;
+    // #2104 step 4 — the transform reads kinT (boil-quantized while a world stands); the
+    // tone pulse below (glyphPulse) is a mode motion and keeps smooth t.
+    const xe = movers && drift > 0 ? pictureXform(movers.get(i), drift, kinT) : null;
     if (xe && !xe.vis) continue; // blinked out: the ground shows
     const scale = glyphPulse(drift, t, i, count) * tl.scale * (xe ? xe.s : 1);
     // a turned mark needs the diagonal of its box; a bobbing one reaches |dy| cells further down or up
@@ -326,7 +328,7 @@ export function rasterPicture(buf, bw, bh, grid, drift = 0, t = 0, movers = null
 }
 
 /** The REFERENCE picture raster: every pixel of the frame, one at a time. rasterPicture is proven identical to it. */
-export function rasterPictureReference(buf, bw, bh, grid, drift = 0, t = 0, movers = null) {
+export function rasterPictureReference(buf, bw, bh, grid, drift = 0, t = 0, movers = null, kinT = t) {
   const { cols, rows, tiles, groundRgba } = grid;
   const cell = bw / cols;
   const count = cols * rows;
@@ -342,7 +344,7 @@ export function rasterPictureReference(buf, bw, bh, grid, drift = 0, t = 0, move
       }
       const i = r * cols + c;
       const tl = tiles[i];
-      const xe = movers && drift > 0 ? pictureXform(movers.get(i), drift, t) : null;
+      const xe = movers && drift > 0 ? pictureXform(movers.get(i), drift, kinT) : null;
       if (xe && !xe.vis) {
         buf[y * bw + x] = groundRgba;
         continue;
