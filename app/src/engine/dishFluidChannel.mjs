@@ -173,7 +173,51 @@ export function packFieldDensity(density, blocked = null) {
  * draw's own order). The selfcheck pins counts and spot seats; the GL capture verifies the
  * transcription on real hardware.
  */
-export function fieldBodySeatModel(packed, seedKey, budget, vocabCount, { rounds = null } = {}) {
+/**
+ * #2182 WS3 — the DISPLAY-resolution read of the density field. The kernel and the coupling stay on the
+ * 96x54 grid; the seating may read that grid finer. `ux, uy` are the read position in CELL units (cell
+ * (cx, cy) spans [cx, cx+1)); texel centres sit at +0.5. Pure; FIELD_VS is transcribed from it.
+ *   mode 0 — the cell's own texel (the pre-WS3 read: every seat in a cell shares one density)
+ *   mode 1 — bilinear between the four nearest texel centres
+ *   mode 2 — bicubic (Catmull-Rom) over the 4x4 neighbourhood, clamped to [0, 1] (the kernel overshoots on
+ *            sharp veins; a negative or >1 density is meaningless)
+ * Edges clamp (texel replication). Bedrock is never reconstructed — it stays the seat's own cell flag.
+ */
+export const FIELD_RECON_MODES = Object.freeze({ cell: 0, bilinear: 1, bicubic: 2 });
+const cr = (t) => [
+  -0.5 * t * t * t + t * t - 0.5 * t,
+  1.5 * t * t * t - 2.5 * t * t + 1,
+  -1.5 * t * t * t + 2 * t * t + 0.5 * t,
+  0.5 * t * t * t - 0.5 * t * t,
+];
+export function fieldBodyReconDensity(packed, ux, uy, mode) {
+  const C = FLUID_GRID_COLS;
+  const R = FLUID_GRID_ROWS;
+  const at = (i, j) => packed[(Math.min(R - 1, Math.max(0, j)) * C + Math.min(C - 1, Math.max(0, i))) * 2] / 255;
+  if (!(mode >= 1)) return at(Math.floor(ux), Math.floor(uy));
+  const px = ux - 0.5;
+  const py = uy - 0.5;
+  const i0 = Math.floor(px);
+  const j0 = Math.floor(py);
+  const fx = px - i0;
+  const fy = py - j0;
+  if (mode < 2) {
+    const a = at(i0, j0) * (1 - fx) + at(i0 + 1, j0) * fx;
+    const b = at(i0, j0 + 1) * (1 - fx) + at(i0 + 1, j0 + 1) * fx;
+    return a * (1 - fy) + b * fy;
+  }
+  const wx = cr(fx);
+  const wy = cr(fy);
+  let v = 0;
+  for (let m = 0; m < 4; m++) {
+    let row = 0;
+    for (let k = 0; k < 4; k++) row += wx[k] * at(i0 - 1 + k, j0 - 1 + m);
+    v += wy[m] * row;
+  }
+  return Math.min(1, Math.max(0, v));
+}
+
+export function fieldBodySeatModel(packed, seedKey, budget, vocabCount, { rounds = null, recon = 0 } = {}) {
   const seats = [];
   const n = FLUID_GRID_COLS * FLUID_GRID_ROWS;
   if (!packed || packed.length !== n * 2 || !(vocabCount > 0)) return seats;
@@ -183,14 +227,15 @@ export function fieldBodySeatModel(packed, seedKey, budget, vocabCount, { rounds
   for (let sub = 0; sub < r; sub++) {
     for (let cell = 0; cell < n; cell++) {
       if (packed[cell * 2 + 1]) continue; // bedrock: no seat, ever
-      const d = packed[cell * 2] / 255;
-      if (!(d >= MATTER_DENSITY_FLOOR)) continue; // gate 1 — the density floor
       const seat = cell * 9 + sub;
-      if (!(fieldBodyHash01(key, FIELD_BODY_STREAMS.fill, seat) < fieldBodyFill(d))) continue; // gate 2 — fill
       const cx = cell % FLUID_GRID_COLS;
       const cy = (cell - cx) / FLUID_GRID_COLS;
       const hx = fieldBodyHash01(key, FIELD_BODY_STREAMS.jitterX, seat);
       const hy = fieldBodyHash01(key, FIELD_BODY_STREAMS.jitterY, seat);
+      // WS3: recon 0 is the cell's own texel — the exact pre-WS3 read; recon 1/2 read the field at the seat itself.
+      const d = recon >= 1 ? fieldBodyReconDensity(packed, cx + hx, cy + hy, recon) : packed[cell * 2] / 255;
+      if (!(d >= MATTER_DENSITY_FLOOR)) continue; // gate 1 — the density floor
+      if (!(fieldBodyHash01(key, FIELD_BODY_STREAMS.fill, seat) < fieldBodyFill(d))) continue; // gate 2 — fill
       seats.push({
         cell,
         sub,
