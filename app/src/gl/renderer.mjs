@@ -77,9 +77,11 @@ import { createCoalesceFinish } from './coalesceFinish.mjs'; // #1411 coalescenc
 import {
   beginFrame as uploadMeterBeginFrame,
   noteUpload as uploadMeterNoteUpload,
+  noteStreamBytes as uploadMeterNoteStream,
   snapshot as uploadMeterSnapshot,
   reset as uploadMeterReset,
 } from './uploadMeter.mjs';
+import { createStreamSlot, invalidateSlot, planStreams, DYN_FLOATS, STATIC_FLOATS } from './instanceStreams.mjs'; // #2183 WS4
 
 // #533 PR1 — upload-byte meter (measure-only). renderer.mjs is the only file
 // allowed to change, so the debug handle attaches here rather than in
@@ -1121,6 +1123,36 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   // does not.
   let instCapacityBytes = 0;
 
+  // #2183 WS4 — split-stream upload: per persistent slot, a dynamic VBO (15 floats/item, re-sent every draw) and a
+  // static VBO (36 floats/item, re-sent only where the bytes changed — see gl/instanceStreams.mjs). Slots are the
+  // draw ordinals of a frame, so the frame's big batch keeps the same buffers frame after frame. Small draws (the
+  // one-item isolated blends, mask bakes) stay on the legacy whole-array path: their uploads are tiny and a slot
+  // per one-off draw would only churn buffers.
+  const STREAM_MIN_ITEMS = 16;
+  const STREAM_MAX_SLOTS = 6;
+  let instanceStreamsOn = false; // default OFF until measured on stage hardware (PR body); window.__kcInstanceStreams flips it
+  const streamSlots = [];
+  let streamCursor = 0;
+  function streamSlotFor(ordinal) {
+    const i = Math.min(ordinal, STREAM_MAX_SLOTS - 1);
+    let sl = streamSlots[i];
+    if (!sl) {
+      sl = { dynVbo: gl.createBuffer(), statVbo: gl.createBuffer(), dynCap: 0, statCap: 0, plan: createStreamSlot() };
+      streamSlots[i] = sl;
+    }
+    return sl;
+  }
+  // Debug/QA handle (like __uploadMeter): the A/B pixel proof flips this between renders.
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, '__kcInstanceStreams', {
+      configurable: true,
+      get: () => ({ on: instanceStreamsOn }),
+      set: (v) => {
+        instanceStreamsOn = !!(v && v.on);
+      },
+    });
+  }
+
   function drawFullscreen(prog) {
     gl.bindBuffer(gl.ARRAY_BUFFER, fullVbo);
     gl.enableVertexAttribArray(0);
@@ -1549,16 +1581,51 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
-    gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
-    if (data.byteLength > instCapacityBytes) {
-      // Grow with 2x headroom so a fluctuating count doesn't reallocate
-      // every frame near a boundary. drawArraysInstanced below uses the
-      // instance count from `data`, not the buffer's capacity, so unused
-      // tail bytes are never read.
-      instCapacityBytes = data.byteLength * 2;
-      gl.bufferData(gl.ARRAY_BUFFER, instCapacityBytes, gl.DYNAMIC_DRAW);
+    const streamed = instanceStreamsOn && data.length / INSTANCE_STRIDE >= STREAM_MIN_ITEMS;
+    let streamSlot = null;
+    if (streamed) {
+      // #2183 WS4: the dynamic stream goes up whole, the static stream only where it changed.
+      streamSlot = streamSlotFor(streamCursor++);
+      const plan = planStreams(data, streamSlot.plan);
+      const dynBytes = plan.n * DYN_FLOATS * 4;
+      const statBytes = plan.n * STATIC_FLOATS * 4;
+      gl.bindBuffer(gl.ARRAY_BUFFER, streamSlot.dynVbo);
+      if (dynBytes > streamSlot.dynCap) {
+        streamSlot.dynCap = dynBytes * 2;
+        gl.bufferData(gl.ARRAY_BUFFER, streamSlot.dynCap, gl.DYNAMIC_DRAW);
+      }
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, plan.dynamic);
+      gl.bindBuffer(gl.ARRAY_BUFFER, streamSlot.statVbo);
+      if (statBytes > streamSlot.statCap) {
+        // A reallocated static buffer holds nothing: everything must go up this draw.
+        streamSlot.statCap = statBytes * 2;
+        gl.bufferData(gl.ARRAY_BUFFER, streamSlot.statCap, gl.DYNAMIC_DRAW);
+        invalidateSlot(streamSlot.plan);
+        const full = planStreams(data, streamSlot.plan);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, full.statics);
+        uploadMeterNoteStream(full.dynBytes + full.staticBytes);
+      } else {
+        for (const [a, b] of plan.ranges) {
+          gl.bufferSubData(
+            gl.ARRAY_BUFFER,
+            a * STATIC_FLOATS * 4,
+            plan.statics.subarray(a * STATIC_FLOATS, b * STATIC_FLOATS),
+          );
+        }
+        uploadMeterNoteStream(plan.dynBytes + plan.staticBytes);
+      }
+    } else {
+      gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
+      if (data.byteLength > instCapacityBytes) {
+        // Grow with 2x headroom so a fluctuating count doesn't reallocate
+        // every frame near a boundary. drawArraysInstanced below uses the
+        // instance count from `data`, not the buffer's capacity, so unused
+        // tail bytes are never read.
+        instCapacityBytes = data.byteLength * 2;
+        gl.bufferData(gl.ARRAY_BUFFER, instCapacityBytes, gl.DYNAMIC_DRAW);
+      }
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
     }
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
     uploadMeterNoteUpload(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)); // #533 PR1: measure-only
     gl.useProgram(quadProg);
     gl.uniform2f(U(quadProg, 'u_canvas'), sceneW, sceneH);
@@ -1617,44 +1684,70 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(0, 0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
-    for (let i = 1; i <= 5; i++) {
-      gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, (i - 1) * 16);
-      gl.vertexAttribDivisor(i, 1);
+    if (streamSlot) {
+      // #2183 WS4: the same sixteen attributes, read from the two streams. Offsets are the legacy ones minus the
+      // floats that live in the other stream; the values the shader sees are bit-identical.
+      const DS = DYN_FLOATS * 4; // dynamic stride, 60 B
+      const SS = STATIC_FLOATS * 4; // static stride, 144 B
+      const att = (loc, size, stride, off) => {
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, size, gl.FLOAT, false, stride, off);
+        gl.vertexAttribDivisor(loc, 1);
+      };
+      gl.bindBuffer(gl.ARRAY_BUFFER, streamSlot.dynVbo);
+      att(1, 4, DS, 0); // x, y, sx, sy
+      att(2, 4, DS, 16); // rot, opacity, u0, v0
+      att(3, 4, DS, 32); // u1, v1, vx, vy
+      att(7, 3, DS, 48); // a_def
+      gl.bindBuffer(gl.ARRAY_BUFFER, streamSlot.statVbo);
+      att(4, 4, SS, 0); // ink rgb, accR
+      att(5, 4, SS, 16); // accG, accB, kineme, kinemePhase
+      att(6, 1, SS, 32); // a_glass
+      att(8, 1, SS, 36); // a_plate (material body code)
+      att(9, 4, SS, 40); // a_matP
+      for (let i = 10; i <= 13; i++) att(i, 4, SS, 56 + (i - 10) * 16); // a_engA/B/C/P
+      att(14, 4, SS, 120); // a_dist
+      att(15, 2, SS, 136); // a_brk
+    } else {
+      gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
+      for (let i = 1; i <= 5; i++) {
+        gl.enableVertexAttribArray(i);
+        gl.vertexAttribPointer(i, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, (i - 1) * 16);
+        gl.vertexAttribDivisor(i, 1);
+      }
+      // #1129 PR2: a_glass — single float at byte 80.
+      gl.enableVertexAttribArray(6);
+      gl.vertexAttribPointer(6, 1, gl.FLOAT, false, INSTANCE_STRIDE * 4, 80);
+      gl.vertexAttribDivisor(6, 1);
+      // #1410: a_def — vec3 (axisX, axisY, amount) at byte 84.
+      gl.enableVertexAttribArray(7);
+      gl.vertexAttribPointer(7, 3, gl.FLOAT, false, INSTANCE_STRIDE * 4, 84);
+      gl.vertexAttribDivisor(7, 1);
+      // #1548/#1549: a_plate — the material body code, single float at byte 96 (the appended tail float).
+      gl.enableVertexAttribArray(8);
+      gl.vertexAttribPointer(8, 1, gl.FLOAT, false, INSTANCE_STRIDE * 4, 96);
+      gl.vertexAttribDivisor(8, 1);
+      // #1585: a_matP — the material body's M4 param vec4 at byte 100 (29-float stride).
+      gl.enableVertexAttribArray(9);
+      gl.vertexAttribPointer(9, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 100);
+      gl.vertexAttribDivisor(9, 1);
+      // Phase 2 S4: a_engA/a_engB/a_engC — the engraving spine joints (vec4
+      // pairs) at bytes 116/132/148; a_engP — [count, spacing, width,
+      // strength] at byte 164.
+      for (let i = 10; i <= 13; i++) {
+        gl.enableVertexAttribArray(i);
+        gl.vertexAttribPointer(i, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 116 + (i - 10) * 16);
+        gl.vertexAttribDivisor(i, 1);
+      }
+      // #2010 P3: a_dist — [shear, melt, tear, seed] at byte 180 (the 49-float stride's tail).
+      gl.enableVertexAttribArray(14);
+      gl.vertexAttribPointer(14, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 180);
+      gl.vertexAttribDivisor(14, 1);
+      // #2116: a_brk — the break-up vector at byte 196 (the 51-float stride's tail).
+      gl.enableVertexAttribArray(15);
+      gl.vertexAttribPointer(15, 2, gl.FLOAT, false, INSTANCE_STRIDE * 4, 196);
+      gl.vertexAttribDivisor(15, 1);
     }
-    // #1129 PR2: a_glass — single float at byte 80.
-    gl.enableVertexAttribArray(6);
-    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, INSTANCE_STRIDE * 4, 80);
-    gl.vertexAttribDivisor(6, 1);
-    // #1410: a_def — vec3 (axisX, axisY, amount) at byte 84.
-    gl.enableVertexAttribArray(7);
-    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, INSTANCE_STRIDE * 4, 84);
-    gl.vertexAttribDivisor(7, 1);
-    // #1548/#1549: a_plate — the material body code, single float at byte 96 (the appended tail float).
-    gl.enableVertexAttribArray(8);
-    gl.vertexAttribPointer(8, 1, gl.FLOAT, false, INSTANCE_STRIDE * 4, 96);
-    gl.vertexAttribDivisor(8, 1);
-    // #1585: a_matP — the material body's M4 param vec4 at byte 100 (29-float stride).
-    gl.enableVertexAttribArray(9);
-    gl.vertexAttribPointer(9, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 100);
-    gl.vertexAttribDivisor(9, 1);
-    // Phase 2 S4: a_engA/a_engB/a_engC — the engraving spine joints (vec4
-    // pairs) at bytes 116/132/148; a_engP — [count, spacing, width,
-    // strength] at byte 164.
-    for (let i = 10; i <= 13; i++) {
-      gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 116 + (i - 10) * 16);
-      gl.vertexAttribDivisor(i, 1);
-    }
-    // #2010 P3: a_dist — [shear, melt, tear, seed] at byte 180 (the 49-float stride's tail).
-    gl.enableVertexAttribArray(14);
-    gl.vertexAttribPointer(14, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 180);
-    gl.vertexAttribDivisor(14, 1);
-    // #2116: a_brk — the break-up vector at byte 196 (the 51-float stride's tail).
-    gl.enableVertexAttribArray(15);
-    gl.vertexAttribPointer(15, 2, gl.FLOAT, false, INSTANCE_STRIDE * 4, 196);
-    gl.vertexAttribDivisor(15, 1);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
@@ -2041,6 +2134,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
    */
   function renderFrameInto(payload, T, uploaded, { transparent = false, accumInput = null } = {}) {
     uploadMeterBeginFrame(); // #533 PR1: measure-only — resets call-slot indexing for this frame
+    streamCursor = 0; // #2183 WS4: the frame's draw ordinals restart
     const { width: w, height: h, contract, cells, bg } = payload;
     sceneW = payload.sceneW || 1000; // #606: scene units follow the authored canvas
     sceneH = payload.sceneH || 700;
@@ -2390,6 +2484,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.deleteBuffer(fullVbo);
     gl.deleteBuffer(cornerVbo);
     gl.deleteBuffer(instVbo);
+    for (const sl of streamSlots)
+      if (sl) {
+        gl.deleteBuffer(sl.dynVbo);
+        gl.deleteBuffer(sl.statVbo);
+      }
   }
 
   /**
