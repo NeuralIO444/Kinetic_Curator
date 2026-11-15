@@ -274,6 +274,7 @@ node src/fx/rollGuard.selfcheck.mjs
 node src/fx/wetCeiling.selfcheck.mjs
 node src/gl/renderFault.selfcheck.mjs
 node src/gl/sceneContract.selfcheck.mjs
+node src/gl/figurePartKineme.selfcheck.mjs
 node src/gl/resolve.selfcheck.mjs
 node src/gl/exposureModel.selfcheck.mjs
 node src/gl/presentOrientation.selfcheck.mjs

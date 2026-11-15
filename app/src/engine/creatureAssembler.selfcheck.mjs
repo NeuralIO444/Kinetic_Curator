@@ -363,6 +363,9 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // #2008: the Riso field Look suite assembles creatures to prove the picker-only Look stays off the
     // assembler's dice (a test, not a stage reader)
     'gl/risoFieldLook.selfcheck.mjs',
+    // #2119: the P7 step-1 pin suite builds tiles through the assembler's own door to prove a part takes
+    // its asset kineme and region kinemes (a test, not a stage reader — it reads contract output only)
+    'gl/figurePartKineme.selfcheck.mjs',
     // #2037: KINETIC births — the deal's backstage breeding read, the #1852 posture one level up: the
     // population read (curator/birthLive.mjs) and the store's press site (state/slices/layoutSlice.js)
     // read the bank to breed from it, and the pure core (engine/kineticBirths.mjs) works on records
