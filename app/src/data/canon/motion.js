@@ -106,6 +106,7 @@ const KINEME = {
   bob: T('Bob'),
   bend: T('Travelling bend'),
   scatter: T('Break-up scatter'),
+  orbit: T('Break-up orbit'),
 };
 
 const CELL = {

@@ -14,6 +14,7 @@
 //   169  kind 4 blink:  kVis = ph < km.z ? 1.0 : 0.0             (km.z is the duty; v_opacity = a_inst1.y * kVis, :229)
 //   170  kind 5 bob  :  kOff = vec2(0.0, km.z * wav)             (added to the instance's world position, :226)
 //   171+ kind 6 scatter (#2116): kOff = a_brk * (km.z * e), e from u = fract(t / per - phase * 0.4) — see scatterPose
+//        kind 7 orbit   (#2116): kOff = box * |km.z| * Rot(2 pi phase) * (cos th - 1, +/- sin th), th = 2 pi fract(t / per) — see orbitPose
 //
 // Pose mapping: spin / osc -> dRot (degrees); pulse -> sx, sy; bob -> dy (scene units); blink -> dAlpha, where the shader's
 // opacity MULTIPLIER of 0 is written as dAlpha = -1 (hidden, if the consumer clamps alpha at 0) and visible as 0.
@@ -76,6 +77,24 @@ export function scatterPose(kineme, t, phase01, brk = [0, 0]) {
   return { dx: brk[0] * k, dy: brk[1] * k };
 }
 
+/**
+ * kind 7 (#2116, the shader's orbit branch): a circle of radius box x |amp| that passes through home, leaning at the node's
+ * phase; a negative amp circles the other way. `brk[0]` is the mark's box side in scene units (the shader's a_brk.x for a
+ * region; for a whole mark the shader reads 100 x the quad's larger scale, so pass that). cos(th) - 1 is written
+ * -2 sin^2(th / 2), as the shader writes it, so t = 0 is exactly (0, 0) for EVERY phase. -> dx, dy.
+ */
+export function orbitPose(kineme, t, phase01, brk = [0, 0]) {
+  const th = TAU * fract(t / Math.max(kineme.period, 1e-3));
+  const h = Math.sin(0.5 * th);
+  const ox = -2 * h * h;
+  const oy = (kineme.amp < 0 ? -1 : 1) * Math.sin(th);
+  const la = TAU * phase01;
+  const lc = Math.cos(la);
+  const ls = Math.sin(la);
+  const r = brk[0] * Math.abs(kineme.amp);
+  return { dx: r * (ox * lc - oy * ls) + 0, dy: r * (ox * ls + oy * lc) + 0 }; // + 0: a rest of -0 reads as 0
+}
+
 const BY_KIND = Object.freeze({
   [KINEME_KINDS.spin]: spinPose,
   [KINEME_KINDS.osc]: oscPose,
@@ -83,6 +102,7 @@ const BY_KIND = Object.freeze({
   [KINEME_KINDS.blink]: blinkPose,
   [KINEME_KINDS.bob]: bobPose,
   [KINEME_KINDS.scatter]: scatterPose,
+  [KINEME_KINDS.orbit]: orbitPose,
 });
 
 /** The pose delta of a kineme record ({ kind, period, amp }) at motion time t (seconds) for an instance phase in [0, 1). */
@@ -111,7 +131,7 @@ for (const k of KINEMES) {
     timeBase: 'kineme',
     costTier: 'motionCore/kineme-adapter',
     anchorNodes: ANCHOR_NODES,
-    // a scatter node carries its packed break-up vector as `node.brk` (the shader's a_brk); others ignore it
+    // a scatter or orbit node carries its packed break-up vector as `node.brk` (the shader's a_brk); others ignore it
     evaluate: (node, t) => kinemePose(k, t, node && Number.isFinite(node.phase01) ? node.phase01 : 0, node && node.brk),
   });
 }

@@ -12,13 +12,14 @@
 // Browser-safe, pure.
 
 /** Shader kind ids (QUAD_VS switches on these). 0 is reserved for "none". */
-export const KINEME_KINDS = Object.freeze({ spin: 1, osc: 2, pulse: 3, blink: 4, bob: 5, scatter: 6 });
+export const KINEME_KINDS = Object.freeze({ spin: 1, osc: 2, pulse: 3, blink: 4, bob: 5, scatter: 6, orbit: 7 });
 
 /**
  * The library. `period` in seconds; `amp` per kind: osc = ± degrees,
  * pulse = ± scale fraction, blink = duty (fraction of the period visible),
  * bob = ± scene units along the screen's y, scatter = the peak distance a REGION leaves home, as a fraction of its mark's
- * box side (#2116 break-up; docs/design/kineme-breakup-spec.md). spin ignores amp (one turn/period).
+ * box side (#2116 break-up; docs/design/kineme-breakup-spec.md), orbit = the radius of the circle, as a fraction of the
+ * mark's box side (a negative amp circles the other way). spin ignores amp (one turn/period).
  */
 export const KINEMES = Object.freeze(
   [
@@ -39,6 +40,10 @@ export const KINEMES = Object.freeze(
     // #2116 — scatter: a region slides out from its mark's centre along its own centroid direction and back, in a ripple
     // across regions. Region-only: a whole mark has no centroid direction, so it would sit still (sanitizeAssetKineme drops it).
     { id: 'scatter', kind: 'scatter', period: 3.2, amp: 0.18, regionOnly: true },
+    // #2116 — orbit: a piece circles on a small ring that passes THROUGH its home, so it leaves and comes back once a period.
+    // The ring leans at the piece's own seed-hash phase, so neighbours circle off in different directions. Works on a region
+    // and on a whole mark (it needs no centroid direction).
+    { id: 'orbit', kind: 'orbit', period: 4.0, amp: 0.06 },
   ].map(Object.freeze),
 );
 

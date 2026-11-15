@@ -168,6 +168,7 @@ const ids = (rs) => rs.map((r) => r.id);
   assert.deepEqual(ids(canonMotionCandidates('orbit')).sort(), [
     'chip:orbit',
     'flock:orbit',
+    'kineme:orbit', // #2116: the break-up orbit kineme joins the colliding id; a bare `orbit` still picks none
     'layout:orbit',
     'path:orbit',
   ]);
@@ -252,9 +253,11 @@ const ids = (rs) => rs.map((r) => r.id);
     behaveIds: [BEHAVE_IDS, '3e6414f0ec366196'],
     behave: [BEHAVE, '91d27a8073e94f12'],
     chips: [MOTION_MODES, 'aa29e3d08723ec0a'],
-    // #2116: the six pre-break-up library entries keep their ORIGINAL pin (unchanged); scatter, appended after them, has its own
-    kinemes: [KINEMES.filter((k) => k.id !== 'scatter'), '1eb9700ee0f39603'],
+    // #2116: the six pre-break-up library entries keep their ORIGINAL pin (unchanged); scatter and orbit, appended after them,
+    // each have their own
+    kinemes: [KINEMES.filter((k) => k.id !== 'scatter' && k.id !== 'orbit'), '1eb9700ee0f39603'],
     kinemeScatter: [getKineme('scatter'), '24a566123a69c594'],
+    kinemeOrbit: [getKineme('orbit'), '126acb08a20551cd'],
     cells: [CELL_KINEMES, 'dc73f5991acc6120'],
     patterns: [KINEME_PATTERNS, '14d8d39d4e08501c'],
     drivers: [KINEME_DRIVERS, 'f6d51e735553ecdd'],

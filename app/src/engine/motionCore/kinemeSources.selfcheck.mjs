@@ -92,7 +92,7 @@ ok('listMotionSources() contains every KINEMES id as kineme:<id>, family kineme,
     assert.equal(s.timeBase, 'kineme', 'the shader reads u_kinemeTime, the kineme clock');
     assert.equal(s.costTier, 'motionCore/kineme-adapter');
   }
-  assert.equal(KINEMES.length, 7, 'the library is spin, rock, pulse, blink, bob, bend, scatter');
+  assert.equal(KINEMES.length, 8, 'the library is spin, rock, pulse, blink, bob, bend, scatter, orbit');
 });
 
 ok('a registered source evaluates to the same pose as the reference, reading the node\'s phase', () => {

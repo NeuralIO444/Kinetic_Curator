@@ -859,6 +859,18 @@ function expandRegionInstances(instances, cells, regionAnim, kinemeTable = null,
       if (slot > 0 && kinemeTable && kinemeTable[slot - 1] && kinemeTable[slot - 1].kind === KINEME_KINDS.scatter) {
         placed.brk = breakVector(lx, ly, co, si, it, kinemePhase(it.asset, r.id));
       }
+      // #2116 — orbit sizes its circle by the MARK's box, which a region instance (it carries the region's own scale) cannot
+      // know: an orbit piece carries the box side in the vector's x. That covers a selected orbit region and a region that
+      // inherits a whole-mark orbit, so the mark still circles as one body. The remainder keeps the mark's scale: it needs none.
+      const effSlot = placed.kineme;
+      if (
+        effSlot > 0 &&
+        kinemeTable &&
+        kinemeTable[effSlot - 1] &&
+        kinemeTable[effSlot - 1].kind === KINEME_KINDS.orbit
+      ) {
+        placed.brk = [100 * Math.max(Math.abs(it.scaleX), Math.abs(it.scaleY)), 0];
+      }
       out.push(placed);
     }
   }
@@ -1047,8 +1059,8 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
       buf[o + 47] = ds[2] || 0;
       buf[o + 48] = ds[3] || 0;
     }
-    // #2116: the break-up vector (a_brk) — a scatter region's home-to-centroid direction x its mark's box side, scene units.
-    // Absent (every instance but a scatter region) the two floats stay zero.
+    // #2116: the break-up vector (a_brk) — a scatter region's home-to-centroid direction x its mark's box side, scene units;
+    // an orbit region's (mark box side, 0). Absent (every other instance) the two floats stay zero.
     const bk = it.brk;
     if (Array.isArray(bk)) {
       buf[o + 49] = bk[0] || 0;

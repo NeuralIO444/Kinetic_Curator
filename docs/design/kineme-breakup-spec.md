@@ -72,6 +72,16 @@ off = B · amp · Rot(2π · phase) · (cos θ − 1, sin θ)
 - Needs **no direction**, so it needs no per-instance packing. `amp = 0.06`.
 - A negative `amp` turns it the other way (the spin kineme's convention, `kinemes.js` `spinKineme`).
 
+**As built (#2116 step 2b).** Three things the lines above did not settle:
+
+- **`B` for a region.** A region instance carries the region's own scale, so the shader cannot read the mark's box from it.
+  An orbit piece therefore carries the mark's box side in `a_brk.x` (the existing attribute; no stride change). A whole mark
+  packs nothing and the shader reads `100 · max(|scaleX|, |scaleY|)` from its own quad. A region that inherits a whole-mark
+  orbit gets the same box, so the mark circles as one body.
+- **Rest and sense.** `cos θ − 1` is evaluated as `−2 · sin²(θ / 2)`, which is exactly 0 at `t = 0` on any GPU. A negative
+  `amp` keeps the same ring and runs it the other way (`sin θ` changes sign; the radius is `B · |amp|`).
+- Orbit is **not a stack member** in v1: the stack's second-member switch has no orbit branch and no stack names it.
+
 ### 2.3 assemble — one-shot, triggered
 
 Two timestamps on the kineme clock ride in one uniform, `u_break = (tOut, tIn)` (seconds; `−1e30` = never):
