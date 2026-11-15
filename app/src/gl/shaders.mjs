@@ -595,6 +595,7 @@ uniform sampler2D u_vocab;             // RGBA32F: row 0 = atlas cell, row 1 = e
 uniform uint u_seed;                   // the fluid cycle's seed key
 uniform float u_floor;                 // the density floor (0.25)
 uniform float u_vocabCount;            // vocabulary size (>= 1)
+uniform float u_recon;                 // #2182 WS3: density read — 0 cell texel (legacy), 1 bilinear, 2 bicubic
 uniform float u_scaleBase;             // the stamp scale law for this canvas
 uniform vec3 u_accent;                 // the palette ink, as the body's accent tint
 uniform float u_opacity;               // the layer's group opacity
@@ -632,6 +633,34 @@ uint fbHash(uint index) {
 }
 float fbHash01(uint index) { return float(fbHash(index) >> 8u) / 16777216.0; }
 
+// #2182 WS3 — the display-resolution read of the density field (transcribed from fieldBodyReconDensity in
+// engine/dishFluidChannel.mjs). p is in cell units; texel centres sit at +0.5; edges clamp.
+float fbTexel(int i, int j) { return texelFetch(u_density, ivec2(clamp(i, 0, 95), clamp(j, 0, 53)), 0).r; }
+vec4 fbCr(float t) {
+  return vec4(-0.5 * t * t * t + t * t - 0.5 * t, 1.5 * t * t * t - 2.5 * t * t + 1.0,
+              -1.5 * t * t * t + 2.0 * t * t + 0.5 * t, 0.5 * t * t * t - 0.5 * t * t);
+}
+float fbRecon(vec2 u) {
+  vec2 q = u - 0.5;
+  int i0 = int(floor(q.x));
+  int j0 = int(floor(q.y));
+  vec2 f = q - vec2(float(i0), float(j0));
+  if (u_recon < 1.5) {
+    float a = mix(fbTexel(i0, j0), fbTexel(i0 + 1, j0), f.x);
+    float b = mix(fbTexel(i0, j0 + 1), fbTexel(i0 + 1, j0 + 1), f.x);
+    return mix(a, b, f.y);
+  }
+  vec4 wx = fbCr(f.x);
+  vec4 wy = fbCr(f.y);
+  float v = 0.0;
+  for (int m = 0; m < 4; m++) {
+    float row = 0.0;
+    for (int k = 0; k < 4; k++) row += wx[k] * fbTexel(i0 - 1 + k, j0 - 1 + m);
+    v += wy[m] * row;
+  }
+  return clamp(v, 0.0, 1.0);
+}
+
 void main() {
   uint id = uint(gl_InstanceID);
   uint sub = id / 5184u;
@@ -641,6 +670,7 @@ void main() {
   int cy = int(cell / 96u);
   vec2 texel = texelFetch(u_density, ivec2(cx, cy), 0).rg;
   float d = texel.r;
+  if (u_recon > 0.5) d = fbRecon(vec2(float(cx) + fbHash01(420000u + seat), float(cy) + fbHash01(430000u + seat)));
   // the vocabulary pick happens before the gates: its cell decides gate 0
   uint vi = min(uint(fbHash01(410000u + seat) * u_vocabCount), uint(u_vocabCount) - 1u);
   vec4 cellRect = texelFetch(u_vocab, ivec2(int(vi), 0), 0);

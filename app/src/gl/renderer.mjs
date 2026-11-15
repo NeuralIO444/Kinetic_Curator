@@ -385,6 +385,7 @@ export const RENDERER_PROGRAMS = [
       'u_seed',
       'u_floor',
       'u_vocabCount',
+      'u_recon', // #2182 WS3
       'u_scaleBase',
       'u_accent',
       'u_opacity',
@@ -1336,6 +1337,18 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   // identity); the vocabulary texture re-uploads only when its packed contents change.
   let fieldBody = null;
   let fieldBodyData = null;
+  // #2182 WS3 — the field body's display-resolution density read: 0 cell (default), 1 bilinear, 2 bicubic. A QA/review
+  // handle, not a dial: which mode becomes the default is Matt's call after he sees the captures.
+  let fieldRecon = 0;
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, '__kcFieldRecon', {
+      configurable: true,
+      get: () => fieldRecon,
+      set: (v) => {
+        fieldRecon = v === 1 || v === 2 ? v : 0;
+      },
+    });
+  }
   let fbDensityTex = null;
   let fbVocabTex = null;
   const fbUploaded = { step: null, blocked: null };
@@ -1434,6 +1447,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.uniform1ui(U(p, 'u_seed'), desc.seedKey >>> 0);
     gl.uniform1f(U(p, 'u_floor'), desc.floor);
     gl.uniform1f(U(p, 'u_vocabCount'), desc.vocab.length);
+    gl.uniform1f(U(p, 'u_recon'), fieldRecon); // #2182 WS3: 0 = the cell's texel (default, unchanged)
     gl.uniform1f(U(p, 'u_scaleBase'), desc.scaleBase);
     const acc = hexToRgb(desc.ink);
     gl.uniform3f(U(p, 'u_accent'), acc[0], acc[1], acc[2]);
