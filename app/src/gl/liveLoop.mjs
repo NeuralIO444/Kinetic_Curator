@@ -32,6 +32,7 @@ import {
   createLiveResolver,
   getLastSpawnDecisions,
   getLastDishWet,
+  getLastDishFluidPlan,
   getLastCouplingBackground,
   setLiveWetSampler,
 } from './liveResolve.mjs';
@@ -54,7 +55,7 @@ import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469
 
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
-import { fluidStamp } from '../engine/dishFluid.mjs'; // #1997: the ferrofluid's cycle stamp (the resolver seats its body; the loop only stamps)
+import { fluidStamp } from '../engine/dishFluid.mjs'; // #1997: the ferrofluid's cycle stamp (the loop only stamps; since #2178 the resolver publishes the plan and the renderer seats the body)
 import { installDishFluidMagnets } from './dishFluidMagnetsDom.mjs'; // #1997: the magnet placement gesture (armed by the chip)
 import { consumeTouch, clearTouch } from '../engine/dishLifeTouch.mjs';
 import { quietStamp, DEFAULT_STRENGTH } from '../engine/dishLifeQuiet.mjs'; // #1923: the secondary read's cycle stamp
@@ -1068,6 +1069,13 @@ export function createLiveLoop(
     lastResolved = resolved;
     applyPatternAudio(resolved, routes.pattern); // #1110: audio moves a pattern track's params, per frame, never the stored block
 
+    // #2178 — the ferrofluid's channel facts, published by the resolver with this frame
+    // (getLastDishFluidPlan, the getLastDishWet pattern): the body's descriptor rides the
+    // contract doc below; the pull read rides it too (the creature expansion consumes it
+    // there — it never lands on the contract); the density itself rides the payload, out
+    // of band. No fluid this frame → no keys anywhere, and the frame is byte-identical.
+    const fluidPlan = getLastDishFluidPlan();
+
     // #790 (render.squash): the assignable squash route's output, in [0,1],
     // rides on top of the layout squash dial (the #594 squash-and-stretch
     // amount, u_smear.z). 0 on the default table (routes.squash undefined)
@@ -1106,6 +1114,20 @@ export function createLiveLoop(
         regionBudget: regionBudgetForDevice(isIpadClassDevice()),
         ...beastDocFields(s.beastSettings), // the beast's roam/trace and Davis's role deal; default settings add no key
         ...roomContractFields(lastResolvedInput()), // #1949 — the rigs' gait (Lois) and deal (Davis), from the frame's effective input
+        // #2178 — the field-body descriptor + the pull read, only while a fluid runs
+        ...(fluidPlan && fluidPlan.fieldBody ? { fieldBody: fluidPlan.fieldBody } : {}),
+        ...(fluidPlan && fluidPlan.active
+          ? {
+              fluidPull: {
+                density: fluidPlan.density,
+                magnets: fluidPlan.magnets,
+                pull: fluidPlan.dial ? fluidPlan.dial.pull : 0,
+                aspectHW: fluidPlan.aspectHW,
+                W: canvasW,
+                H: canvasH,
+              },
+            }
+          : {}),
       },
       resolvedLayers: resolved,
       caps: null,
@@ -1236,6 +1258,18 @@ export function createLiveLoop(
 
     // Static resource: the atlas, keyed by the combos the transformed instances use.
     const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
+    // #2178 — the field body's vocabulary bakes like any other combo: each pool asset in the
+    // descriptor's ink for both tints, plus — while a world stands — in the world's ink for
+    // the tint, the cell the renderer's world-ink rule looks up for stroke-only pieces.
+    if (contract.fieldBody) {
+      const fbInk = contract.fieldBody.ink;
+      for (const id of contract.fieldBody.vocab) combos.push({ asset: id, ink: fbInk, accent: fbInk });
+      if (contract.world) {
+        for (const id of contract.fieldBody.vocab) {
+          combos.push({ asset: id, ink: contract.world.ink, accent: fbInk });
+        }
+      }
+    }
     const fxLayerIds = new Set((contract.fxWraps || []).map((w) => w.fxLayerId));
 
     const renderScale = Math.min(1, Math.max(0.1, s.renderScale || 1));
@@ -1319,6 +1353,13 @@ export function createLiveLoop(
                 wetAmount: wet.wetAmount,
                 pigDep: wet.pigDep,
               }
+            : null,
+        // #2178 — the ferrofluid's published density, out of band (the accumInput
+        // precedent): the renderer uploads it as the channel's texture on step change.
+        // The descriptor it pairs with rides the contract; neither enters the take hash.
+        fieldBody:
+          fluidPlan && fluidPlan.fieldBody
+            ? { density: fluidPlan.density, blocked: fluidPlan.blocked, step: fluidPlan.step }
             : null,
       },
       transparent: !bgCss,
@@ -1630,11 +1671,14 @@ export function createLiveLoop(
               }
             : null,
         );
-        // #1997: no render arm — the ferrofluid system is invisible (Matt's ruling,
-        // 2026-11-08): the resolver seats its body as ordinary stage items in the resolve
-        // itself, so the loop's whole part is the stamp above. (The first build armed a
-        // fullscreen floor pass here from the resolver's plan; that visible-texture path —
-        // and the palette derivation it needed — was removed with the ruling.)
+        // #1997: no render arm for the FIELD — the ferrofluid system is invisible (Matt's
+        // ruling, 2026-11-08): the field itself is never drawn, here or anywhere. Its body
+        // is another matter: #2178 seats it in the renderer from the plan the resolver
+        // published (the descriptor on the contract, the density on the payload — both
+        // ride the frame built above), so the loop's whole part remains the stamp. (The
+        // first #1997 build armed a fullscreen floor pass here from the plan; that
+        // visible-texture path — and the palette derivation it needed — was removed with
+        // the ruling, and #2178 does not revive it.)
       }
       const timer = ensureGpuTimer();
       const cpuFallback = !timer.isHardware;

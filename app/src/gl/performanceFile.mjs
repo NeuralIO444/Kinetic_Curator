@@ -19,7 +19,13 @@ import { KERNEL_VERSION } from '../engine/kernel/version.js';
 import { sanitizeWorld } from '../data/world.js';
 
 export const PERFORMANCE_FORMAT = 'kc-performance';
-export const PERFORMANCE_VERSION = 2;
+// Version 3 (#2178, Matt's clean-break ruling on the issue): the ferrofluid's body left the
+// resolver's hashed output for a GPU channel, so a version-2 take containing fluid frames
+// can never land on its checkpoints again — v2 files retire with no legacy replay path
+// (parse stays fail-closed on the mismatch). Version 2 was itself the #2104 world record's
+// bump; the break discipline is the same: a take format changes only by a ruling, and the
+// ruling is recorded where the version lives.
+export const PERFORMANCE_VERSION = 3;
 export const CHECKPOINT_EVERY = 60;
 /** Recording stops here (and says so): 20 minutes at 60 fps. A longer take is a new file. */
 export const MAX_FRAMES = 60 * 60 * 20;

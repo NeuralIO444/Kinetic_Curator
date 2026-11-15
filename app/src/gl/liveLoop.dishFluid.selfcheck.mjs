@@ -11,25 +11,30 @@
 //
 // The presentation rework (Matt's ruling, 2026-11-08) removed the arm itself: the system is
 // invisible, the resolver seats the fluid's body as ordinary stage items, and the loop's whole
-// part is the stamp. The pin's charge is unchanged — the real frame path, fluid active, must
-// run clean and the fluid must actually appear — with the observables the new shape offers:
+// part is the stamp. #2178 moved the body again — OFF the resolver's items entirely, into a
+// GPU channel the renderer seats from the published density (Matt's clean-break ruling on the
+// issue; PERFORMANCE_VERSION 3). The pin's charge is unchanged — the real frame path, fluid
+// active, must run clean — and the "fluid must actually appear" half of the charge is now
+// discharged by gl/fieldBody.selfcheck.mjs, where the channel renders deterministically
+// through the real renderer (see section B's note). The observables the new shape offers:
 //
 //   A source     tick() carries no `voiceState.` read (the original fault class); NO floor
 //                arm survives anywhere (no setDishFluid in the loop or the renderer, no
 //                dishfluid programme in the renderer table); the loop still stamps the fluid
-//                onto the input; the resolver still publishes the attachment plan and emits
-//                the body from it.
+//                onto the input; the resolver still publishes the attachment plan — and now
+//                annotates it with the channel descriptor instead of emitting body items;
+//                the loop consumes the plan (the channel's door) and the renderer carries
+//                the fieldBody programme.
 //   B browser    (skipped when no Playwright browser is present) the BUILT app, booted for
 //                real over a local static server. A control boot (fluid off) must be healthy;
 //                turning the mode on through the store's own action must publish
-//                dishFluidAwake, raise the store's nodeCount by the attached body (the body
-//                is ordinary stage content — the footer count sees it), log ZERO
-//                '[gl-live] frame error' console messages and keep renderFault down; turning
-//                it off must take the body back off the stage — proven by a local bracket
-//                (off level → re-seat → off again), never by comparing against the stale
-//                baseline: nodeCount is a live quantity whose scene component drifts as
-//                the dealt scene's own systems run, so a cross-window level comparison
-//                fails on healthy product (CI, 2026-11-09 — see the off leg's comment).
+//                dishFluidAwake, log ZERO '[gl-live] frame error' console messages and keep
+//                renderFault down; turning it off must clear the awake flag. (The old
+//                observable — the store's nodeCount rising by the attached body — retired
+//                with the items: the channel body is not resolver items, so the count no
+//                longer sees it. That the body actually appears is proven where it can be
+//                proven deterministically: gl/fieldBody.selfcheck.mjs renders the channel
+//                through the real renderer and measures the pooled ink at the magnet.)
 //                A second boot through the
 //                loop's headless flag (window.__KC_FERROFLUID) must stay clean the same way,
 //                with a magnet stamped through the store's own action. The app is rebuilt
@@ -61,16 +66,20 @@ const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..
   ok('tick() carries no voiceState property read (the out-of-scope name)', () => {
     assert.ok(!/voiceState\s*\./.test(tick), 'a bare voiceState.<prop> read in tick() throws every frame');
   });
-  ok('no floor arm survives: the loop stamps, the resolver seats', () => {
+  ok('no floor arm survives: the loop stamps, the resolver publishes, the renderer seats', () => {
     assert.ok(!src.includes('renderer.setDishFluid'), 'liveLoop carries no renderer arm for the fluid');
-    assert.ok(!src.includes('getLastDishFluidPlan'), 'liveLoop no longer consumes the plan');
+    assert.ok(src.includes('getLastDishFluidPlan'), 'the loop consumes the plan — the #2178 channel door');
     assert.ok(src.includes('dishFluid: dishFluidStamp'), 'the loop still stamps the fluid onto the resolver input');
+    assert.ok(src.includes('fieldBody: fluidPlan.fieldBody'), 'the descriptor rides the contract doc');
     const renderer = readFileSync(path.join(APP, 'src', 'gl', 'renderer.mjs'), 'utf8');
     assert.ok(!renderer.includes('setDishFluid'), 'the renderer has no fluid arm');
     assert.ok(!renderer.includes("'dishfluid'"), 'the renderer table has no floor programme');
+    assert.ok(renderer.includes("key: 'fieldBody'"), 'the renderer table carries the channel programme');
+    assert.ok(renderer.includes('drawFieldBody'), 'the renderer seats the body from the channel');
     const resolve = readFileSync(path.join(APP, 'src', 'gl', 'liveResolve.mjs'), 'utf8');
     assert.ok(resolve.includes('lastDishFluidPlan = dishFluid.plan'), 'the resolver publishes the attachment plan');
-    assert.ok(resolve.includes('fluidMatterItems('), 'the resolver emits the body from the plan');
+    assert.ok(resolve.includes('plan.fieldBody ='), 'the resolver annotates the plan with the channel descriptor');
+    assert.ok(!resolve.includes('fluidMatterItems('), 'the resolver no longer emits body items (#2178)');
   });
 }
 
@@ -181,30 +190,6 @@ if (!skipped) {
       const s = window.__kcStore.getState();
       return { awake: s.dishFluidAwake, fault: s.renderFault, reason: s.renderFaultReason, nodes: s.nodeCount };
     });
-  /** Sample the store's nodeCount for `ms`, returning the max seen (the body's rise is a step, not a flicker). */
-  const sampleNodes = async (page, ms) => {
-    let max = 0;
-    const until = Date.now() + ms;
-    while (Date.now() < until) {
-      const v = await page.evaluate(() => window.__kcStore.getState().nodeCount | 0);
-      if (v > max) max = v;
-      await page.waitForTimeout(400);
-    }
-    return max;
-  };
-  /** Sample the store's nodeCount for `ms`, returning the median — the level the window sits
-   * at, immune to the single-frame spikes (a morph's union frame, a shed step) that poison a
-   * max. The off leg's bracket is measured in medians for exactly that reason. */
-  const sampleMedian = async (page, ms) => {
-    const vals = [];
-    const until = Date.now() + ms;
-    while (Date.now() < until) {
-      vals.push(await page.evaluate(() => window.__kcStore.getState().nodeCount | 0));
-      await page.waitForTimeout(200);
-    }
-    vals.sort((a, b) => a - b);
-    return vals.length ? vals[Math.floor(vals.length / 2)] : 0;
-  };
 
   try {
     // Control boot: healthy with no fluid — then the mode turned on through the store's own
@@ -223,63 +208,28 @@ if (!skipped) {
           `presented content (distinct ${st.distinct}, meanLum ${st.meanLum.toFixed(2)})`,
         );
       });
-      const baseNodes = await sampleNodes(page, 4000);
-      await page.evaluate(() => window.__kcStore.getState().setDishFluid(true));
+      await page.evaluate(() => {
+        const s = window.__kcStore.getState();
+        s.setDishFluid(true);
+        s.placeDishFluidMagnet(0.5, 0.5);
+      });
       await page
         .waitForFunction('window.__kcStore.getState().dishFluidAwake === true', null, { timeout: 20000 })
         .catch(() => {});
-      const onNodes = await sampleNodes(page, 8000);
+      await page.waitForTimeout(4000);
       const hOn = await health(page);
-      ok('fluid on (store action): the body attaches to the live stage, frame path clean', () => {
+      ok('fluid on (store action): the stamp flows, a magnet stamps, frame path clean', () => {
         assert.equal(hOn.awake, true, 'dishFluidAwake never published — the stamp never flowed');
-        assert.ok(
-          onNodes > baseNodes + 8,
-          `nodeCount rose by the attached body (off max ${baseNodes} → on max ${onNodes})`,
-        );
         assert.deepEqual(frameErrors, [], `frame errors: ${(frameErrors[0] || '').slice(0, 120)}`);
         assert.equal(hOn.fault, false, `renderFault tripped: ${hOn.reason}`);
       });
       await page.evaluate(() => window.__kcStore.getState().setDishFluid(false));
       await page.waitForTimeout(1500);
-      // The departure is proven by a LOCAL BRACKET, not a level against the baseline above.
-      // nodeCount is a live quantity: its scene component drifts as the dealt scene's own
-      // systems run (growth, swarm dynamics, governor recovery after boot stress) — tens of
-      // nodes over a leg's span on a machine fast enough to run every frame. The first cut
-      // of this leg compared the off window's max against the baseline max sampled ~15 s
-      // earlier with +8 of slack and failed on CI (off max 276 vs baseline max 226) with the
-      // body verifiably gone: the resolver's off output is byte-identical to a never-on
-      // resolver's, and in-browser the body is an exact step that fully reverses. (The
-      // sandbox never caught it — SwiftShader frames are so slow the perf watchdog holds
-      // most boots frozen, and a frozen count cannot drift.) So: measure the off level,
-      // turn the mode back ON — a level the body still occupied could not rise by the body
-      // again — then off a second time, and require the second departure to match the
-      // re-arrival. Every comparison spans seconds, where drift is a node or two, and the
-      // medians shrug off single-frame spikes. Lingering matter fails both assertions: it
-      // leaves nothing to re-seat, and nothing departs.
-      const offLevel = await sampleMedian(page, 2000);
       const hOff = await health(page);
-      await page.evaluate(() => window.__kcStore.getState().setDishFluid(true));
-      await page
-        .waitForFunction('window.__kcStore.getState().dishFluidAwake === true', null, { timeout: 20000 })
-        .catch(() => {});
-      await page.waitForTimeout(2000);
-      const onLevel2 = await sampleMedian(page, 2000);
-      await page.evaluate(() => window.__kcStore.getState().setDishFluid(false));
-      await page.waitForTimeout(1500);
-      const offLevel2 = await sampleMedian(page, 2000);
-      ok('fluid off again: the body leaves the stage', () => {
+      ok('fluid off again: the stamp stops and the frame path stays clean', () => {
         assert.equal(hOff.awake, false, 'dishFluidAwake still published after off — the stamp never stopped');
-        const reseat = onLevel2 - offLevel;
-        const depart = onLevel2 - offLevel2;
-        assert.ok(
-          reseat > 8,
-          `turning back on re-seated the body from the off level (off median ${offLevel} → on median ${onLevel2}) — a level the body still occupied could not rise by it again`,
-        );
-        assert.ok(
-          depart >= reseat - 8,
-          `the body left as fully as it arrived (re-seated ${reseat} by medians, departed ${depart})`,
-        );
         assert.deepEqual(frameErrors, [], `frame errors: ${(frameErrors[0] || '').slice(0, 120)}`);
+        assert.equal(hOff.fault, false, `renderFault tripped: ${hOff.reason}`);
       });
       await page.close();
     }

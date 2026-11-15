@@ -33,6 +33,7 @@ import { roamAt, sanitizeRoam } from './beastRoam.js'; // #1867 — the travelli
 import { traceMarks } from './beastTrace.js'; // #1868 S5b — the dish writing
 import { libraryTraits } from '../data/assetDescriptor.js'; // the baked traits of the library
 import { KINEMES, KINEME_STACKS } from '../data/kinemes.js'; // #2119 §2 — a bone's kineme source must name a real library id
+import { bonePullDelta } from './dishFluidPull.mjs'; // #2178 — the ferrofluid's pull read (stage-space); this module owns the tile transform that converts it to rig terms
 
 /** Where the body sits inside the tile's 100-unit box: small enough that the bones have room to reach. */
 export const TILE_BODY_SCALE = 0.55;
@@ -575,6 +576,46 @@ function effectiveLinkageMotion(rig, { frozen, palette, seed, hand }) {
 }
 
 /**
+ * #2178 — one placed tile's ferrofluid pull sampler, in the shape poseFigure reads
+ * (engine/motionCore/rigSources.js): (boneKey, jointX, jointY, tipX, tipY) in RIG units →
+ * { dx, dy, dRot } in rig units, or null. The field read itself is engine/dishFluidPull.mjs's
+ * (stage-space, ruled: toward the magnet, gated on the published density at the bone); this
+ * module owns the tile transform (placePart's mapping), so the conversion lives here: joint
+ * and tip go to stage px through the tile's own transform, the stage delta comes back, its
+ * rotation is flip-signed into rig terms (placePart applies a rig angle change as
+ * flip × Δ on stage), and its offset un-rotates and un-scales (the mapping's inverse — the
+ * posers read it only at a root's free joint). Returns null when the field cannot pull this
+ * tile at all (no field, no magnets, dial at 0, a degenerate tile transform) — the caller
+ * then hands poseFigure no sampler and the figure poses exactly as it did before #2178.
+ */
+function tilePullSampler(it, field) {
+  if (!field || !field.density || !Array.isArray(field.magnets) || !field.magnets.length) return null;
+  if (!(Number(field.pull) > 0)) return null;
+  if (!it.scaleX || !it.scaleY) return null;
+  const W = Number(field.W) || 0;
+  const H = Number(field.H) || 0;
+  if (!(W > 0) || !(H > 0)) return null;
+  const th = rad(it.rotation);
+  const co = Math.cos(th);
+  const si = Math.sin(th);
+  const flip = it.scaleX < 0 ? -1 : 1;
+  const toStage = (x, y) => {
+    const lx = (x - 50) * it.scaleX;
+    const ly = (y - 50) * it.scaleY;
+    return [it.x + lx * co - ly * si, it.y + lx * si + ly * co];
+  };
+  return (key, jx, jy, tx, ty) => {
+    const [sjx, sjy] = toStage(jx, jy);
+    const [stx, sty] = toStage(tx, ty);
+    const pd = bonePullDelta(field, sjx, sjy, stx, sty);
+    if (!pd) return null;
+    const ox = pd.offX * co + pd.offY * si;
+    const oy = -pd.offX * si + pd.offY * co;
+    return { dRot: flip * pd.dRot, dx: ox / it.scaleX, dy: oy / it.scaleY };
+  };
+}
+
+/**
  * #1960 — a beast tile's expansion: the linkage posed bar by bar, each bar bone wearing a part. The 12 bar NAMES are dealt
  * once (a bar is dealt as a depth-0 limb of its own hand) and every leg wears the same set; the beam takes a body-fit
  * deal and stands in for the tile's own mark (the beast IS the linkage, so `it` is not pushed). A stillbirth → [].
@@ -583,7 +624,23 @@ function expandBeast(
   it,
   rig,
   pile,
-  { seed, t, frozen, variety, roleDeal, hand, glow, phase, roamOpt, trace, poseFigureFn, motion, seedOffset, tileKey },
+  {
+    seed,
+    t,
+    frozen,
+    variety,
+    roleDeal,
+    hand,
+    glow,
+    phase,
+    roamOpt,
+    trace,
+    poseFigureFn,
+    motion,
+    seedOffset,
+    tileKey,
+    pullSampler,
+  },
 ) {
   const linkage = { ...rig.linkage, phase: rig.linkage.phase + phase };
   // #1867 — the travelling home: the body advances by its own stance stroke and steers by differential crank phase
@@ -595,7 +652,7 @@ function expandBeast(
   // #2119 step 3.3 — through poseFigure when the seam hands it in (the motion map is the effective one:
   // recorded entries plus Davis's deal, or none under frozen); the native solver call otherwise
   let pose = poseFigureFn
-    ? poseFigureFn(linkage, frozen ? 0 : t, { drive: 1, crank, motion, seedOffset, tileKey })
+    ? poseFigureFn(linkage, frozen ? 0 : t, { drive: 1, crank, motion, seedOffset, tileKey, pullSampler })
     : poseLinkage(linkage, frozen ? 0 : t, 1, crank);
   if (!pose) return [];
   if (roam && (roam.x || roam.y || roam.heading)) {
@@ -671,7 +728,7 @@ function placeMark(it, m, i, glow, co, si, flip) {
  * @param {Map<string, object>|null} overlayById customAssets by id
  * @param {{ seed: number, t: number, frozen: boolean, collapsed: boolean, face?: string, davis?: string,
  *   fitOf?: (id: string) => object|null, pileOnly?: Set<string>|null,
- *   poseFigure?: Function|null, sourcePalette?: string[]|null }} opts
+ *   poseFigure?: Function|null, sourcePalette?: string[]|null, pullField?: object|null }} opts
  *   fitOf = #1945's id → { limb, head, mass, elong } (absent = Davis deals as he always did, byte for byte);
  *   pileOnly = #1945's kit triad pool: the pile is the stage's assets ∩ it, and with no overlap the stage's pile
  *   face = Lois's live face (her gait), davis = Davis's live state (how varied his deal is) — #1949
@@ -682,6 +739,11 @@ function placeMark(it, m, i, glow, co, si, flip) {
  *   motion and Davis's dealt sources; when it is absent, the native calls pose exactly as they always have.
  *   sourcePalette = Davis's source palette for the deal (dealBoneSource): the kinemes the stage is already
  *   running, resolved by the seam (§11 ruling 1); absent or empty deals nothing.
+ *   pullField = #2178: the ferrofluid's published read for this frame ({ density, magnets, pull,
+ *   aspectHW, W, H } — engine/dishFluidPull.mjs's field), handed in by the seam from the resolver's
+ *   plan. Per placed tile it becomes a pullSampler for poseFigure (tilePullSampler above); absent,
+ *   magnet-less or dial-0 it builds no sampler and every figure poses exactly as before. A frozen
+ *   frame never pulls — frozen is the exact rest pose, the §7 shed law.
  * @returns {Array} the original array when nothing expands, else a new one
  */
 /** The library solid a beast's trace marks are drawn with (a plain ellipse when stretched). */
@@ -705,6 +767,7 @@ export function expandCreatureInstances(
     beastTrace = null,
     poseFigure = null,
     sourcePalette = null,
+    pullField = null,
   } = {},
 ) {
   if (!overlayById) return instances;
@@ -763,6 +826,10 @@ export function expandCreatureInstances(
     const family = familyOf(it.asset);
     const hand = `user:${family}`; // a founder's own tile id — so a founder's deal is exactly what it always was
     const glow = frozen ? 1 : kinShimmer(family, t);
+    // #2178 — this tile's pull sampler: only through the poseFigure seam (the native calls have
+    // no slot for it), never on a frozen frame (the exact rest pose), and null whenever the
+    // field cannot pull this tile — the figure then poses exactly as it did before #2178.
+    const pullSampler = poseFigureFn && !frozen ? tilePullSampler(it, pullField) : null;
     if (rig.linkage) {
       out.push(
         ...expandBeast(it, rig, pile, {
@@ -782,6 +849,7 @@ export function expandCreatureInstances(
             : rig.motion,
           seedOffset: it.seedOffset,
           tileKey: it.key,
+          pullSampler,
         }),
       );
       continue;
@@ -796,6 +864,7 @@ export function expandCreatureInstances(
           phase,
           seedOffset: it.seedOffset,
           tileKey: it.key,
+          pullSampler,
         })
       : poseRig(rig, frozen ? 0 : t, gait, phase);
     const th = rad(it.rotation);

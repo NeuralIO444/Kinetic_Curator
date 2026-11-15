@@ -9,8 +9,8 @@
 //   ONE INSTANCE, ONE KERNEL — this stage steps the kernel (engine/dishFluid.mjs) at the DISH GRID
 //   (96×54) at 1/FLUID_GRID_STEP_DIVISOR of the stamp rate. That instance is the whole system: its
 //   published density is what the culture's births read (engine/dishFluidCouple.mjs), it is the
-//   state a snapshot restores, and it is the field the stage's attached matter seats on
-//   (engine/dishFluidRender.mjs, driven by the attachment plan this stage publishes). Pure JS over
+//   state a snapshot restores, and it is the field the stage's attached body seats on (the GPU
+//   channel, engine/dishFluidChannel.mjs, driven by the attachment plan this stage publishes). Pure JS over
 //   the recorded stream, so the coupling, the snapshot and the visible body are exact on every
 //   device. (The first build carried a second, GPU display instance rendering a fluid floor;
 //   Matt's ruling later on 2026-11-08 made the system invisible — assets attach to it instead —
@@ -63,10 +63,15 @@ export function createDishFluidStage() {
     density: null,
   };
   // The attachment plan: ONE stable object the resolver reads after this stage applies
-  // (getLastDishFluidPlan) to seat the fluid's visible body (engine/dishFluidRender.mjs): the
-  // exact instance's published density, the stamped magnets + dials, and the governor rung's
-  // seating terms (seat grid + matter fraction). Its density is the publishedFluid array
-  // itself — read it the frame you get it, never retain it. Inactive on the same terms.
+  // (getLastDishFluidPlan). Since #2178 the body is a GPU channel, not resolver items: the
+  // plan carries the exact instance's published density, the stamped magnets + dials, and
+  // the governor rung's seating terms (seat grid + matter fraction — the kernel ladder's own
+  // record; the channel reads its budget from the rung, not the seat/matter axes). Two
+  // fields are the RESOLVER's annotations, written each frame it resolves a scene over this
+  // plan: `blocked` (the bedrock mask at the dish grid, or null) and `fieldBody` (the
+  // channel descriptor the contract carries — engine/dishFluidChannel.mjs — or null). Its
+  // density is the publishedFluid array itself — read it the frame you get it, never
+  // retain it. Inactive on the same terms.
   const plan = {
     active: false,
     seedKey: 0,
@@ -79,6 +84,8 @@ export function createDishFluidStage() {
     seatRows: FLUID_GRID_ROWS,
     matterFrac: 1,
     aspectHW: 0.7,
+    blocked: null,
+    fieldBody: null,
   };
 
   function clearPublication() {
@@ -89,6 +96,8 @@ export function createDishFluidStage() {
     plan.active = false;
     plan.step = -1;
     plan.density = null;
+    plan.blocked = null;
+    plan.fieldBody = null;
   }
 
   function build(wakeMs, seed, magnets) {

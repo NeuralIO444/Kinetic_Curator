@@ -35,6 +35,7 @@
 import {
   QUAD_VS,
   QUAD_FS,
+  FIELD_VS,
   MESH_VS,
   FULL_VS,
   COMPOSITE_FS,
@@ -55,6 +56,7 @@ import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
 import { registerMathShaders, applyMathMod } from './effects/mathShaders.mjs';
 import { createPatternFrames, patternBytes, patternDrawSize } from '../pattern/patternSource.js'; // #1098/#1101: a PATTERN track's frame
 import { boilSec, boilStep } from '../engine/kineme.js'; // #2104 step 4: the world's boil grid, for the clocks it binds
+import { packFieldDensity, fieldBodyDrawCount, FIELD_BODY_VOCAB_MAX } from '../engine/dishFluidChannel.mjs'; // #2178: the field-body channel's packing + budget law
 
 // #520 Phase 2: kept local so renderer.mjs stays browser-safe (the parity
 // harness serves only src/gl/, not src/fx/). Must match fxFilters.js.
@@ -362,6 +364,46 @@ export const RENDERER_PROGRAMS = [
       timeMs: 0.05,
       notes:
         'Phase 2 S2 wing warp draw: skinned wing meshes in list order; transient VBO (~48 KB at the 4-creature cap)',
+    },
+  },
+  {
+    // #2178 — the ferrofluid's field-body program: FIELD_VS seats the pooled body from
+    // gl_InstanceID against the density + vocabulary textures (no instance buffer at all);
+    // the fragment stage is QUAD_FS itself, so a pooled stamp shades identically to an
+    // ordinary item. Structural like the quad/mesh programs (tier 0): the channel's cost
+    // is governed by the descriptor's budget uniform, not by shedding the program.
+    key: 'fieldBody',
+    name: 'fieldBody',
+    vs: FIELD_VS,
+    fs: QUAD_FS,
+    vsFile: 'shaders.mjs:FIELD_VS',
+    fsFile: 'shaders.mjs:QUAD_FS',
+    uniforms: [
+      'u_canvas',
+      'u_density',
+      'u_vocab',
+      'u_seed',
+      'u_floor',
+      'u_vocabCount',
+      'u_scaleBase',
+      'u_accent',
+      'u_opacity',
+      'u_atlas',
+      'u_distHeat', // the shared QUAD_FS declares it; the body carries no distortion record (v_dist = 0)
+      'u_liveTint',
+      'u_sun',
+      'u_sunLight',
+      'u_ambient',
+      'u_sunMat',
+      'u_pool',
+      'u_hands',
+    ],
+    cost: {
+      tier: 0,
+      memoryBytes: 49152,
+      timeMs: 0.05,
+      notes:
+        '#2178 field-body draw: one instanced draw per frame at the top content layer slot, instance count = the channel budget ladder (8192 max); two small textures (RG8 density 96x54, RGBA32F vocabulary 128x2)',
     },
   },
   {
@@ -1046,6 +1088,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     });
   }
   const quadProg = progs.quad;
+  const fieldProg = progs.fieldBody; // #2178
   const compProg = progs.composite;
   const resProg = progs.resolve;
   const copyProg = progs.copy;
@@ -1286,6 +1329,141 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     soakVelTex = null,
     soakPigTex = null;
   const soakUploaded = { mask: null, vel: null, pig: null };
+  // #2178 — the ferrofluid's field-body channel: the frame's descriptor (contract.fieldBody)
+  // and its out-of-band density data (payload.fieldBody: { density, blocked, step }), set per
+  // renderFrameInto. Either absent → no draw, and the frame is exactly the pre-channel frame.
+  // The density texture re-uploads only when the fluid steps (or the bedrock mask changes
+  // identity); the vocabulary texture re-uploads only when its packed contents change.
+  let fieldBody = null;
+  let fieldBodyData = null;
+  let fbDensityTex = null;
+  let fbVocabTex = null;
+  const fbUploaded = { step: null, blocked: null };
+  let fbVocabPacked = null;
+  function ensureFieldBodyTextures() {
+    if (!fbDensityTex) {
+      fbDensityTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, fbDensityTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    if (!fbVocabTex) {
+      fbVocabTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, fbVocabTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+  }
+  /**
+   * #2178 — draw the ferrofluid's pooled body into the currently bound layer target: one
+   * instanced draw, no instance buffer — FIELD_VS seats every stamp from gl_InstanceID
+   * against the density + vocabulary textures (engine/dishFluidChannel.mjs's law). Called at
+   * the end of the top content layer's own render (and its mask bakes), so the body
+   * composites, blends and mattes exactly where the retired CPU body's items rode. Fails
+   * closed: no descriptor, no payload density, or a zero budget draws nothing.
+   */
+  function drawFieldBody(atlasTex, cells, w, h, groupOpacity) {
+    const desc = fieldBody;
+    const data = fieldBodyData;
+    if (!desc || !data || !data.density) return;
+    const count = fieldBodyDrawCount(desc.budget);
+    if (!count) return;
+    ensureFieldBodyTextures();
+    if (fbUploaded.step !== data.step || fbUploaded.blocked !== data.blocked) {
+      gl.bindTexture(gl.TEXTURE_2D, fbDensityTex);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RG8,
+        96,
+        54,
+        0,
+        gl.RG,
+        gl.UNSIGNED_BYTE,
+        packFieldDensity(data.density, data.blocked),
+      );
+      fbUploaded.step = data.step;
+      fbUploaded.blocked = data.blocked;
+    }
+    // The vocabulary texture: row 0 = each pool asset's atlas cell for the (ink, ink) bake —
+    // the packer's own lookup, fallback included — row 1 = its effective ink under the
+    // standing world-ink rule (the packer's predicate). An asset with no baked cell packs a
+    // degenerate rect and the shader's gate 0 retires its seats.
+    const packed = new Float32Array(FIELD_BODY_VOCAB_MAX * 2 * 4);
+    desc.vocab.forEach((id, i) => {
+      const effInk = worldInk && isStrokeOnlyInkAsset(id) ? worldInk : desc.ink;
+      const cell = cells[`${id}|${effInk}|${desc.ink}`] || cells[id];
+      const o = i * 4;
+      if (cell) {
+        packed[o] = cell.u0;
+        packed[o + 1] = cell.v0;
+        packed[o + 2] = cell.u1;
+        packed[o + 3] = cell.v1;
+      }
+      const rgb = hexToRgb(effInk);
+      const o2 = FIELD_BODY_VOCAB_MAX * 4 + i * 4;
+      packed[o2] = rgb[0];
+      packed[o2 + 1] = rgb[1];
+      packed[o2 + 2] = rgb[2];
+      packed[o2 + 3] = 1;
+    });
+    let vocabDirty = !fbVocabPacked || fbVocabPacked.length !== packed.length;
+    if (!vocabDirty) {
+      for (let i = 0; i < packed.length; i++) {
+        if (fbVocabPacked[i] !== packed[i]) {
+          vocabDirty = true;
+          break;
+        }
+      }
+    }
+    if (vocabDirty) {
+      gl.bindTexture(gl.TEXTURE_2D, fbVocabTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, FIELD_BODY_VOCAB_MAX, 2, 0, gl.RGBA, gl.FLOAT, packed);
+      fbVocabPacked = packed;
+    }
+    const p = fieldProg;
+    gl.useProgram(p);
+    gl.uniform2f(U(p, 'u_canvas'), sceneW, sceneH);
+    gl.uniform1i(U(p, 'u_atlas'), bindTex(0, atlasTex));
+    gl.uniform1i(U(p, 'u_density'), bindTex(4, fbDensityTex));
+    gl.uniform1i(U(p, 'u_vocab'), bindTex(5, fbVocabTex));
+    gl.uniform1ui(U(p, 'u_seed'), desc.seedKey >>> 0);
+    gl.uniform1f(U(p, 'u_floor'), desc.floor);
+    gl.uniform1f(U(p, 'u_vocabCount'), desc.vocab.length);
+    gl.uniform1f(U(p, 'u_scaleBase'), desc.scaleBase);
+    const acc = hexToRgb(desc.ink);
+    gl.uniform3f(U(p, 'u_accent'), acc[0], acc[1], acc[2]);
+    gl.uniform1f(U(p, 'u_opacity'), groupOpacity);
+    gl.uniform1f(U(p, 'u_distHeat'), distortHeat);
+    gl.uniform1f(U(p, 'u_liveTint'), isLive ? 1.0 : 0.0);
+    gl.uniform4f(U(p, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
+    gl.uniform4f(
+      U(p, 'u_sunLight'),
+      sun ? sun.color[0] : 1,
+      sun ? sun.color[1] : 1,
+      sun ? sun.color[2] : 1,
+      sun ? sun.intensity : 0,
+    );
+    gl.uniform1f(U(p, 'u_ambient'), sun ? sun.ambient : 1);
+    gl.uniform2f(U(p, 'u_sunMat'), sun ? sun.bevel : 0, sun ? sun.spec : 0);
+    gl.uniform1f(U(p, 'u_pool'), sun ? sun.pool || 0 : 0);
+    gl.uniform2f(U(p, 'u_hands'), hands.crooked || 0, hands.open || 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(0, 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendEquation(gl.FUNC_ADD);
+    gl.viewport(0, 0, w, h);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, count);
+    gl.disableVertexAttribArray(0);
+    gl.disable(gl.BLEND);
+  }
   function ensureSoakTextures() {
     if (soakMaskTex) return;
     const mk = () => {
@@ -1623,7 +1801,18 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
    * groupOpacity folds into instance alpha (mask bakes; normal layers keep
    * group opacity in the composite pass, matching the SVG <g opacity>).
    */
-  function renderLayerInstances(layerTarget, instances, cells, atlasTex, scratch, blendTmp, w, h, groupOpacity = 1) {
+  function renderLayerInstances(
+    layerTarget,
+    instances,
+    cells,
+    atlasTex,
+    scratch,
+    blendTmp,
+    w,
+    h,
+    groupOpacity = 1,
+    layerId = null,
+  ) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, layerTarget.fb);
     gl.viewport(0, 0, w, h);
     gl.clearColor(0, 0, 0, 0);
@@ -1723,6 +1912,13 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     if (isolatedRun.length) flushIsolatedRun(isolatedRun, isolatedRunBlend);
     flushNormal();
     flushMesh();
+    // #2178 — the ferrofluid's body rides the TOP content layer's slot: when this render is
+    // that layer's (its composite pass, or a mask bake of it), the channel draws after the
+    // layer's own items, into the same target, under the same group opacity — the retired
+    // CPU body's exact seat in the stack. Any other layer's render draws nothing.
+    if (layerId !== null && fieldBody && fieldBody.layerId === layerId) {
+      drawFieldBody(atlasTex, cells, w, h, groupOpacity);
+    }
   }
 
   /**
@@ -1852,6 +2048,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     worldInk = contract.world ? contract.world.ink : null;
     cellShed = !!contract.cellShed; // #1431
     regionAnim = contract.regionAnim || null; // #1433
+    // #2178 — the ferrofluid's field-body channel: the descriptor rides the contract, the
+    // density rides the payload out of band (the accumInput precedent). Either absent →
+    // the channel draws nothing this frame.
+    fieldBody = contract.fieldBody || null;
+    fieldBodyData = payload.fieldBody || null;
     // #1814: the frame's soak field, normalised from the payload's wet
     // packs (the live service result and the warm-up export ferry carry
     // one shape). No packs → null → every composite runs the dry path
@@ -1893,7 +2094,18 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // its opacity is baked into the mask alpha.
     const renderMask = (sourceId) => {
       const src = layerById.get(sourceId);
-      renderLayerInstances(maskT, byLayer.get(sourceId) || [], cells, atlasTex, scratchT, blendT, w, h, src.opacity);
+      renderLayerInstances(
+        maskT,
+        byLayer.get(sourceId) || [],
+        cells,
+        atlasTex,
+        scratchT,
+        blendT,
+        w,
+        h,
+        src.opacity,
+        sourceId,
+      );
     };
     const maskFor = (layerId) => {
       const m = matteMap.get(layerId);
@@ -1928,7 +2140,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       let srcTex =
         layer.type === 'pattern'
           ? patternTexture(layer, w, h)
-          : (renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h), layerT.tex);
+          : (renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h, 1, layer.id), layerT.tex);
       // #2038 — a rotated PATTERN stratum: its field texture turns by
       // the detent before it composites (blendT is free here — the
       // contact shadow, its other tenant, is content-only). The marks

@@ -571,6 +571,139 @@ void main() {
 // unaffected — see glassCaustic.selfcheck.mjs.
 export const QUAD_FS = injectCommon(QUAD_FS_SRC);
 
+// #2178 — the ferrofluid's field-body vertex shader (the GPU seating channel,
+// engine/dishFluidChannel.mjs). Pairs with QUAD_FS: it fills every varying QUAD_FS reads,
+// so the pooled body shades exactly like an ordinary item — same live tint, same sun, same
+// glass/plate paths (all gated off here: the body is plain stamps). There is NO instance
+// buffer: an instance is a seat index (gl_InstanceID over a sub-cell lattice, 3×3 per dish
+// cell, sub-major) and everything about it — whether it exists, where it sits, what it
+// wears, how big and how turned — is a pure function of (seed, seat, density texture,
+// vocabulary texture), transcribed seat-for-seat from the channel module's JS model
+// (fieldBodySeatModel), which the selfcheck pins against a grown field. The gates, in
+// order: vocabulary cell degenerate (the asset never baked) → bedrock-blocked → below the
+// density floor → the density-shaped fill draw. A gated instance collapses to a single
+// clip-space point and draws nothing. The body carries no kineme, no region animation and
+// no spectrum response — disclosed in the channel module; engine-note lever 1 sanctions a
+// kineme-less body. The seating hash is the kernel's hashU32 transcribed to uint math over
+// the fluid channel constant (0xc91a0618), draws quantized to the top 24 bits so the JS
+// model and this shader agree exactly.
+const FIELD_VS_SRC = `#version 300 es
+layout(location=0) in vec2 a_corner;   // 0..1 quad corner (the renderer's unit quad)
+uniform vec2 u_canvas;                 // scene px
+uniform sampler2D u_density;           // RG8: R = density byte, G = bedrock flag
+uniform sampler2D u_vocab;             // RGBA32F: row 0 = atlas cell, row 1 = effective ink rgb
+uniform uint u_seed;                   // the fluid cycle's seed key
+uniform float u_floor;                 // the density floor (0.25)
+uniform float u_vocabCount;            // vocabulary size (>= 1)
+uniform float u_scaleBase;             // the stamp scale law for this canvas
+uniform vec3 u_accent;                 // the palette ink, as the body's accent tint
+uniform float u_opacity;               // the layer's group opacity
+uniform vec4 u_sun;                    // shared with QUAD_VS: sun position/dir + on flag
+uniform vec4 u_sunLight;               // sun colour + intensity
+uniform float u_ambient;               // ambient light level
+uniform vec2 u_hands;                  // shared with QUAD_VS: crooked-hand amounts (world, local)
+out float v_seed;
+out vec2 v_world;
+out vec4 v_rot;
+out vec4 v_cell;
+out vec2 v_uv;
+out float v_opacity;
+out vec3 v_ink;
+out vec3 v_accent;
+out vec3 v_light;
+out float v_glass;
+out float v_plate;
+out float v_wash;
+out float v_stipple;
+out vec4 v_matP;
+out vec2 v_au;
+out vec4 v_engA;
+out vec4 v_engB;
+out vec4 v_engC;
+out vec4 v_engP;
+flat out vec4 v_dist;
+
+uint fbHash(uint index) {
+  uint h = u_seed ^ (0xc91a0618u * 0x9e3779b9u) ^ (index * 0x85ebca6bu);
+  h = (h ^ (h >> 16u)) * 0x7feb352du;
+  h = (h ^ (h >> 15u)) * 0x846ca68bu;
+  h = h ^ (h >> 16u);
+  return h == 0u ? 1u : h;
+}
+float fbHash01(uint index) { return float(fbHash(index) >> 8u) / 16777216.0; }
+
+void main() {
+  uint id = uint(gl_InstanceID);
+  uint sub = id / 5184u;
+  uint cell = id % 5184u;
+  uint seat = cell * 9u + sub;
+  int cx = int(cell % 96u);
+  int cy = int(cell / 96u);
+  vec2 texel = texelFetch(u_density, ivec2(cx, cy), 0).rg;
+  float d = texel.r;
+  // the vocabulary pick happens before the gates: its cell decides gate 0
+  uint vi = min(uint(fbHash01(410000u + seat) * u_vocabCount), uint(u_vocabCount) - 1u);
+  vec4 cellRect = texelFetch(u_vocab, ivec2(int(vi), 0), 0);
+  vec3 effInk = texelFetch(u_vocab, ivec2(int(vi), 1), 0).rgb;
+  bool dead = cellRect.z <= cellRect.x || texel.g > 0.5 || d < u_floor
+    || fbHash01(400000u + seat) >= clamp((d - u_floor) / 0.18, 0.0, 1.0);
+  float jx = (float(cx) + fbHash01(420000u + seat)) * (u_canvas.x / 96.0);
+  float jy = (float(cy) + fbHash01(430000u + seat)) * (u_canvas.y / 54.0);
+  vec2 pos = vec2(jx, jy);
+  float scale = u_scaleBase * (0.45 + 0.55 * d);
+  float rotDeg = fbHash01(440000u + seat) * 360.0;
+  float th = radians(rotDeg);
+  float co = cos(th);
+  float si = sin(th);
+  float au = a_corner.x * 199.5 - 49.75;
+  float av = a_corner.y * 199.5 - 49.75;
+  v_au = vec2(au, av);
+  vec2 c = (vec2(au, av) - 50.0) * scale;
+  // the crooked hand, transcribed from QUAD_VS (the shared u_hands law): the seed is the
+  // position hash, exactly as the quad path seeds it from the instance position
+  float seed = kc_hash12(pos);
+  v_seed = seed;
+  if (u_hands.x > 0.0) {
+    float bend = (kc_hash12(pos + 7.31) - 0.5) * u_hands.x * 0.30;
+    float bt = bend;
+    float bc = cos(bt); float bs = sin(bt);
+    c = mat2(bc, -bs, bs, bc) * c;
+    c *= 1.0 + (kc_hash12(pos + 13.7) - 0.5) * u_hands.x * 0.22;
+  }
+  vec2 rr = vec2(c.x * co - c.y * si, c.x * si + c.y * co);
+  vec2 world = pos + rr;
+  v_world = world;
+  v_rot = vec4(co, si, cellRect.z < cellRect.x ? -1.0 : 1.0, cellRect.w < cellRect.y ? -1.0 : 1.0);
+  v_cell = cellRect;
+  v_uv = vec2(mix(cellRect.x, cellRect.z, a_corner.x), mix(cellRect.y, cellRect.w, a_corner.y));
+  v_opacity = d * u_opacity;
+  v_ink = effInk;
+  v_accent = u_accent;
+  if (u_sun.w > 0.5) {
+    vec3 L = normalize(vec3(u_sun.xy - pos, u_sun.z));
+    v_light = vec3(u_ambient) + u_sunLight.rgb * (u_sunLight.a * L.z);
+  } else {
+    v_light = vec3(1.0);
+  }
+  v_glass = 0.0;
+  v_plate = 0.0;
+  v_wash = 0.0;
+  v_stipple = 0.0;
+  v_matP = vec4(0.0);
+  v_engA = vec4(0.0);
+  v_engB = vec4(0.0);
+  v_engC = vec4(0.0);
+  v_engP = vec4(0.0);
+  v_dist = vec4(0.0);
+  if (dead) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
+  gl_Position = vec4(world.x / u_canvas.x * 2.0 - 1.0, 1.0 - world.y / u_canvas.y * 2.0, 0.0, 1.0);
+}
+`;
+export const FIELD_VS = injectCommon(FIELD_VS_SRC);
+
 // Phase 2 S2 — the wing-warp mesh vertex shader. A mesh instance (a bent wing, engine/wingWarp.mjs) arrives
 // with its vertices ALREADY skinned in scene space by the resolver; this shader only places them and fills
 // the same varyings QUAD_VS fills, so the shared QUAD_FS shades a warped wing exactly as it shades a quad —

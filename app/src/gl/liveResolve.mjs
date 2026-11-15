@@ -119,7 +119,7 @@ const POEM_ONLY_IDS = new Set(
 );
 import { createDishLifeStage, isTerrain } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
 import { createDishFluidStage } from '../engine/dishFluidStage.mjs'; // #1997: the ferrofluid, driven by input.dishFluid (absent = no work)
-import { fluidMatterItems, isFluidMatter } from '../engine/dishFluidRender.mjs'; // #1997: the fluid's attached body — ordinary items seated on its published density
+import { fieldBodyBudgetFor, fieldBodyScaleBase } from '../engine/dishFluidChannel.mjs'; // #2178: the fluid's attached body is a GPU channel — the resolver publishes its descriptor on the plan, never items
 import { coverageField } from '../engine/dishLifeSeed.mjs'; // #1997: the terrain coverage the attachment's bedrock mask is derived from (the culture seed's own field)
 import { FLUID_GRID_COLS, FLUID_GRID_ROWS } from '../engine/dishFluid.mjs'; // #1997: the dish grid the bedrock mask is sampled at
 import {
@@ -373,9 +373,10 @@ export function getLastDishWet() {
 /**
  * #1997 — the last resolved frame's FERROFLUID attachment plan, published by the resolver (the
  * getLastDishWet pattern): the fluid stage's stable plan object — { active, seedKey, wakeMs,
- * step, density, magnets, dial, seatCols, seatRows, matterFrac, aspectHW }. The resolver itself
- * consumes it in the same resolve (the attached body, engine/dishFluidRender.mjs); the channel
- * stays published for any outside reader. Not drained: the value is a frame fact, re-published
+ * step, density, magnets, dial, seatCols, seatRows, matterFrac, aspectHW, blocked, fieldBody }.
+ * The resolver annotates it in the same resolve (the bedrock mask + the GPU channel's
+ * descriptor, #2178); the loop reads it to carry the body to the contract and the renderer.
+ * Not drained: the value is a frame fact, re-published
  * by every resolve. Module-level, last-resolver-wins (the getLastFrameMotion law).
  */
 let lastDishFluidPlan = null;
@@ -887,8 +888,9 @@ export function createLiveResolver() {
     let frameKineme = null;
     let frameWind = null;
     // #1997 — the top content layer's dealt pool, recorded per content layer below (the last
-    // one recorded is the top): the ferrofluid body's vocabulary on a stage with no dealt
-    // marks to wear — any pool asset shape, letterforms included (Matt's ruling, 2026-11-08).
+    // one recorded is the top): the ferrofluid body's vocabulary — any pool asset shape,
+    // letterforms included (Matt's ruling, 2026-11-08). Since #2178 the pool is the body's
+    // ONLY vocabulary (the wear path retired with the CPU seating).
     let fluidPoolIds = null;
     const aliveIds = new Set();
     // #450 — every layer id present in the document, regardless of
@@ -1108,7 +1110,7 @@ export function createLiveResolver() {
         activeAssets = activeAssets.filter((a) => !dropped.has(a.id));
       }
       // #1997 — this layer's dealt pool (the dealer's exclusions and this layer's enabled
-      // set already applied) is the fluid body's no-marks vocabulary; content layers record
+      // set already applied) is the fluid body's vocabulary; content layers record
       // in stack order, so the top content layer's pool is what stands at the bottom.
       fluidPoolIds = activeAssets.map((a) => a.id);
       const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
@@ -1790,55 +1792,47 @@ export function createLiveResolver() {
       H,
     });
     lastDishFluidPlan = dishFluid.plan;
-    // #1997 — the dealt scene the fluid's body will wear, captured BEFORE the culture's draw
-    // below replaces the content layers' items: every content layer's non-terrain marks (the
-    // culture seed's own collection discipline), plus the bedrock mask the terrain covers at
-    // the dish grid. Only captured while a fluid runs — off costs nothing.
-    let fluidScene = null;
+    // #2178 — the ATTACHED BODY is a GPU channel now (engine/dishFluidChannel.mjs), not
+    // resolver items: the system stays invisible (Matt's ruling, 2026-11-08) and the body is
+    // seated by the renderer from the published density, riding the TOP content layer's slot.
+    // The resolver's whole contribution is the plan's annotation, below: the bedrock mask
+    // (the terrain's coverage at the dish grid — the channel never seats on bedrock, the
+    // retired CPU body's law) and the channel descriptor (the top layer's id, the stage
+    // pool as vocabulary, the palette ink, the cycle's seed key, the governor's channel
+    // budget for this frame's shed rung + device class, and the stamp scale law for this
+    // canvas). Nothing enters the resolver's output, so the frame — and every take hash
+    // over it — is exactly the frame the field alone produces; the body's placement is
+    // presentation under the #2180 ruling (and PERFORMANCE_VERSION 3 marks the break for
+    // takes recorded while the body was still items). No plan (fluid off) = no annotation,
+    // and the frame is byte-identical to a build without this block.
+    dishFluid.plan.blocked = null;
+    dishFluid.plan.fieldBody = null;
     if (dishFluid.plan.active) {
-      const marks = [];
       const terrain = [];
       for (const e of out) {
         if (!e || e.isFx || e.isPattern || !Array.isArray(e.items)) continue;
-        for (const it of e.items) {
-          if (!it) continue;
-          if (isTerrain(it)) terrain.push(it);
-          else if (!isFluidMatter(it)) marks.push(it);
-        }
+        for (const it of e.items) if (it && isTerrain(it)) terrain.push(it);
       }
-      let blocked = null;
       if (terrain.length) {
         const cov = coverageField(terrain, { canvasW: W, canvasH: H, cols: FLUID_GRID_COLS, rows: FLUID_GRID_ROWS });
-        blocked = new Uint8Array(FLUID_GRID_COLS * FLUID_GRID_ROWS);
+        const blocked = new Uint8Array(FLUID_GRID_COLS * FLUID_GRID_ROWS);
         for (let i = 0; i < blocked.length; i++) if (cov[i] > 0) blocked[i] = 1;
+        dishFluid.plan.blocked = blocked;
       }
-      fluidScene = { marks, blocked };
-    }
-    dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion }); // the tertiary specks hold still under reduced motion
-    // #1997 — the ATTACHED BODY: the system is invisible (Matt's ruling, 2026-11-08), so the
-    // ferrofluid appears as ordinary asset items seated on the exact instance's published
-    // density (engine/dishFluidRender.mjs), riding the TOP content layer after the culture's
-    // draw — added to it, never taking a mark's place (the quiet specks' discipline). Its
-    // vocabulary is the stage's own: dealt marks worn nearest-first, or — on a stage with
-    // nothing dealt — the top content layer's dealt pool (poolIds: any pool asset shape,
-    // letterforms and stamps included). No plan (fluid off) = no items, and the frame is
-    // byte-identical to a build without this block.
-    if (fluidScene && dishFluid.plan.active) {
       const content = out.filter((e) => e && !e.isFx && !e.isPattern && Array.isArray(e.items));
       if (content.length) {
-        const top = content[content.length - 1];
-        const matter = fluidMatterItems(dishFluid.plan, fluidScene.marks, {
-          canvasW: W,
-          canvasH: H,
-          blocked: fluidScene.blocked,
-          paletteInk: fluidScene.marks.length
-            ? null
-            : resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes).ink,
+        dishFluid.plan.fieldBody = {
+          layerId: String(content[content.length - 1].id),
           poolIds: fluidPoolIds,
-        });
-        if (matter.length) top.items = top.items.filter((it) => !isFluidMatter(it)).concat(matter);
+          ink: resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes).ink,
+          seedKey: dishFluid.plan.seedKey,
+          budget: fieldBodyBudgetFor(input.dishFluid?.shed, !!input.travelIpadClass),
+          scaleBase: fieldBodyScaleBase(W, H),
+          aspectHW: dishFluid.plan.aspectHW,
+        };
       }
     }
+    dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion }); // the tertiary specks hold still under reduced motion
     prune(aliveIds, documentIds);
     // #1412 — publish the frame's contact-density field (engine/
     // dishDensity.mjs): the shared grid's per-cell body counts from

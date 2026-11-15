@@ -119,3 +119,16 @@ first checkpoint divergence. Checkpoint-only refresh via
 byte-identical, nothing else (nonCheckpointDiffs []). The refresh is deterministic (the
 tool's two-run check). replayGate.kcperf was not refreshed: it still verifies as committed
 (its take never crosses the new edge).
+
+**#2178 version migration (2026-11-15, Matt's clean-break ruling on the issue):**
+PERFORMANCE_VERSION 2 → 3 — the fluid body left the hashed resolver output, so v2 takes
+retire and the parser refuses them. This take carries no fluid. The fixture was NOT
+re-recorded: `scripts/recordCreatureRepipeFixture.mjs` is broken on main itself (it imports
+the resolveTap provider channel — getDishHosted and friends — that no longer exists since
+the channel moved into the resolver's inputs; verified identical on clean main 92d77144).
+Instead the committed v2 file was re-enveloped once, in this PR only: unpacked with the
+pre-bump parser on clean main, re-packed with the v3 packer, product code untouched (the
+parser still refuses v2 — there is no legacy path). Result: 17765 bytes, sha256
+9b3b0695…; all 16 checkpoint hashes byte-identical to the v2 fixture's, recorded inputs
+unchanged, and the gate verifies them against the current resolver. The recorder script
+needs its own repair slice before the next re-record.

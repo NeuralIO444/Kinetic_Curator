@@ -51,6 +51,18 @@ const decodeWet = (wet) => {
  *            atlasMips }
  * returns { pixelsB64, width, height } — pixels are top-first RGBA bytes.
  */
+/** #2178 — the field body's out-of-band density, ferried as base64 raw bytes. */
+function decodeFieldBody(fb) {
+  if (!fb) return null;
+  const raw = b64ToU8(fb.densityB64);
+  const density = new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength / 4);
+  return {
+    density,
+    blocked: fb.blockedB64 ? b64ToU8(fb.blockedB64) : null,
+    step: fb.step | 0,
+  };
+}
+
 function renderArgs(payload) {
   const atlasPx = b64ToU8(payload.atlasB64);
   const atlasMips = (payload.atlasMips || []).map((m) => ({
@@ -61,6 +73,7 @@ function renderArgs(payload) {
     height: payload.height,
     bg: payload.bg,
     wet: decodeWet(payload.wet), // #1815: warmed field for renderScene
+    fieldBody: decodeFieldBody(payload.fieldBody), // #2178: the ferrofluid channel's density
     contract: payload.contract,
     cells: payload.cells,
     atlas: { pixels: atlasPx, width: payload.atlasW, height: payload.atlasH, mipmaps: atlasMips },
