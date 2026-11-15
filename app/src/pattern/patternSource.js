@@ -22,7 +22,9 @@ import {
   panOffset,
   quiltMoverMap,
   glyphMoverMap,
+  toRgba,
 } from './engine.js';
+import { isStrokeOnlyOps, motifRoles } from './glyph.js';
 import { assignTides, rasterTides, tidesCols } from './tides.js';
 import { assignRewrite, rasterRewrite, rewriteCols } from './rewrite.js';
 import { assignBlocks, rasterBlocks, blocksCols } from './blocks.js';
@@ -43,7 +45,7 @@ export const patternPalette = (p) => ({
  * time is left OUT of its key and the frame is reused until a parameter, the palette or the size
  * changes. A drifting pattern keys on `t` (every frame is new).
  */
-export function patternKey(pattern, palette, w, h, t = 0, image = null, culture = null, kinT = t) {
+export function patternKey(pattern, palette, w, h, t = 0, image = null, culture = null, kinT = t, ink = null) {
   const p = sanitizePattern(pattern);
   const pal = patternPalette(palette);
   // #1798: a BLOCKS deal is a still — time never changes its pixels, whatever DRIFT says.
@@ -72,6 +74,10 @@ export function patternKey(pattern, palette, w, h, t = 0, image = null, culture 
     ...(p.drift > 0 && !PATTERN_FIELD_LIKE.includes(p.mode) && p.mode !== 'BLOCKS' && Number(kinT) !== time
       ? ['B', Number(kinT) || 0]
       : []),
+    // #2104 Q2/Q4: a frame drawn under a standing world's ink (the glyph board's stroke-only
+    // tiles take it) is a function of that ink. Spread only when an ink rides, so every
+    // world-less key stays byte-identical.
+    ...(ink ? ['I', ink] : []),
     // #1795: a PICTURE frame is a function of its image too — keyed on the image's id (the bundled
     // seed by default). Spread only for PICTURE, so every other mode's key stays byte-identical.
     ...(p.mode === 'PICTURE' ? [normalizePictureImage(image).id] : []),
@@ -127,7 +133,7 @@ export function patternDrawSize(drift, w, h) {
 }
 
 /** What decides the frame (everything but time): the key a still frame, and a drifting frame's tables, are cached on. */
-const staticKey = (p, pal, w, h, image = null) =>
+const staticKey = (p, pal, w, h, image = null, ink = null) =>
   JSON.stringify([
     p.mode,
     p.seed,
@@ -141,6 +147,9 @@ const staticKey = (p, pal, w, h, image = null) =>
     w,
     h,
     PATTERN_FIELD_LIKE.includes(p.mode) ? null : [p.kin, p.movers],
+    // #2104 Q2/Q4: the built grid itself depends on the ink (stroke-only glyph tiles are
+    // recoloured at build). Spread only when an ink rides, so world-less plans cache as before.
+    ...(ink ? ['I', ink] : []),
     // #1795: PICTURE's grid is built from its image; the image's id stands for its pixels.
     // Spread only for PICTURE, so every other mode's key stays byte-identical.
     ...(p.mode === 'PICTURE' ? [normalizePictureImage(image).id] : []),
@@ -175,6 +184,29 @@ function buildGrid(p, pal, bw, bh, image = null) {
 }
 
 /**
+ * #2104 Q2/Q4 — a standing world's ink, applied to a freshly built GLYPH grid:
+ * a tile painted with stroked ops only draws in the ink — every role it paints
+ * with, the tile is the unit (Q1's whole-unit law, applied to tiles). Mixed
+ * and filled tiles keep their dealt colours whole; the ground never moves.
+ * Only GLYPH tiles carry a stroke/fill paint structure at all — the other
+ * modes' units are colour cells (flat fills by construction), so the law
+ * reaches nothing there. Mutates the grid it is handed: buildGrid's product,
+ * plan-owned, never shared.
+ */
+function applyGlyphInk(grid, inkHex) {
+  const rgba = toRgba(inkHex);
+  for (const tile of grid.tiles) {
+    if (!isStrokeOnlyOps(tile.ops)) continue;
+    const roles = motifRoles(tile.ops);
+    for (const role of roles) {
+      tile.rgba[role] = rgba;
+      tile.roles[role] = inkHex;
+    }
+    tile.used = [...new Set(roles.map((k) => tile.roles[k]))];
+  }
+}
+
+/**
  * A pattern track's frame source (#1101): one per track. It remembers what does not change between frames, so
  * a still pattern is drawn ONCE and a moving one pays only for what moves:
  *   QUILT  the still picture is drawn once; each frame repaints just the turning tiles
@@ -202,16 +234,20 @@ export function createPatternFrames() {
      * @param {number} [kinT] #2104 step 4: the time the ELEMENT KINEMES read — the standing
      *   world's boil-quantized time while a world stands, the frame's own t otherwise. Only the
      *   element transforms (elementXform) read it; mode motions (pan, pulse, growth) keep t.
+     * @param {string} [ink] #2104 Q2/Q4: the standing world's ink (hex) — GLYPH tiles painted
+     *   with stroked ops only draw in it. Null (no world) is the pre-ink frame, byte for byte.
      * @returns {{pixels: Uint32Array, w: number, h: number, key: string}} top row first
      */
-    frame(pattern, palette, w, h, t = 0, image = null, culture = null, kinT = t) {
+    frame(pattern, palette, w, h, t = 0, image = null, culture = null, kinT = t, ink = null) {
       const p = sanitizePattern(pattern);
       const pal = patternPalette(palette);
+      const inkHex = typeof ink === 'string' && ink ? ink : null;
       const bw = Math.max(1, Math.round(w));
       const bh = Math.max(1, Math.round(h));
-      const k = staticKey(p, pal, bw, bh, image);
+      const k = staticKey(p, pal, bw, bh, image, inkHex);
       if (k !== sKey) {
         const { tileW, grid } = buildGrid(p, pal, bw, bh, image);
+        if (inkHex && p.mode === 'GLYPH') applyGlyphInk(grid, inkHex);
         // #1137: the seeded few elements that carry a KINEME motion (null = none, the picture as it was)
         const movers =
           p.mode === 'QUILT'
@@ -244,7 +280,7 @@ export function createPatternFrames() {
                 culture.coupling,
               )
           : null;
-      const key = patternKey(p, pal, bw, bh, t, image, culture, kinT);
+      const key = patternKey(p, pal, bw, bh, t, image, culture, kinT, inkHex);
       if (p.drift === 0 || p.mode === 'BLOCKS') {
         // A coupled TIDES still is NOT a still: the culture evolves under it, so it re-rasters every
         // frame (into the scratch buffer, never the drawn-once cache) and its key carries the field's
@@ -281,15 +317,15 @@ export function createPatternFrames() {
  * @param {object} pattern a layer's pattern block (sanitized here)
  * @param {object} palette the active palette ({swatches, bg, ink, weights?})
  */
-export function patternPixels(pattern, palette, w, h, t = 0, image = null, culture = null) {
-  return createPatternFrames().frame(pattern, palette, w, h, t, image, culture).pixels.slice();
+export function patternPixels(pattern, palette, w, h, t = 0, image = null, culture = null, ink = null) {
+  return createPatternFrames().frame(pattern, palette, w, h, t, image, culture, t, ink).pixels.slice();
 }
 
 /** The same frame as bytes, rows flipped to GL's bottom-up order, ready for texImage2D. */
-export function patternBytesGL(pattern, palette, w, h, t = 0, image = null, culture = null) {
+export function patternBytesGL(pattern, palette, w, h, t = 0, image = null, culture = null, ink = null) {
   const bw = Math.max(1, Math.round(w));
   const bh = Math.max(1, Math.round(h));
-  const src = patternPixels(pattern, palette, bw, bh, t, image, culture);
+  const src = patternPixels(pattern, palette, bw, bh, t, image, culture, ink);
   const outp = new Uint32Array(bw * bh);
   for (let y = 0; y < bh; y++) outp.set(src.subarray(y * bw, (y + 1) * bw), (bh - 1 - y) * bw);
   return new Uint8Array(outp.buffer);

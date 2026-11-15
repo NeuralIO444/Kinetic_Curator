@@ -494,3 +494,17 @@ export const strokeWidths = (ops) => ops.filter((o) => o.type === 'ring' || o.ty
 
 /** The roles a mark paints with, ground knockouts excluded. */
 export const motifRoles = (ops) => [...new Set(ops.map((o) => o.role).filter((r) => r !== 'ground'))];
+
+/** Op types that paint with a stroke; disc / poly / lens fill. */
+export const STROKE_OP_TYPES = Object.freeze(['ring', 'seg']);
+
+/**
+ * #2104 Q2/Q4 — a glyph tile's paint structure, the ink ruling's unit test
+ * for the pattern stratum: the tile is line work iff it paints with stroked
+ * ops only (at least one op, every op a stroke). A tile mixing stroked and
+ * filled ops keeps its dealt colours whole — Q1's law, applied to tiles.
+ * Per-tile, never per mark name: capsule builds either three filled discs
+ * or one fat stroke, and the tile is what was actually built.
+ */
+export const isStrokeOnlyOps = (ops) =>
+  Array.isArray(ops) && ops.length > 0 && ops.every((op) => STROKE_OP_TYPES.includes(op.type));

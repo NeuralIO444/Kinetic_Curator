@@ -65,6 +65,7 @@ import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs'
 import { soakFieldState, WET_SOAK } from './wetSoak.mjs'; // #1814: strata soak recipe + payload normaliser
 import { registerCostTier } from './costTiers.mjs';
 import { ASSET_CELL_KINEME, getCellKineme, cellIndexAt, cellUvWindow, stripFramesFor } from '../data/cellKinemes.js'; // #1431 KINEME C
+import { isStrokeOnlyInkAsset } from '../data/inkPaint.js'; // #2104 Q2: the paint-structure predicate — line work takes the ink
 import { kinemePhase, KINEME_KINDS } from '../data/kinemes.js'; // #1433 R2: per-region phase = the house seed hash of (asset id, region id); #2116: the scatter kind
 import { createContactShadow, CONTACT_SHADOW_COST } from './contactShadow.mjs'; // #1183 contact shadow
 import { PLATE_GEO_DEFAULTS } from '../engine/plateBody.mjs'; // #1585 (Materials M4): packer defaults for the param attribute
@@ -716,7 +717,7 @@ export function breakVector(lx, ly, co, si, it, phase) {
  * have) keeps the single-quad path — the mark always draws complete.
  * When nothing expands, the ORIGINAL array is returned untouched.
  */
-function expandRegionInstances(instances, cells, regionAnim, kinemeTable = null) {
+function expandRegionInstances(instances, cells, regionAnim, kinemeTable = null, frameInk = null) {
   const idx = regionIndexFor(cells);
   if (!idx.size) return instances;
   const assets = regionAnim.assets || {};
@@ -724,7 +725,11 @@ function expandRegionInstances(instances, cells, regionAnim, kinemeTable = null)
   for (let i = 0; i < instances.length; i++) {
     const it = instances[i];
     const assignment = assets[it.asset];
-    const combo = `${it.asset}|${it.tint}|${it.accent}`;
+    // #2104 Q2: the combo is keyed by the instance's EFFECTIVE ink, so a
+    // stroke-only mark under a standing world finds the cells the stills
+    // bake made for the world's ink (the live path keys cells by asset and
+    // falls back exactly as before).
+    const combo = `${it.asset}|${effectiveInk(it, frameInk)}|${it.accent}`;
     const base = cells[combo] ? combo : cells[it.asset] ? it.asset : null;
     const entry = assignment && base ? idx.get(base) : null;
     const complete =
@@ -818,16 +823,32 @@ function expandRegionInstances(instances, cells, regionAnim, kinemeTable = null)
 /** Floats per instance in the quad VBO (#2116: 51 — the break-up vector's two appended to the 49; #2010 P3: 49 — the distortion channel's four appended to the 45). */
 export const INSTANCE_STRIDE = 51;
 
+/**
+ * #2104 Q2 — the ONE effective-ink decision every colour seam in this file
+ * shares: while a world stands (frameInk), an instance whose asset paints
+ * its ink slot with strokes only takes the world's ink — for the packed
+ * tint AND the baked-combo cell key alike, so the live mask path and the
+ * stills bake path can never disagree. Every other instance (fills, mixed
+ * paintings per Q1, accent lines per Q3) keeps its dealt tint; a null
+ * frameInk (no world) is the dealt tint, always.
+ */
+const effectiveInk = (it, frameInk) => (frameInk && isStrokeOnlyInkAsset(it.asset) ? frameInk : it.tint);
+
 export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = null) {
   // Spine B (#388): skip instances whose cells[comboKey] is missing instead
   // of throwing. Do not invent UVs; new combos simply do not draw until baked.
   if (!instances || instances.length === 0 || !cells) return new Float32Array(0);
+  // #2104 Q2 — the standing world's ink, when the caller rides it on the frame
+  // (the renderer does, only while a world stands). The contract instance
+  // itself is never touched — its tint stays the dealt colour — and the
+  // accent floats never move (Q3).
+  const frameInk = cellFrame && typeof cellFrame.ink === 'string' && cellFrame.ink ? cellFrame.ink : null;
   // #1433 (R2): region expansion (above). Only when the caller supplies
   // the frame's region state and it is not the collapse shed — the shed
   // and every pre-R2 caller take the exact single-quad path below.
   let list = instances;
   if (cellFrame && cellFrame.regions && !cellFrame.regions.shed) {
-    list = expandRegionInstances(instances, cells, cellFrame.regions, cellFrame.kinemes);
+    list = expandRegionInstances(instances, cells, cellFrame.regions, cellFrame.kinemes, frameInk);
   }
 
   // 49 floats/instance (196-byte stride; 45/180 until #2010 P3): (x,y,sx,sy) (rot,opacity,u0,v0)
@@ -866,7 +887,9 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     const it = list[i];
     // Spine D: fallback supports both live (R/G mask per asset) and offline (baked combos)
     // #1433: an expanded region/remainder instance carries its resolved cell.
-    const cell = it._cell || cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset];
+    // #2104 Q2: the combo key carries the EFFECTIVE ink, matching the stills bake.
+    const effInk = effectiveInk(it, frameInk);
+    const cell = it._cell || cells[`${it.asset}|${effInk}|${it.accent}`] || cells[it.asset];
     if (!cell) continue; // Spine B: skip missing instance, never throw
     let u0 = cell.u0,
       v0 = cell.v0,
@@ -921,7 +944,7 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     buf[o + 9] = v1;
     buf[o + 10] = it.vx || 0;
     buf[o + 11] = it.vy || 0;
-    const ink = hexToRgb(it.tint);
+    const ink = hexToRgb(effInk);
     const acc = hexToRgb(it.accent);
     buf[o + 12] = ink[0];
     buf[o + 13] = ink[1];
@@ -1237,6 +1260,10 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   // pattern element kinemes and the cell library's line-boil; the finish is the final pass.
   let worldBoilFps = 0;
   let worldFinishGrain = 0;
+  // #2104 Q2: the standing world's ink (hex; null = no world). Read by the pack seam
+  // (stroke-only instances pack it instead of their dealt tint), the mesh path (the
+  // same resolution) and the pattern texture (stroke-only glyph tiles draw in it).
+  let worldInk = null;
   let cellShed = false; // #1431: contract.cellShed — strip assets park on cell 0
   let regionAnim = null; // #1433: contract.regionAnim — region playback state (null = pre-R2 path)
   const kinemeBuf = new Float32Array(16 * 3);
@@ -1474,9 +1501,12 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     for (const { it, index } of list) {
       const m = it.mesh;
       if (!m) continue;
-      const cell = it._cell || cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset];
+      // #2104 Q2 — the mesh path resolves colour exactly as the packer does: the
+      // effective ink keys the cell and sets the tint alike.
+      const effInk = effectiveInk(it, worldInk);
+      const cell = it._cell || cells[`${it.asset}|${effInk}|${it.accent}`] || cells[it.asset];
       if (!cell) continue; // Spine B (#388): no cell, no draw — the packer's rule
-      const ink = hexToRgb(it.tint);
+      const ink = hexToRgb(effInk);
       const acc = hexToRgb(it.accent);
       const op = (it.opacity ?? 1) * groupOpacity;
       const th = (it.rotation * Math.PI) / 180;
@@ -1609,6 +1639,9 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       // #2104 step 4 — the standing world's boil rides the frame clock only while a world
       // stands, so a world-less frame's cellFrame is exactly the pre-world shape.
       ...(worldBoilFps > 0 ? { boilFps: worldBoilFps } : {}),
+      // #2104 Q2 — the standing world's ink rides the frame the same way: spread only
+      // while a world stands, so a world-less frame's cellFrame is exactly the pre-ink shape.
+      ...(worldInk ? { ink: worldInk } : {}),
     };
     let batch = [];
     const flushNormal = () => {
@@ -1737,6 +1770,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // No world → undefined → the frame source reads plain t, as before.
     const kinT =
       worldBoilFps > 0 && Number.isFinite(layer.pattern.t) ? boilSec(layer.pattern.t, worldBoilFps) : undefined;
+    // #2104 Q2/Q4 — the standing world's ink rides the same call: the glyph board's
+    // stroke-only tiles draw in it. No world → null → the dealt frame, byte for byte.
     const f = e.frames.frame(
       layer.pattern,
       layer.palette,
@@ -1746,6 +1781,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       null,
       layer.patternCulture ?? null,
       kinT,
+      worldInk,
     );
     if (e.key !== f.key) {
       gl.bindTexture(gl.TEXTURE_2D, e.tex);
@@ -1809,8 +1845,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // #2104 step 4 — the contract's world (door-clean by construction): its boil grid and
     // its finish grain ride the frame. No world on the contract → both 0 → every consumer
     // below runs its pre-world path.
+    // #2104 Q2 — the world's ink rides the same read: null when no world stands, and every
+    // ink consumer below runs its dealt-colour path on null.
     worldBoilFps = contract.world ? contract.world.boilFps : 0;
     worldFinishGrain = contract.world ? Math.max(0, contract.world.finish?.grain ?? 0) : 0;
+    worldInk = contract.world ? contract.world.ink : null;
     cellShed = !!contract.cellShed; // #1431
     regionAnim = contract.regionAnim || null; // #1433
     // #1814: the frame's soak field, normalised from the payload's wet

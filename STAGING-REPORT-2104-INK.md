@@ -84,3 +84,53 @@ For the coordinator's line order — the build, when the classification exists, 
 ## 7. Verification
 
 None run — no code was built, by the brief's own stop rule. The base tree is untouched except this report (see the git proof in the handoff). The publish ritual (decisive suites, manifest sweep, lint, format:check, build, before/after screenshots) runs with the build once the classification is ruled.
+
+---
+
+# BUILD — appended after Matt's rulings (2026-11-14)
+
+## 8. The rulings, as given
+
+All four §5 questions were ruled by Matt on issue #2104, 2026-11-14: Q1 (comment 6885709859) mixed stroke+fill assets keep their dealt colour whole — only stroke-only takes the ink. Q2 (6885717226) `mic_specbar_h/v` are NOT lines. Q3 (6885721723) accent-slot strokes keep their colour — the ink governs the ink slot only. Q4 (6885727268) patterns ARE in scope, same law, the TILE as the unit. Consolidated law: while a world stands, a unit (asset instance / pattern tile) whose ink-slot painting is strokes only takes the standing world's `ink`; fills, mixed units, accent lines, poem letters and UI are untouched; no world → exactly the pre-ink behaviour.
+
+## 9. The seam as built
+
+- **The predicate** — `app/src/data/inkPaint.js` (new): the paint-structure census of §3 as a module. `inkPaintStructure(svg)` counts `stroke="var(--ink…)"` / `fill="var(--ink…)"` occurrences in an asset's SVG string and classifies stroke-only / fill-only / mixed / none; `INK_PAINT_CENSUS` computes it over the whole library at module load; `inkPaintOf(id)` / `isStrokeOnlyInkAsset(id)` answer per asset, fail-closed ('none' → dealt colour kept) for unknown/custom ids. Never a category or trait proxy (§4). Poem letters are fill-only by construction (all 36 letterforms + every stamp face), so the poem carve-out holds without a special case.
+- **Marks, live path** — `app/src/gl/renderer.mjs`: one helper, `effectiveInk(it, frameInk)`, is the single effective-ink decision. `renderFrameInto` sets a closure `worldInk` from `contract.world.ink` (null when no world); the per-layer `cellFrame` spreads `ink` only while a world stands (step 4's boilFps discipline); `packInstanceData` packs `effectiveInk` as the instance tint AND keys its baked-combo cell lookup by it; `expandRegionInstances` resolves region combos by the effective ink; `drawMeshes` resolves cell + tint the same way. The contract is never mutated — instance tints stay the dealt colour.
+- **Marks, stills path (the candidate twin §6 named)** — the stills bake decides colours at bake time (`gl/atlas.mjs` substitutes the combo's real colours; the shader's mask recombination runs only under `u_liveTint`). So `app/src/gl/parity/glDriver.mjs` collects bake combos by the same law (`comboInk(contract, it)`: the contract's world ink for stroke-only instances, the dealt tint otherwise) at both collection sites (single frame and ACCUM sequence union). Packer key and bake key are the same decision, so the two paths cannot disagree.
+- **Patterns** — `app/src/pattern/glyph.js` gains `STROKE_OP_TYPES` (ring, seg) + `isStrokeOnlyOps(ops)`, classified from a tile's BUILT ops, never its mark name (a capsule builds either 3 filled discs or one fat seg — only the ops know). `app/src/pattern/patternSource.js` threads the ink as a trailing optional parameter through `frame()` / `patternKey()` / `staticKey()` / `patternPixels()` / `patternBytesGL()`; `applyGlyphInk()` recolours a stroke-only GLYPH tile at plan build (its `rgba` + `roles` for every role the tile paints with via `motifRoles`, `used` recomputed; the ground never moves). Both keys spread `['I', ink]` ONLY while an ink rides, so world-less keys are byte-identical to base. The renderer passes its closure `worldInk` as the frame call's ink argument. The other modes (FIELD/QUILT/TIDES/REWRITE/BLOCKS/PICTURE) were determined from the code to have no stroke/fill op structure — their units are flat colour cells, fills by construction — and are untouched.
+- **Boundaries determined, not invented**: the SVG parity reference (`studio/render.mjs`) contains no world consumption at all (zero mentions of `world` — no ground, grain, boil or ink), so it stays out of scope exactly as it was for steps 1–4. The live atlas keys cells by asset (mask bake), so the live path needed no bake change — the packer tint is its colour decision.
+
+## 10. Files touched
+
+- `app/src/data/inkPaint.js` — NEW: the paint-structure predicate + census.
+- `app/src/data/inkPaint.selfcheck.mjs` — NEW: structure function (incl. Q3 accent-blindness), census pin {985 total, 107 stroke-only, 813 fill-only, 46 mixed, 19 none}, exemplars both sides of every ruling, the poem-face sweep.
+- `app/src/gl/worldInk.selfcheck.mjs` — NEW: the pack seam (5 asset classes; only stroke-only packs the world ink; accents frozen; every other float identical; contract instances never mutated; strip-asset interaction; the stills combo-key behaviour — ink-baked cell found under a world, dealt bake awaited without one) + the pattern seam (changed pixels are exactly the ink colour and live only in stroke-only tiles; key behaviour; FIELD untouched).
+- `app/src/gl/renderer.mjs` — `effectiveInk` + packer/expansion/mesh consumption + `worldInk` closure + cellFrame ink spread + pattern frame ink argument.
+- `app/src/gl/parity/glDriver.mjs` — `comboInk` at both bake-combo collection sites.
+- `app/src/pattern/glyph.js` — `STROKE_OP_TYPES`, `isStrokeOnlyOps`.
+- `app/src/pattern/patternSource.js` — ink threading + `applyGlyphInk`.
+- `app/src/pattern/patternRender.selfcheck.mjs` — ONE source pin re-pinned at full strength: the renderer's frame-call shape gains the ink argument (the pin's own narration extended: "and, since #2104 Q2, the standing world's ink").
+- `app/selfcheck.manifest` — the two new suites, one line each beside `world.selfcheck`.
+
+## 11. Verification evidence
+
+- **New suites**: `inkPaint.selfcheck` OK (census reproduced exactly: 985 assets — 107 stroke-only, 813 fill-only, 46 mixed, 19 none; exemplars `line_squiggle_01/02`, `mic_wave`, `mic_chevrons`, `geo_circle_02`, `rad_rings_01` IN; `mic_dial`, `bio08`, `rad_rings_02`, `stamp_num_01`, `line_arrow_01` OUT as mixed; `mic_specbar_h/v`, `geo_tri_01` OUT as fill; every letterform + stamp face fill-only). `worldInk.selfcheck` OK (pack seam incl. the stills combo-key pins; pattern seam: seed-1234 GLYPH board, changed pixels exactly `toRgba(ink)` and only inside stroke-only tiles; world-less frame + keys byte-identical).
+- **Decisive suites, re-run on the final tree**: world, sceneContract, replayGate, creatureGate, allEraGolden, cellKinemePlayback, regionLines, regionPlayback, glyph, patternRender (22 checks, incl. the re-pinned frame-call shape), rasterFast, canon, response, composite — all PASS.
+- **Full manifest sweep** (continue-on-error loop over all 680 manifest commands): **676 PASS, 4 FAIL**, each failure accounted for:
+  - `swarmWasm` — fails identically on a clean `ea4ebfa7` checkout (exit 1 both trees). Sandbox-environmental.
+  - `rollSafety` — fails identically on base (exit 1 both trees). Sandbox-environmental.
+  - `accum` — dies by signal on BOTH trees in this sandbox (base: SIGABRT exit 134; this tree: V8 heap OOM abort, exit 134; in the sweep it was signal-killed under the same memory pressure). Never reaches an assertion on either tree; CI arbitrates, per the standing sandbox note.
+  - `liveLoop.dishFluid` — a live-frame MEDIAN assertion ("the body left as fully as it arrived"), load-sensitive: it failed in the sweep while other browser suites ran concurrently on the same box, and once more under post-restart load; run serially on a quiet box it PASSES on this tree (2 of 2) and on base (2 of 2). The slice's changes are colour-only and gated on a standing world, which this suite never sets. Verdict: intermittent load flake, evidenced — not a defect of this change.
+- **Lint**: 0 errors (11 pre-existing warnings, none in touched files). **format:check**: clean. **Build**: green (`npm run build`, exit 0; no @resvg error — no new eager imports were added to the entry graph: `inkPaint.js` imports only the asset catalogue, and the renderer already imports data modules).
+- **Source-shape pins**: `grep` of the selfchecks for the touched files found one standing pin on the old pattern frame-call shape (`patternRender.selfcheck`); re-pinned at full strength (§10). All other suites naming the touched files pass unmodified.
+
+
+## 12. Screenshots
+
+`~/workspace/goals/kinetic-curator-generative-art-instrument/hidden_files/ink-shots/{before,after}.png` — one fixed scene rendered through the parity candidate path by the base tree (before) and this tree (after): a GLYPH pattern board under a content layer, a world standing with ground `#101014` and ink `#b400ff` (praystation's own derived line ink). Before: line work in dealt yellow/teal/pink. After: every stroke-only unit — squiggles, rings, the circle outline, the board's line tiles — has taken the ink and reads as the magenta itself (their accent centre dots remain, per Q3); suns, X badges, letters, triangles and the spec bar keep their colours exactly. Measured diff: 16,642 of 700,000 pixels changed (2.38%), and every changed pixel lands on the ink colour family (183–184, 0, 204–205 after the display curve). A probe render with ink `#00ff00` (not a deliverable) made the reach visible directly, and an isolated six-instance `rad_rings_01` render showed every ring in the ink with only the accent centre dots keeping their colours.
+
+## 13. Visible-change verdict
+
+VISIBLE, as ruled: while a world stands, line work on stage — marks and glyph-board line tiles — draws in the world's ink. Fills, mixed drawings, accent lines, poem letters and UI are unchanged, and a world-less stage is byte-identical to base (replayGate / creatureGate / allEraGolden green; world-less pack output and pattern keys byte-identical by selfcheck).
+
