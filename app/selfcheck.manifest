@@ -690,3 +690,4 @@ node src/composition/dispatchPipe.selfcheck.mjs
 node src/composition/wireUndefendedPayload.selfcheck.mjs
 node src/gl/kinemeStack.selfcheck.mjs
 node src/gl/creatureRepipe.selfcheck.mjs
+node src/gl/instanceStreams.selfcheck.mjs

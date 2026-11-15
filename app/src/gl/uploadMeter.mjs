@@ -19,6 +19,7 @@ let frames = 0; // beginFrame() calls since reset
 let uploadedBytes = 0; // cumulative bytes handed to bufferSubData
 let changedBytes = 0; // cumulative bytes differing from last frame's shadow
 let uploadCalls = 0; // cumulative drawInstances uploads
+let streamBytes = 0; // #2183 WS4: bytes actually sent through the split streams (vs `uploadedBytes`, the legacy-equivalent)
 let callIndex = 0; // call slot within the current frame
 let shadows = []; // per-call-slot Uint8Array shadow of the last frame
 
@@ -57,12 +58,18 @@ export function noteUpload(bytes) {
   callIndex++;
 }
 
+/** #2183 WS4: record the bytes a split-stream draw really uploaded. */
+export function noteStreamBytes(n) {
+  streamBytes += n >>> 0;
+}
+
 /** Point-in-time read of the cumulative counters. */
 export function snapshot() {
   return {
     frames,
     uploadCalls,
     uploadedBytes,
+    streamBytes,
     changedBytes,
     changedPerUploaded: uploadedBytes > 0 ? changedBytes / uploadedBytes : Number.NaN,
   };
@@ -73,6 +80,7 @@ export function reset() {
   frames = 0;
   uploadedBytes = 0;
   changedBytes = 0;
+  streamBytes = 0;
   uploadCalls = 0;
   callIndex = 0;
   shadows = [];
