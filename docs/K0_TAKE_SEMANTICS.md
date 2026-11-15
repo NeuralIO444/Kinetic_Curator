@@ -116,6 +116,6 @@ The diagnosis of record stands: `Date.now` reaches the Director (`curator/taste.
 
 **Inherited by every kernel slice:** the tier law; the decision-seam reader list (named in the PR); a parity-harness property suite in place of any pin it retires; same-device repeatability as the replacement for bit-exactness; the readback cost stated against the frame budgets; the take's `simBackends` entry for its kernel.
 
-**Prerequisite probes (cheap, before K1 costing):** float render-target support (`EXT_color_buffer_float`) on the iPad Safari / Tauri WebView target — the WebGL2 ping-pong pattern depends on it, and it is the same ground the WebGPU spike (#2184) covers.
+**Prerequisite (already met on the desktop path):** float render targets. `gl/renderer.mjs` throws at startup without `EXT_color_buffer_float` (RGBA16F targets are in use today), so the WebGL2 ping-pong pattern adds no new capability requirement. What K1 must still probe is RGBA32F render-target and linear-filter support (`OES_texture_float_linear`) on any iPad-class device; the WebGPU spike (#2184) covers the same ground.
 
 **Not in K0:** any code, any selfcheck change, any fixture re-record, any kernel resolution or substepping choice (K1 costing), the culture's generation cadence under GPU residency (K2), the swarm integration scheme and cap (K3), and the retirement of the JS kernels (a ruling after K3).
