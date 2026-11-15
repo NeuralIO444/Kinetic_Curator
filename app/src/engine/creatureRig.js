@@ -192,6 +192,46 @@ export function sanitizeRig(raw) {
     }
     return { body: lbody, bones: [], linkage, ...(Object.keys(motion).length ? { motion } : {}) };
   }
+  // #2119 step 3.2 — the mobile: this door's second shape (§11 ruling 6 — one door for all rigs). A figure with
+  // no gait and no linkage has no native source to fall back to, so every bone must name a valid source: a bone
+  // whose motion is absent or invalid DROPS, and its subtree drops with it — a child cannot hang from a dropped
+  // parent, and the parents-first check below makes that mechanical. 'gait' and 'linkage' are invalid here
+  // (sanitizeBoneMotion under the 'mobile' skeleton drops both, exactly as it drops a tree's 'linkage'), the
+  // head grammar is invalid (ruling 5: limb grammar only, role 'limb'), and a mobile whose bones all drop is
+  // null, like a rig with no valid bones. A record that declares itself a mobile never falls through to the
+  // tree shape below.
+  if (raw && typeof raw === 'object' && raw.figure === 'mobile') {
+    if (!Array.isArray(raw.bones)) return null;
+    const out = [];
+    const seen = new Set();
+    for (const b of raw.bones) {
+      if (out.length >= MAX_BONES) break;
+      if (!b || typeof b !== 'object' || typeof b.id !== 'string' || !/^l\d\.\d$/.test(b.id) || seen.has(b.id))
+        continue;
+      if (b.role !== 'limb') continue;
+      if (b.parent !== null && !seen.has(b.parent)) continue;
+      if (![b.chain, b.x, b.y, b.angle, b.len].every(isNum)) continue;
+      if (b.x < -50 || b.x > 150 || b.y < -50 || b.y > 150 || b.len <= 0 || b.len > 100 || Math.abs(b.angle) > 720)
+        continue;
+      const motion = sanitizeBoneMotion(b.motion, 'mobile');
+      if (!motion) continue; // no valid source → the bone drops, and its subtree with it
+      seen.add(b.id);
+      out.push({
+        id: b.id,
+        role: b.role,
+        chain: b.chain,
+        parent: b.parent,
+        x: b.x,
+        y: b.y,
+        angle: b.angle,
+        len: b.len,
+        motion,
+      });
+    }
+    if (!out.length) return null;
+    const mbody = typeof raw.body === 'string' && raw.body.length <= 120 && !/[<>"'&]/.test(raw.body) ? raw.body : '';
+    return { figure: 'mobile', body: mbody, bones: out };
+  }
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.bones)) return null;
   const out = [];
   const seen = new Set();
@@ -541,8 +581,9 @@ function placeMark(it, m, i, glow, co, si, flip) {
  * spanning PART_FILL of the bone's length, its "up" along the bone) through the body mark's own transform.
  *
  * The governor's rungs (the #1433 region ladder, the same flags): `frozen` holds the rest pose; `collapsed` drops the
- * parts — the body alone, the cheapest creature. No other stage shapes to deal from (the creature soloed) → Davis
- * deals from the creature's own body shape.
+ * parts — the body alone, the cheapest creature. One exception (#2119 §11 ruling 7): a collapsed MOBILE leaves the
+ * stage entirely — its tile is dropped from the list, no hub remains. No other stage shapes to deal from (the
+ * creature soloed) → Davis deals from the creature's own body shape.
  *
  * @param {Array} instances the contract's instances (not mutated)
  * @param {Map<string, object>|null} overlayById customAssets by id
@@ -574,11 +615,23 @@ export function expandCreatureInstances(
     beastTrace = null,
   } = {},
 ) {
-  if (!overlayById || collapsed) return instances;
+  if (!overlayById) return instances;
   const rigOf = (id) => {
     const rec = overlayById.get(id);
     return rec && rec.category === 'creature' && rec.source === 'wetlab' ? sanitizeRig(rec.rig) : null;
   };
+  // #2119 §11 ruling 7 — under the collapsed rung a mobile leaves the stage ENTIRELY: no hub remains. A creature
+  // or a beast keeps its body (the unexpanded tile, below), so only mobile tiles are dropped here; with no mobile
+  // placed, the very array that came in goes back — a mobileless scene's contract is untouched.
+  if (collapsed) {
+    const mobileIds = new Set();
+    for (const it of instances) {
+      const rig = rigOf(it.asset);
+      if (rig && rig.figure === 'mobile') mobileIds.add(it.asset);
+    }
+    if (!mobileIds.size) return instances;
+    return instances.filter((it) => !mobileIds.has(it.asset));
+  }
   // #1947 — the family: the founder whose skeleton this creature carries (a founder is its own); its parts are dealt
   // by the founder's hand, so kin resemble each other, and kin shimmer together
   const familyOf = (id) => sanitizeKin(overlayById.get(id)?.kin) || String(id).replace(/^user:/, '');

@@ -25,7 +25,7 @@ import { COST_WARNING_THRESHOLD } from '../assets/ingest.js'; // #1871 — the c
 import { COMPOSITION_PRESETS } from '../data/presets.js';
 import { RISO_FIELD_LOOK_ID } from './risoField.mjs'; // #2008 — the picker-only Look stays off the dice
 import { creatureTileId } from './creatureTileId.js';
-import { creatureTileSvg, buildRig } from './creatureRig.js';
+import { creatureTileSvg, buildRig, sanitizeRig } from './creatureRig.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
 
 export const CREATURE_ASSEMBLY_KIND = 'kc-assembled/1';
@@ -782,5 +782,41 @@ export function creatureTile(record, bodyAsset, kin = null) {
     ...((rig) => (rig ? { rig } : {}))(buildRig(record)),
     // #1947 — a bred creature's family: the founder its skeleton descends from (a founder carries none — it is its own)
     ...(typeof kin === 'string' && kin !== record.id && /^cr-[0-9a-f]{8}$/.test(kin) ? { kin } : {}),
+  };
+}
+
+/** True for a mobile tile's pool id (the `user:` namespace + the kind + the baked rig's hash). */
+export const isMobileTileId = (id) => typeof id === 'string' && /^user:mobile-[0-9a-f]{8}$/.test(id);
+
+/**
+ * #2119 step 3.2 — the overlay entry for a mobile record, beside creatureTile (figures-spec §4). The record is
+ * the authored figure itself — `{ body: <hub asset id>, bones: [...] }` — its bones authored directly, because
+ * there are no H/L points to derive a rig from: roots carry their hang points on the hub, children hang from
+ * their parent's tip, and every bone names its motion source. `hubAsset` is the hub's own pool record (library
+ * or import); the hub may be any asset the wet lab can pick (§11 ruling 9). The tile's SVG is the hub's drawing
+ * through the same creatureTileSvg wrap a creature body gets; the bones ride as data in a rig marked
+ * `figure: 'mobile'`, baked through the same door that validates it on load (sanitizeRig's second shape), so a
+ * bone with no valid source never bakes. Returns null when the hub cannot be drawn or no valid bone remains.
+ * The tile id is a hash of the baked rig — the beast tile's pattern — so the same mobile always takes the same
+ * tile and a re-bake never banks a duplicate.
+ */
+export function mobileTile(record, hubAsset) {
+  const svg = creatureTileSvg(record, hubAsset && hubAsset.svg);
+  if (!svg) return null;
+  const rig = sanitizeRig({
+    figure: 'mobile',
+    body: record && record.body,
+    bones: record && record.bones,
+  });
+  if (!rig) return null;
+  return {
+    id: `user:mobile-${hash32(JSON.stringify(rig)).toString(16).padStart(8, '0')}`,
+    category: 'creature',
+    weight: hubAsset.weight || 'medium',
+    tags: ['creature', 'wetlab', 'mobile', rig.body],
+    compound: true,
+    source: 'wetlab',
+    svg,
+    rig,
   };
 }
