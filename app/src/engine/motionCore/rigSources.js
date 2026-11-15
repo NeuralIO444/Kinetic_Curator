@@ -9,6 +9,8 @@
 // registry, composed parent ∘ source; the part and region kinemes stay downstream in the contract, untouched). The
 // registry sources above are exactly P2b's; nothing but selfchecks imports this file until step 3.3 re-pipes the
 // expansion through poseFigure.
+// #2119 step 3.2: a mobile (a rig marked `figure: 'mobile'`) poses through poseMobileFigure — no native pass, no
+// gait: every bone composes locally from the authored rest, each on its own source.
 //
 // What a source needs rides in `ctx` (the registry's probe passes `{}` and gets rest back):
 //   gait:<FACE>     ctx.rig, optional ctx.phase (0..1 stride offset). One source per LOIS_GAITS entry.
@@ -303,15 +305,79 @@ function poseLinkageFigure(linkage, t, opts) {
 }
 
 /**
+ * A mobile posed (step 3.2; figures-spec §4): a figure with no gait and no linkage, so there is no native pass —
+ * every bone composes locally from the AUTHORED rest (the record is the truth for rest angles; poseRig's t = 0
+ * would bend the hang by a gait's crouch and knee, and a mobile has no gait). A root's joint is its authored hang
+ * point plus its source's offset; a child's joint is its parent's posed tip exactly, and its angle is its parent's
+ * posed angle + its authored local angle + its source's local delta — the same local composition as an off-pass
+ * tree bone, with the authored hang in place of the adapter's rest. The source evaluates at the part's own phase
+ * (§11 ruling 2), and `amount` multiplies the local delta. A source the registry does not hold — a `phrase:<id>`
+ * before P6 (#2118) registers the phrase sources — contributes nothing: the bone hangs at its authored rest while
+ * its subtree composes from it (the mobile's only native), the entry waiting for P6 exactly as a tree bone's does.
+ */
+function poseMobileFigure(rig, t, opts) {
+  const seedOffset = opts.seedOffset ?? 0;
+  const tileKey = opts.tileKey ?? '';
+  const posed = new Map();
+  const out = [];
+  for (const b of rig.bones) {
+    // no native source exists to match, so readBoneMotion's native arm never fires: 'gait' / 'linkage' entries
+    // (the door drops them; an unsanitized rig is read the same way) and unregistered sources read as absent
+    const m = readBoneMotion(b.motion, null);
+    let dRot = 0;
+    let dx = 0;
+    let dy = 0;
+    if (m && !m.native) {
+      const d = m.src.evaluate(
+        { key: b.id, seedOffset, phase01: kinemePhase(seedOffset, `${tileKey}#${b.id}`) },
+        t,
+        {},
+      );
+      dRot = (d.dRot || 0) * m.amount;
+      dx = (d.dx || 0) * m.amount;
+      dy = (d.dy || 0) * m.amount;
+    }
+    const parent = b.parent ? posed.get(b.parent) : null;
+    let x;
+    let y;
+    let angle;
+    if (parent) {
+      x = parent.tx;
+      y = parent.ty;
+      angle = parent.angle + b.angle + dRot;
+    } else {
+      x = b.x + dx;
+      y = b.y + dy;
+      angle = b.angle + dRot;
+    }
+    const p = {
+      id: b.id,
+      role: b.role,
+      x,
+      y,
+      tx: x + Math.cos(rad(angle)) * b.len,
+      ty: y + Math.sin(rad(angle)) * b.len,
+      angle,
+      len: b.len,
+    };
+    posed.set(b.id, p);
+    out.push(p);
+  }
+  return out;
+}
+
+/**
  * The whole figure posed at time t: posed bones in poseRig's / poseLinkage's own shape (joint, tip, angle, len —
  * the shape placePart consumes), honouring each bone's baked `motion` (step 3.1; figures-spec §6). A figure with
  * no motion anywhere returns the native evaluator's bones untouched — Object.is per bone. opts: `{ gait | face,
  * phase, drive, crank, motion, seedOffset, tileKey }` — seedOffset + tileKey are the placed copy's, so a kineme
- * bone evaluates at its own part's phase. For a roam pass opts.roam; the result is `{ body: delta }` with the
- * extension fields (including `moving`), as it has always been.
+ * bone evaluates at its own part's phase. A mobile (`figure: 'mobile'`) poses from its authored rest instead
+ * (step 3.2). For a roam pass opts.roam; the result is `{ body: delta }` with the extension fields (including
+ * `moving`), as it has always been.
  */
 export function poseFigure(figure, t, opts = {}) {
   if (opts.roam) return { body: roamEvaluate({ key: 'body' }, t, { roam: opts.roam }) };
+  if (figure && figure.figure === 'mobile' && Array.isArray(figure.bones)) return poseMobileFigure(figure, t, opts);
   if (figure && Array.isArray(figure.bones)) return poseTreeFigure(figure, t, opts);
   if (figure && figure.measures) return poseLinkageFigure(figure, t, opts);
   return [];
