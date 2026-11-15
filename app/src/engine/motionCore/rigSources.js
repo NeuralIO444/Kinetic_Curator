@@ -198,16 +198,32 @@ function poseTreeFigure(rig, t, opts) {
   if (!gait) throw new TypeError(`[rigSources] unknown gait "${String(name)}"`);
   const phase = Number.isFinite(opts.phase) ? opts.phase : 0;
   const native = poseRig(rig, t, gait, phase);
+  const nativeById = new Map(native.map((p) => [p.id, p]));
   const motions = new Map(rig.bones.map((b) => [b.id, readBoneMotion(b.motion, 'gait')]));
   const pass = new Map();
   for (const b of rig.bones) {
     const m = motions.get(b.id);
     pass.set(b.id, (b.parent === null || pass.get(b.parent)) && (!m || (m.native && m.amount === 1)));
   }
-  if (rig.bones.every((b) => pass.get(b.id))) return native;
+  // #2178 — the ferrofluid's pull (opts.pullSampler): a per-bone delta in rig units, sampled by the
+  // expansion at each bone's NATIVE (unpulled) joint + tip — the joint's position this frame before
+  // the pull bends it. poseFigure stays field-agnostic: the sampler is data-shaped like a source
+  // delta ({ dx, dy, dRot }) or null. A pulled bone leaves the native pass by the same mechanism a
+  // foreign-sourced bone does, and so do its descendants (their joints ride the pulled tip); a
+  // bone the sampler leaves alone is untouched — zero pull, bit-identical pose.
+  const sampler = typeof opts.pullSampler === 'function' ? opts.pullSampler : null;
+  const pulls = new Map();
+  if (sampler) {
+    for (const b of rig.bones) {
+      const np = nativeById.get(b.id);
+      if (!np) continue;
+      const pd = sampler(b.id, np.x, np.y, np.tx, np.ty);
+      if (pd) pulls.set(b.id, pd);
+    }
+  }
+  if (!pulls.size && rig.bones.every((b) => pass.get(b.id))) return native;
   const rest = poseRig(rig, 0, gait, phase);
   const restById = new Map(rest.map((p) => [p.id, p]));
-  const nativeById = new Map(native.map((p) => [p.id, p]));
   const gaitSrc = getMotionSource(gaitSourceId(name));
   const deltas = new Map();
   const gaitDelta = (id) => {
@@ -218,11 +234,14 @@ function poseTreeFigure(rig, t, opts) {
   const seedOffset = opts.seedOffset ?? 0;
   const tileKey = opts.tileKey ?? '';
   const posed = new Map();
+  const nativePushed = new Set();
   const out = [];
   for (const b of rig.bones) {
-    if (pass.get(b.id)) {
+    const pd = pulls.get(b.id);
+    if (!pd && pass.get(b.id) && (b.parent === null || nativePushed.has(b.parent))) {
       const p = nativeById.get(b.id);
       posed.set(b.id, p);
+      nativePushed.add(b.id);
       out.push(p);
       continue;
     }
@@ -245,6 +264,14 @@ function poseTreeFigure(rig, t, opts) {
       const amt = m ? m.amount : 1;
       dRot = (db.dRot - (dp ? dp.dRot : 0)) * amt;
       off = { dx: db.dx * amt, dy: db.dy * amt };
+    }
+    // the pull composes AFTER the bone's source delta (the survey's slot, §4b): its rotation
+    // adds for every bone; its offset lands in `off`, which only a root's joint reads — a
+    // child's joint is its parent's posed tip by construction, so the offset is root-only
+    // by the same construction that makes the source offset root-only.
+    if (pd) {
+      dRot += pd.dRot || 0;
+      off = { dx: off.dx + (pd.dx || 0), dy: off.dy + (pd.dy || 0) };
     }
     let x;
     let y;
@@ -285,25 +312,47 @@ function poseLinkageFigure(linkage, t, opts) {
   const base = poseLinkage(linkage, t, opts.drive, opts.crank);
   if (!base) return base; // a stillbirth poses as poseLinkage leaves it: null
   const map = opts.motion && typeof opts.motion === 'object' ? opts.motion : null;
-  if (!map) return base;
+  const sampler = typeof opts.pullSampler === 'function' ? opts.pullSampler : null;
+  if (!map && !sampler) return base;
   const seedOffset = opts.seedOffset ?? 0;
   const tileKey = opts.tileKey ?? '';
   const deltas = new Map();
-  for (const name of Object.keys(map)) {
-    const m = readBoneMotion(map[name], 'linkage');
-    if (!m || m.native) continue;
-    const d = m.src.evaluate({ key: name, seedOffset, phase01: kinemePhase(seedOffset, `${tileKey}#${name}`) }, t, {});
-    deltas.set(name, { dx: (d.dx || 0) * m.amount, dy: (d.dy || 0) * m.amount, dRot: (d.dRot || 0) * m.amount });
+  if (map) {
+    for (const name of Object.keys(map)) {
+      const m = readBoneMotion(map[name], 'linkage');
+      if (!m || m.native) continue;
+      const d = m.src.evaluate({ key: name, seedOffset, phase01: kinemePhase(seedOffset, `${tileKey}#${name}`) }, t, {});
+      deltas.set(name, { dx: (d.dx || 0) * m.amount, dy: (d.dy || 0) * m.amount, dRot: (d.dRot || 0) * m.amount });
+    }
   }
-  if (!deltas.size) return base;
-  return base.map((p) => {
-    const d = deltas.get(p.name);
-    if (!d) return p;
-    const x = p.x + d.dx;
-    const y = p.y + d.dy;
-    const angle = p.angle + d.dRot;
+  const applyDelta = (p, d) => {
+    const x = p.x + (d.dx || 0);
+    const y = p.y + (d.dy || 0);
+    const angle = p.angle + (d.dRot || 0);
     return { ...p, x, y, angle, tx: x + Math.cos(rad(angle)) * p.len, ty: y + Math.sin(rad(angle)) * p.len };
+  };
+  const posed = deltas.size
+    ? base.map((p) => {
+        const d = deltas.get(p.name);
+        return d ? applyDelta(p, d) : p;
+      })
+    : base;
+  if (!sampler) return posed;
+  // #2178 — the ferrofluid's pull: sampled per bar INSTANCE at the bar's base (unpulled)
+  // joint + tip and applied after the source deltas, with the map's own delta formula. It
+  // cannot ride the delta map itself: the map is keyed by bar NAME and a linkage's names
+  // repeat per leg, so a per-instance value merged into it would sum once per leg. The
+  // composition order is the survey's (§4b) either way — the bone's own delta first, the
+  // pull after — and a bar the sampler leaves alone keeps its map-posed object untouched.
+  let any = false;
+  const out = posed.map((p, i) => {
+    const b0 = base[i];
+    const pd = sampler(p.name, b0.x, b0.y, b0.tx, b0.ty);
+    if (!pd) return p;
+    any = true;
+    return applyDelta(p, pd);
   });
+  return any ? out : posed;
 }
 
 /**
@@ -320,6 +369,7 @@ function poseLinkageFigure(linkage, t, opts) {
 function poseMobileFigure(rig, t, opts) {
   const seedOffset = opts.seedOffset ?? 0;
   const tileKey = opts.tileKey ?? '';
+  const sampler = typeof opts.pullSampler === 'function' ? opts.pullSampler : null;
   const posed = new Map();
   const out = [];
   for (const b of rig.bones) {
@@ -340,6 +390,21 @@ function poseMobileFigure(rig, t, opts) {
       dy = (d.dy || 0) * m.amount;
     }
     const parent = b.parent ? posed.get(b.parent) : null;
+    // #2178 — the ferrofluid's pull, sampled at the bone's composed joint + tip BEFORE its own
+    // pull lands (a mobile has no native pose to sample at — the composed pre-pull pose is its
+    // current position), composed after the source delta exactly as in the tree: rotation for
+    // every bone, offset only where the composition reads it (the root's joint, below).
+    if (sampler) {
+      const jx = parent ? parent.tx : b.x + dx;
+      const jy = parent ? parent.ty : b.y + dy;
+      const ja = parent ? parent.angle + b.angle + dRot : b.angle + dRot;
+      const pd = sampler(b.id, jx, jy, jx + Math.cos(rad(ja)) * b.len, jy + Math.sin(rad(ja)) * b.len);
+      if (pd) {
+        dRot += pd.dRot || 0;
+        dx += pd.dx || 0;
+        dy += pd.dy || 0;
+      }
+    }
     let x;
     let y;
     let angle;
@@ -372,10 +437,16 @@ function poseMobileFigure(rig, t, opts) {
  * The whole figure posed at time t: posed bones in poseRig's / poseLinkage's own shape (joint, tip, angle, len —
  * the shape placePart consumes), honouring each bone's baked `motion` (step 3.1; figures-spec §6). A figure with
  * no motion anywhere returns the native evaluator's bones untouched — Object.is per bone. opts: `{ gait | face,
- * phase, drive, crank, motion, seedOffset, tileKey }` — seedOffset + tileKey are the placed copy's, so a kineme
+ * phase, drive, crank, motion, seedOffset, tileKey, pullSampler }` — seedOffset + tileKey are the placed copy's, so a kineme
  * bone evaluates at its own part's phase. A mobile (`figure: 'mobile'`) poses from its authored rest instead
  * (step 3.2). For a roam pass opts.roam; the result is `{ body: delta }` with the extension fields (including
  * `moving`), as it has always been.
+ *
+ * `pullSampler` (#2178) is the ferrofluid's door: `(key, jointX, jointY, tipX, tipY) → { dx, dy, dRot } | null`
+ * in rig units, built by the expansion (which owns the tile transform and the field read) and composed by
+ * every poser after the bone's own source delta — rotation for every bone, offset for roots (tree/mobile)
+ * and for bars (linkage, applied per bar instance after the name-keyed delta map, since a linkage's bar
+ * names repeat per leg). Absent, or null at a bone, the pose is exactly what it was before the channel existed.
  */
 export function poseFigure(figure, t, opts = {}) {
   if (opts.roam) return { body: roamEvaluate({ key: 'body' }, t, { roam: opts.roam }) };

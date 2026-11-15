@@ -158,7 +158,7 @@ ok('resolveLayerMattes: valid, self-cycle, 2-cycle, missing, fx source', () => {
 // in Node we prove the audit table is complete and honest: every uniform
 // each shader declares is in its program's upload list — the exact
 // direction the checked audit throws on.
-ok('harness: RENDERER_PROGRAMS covers all eight renderer programs', () => {
+ok('harness: RENDERER_PROGRAMS covers all nine renderer programs', () => {
   const keys = RENDERER_PROGRAMS.map((d) => d.key).sort();
   // #1932 re-pin (cause: the plate program retired with the plate — the FIELD poem is instances
   // now, so the #1928 tint-blit program no longer exists): eight programs → seven.
@@ -167,7 +167,20 @@ ok('harness: RENDERER_PROGRAMS covers all eight renderer programs', () => {
   // invisible, assets attach to it, so there is no floor program): eight programs → seven.
   // #2038 re-pin (cause: per-stratum rotation — the rotcopy turn program
   // joins the table): seven programs → eight.
-  assert.deepEqual(keys, ['composite', 'copy', 'mesh', 'quad', 'resolve', 'rotcopy', 'upscale', 'wetlook']);
+  // #2178 re-pin (cause: the ferrofluid's field-body channel joins the table — FIELD_VS seats
+  // the pooled body from gl_InstanceID against the density texture, QUAD_FS shades it; the
+  // FIELD stays undrawn, this program draws only the body): eight programs → nine.
+  assert.deepEqual(keys, [
+    'composite',
+    'copy',
+    'fieldBody',
+    'mesh',
+    'quad',
+    'resolve',
+    'rotcopy',
+    'upscale',
+    'wetlook',
+  ]);
   for (const def of RENDERER_PROGRAMS) {
     assert.equal(typeof def.vs, 'string', `${def.key}: has vertex source`);
     assert.equal(typeof def.fs, 'string', `${def.key}: has fragment source`);

@@ -42,6 +42,8 @@ import '../engine/motionCore/kinemeSources.js'; // #2119 step 3.3 — registrati
 import { contractLight } from '../data/light.js';
 import { sanitizeWorld } from '../data/world.js'; // #2104: the Canon world record
 import { chapterStyleResponse, applyMaterialLight } from '../data/canon/response.js'; // #2104 Q2: the standing style's material answers the sun
+import { sanitizeFieldBody } from '../engine/dishFluidChannel.mjs'; // #2178: the ferrofluid's GPU field-body descriptor (the door)
+import { sanitizeMagnets, FLUID_GRID_COLS, FLUID_GRID_ROWS } from '../engine/dishFluid.mjs'; // #2178: the pull field's magnet door + dish grid
 import {
   KINEME_KINDS,
   KINEME_TABLE_MAX,
@@ -540,6 +542,35 @@ export function contractShadow(rl, groundBelow, shed) {
   return { amount: Math.round(Math.min(1, a) * 1000) / 1000, color: darkestSwatch(rl.palette) };
 }
 
+/**
+ * #2178 — the ferrofluid's pull field for the creature expansion, read off the doc the loop
+ * builds from the resolver's plan: { density, magnets, pull, aspectHW, W, H } or null. The
+ * density array is validated by shape only (it is the fluid stage's own published array,
+ * never retained past the frame); the magnets go through the kernel's door. The field is
+ * consumed by the expansion's pull samplers and never lands on the contract — the pull is a
+ * pose input, and the poses it bends are already the contract's instances.
+ */
+function pullFieldOf(doc) {
+  const raw = doc && doc.fluidPull;
+  if (!raw || typeof raw !== 'object') return null;
+  const density = raw.density;
+  if (!density || typeof density.length !== 'number' || density.length !== FLUID_GRID_COLS * FLUID_GRID_ROWS)
+    return null;
+  const W = Number(raw.W);
+  const H = Number(raw.H);
+  if (!(W > 0) || !(H > 0)) return null;
+  const pull = Number(raw.pull);
+  const aspectHW = Number(raw.aspectHW);
+  return {
+    density,
+    magnets: sanitizeMagnets(raw.magnets),
+    pull: Number.isFinite(pull) ? Math.min(1, Math.max(0, pull)) : 0,
+    aspectHW: Number.isFinite(aspectHW) && aspectHW > 0 ? aspectHW : H / W,
+    W,
+    H,
+  };
+}
+
 export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = null }) {
   if (!doc || typeof doc !== 'object') throw new TypeError('buildSceneContract: doc required');
   if (!Array.isArray(resolvedLayers)) throw new TypeError('buildSceneContract: resolvedLayers required');
@@ -736,6 +767,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       const expanded = expandCreatureInstances(instances, overlayById, {
         fitOf,
         poseFigure,
+        pullField: pullFieldOf(doc), // #2178 — the ferrofluid's pull, when the frame's fluid runs
         sourcePalette: sourcePalette.length ? sourcePalette : null,
         pileOnly: Array.isArray(doc.kitPool) && doc.kitPool.length ? new Set(doc.kitPool.map(String)) : null,
         seed: Number(doc.seed) || 0,
@@ -941,6 +973,16 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     ...(() => {
       const world = sanitizeWorld(doc.world);
       return world ? { world } : {};
+    })(),
+    // #2178 — the ferrofluid's GPU field-body descriptor (engine/dishFluidChannel.mjs): the
+    // vocabulary, ink, seed, floor, budget and scale law the renderer seats the fluid's body
+    // from, against the density it receives out of band. Key omitted when no fluid runs, so
+    // a fluid-less contract (and its hash) is exactly what it was before the channel existed.
+    // The contract is not the hashed surface, so the descriptor costs the take story nothing;
+    // the density itself never enters the contract.
+    ...(() => {
+      const fb = sanitizeFieldBody(doc.fieldBody);
+      return fb ? { fieldBody: fb } : {};
     })(),
     // #594 PR3 — squash-and-stretch amount (scene-level, like the sun). Key
     // omitted at 0 so every existing contract and its hash are unchanged.

@@ -2,7 +2,7 @@
 
 - **What:** one scripted 60-second performance, recorded through the app's real recording taps
   (the performance recorder on the resolve taps, the spectrum recorder on the spectrum tap).
-- **File:** `replayGate.kcperf` — 144276 bytes, sha256 `a47a296758d50bc0585f4e4155c81d0c2fb5fd732da519de9cbb84d0ac687733`.
+- **File:** `replayGate.kcperf` — 144315 bytes, sha256 `c958c9f9e71c5f426676b8a15fce2c53ce126c2813ddb7236c9a465e2215fcc6`.
 - **Frames:** 3601 (0..3600), 61 checkpoints (every 60 frames).
 - **Seed:** 1234 (changed to 77 at frame 3001, as the script's artist changes it).
 - **Look:** layout params from the generator script: swarm/scatter, count 220→260 at frame 900,
@@ -13,7 +13,7 @@
   the hearing playback will reproduce. The gate's checkpoint comparison covers the resolver
   chain, which is what a take's hashes are made of; the marks ride the render contract, not
   the resolver, and never entered the chain.
-- **Recorded with:** `node scripts/recordReplayGateFixture.mjs` on commit `262a4f64`.
+- **Recorded with:** `node scripts/recordReplayGateFixture.mjs` on commit `92d77144`.
 - **Re-record:** run the same command. It is deterministic — the sha256 must be identical unless
   behaviour changed. When an intentional behaviour change moves the replay, re-record in the same
   PR and say so in its body, with the reason. Never re-record just to make a red gate green.
@@ -44,3 +44,9 @@
   removed from the authored index (scratch tree, every other #1854 file in place) the
   pre-refresh fixture verifies byte-for-byte on this tree — the divergence is the catalog
   growth, only the growth; the refresh is deterministic (the tool's two-run check).
+- **#2178 re-record (2026-11-15, Matt's clean-break ruling on the issue):** PERFORMANCE_VERSION
+  2 → 3 — the fluid body left the hashed resolver output, so v2 takes retire and the parser
+  refuses them. This take carries no fluid; re-recorded with the same command on the #2178
+  branch: sha256 9253b8bf… → c958c9f9…, 144283 → 144315 bytes. Control: all 61 checkpoint
+  hashes are byte-identical to the v2 fixture's (read with the pre-bump parser on clean
+  main) — the envelope version is the only change; the recorded session replays exactly.

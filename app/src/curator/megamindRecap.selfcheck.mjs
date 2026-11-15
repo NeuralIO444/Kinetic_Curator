@@ -96,7 +96,7 @@ function fixtureTake() {
   decision('davis', 3, { propose: null, state: { id: 'FLOW', intensity: 1, decay: 0 } });
   return {
     format: 'kc-performance',
-    version: 2,
+    version: 3, // #2178: PERFORMANCE_VERSION 3 — synthetic takes are built at the current version
     kernelVersion: 'test',
     frames: 600,
     truncated: false,
@@ -142,7 +142,7 @@ function fixtureTake() {
 function fixtureCapture() {
   return {
     format: 'kc-performance',
-    version: 2,
+    version: 3, // #2178: PERFORMANCE_VERSION 3 — synthetic takes are built at the current version
     kernelVersion: 'test',
     frames: 300,
     truncated: false,

@@ -277,8 +277,22 @@ function regionAssetsFor(contract) {
  * Build the page payload for a scene contract (atlas + grain LUTs + wrap
  * boxes), shared by renderViaGL and the perf probe.
  */
-export function buildRenderPayload(contract, { width = 400, height = 280, bg = '#0a0a0a', wet = null } = {}) {
+export function buildRenderPayload(
+  contract,
+  { width = 400, height = 280, bg = '#0a0a0a', wet = null, fieldBody = null } = {},
+) {
   const combos = contract.instances.map((it) => ({ asset: it.asset, ink: comboInk(contract, it), accent: it.accent }));
+  // #2178 — the field body's vocabulary bakes like any other combo (the descriptor's ink
+  // for both tints, plus the world's ink for the tint while a world stands — the cells the
+  // renderer's vocabulary texture looks up), and its density ferries as base64 raw bytes
+  // (the age-buffer precedent), decoded harness-side into the payload's fieldBody slot.
+  if (contract.fieldBody) {
+    const fbInk = contract.fieldBody.ink;
+    for (const id of contract.fieldBody.vocab) combos.push({ asset: id, ink: fbInk, accent: fbInk });
+    if (contract.world) {
+      for (const id of contract.fieldBody.vocab) combos.push({ asset: id, ink: contract.world.ink, accent: fbInk });
+    }
+  }
   const atlas = getAtlas(combos, regionAssetsFor(contract));
   const cells = {};
   for (const [k, v] of atlas.cells)
@@ -289,6 +303,13 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
     height,
     bg,
     wet, // #1815: the warmed field (wetExportPayload form) or null
+    fieldBody: fieldBody
+      ? {
+          densityB64: Buffer.from(new Float32Array(fieldBody.density).buffer).toString('base64'),
+          blockedB64: fieldBody.blocked ? Buffer.from(fieldBody.blocked).toString('base64') : null,
+          step: fieldBody.step | 0,
+        }
+      : null,
     contract,
     cells,
     atlasB64: b64Pieces(atlas.pixels),
