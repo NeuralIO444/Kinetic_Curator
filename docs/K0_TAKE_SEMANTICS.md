@@ -55,7 +55,7 @@ Readers this touches (named from the open issues; K1/K2 each re-verify their own
 
 - Ferro body seating (#2178 / PR #2190) — already presentation-class under the clean break.
 - Culture ↔ fluid coupling — becomes shader-space (K2); both Tier S.
-- DISH LIFE force on assets (#2152) — must be post-contract displacement, or stamped if it ever makes a discrete choice. This is the one most likely to be built wrong; K2 should resolve it before building.
+- DISH LIFE force on assets (#2152) — **ruled (Matt, 2026-11-15): post-contract presentation (Tier P).** It displaces marks after the contract is resolved and never writes resolver state; if it ever makes a discrete choice, that choice is stamped as a recorded input instead. This is the one most likely to be built wrong; K2's PR must name it as Tier P.
 - Finger painting into the dish (#2153) — the **act** is Tier D (a recorded performer input); its **effect** on the fields is Tier S.
 
 **R3 (recommend: adopt).** The seam rule as stated. Corollary for K1–K3: each slice's PR lists every reader of its field and names its tier.
