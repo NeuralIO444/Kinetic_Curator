@@ -4,6 +4,9 @@
 // Every source is registered and obeys the anchor law; every delta is exactly `pose − rest` of what poseRig / poseLinkage /
 // roamAt return (Object.is), and rest + delta is the pose to within one ulp; the three kinematic files are untouched and
 // nothing outside this selfcheck imports the adapter.
+// #2119 step 3.1 grew poseFigure (posed bones, bone.motion) and creatureRig's acceptance: the poseFigure assertions
+// below were re-expressed at the grown contract, and the untouched-files guard dropped creatureRig.js (see its note).
+// The sources themselves — this suite's subject — are unchanged.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -134,16 +137,19 @@ ok('gaits: 3 rigs × 5 gaits × 6 times — each delta is exactly poseRig(t) −
           });
         }
   assert.ok(cells >= 900, `${cells} cells`);
-  // a rig really moves somewhere (the check is not vacuously zero)
+  // a rig really moves somewhere (the check is not vacuously zero). #2119 step 3.1: poseFigure returns posed
+  // bones now (the figurePose suite owns its full contract); this is its smoke — the pose differs from rest.
   const moved = poseFigure(RIGS[0], 0.3, { gait: 'BURN' });
-  assert.ok(Object.values(moved).some((d) => d.dRot !== 0));
+  const rest0 = poseRig(RIGS[0], 0, LOIS_GAITS.BURN, 0);
+  assert.ok(moved.some((p, i) => p.angle !== rest0[i].angle || p.x !== rest0[i].x), 'the figure actually moves');
 });
 
 ok('gaits: the sources keep the poseRig rules (phase offsets the stride, a frozen t = 0 is rest, unknown gait refused)', () => {
   const a = poseFigure(RIGS[0], 0.8, { gait: 'NOD', phase: 0 });
   const b = poseFigure(RIGS[0], 0.8, { gait: 'NOD', phase: 0.5 });
   assert.notDeepEqual(a, b);
-  assert.deepEqual(poseFigure(RIGS[0], 0, { gait: 'CUT' })['h'], { dx: 0, dy: 0, dRot: 0, dtx: 0, dty: 0, dlen: 0 });
+  // #2119 step 3.1: at t = 0 poseFigure poses the rest pose itself (posed bones, not deltas)
+  assert.deepEqual(poseFigure(RIGS[0], 0, { gait: 'CUT' }), poseRig(RIGS[0], 0, LOIS_GAITS.CUT, 0));
   assert.throws(() => poseFigure(RIGS[0], 1, { gait: 'NOPE' }), /unknown gait/);
 });
 
@@ -165,7 +171,10 @@ ok('linkage: 2 linkages × 6 times × drives — each delta is exactly poseLinka
         });
       }
   assert.ok(cells > 500, `${cells} cells`);
-  assert.ok(Object.values(poseFigure(LINKAGES[0], 0.4)).some((d) => d.dx !== 0 || d.dy !== 0));
+  // #2119 step 3.1: poseFigure returns the posed bars themselves — they differ from the rest pose somewhere
+  const posedBars = poseFigure(LINKAGES[0], 0.4);
+  const restBars = poseLinkage(LINKAGES[0], 0);
+  assert.ok(posedBars.some((p, i) => p.x !== restBars[i].x || p.y !== restBars[i].y), 'the linkage actually moves');
 });
 
 ok('linkage: the roam hands in its bank phases through ctx.crank, as expandBeast does', () => {
@@ -220,19 +229,23 @@ ok('the census: only the adapter adds sources here, and no source is a clock', (
   assert.equal(/Date\.now|performance\.now|Math\.random/.test(text), false, 'no clock, no chance');
 });
 
-ok('no behaviour change: the kinematic files are untouched and nothing outside selfchecks imports the adapter', () => {
+ok('no behaviour change: beastRig and beastRoam are untouched, and nothing outside selfchecks imports the adapter', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   let changed = '';
   try {
     changed = execFileSync(
       'git',
-      ['diff', '--name-only', 'origin/main', '--', 'src/engine/creatureRig.js', 'src/engine/beastRig.js', 'src/engine/beastRoam.js'],
+      ['diff', '--name-only', 'origin/main', '--', 'src/engine/beastRig.js', 'src/engine/beastRoam.js'],
       { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
     ).trim();
   } catch {
     changed = ''; // no git / no origin/main in this checkout: the import scan below still runs
   }
-  assert.equal(changed, '', 'creatureRig.js, beastRig.js, beastRoam.js unedited');
+  assert.equal(changed, '', 'beastRig.js, beastRoam.js unedited');
+  // creatureRig.js left this list at #2119 step 3.1: that step grew buildRig / sanitizeRig there (the bone.motion
+  // acceptance, figures-spec §2) — a later phase of the same epic, sanctioned by its issue. poseRig's behaviour is
+  // pinned instead by the figurePose parity suite (poseFigure ≡ poseRig, Object.is per bone), a stronger pin than
+  // file identity. The import scan below is unchanged.
   const hits = [];
   const walk = (dir) => {
     for (const f of readdirSync(dir)) {

@@ -32,6 +32,7 @@ import {
 import { roamAt, sanitizeRoam } from './beastRoam.js'; // #1867 — the travelling home
 import { traceMarks } from './beastTrace.js'; // #1868 S5b — the dish writing
 import { libraryTraits } from '../data/assetDescriptor.js'; // the baked traits of the library
+import { KINEMES, KINEME_STACKS } from '../data/kinemes.js'; // #2119 §2 — a bone's kineme source must name a real library id
 
 /** Where the body sits inside the tile's 100-unit box: small enough that the bones have room to reach. */
 export const TILE_BODY_SCALE = 0.55;
@@ -132,12 +133,44 @@ export function buildRig(record) {
       });
     }
   });
+  // #2119 §2 — the record's motion map (keyed by bone id) bakes onto the bones it names; only the two fields ride.
+  // sanitizeRig validates the baked form at the door, so an invalid entry never survives a load.
+  if (record.motion && typeof record.motion === 'object') {
+    for (const b of bones) {
+      const m = record.motion[b.id];
+      if (m && typeof m === 'object') {
+        b.motion = { source: m.source };
+        if (m.amount !== undefined) b.motion.amount = m.amount;
+      }
+    }
+  }
   // the body's own asset id rides along: when the stage places nothing else (the creature soloed), Davis deals from
   // the shape the creature is made of
   return bones.length ? { body: String(record.body || ''), bones: bones.slice(0, MAX_BONES) } : null;
 }
 
 const isNum = (n) => typeof n === 'number' && Number.isFinite(n);
+
+// #2119 (figures-spec §2) — a bone's motion source, baked form: { source, amount? }. The source grammar is the
+// spec's; a kineme id must exist in the library (singles and P5 stacks alike — `rock` and `rock+bob` are both just
+// ids); a phrase id is syntax only until P6 (#2118) defines the namespace. The source must fit the figure's
+// skeleton: 'gait' is a tree figure's native, 'linkage' a linkage figure's. An invalid entry is dropped, never
+// the rig — the bone falls back to absent (its native source). `amount` must be finite and clamps to [0, 2]
+// (§11 ruling 3).
+const MOTION_SOURCE_RE = /^(gait|linkage|kineme:[a-z0-9][a-z0-9+_-]*|phrase:[a-z0-9][a-z0-9+_-]*)$/;
+const LIBRARY_KINEME_IDS = new Set([...KINEMES, ...KINEME_STACKS].map((k) => k.id));
+function sanitizeBoneMotion(raw, skeleton) {
+  if (!raw || typeof raw !== 'object' || typeof raw.source !== 'string' || !MOTION_SOURCE_RE.test(raw.source))
+    return null;
+  if (raw.source === 'gait' && skeleton !== 'tree') return null;
+  if (raw.source === 'linkage' && skeleton !== 'linkage') return null;
+  if (raw.source.startsWith('kineme:') && !LIBRARY_KINEME_IDS.has(raw.source.slice('kineme:'.length))) return null;
+  if (raw.amount !== undefined && !isNum(raw.amount)) return null;
+  const out = { source: raw.source };
+  if (raw.amount !== undefined) out.amount = Math.min(2, Math.max(0, raw.amount));
+  return out;
+}
+
 /**
  * The trust boundary for a tile's rig (the overlay door re-runs it on every load): bones with known shapes only,
  * parents listed before children, numbers inside sane bounds. Null when nothing valid remains.
@@ -148,7 +181,16 @@ export function sanitizeRig(raw) {
     const linkage = sanitizeLinkage(raw.linkage);
     if (!linkage) return null;
     const lbody = typeof raw.body === 'string' && raw.body.length <= 120 && !/[<>"'&]/.test(raw.body) ? raw.body : '';
-    return { body: lbody, bones: [], linkage };
+    // #2119 §2 — a beast's motion map rides the rig itself (a linkage has no baked bone records to hang the field
+    // on), keyed by bar name; the beam is a name of its own. Only the names a bar can carry are read.
+    const motion = {};
+    if (raw.motion && typeof raw.motion === 'object') {
+      for (const name of [...LINKAGE_BAR_NAMES, BEAM_ID]) {
+        const m = sanitizeBoneMotion(raw.motion[name], 'linkage');
+        if (m) motion[name] = m;
+      }
+    }
+    return { body: lbody, bones: [], linkage, ...(Object.keys(motion).length ? { motion } : {}) };
   }
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.bones)) return null;
   const out = [];
@@ -163,7 +205,19 @@ export function sanitizeRig(raw) {
     if (b.x < -50 || b.x > 150 || b.y < -50 || b.y > 150 || b.len <= 0 || b.len > 100 || Math.abs(b.angle) > 720)
       continue;
     seen.add(b.id);
-    out.push({ id: b.id, role: b.role, chain: b.chain, parent: b.parent, x: b.x, y: b.y, angle: b.angle, len: b.len });
+    // #2119 §2 — the bone's baked motion entry, validated; an invalid one is dropped and the bone keeps no field
+    const motion = sanitizeBoneMotion(b.motion, 'tree');
+    out.push({
+      id: b.id,
+      role: b.role,
+      chain: b.chain,
+      parent: b.parent,
+      x: b.x,
+      y: b.y,
+      angle: b.angle,
+      len: b.len,
+      ...(motion ? { motion } : {}),
+    });
   }
   if (!out.length) return null;
   const body = typeof raw.body === 'string' && raw.body.length <= 120 && !/[<>"'&]/.test(raw.body) ? raw.body : '';

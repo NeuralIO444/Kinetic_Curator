@@ -1,9 +1,14 @@
 // engine/motionCore/rigSources.js — Motion Core P2b (#2114, epic #2109): the rig adapter.
 //
 // The assembled creature's gaits (creatureRig.poseRig), the beast's linkage (beastRig.poseLinkage) and the beast's roam
-// (beastRoam.roamAt) as motion sources. NO BEHAVIOUR CHANGE: nothing but the selfcheck imports this file, and the three
-// kinematic files are untouched. Every number here comes from calling poseRig / poseLinkage / roamAt, never from
+// (beastRoam.roamAt) as motion sources. Every number here comes from calling poseRig / poseLinkage / roamAt, never from
 // re-implementing them; a source's delta is `pose(t) − pose(0)`, so the anchor law holds by construction.
+//
+// #2119 step 3.1 (P7, figures-spec §6): poseFigure grew from a per-bone delta view into the figure poser — it returns
+// POSED bones (the shape placePart consumes) and honours each bone's baked `motion` (per-bone sources through the
+// registry, composed parent ∘ source; the part and region kinemes stay downstream in the contract, untouched). The
+// registry sources above are exactly P2b's; nothing but selfchecks imports this file until step 3.3 re-pipes the
+// expansion through poseFigure.
 //
 // What a source needs rides in `ctx` (the registry's probe passes `{}` and gets rest back):
 //   gait:<FACE>     ctx.rig, optional ctx.phase (0..1 stride offset). One source per LOIS_GAITS entry.
@@ -20,10 +25,11 @@
 // Exactness: a delta is exactly `pose − rest` (Object.is). `rest + delta` is that pose to within one ulp, not always
 // bit-for-bit: in IEEE doubles `a + (b − a)` is not always `b` (measured 4/1710 on the poseRig fixtures).
 import { registerCostTier } from '../kernel/costRegistry.mjs';
-import { registerMotionSource } from './index.js';
-import { LOIS_GAITS, poseRig } from '../creatureRig.js';
+import { registerMotionSource, getMotionSource } from './index.js';
+import { LOIS_GAITS, gaitFor, poseRig } from '../creatureRig.js';
 import { poseLinkage } from '../beastRig.js';
 import { roamAt } from '../beastRoam.js';
+import { kinemePhase } from '../../data/kinemes.js';
 
 export const RIG_COST_TIER = 'motionCore/rig-adapter';
 registerCostTier(RIG_COST_TIER, { tier: 0, notes: 'Motion Core P2b: the rig adapter evaluates the existing rig kinematics, nothing new' });
@@ -136,29 +142,177 @@ for (const s of SPECS) registerMotionSource({ ...s, costTier: RIG_COST_TIER });
 /** The ids this adapter registers, in order. */
 export const RIG_SOURCE_IDS = Object.freeze(SPECS.map((s) => s.id));
 
-const evaluators = new Map([
-  ...Object.keys(LOIS_GAITS).map((name) => [gaitSourceId(name), gaitEvaluate(name)]),
-  [LINKAGE_SOURCE_ID, linkageEvaluate],
-  [ROAM_SOURCE_ID, roamEvaluate],
-]);
+// ---- #2119 step 3.1: poseFigure honours bone.motion (figures-spec §2, §6)
+
+const rad = (d) => (d * Math.PI) / 180;
+const BONE_SOURCE_RE = /^(gait|linkage|kineme:[a-z0-9][a-z0-9+_-]*|phrase:[a-z0-9][a-z0-9+_-]*)$/;
+const clampAmount = (v) => (Number.isFinite(v) ? Math.min(2, Math.max(0, v)) : 1);
 
 /**
- * The whole figure's deltas at time t, through the sources: `{ [boneId]: delta }` for a rig (opts.gait: a LOIS_GAITS name,
- * default 'NOD'; opts.phase) or a linkage (opts.linkage; opts.drive; opts.crank). For a roam pass opts.roam; the result is
- * `{ body: delta }` with the extension fields (including `moving`). Rest → every delta is zero.
+ * One baked bone's motion entry, read for posing. sanitizeRig is the door and has already validated the record;
+ * anything unparseable here is read as absent, exactly as a dropped entry is. A source the registry does not hold
+ * — a `phrase:<id>` before P6 (#2118) registers the phrase sources — is likewise absent at pose time: the entry
+ * (its amount included) waits for P6 and the bone poses natively meanwhile. Returns null for absent, else
+ * `{ source, amount, native, src? }`.
+ */
+function readBoneMotion(motion, nativeSource) {
+  if (!motion || typeof motion !== 'object' || typeof motion.source !== 'string' || !BONE_SOURCE_RE.test(motion.source))
+    return null;
+  if (motion.source === nativeSource)
+    return { source: motion.source, amount: clampAmount(motion.amount), native: true };
+  if (motion.source === 'gait' || motion.source === 'linkage') return null; // the other skeleton's native: the door drops it
+  const src = getMotionSource(motion.source);
+  if (!src) return null;
+  return { source: motion.source, amount: clampAmount(motion.amount), native: false, src };
+}
+
+/** The gait name a tree figure poses under: an explicit opts.gait, else Lois's face (opts.face) through gaitFor. */
+function gaitNameOf(opts) {
+  if (opts.gait !== undefined && opts.gait !== null) return opts.gait;
+  if (opts.face !== undefined && opts.face !== null) {
+    const rec = gaitFor(opts.face);
+    return Object.keys(LOIS_GAITS).find((n) => LOIS_GAITS[n] === rec) || 'NOD';
+  }
+  return 'NOD';
+}
+
+/**
+ * A tree figure posed: poseRig's own bones for the native pass, local composition for the rest (§6). The native
+ * pass is a bone on its native source at amount 1 over native-pass ancestors — ancestry included, bit-identical,
+ * because those bones ARE poseRig's output objects. Any other bone composes from its parent's posed bone: a child
+ * hangs from its parent's posed tip (its joint rides the tip by construction, so a source offset never moves a
+ * child's joint), its angle is its parent's posed angle + its rest local angle + its local delta; a root's joint
+ * is its rest joint plus its offset. The local delta: for a kineme source, the source's own pose (evaluated at the
+ * part's own phase — §11 ruling 2); for a native source off the pass (amount ≠ 1, or a foreign ancestor), the
+ * adapter's local form of its world delta — its own dRot minus its parent's. `amount` multiplies the local delta.
+ * Rest is the adapter's rest, poseRig at t = 0 — the only rest under which a native bone at amount 1 under a
+ * native parent composes to exactly its native pose.
+ */
+function poseTreeFigure(rig, t, opts) {
+  const name = gaitNameOf(opts);
+  const gait = LOIS_GAITS[name];
+  if (!gait) throw new TypeError(`[rigSources] unknown gait "${String(name)}"`);
+  const phase = Number.isFinite(opts.phase) ? opts.phase : 0;
+  const native = poseRig(rig, t, gait, phase);
+  const motions = new Map(rig.bones.map((b) => [b.id, readBoneMotion(b.motion, 'gait')]));
+  const pass = new Map();
+  for (const b of rig.bones) {
+    const m = motions.get(b.id);
+    pass.set(b.id, (b.parent === null || pass.get(b.parent)) && (!m || (m.native && m.amount === 1)));
+  }
+  if (rig.bones.every((b) => pass.get(b.id))) return native;
+  const rest = poseRig(rig, 0, gait, phase);
+  const restById = new Map(rest.map((p) => [p.id, p]));
+  const nativeById = new Map(native.map((p) => [p.id, p]));
+  const gaitSrc = getMotionSource(gaitSourceId(name));
+  const deltas = new Map();
+  const gaitDelta = (id) => {
+    let d = deltas.get(id);
+    if (!d) deltas.set(id, (d = gaitSrc.evaluate({ key: id }, t, { rig, phase })));
+    return d;
+  };
+  const seedOffset = opts.seedOffset ?? 0;
+  const tileKey = opts.tileKey ?? '';
+  const posed = new Map();
+  const out = [];
+  for (const b of rig.bones) {
+    if (pass.get(b.id)) {
+      const p = nativeById.get(b.id);
+      posed.set(b.id, p);
+      out.push(p);
+      continue;
+    }
+    const m = motions.get(b.id);
+    const parent = b.parent ? posed.get(b.parent) : null;
+    const R = restById.get(b.id);
+    let dRot;
+    let off;
+    if (m && !m.native) {
+      const d = m.src.evaluate(
+        { key: b.id, seedOffset, phase01: kinemePhase(seedOffset, `${tileKey}#${b.id}`) },
+        t,
+        {},
+      );
+      dRot = (d.dRot || 0) * m.amount;
+      off = { dx: (d.dx || 0) * m.amount, dy: (d.dy || 0) * m.amount };
+    } else {
+      const db = gaitDelta(b.id);
+      const dp = b.parent ? gaitDelta(b.parent) : null;
+      const amt = m ? m.amount : 1;
+      dRot = (db.dRot - (dp ? dp.dRot : 0)) * amt;
+      off = { dx: db.dx * amt, dy: db.dy * amt };
+    }
+    let x;
+    let y;
+    let angle;
+    if (parent) {
+      x = parent.tx;
+      y = parent.ty;
+      angle = parent.angle + (R.angle - restById.get(b.parent).angle) + dRot;
+    } else {
+      x = R.x + off.dx;
+      y = R.y + off.dy;
+      angle = R.angle + dRot;
+    }
+    const p = {
+      id: b.id,
+      role: b.role,
+      x,
+      y,
+      tx: x + Math.cos(rad(angle)) * b.len,
+      ty: y + Math.sin(rad(angle)) * b.len,
+      angle,
+      len: b.len,
+    };
+    posed.set(b.id, p);
+    out.push(p);
+  }
+  return out;
+}
+
+/**
+ * A linkage figure posed: poseLinkage's own bars, with a foreign source's delta composed onto the bar itself
+ * (§11 ruling 4 — the bar, the skeleton, bends; the linkage is never re-solved). The delta is evaluated once per
+ * bar NAME, not per leg (§7), so every leg's bar of that name bends in step. A 'linkage' or absent bar rides
+ * exactly as today (its amount has no pose effect on a native bar — §6); bars the map does not bend are
+ * poseLinkage's own objects. opts.motion is the rig's baked motion map (keyed by bar name, the beam included).
+ */
+function poseLinkageFigure(linkage, t, opts) {
+  const base = poseLinkage(linkage, t, opts.drive, opts.crank);
+  if (!base) return base; // a stillbirth poses as poseLinkage leaves it: null
+  const map = opts.motion && typeof opts.motion === 'object' ? opts.motion : null;
+  if (!map) return base;
+  const seedOffset = opts.seedOffset ?? 0;
+  const tileKey = opts.tileKey ?? '';
+  const deltas = new Map();
+  for (const name of Object.keys(map)) {
+    const m = readBoneMotion(map[name], 'linkage');
+    if (!m || m.native) continue;
+    const d = m.src.evaluate({ key: name, seedOffset, phase01: kinemePhase(seedOffset, `${tileKey}#${name}`) }, t, {});
+    deltas.set(name, { dx: (d.dx || 0) * m.amount, dy: (d.dy || 0) * m.amount, dRot: (d.dRot || 0) * m.amount });
+  }
+  if (!deltas.size) return base;
+  return base.map((p) => {
+    const d = deltas.get(p.name);
+    if (!d) return p;
+    const x = p.x + d.dx;
+    const y = p.y + d.dy;
+    const angle = p.angle + d.dRot;
+    return { ...p, x, y, angle, tx: x + Math.cos(rad(angle)) * p.len, ty: y + Math.sin(rad(angle)) * p.len };
+  });
+}
+
+/**
+ * The whole figure posed at time t: posed bones in poseRig's / poseLinkage's own shape (joint, tip, angle, len —
+ * the shape placePart consumes), honouring each bone's baked `motion` (step 3.1; figures-spec §6). A figure with
+ * no motion anywhere returns the native evaluator's bones untouched — Object.is per bone. opts: `{ gait | face,
+ * phase, drive, crank, motion, seedOffset, tileKey }` — seedOffset + tileKey are the placed copy's, so a kineme
+ * bone evaluates at its own part's phase. For a roam pass opts.roam; the result is `{ body: delta }` with the
+ * extension fields (including `moving`), as it has always been.
  */
 export function poseFigure(figure, t, opts = {}) {
   if (opts.roam) return { body: roamEvaluate({ key: 'body' }, t, { roam: opts.roam }) };
-  const out = {};
-  if (figure && Array.isArray(figure.bones)) {
-    const ev = evaluators.get(gaitSourceId(opts.gait || 'NOD'));
-    if (!ev) throw new TypeError(`[rigSources] unknown gait "${String(opts.gait)}"`);
-    const ctx = { rig: figure, phase: opts.phase };
-    for (const b of figure.bones) out[b.id] = ev({ key: b.id }, t, ctx);
-  } else if (figure && figure.measures) {
-    const posed = poseLinkage(figure, 0, opts.drive ?? 1, null) || [];
-    const ctx = { linkage: figure, drive: opts.drive, crank: opts.crank };
-    for (const b of posed) out[b.id] = linkageEvaluate({ key: b.id }, t, ctx);
-  }
-  return out;
+  if (figure && Array.isArray(figure.bones)) return poseTreeFigure(figure, t, opts);
+  if (figure && figure.measures) return poseLinkageFigure(figure, t, opts);
+  return [];
 }
