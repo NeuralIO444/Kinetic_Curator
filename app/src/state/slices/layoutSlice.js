@@ -1605,8 +1605,11 @@ export const createLayoutSlice = (set) => ({
       // the next free press deals from where it stands.
       const funnel = settledFunnel(state);
       const held = !!state.armedMode || !!state.lockedParams?.composition;
-      // #518: every roll comes off one seeded stream keyed by (seed, press #), so
-      // presses differ but a given (seed, offsets, press #) replays the same pick.
+      // #518: every roll comes off one seeded stream keyed by (seed, press #), so presses differ.
+      // The stream is deterministic; the PICK is not guaranteed to replay: it also reads the board (the funnel,
+      // locks) and anything wall-clock-derived upstream, so a re-press on another machine or session can differ.
+      // A take must record the result of a press (Tier D), never re-derive it from (seed, offsets, press #).
+      // See docs/K0_TAKE_SEMANTICS.md (wall-clock law, R6).
       const press = state.curatePress | 0;
       const rng = rngForIndex(state.seed, CH.curate, press, state.seedOffsets);
       const candidates = [];
