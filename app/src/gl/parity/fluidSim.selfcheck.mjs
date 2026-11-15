@@ -29,7 +29,19 @@ const stats = (a, b) => {
   return { max: maxd, mean: sum / a.length };
 };
 
-const { page, close } = await openHarnessPage('/parity/fluidSim.html');
+// The lint job's runner skips `playwright install` to stay fast (same as parity.selfcheck.mjs): no browser there is a
+// skip, not a failure. The selfcheck-browser job and dev machines run it for real.
+let harness;
+try {
+  harness = await openHarnessPage('/parity/fluidSim.html');
+} catch (e) {
+  if (String(e && e.message).includes("Executable doesn't exist")) {
+    console.log('  [skip] GPU fluid kernel vs JS: Playwright browser not installed in this environment');
+    process.exit(0);
+  }
+  throw e;
+}
+const { page, close } = harness;
 let failed = 0;
 const check = (name, cond, detail) => {
   console.log(`  [${cond ? 'ok' : 'FAIL'}] ${name}${detail ? ' — ' + detail : ''}`);
