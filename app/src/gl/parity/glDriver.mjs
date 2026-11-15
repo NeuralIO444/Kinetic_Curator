@@ -15,7 +15,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { bakeAtlas, comboKey } from '../atlas.mjs';
+import { isStrokeOnlyInkAsset } from '../../data/inkPaint.js';
 import { glStaticHandler } from './glStaticServer.mjs';
+
+// #2104 Q2 — the stills bake is where a still's colours are decided, so the
+// combo an instance bakes under carries its EFFECTIVE ink: while a world
+// stands on the contract, a stroke-only asset bakes in the world's ink (the
+// packer keys its cell lookup by the same decision in renderer.mjs, so the
+// two can never disagree). No world → the dealt tint, the pre-ink combo.
+const comboInk = (contract, it) => (contract.world && isStrokeOnlyInkAsset(it.asset) ? contract.world.ink : it.tint);
 
 const PARITY_DIR = path.dirname(fileURLToPath(import.meta.url));
 const GL_DIR = path.join(PARITY_DIR, '..'); // serve src/gl; harness at /parity/glHarness.html
@@ -270,7 +278,7 @@ function regionAssetsFor(contract) {
  * boxes), shared by renderViaGL and the perf probe.
  */
 export function buildRenderPayload(contract, { width = 400, height = 280, bg = '#0a0a0a', wet = null } = {}) {
-  const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
+  const combos = contract.instances.map((it) => ({ asset: it.asset, ink: comboInk(contract, it), accent: it.accent }));
   const atlas = getAtlas(combos, regionAssetsFor(contract));
   const cells = {};
   for (const [k, v] of atlas.cells)
@@ -334,10 +342,11 @@ export async function renderAccumViaGL(
   const seen = new Set();
   for (const contract of frameContracts) {
     for (const it of contract.instances) {
-      const key = comboKey(it.asset, it.tint, it.accent);
+      const ink = comboInk(contract, it);
+      const key = comboKey(it.asset, ink, it.accent);
       if (!seen.has(key)) {
         seen.add(key);
-        combos.push({ asset: it.asset, ink: it.tint, accent: it.accent });
+        combos.push({ asset: it.asset, ink, accent: it.accent });
       }
     }
   }
