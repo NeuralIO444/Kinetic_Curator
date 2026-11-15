@@ -502,11 +502,89 @@ export function dealBodyPart(pile, seed, tileId, fitOf = null) {
 }
 
 /**
+ * #2119 step 3.3 — DAVIS deals a bone's motion SOURCE (figures-spec §8, as ruled): a bone with no recorded
+ * `motion` gets its source from Davis at expansion time, a seeded pick keyed on (seed, the tile's family
+ * hand, the bone's hand) over the figure's source palette — a chain's bones share a hand, as in dealPart,
+ * so a whole chain takes one source. §11 ruling 1 sets the palette: the kinemes the stage is already
+ * running (the contract seam resolves them; an empty palette deals nothing and the bone poses natively).
+ * The deal is derived in the expansion and never stored back into the record. Precedence, highest first:
+ * the record (artist) → Davis's deal → the native default. Davis's mood varies his PART deal only — the
+ * spec does not extend it to sources, so `variety` plays no part here.
+ *
+ * @param {string[]|null} palette source ids ('kineme:<id>'), in the caller's canonical (sorted) order
+ * @param {string} boneHand 'h' for a head, 'l<chain>' for a limb chain, a bar name for a linkage figure
+ * @returns {string|null} the dealt source, or null when the palette is empty
+ */
+export function dealBoneSource(palette, seed, hand, boneHand) {
+  if (!Array.isArray(palette) || !palette.length) return null;
+  return palette[Math.floor(u01(`davis-motion|${seed >>> 0}|${hand}|${boneHand}`) * palette.length) % palette.length];
+}
+
+/** A tree bone's deal hand: the head is 'h'; a limb chain shares 'l<chain>' (dealPart's hands). */
+const boneHandOf = (bone) => (bone.role === 'head' ? 'h' : `l${bone.chain}`);
+
+/**
+ * The figure the re-pipe actually poses, for a tree rig or a mobile: under `frozen` it is the rig with
+ * every bone's motion stripped — sources are never evaluated on a frozen frame (§7's shed ladder), so a
+ * still of a figure is its rest pose regardless of what its bones carry. Live, it is the rig with Davis's
+ * deal filled into the bones that carry no recorded motion (a mobile's bones all carry one — the door
+ * saw to that — so a mobile is never dealt). The record's own rig is never mutated: a copy is built only
+ * when something actually changes, so a motionless, palette-less figure poses its very own rig.
+ */
+function effectiveFigureRig(rig, { frozen, palette, seed, hand }) {
+  if (frozen) {
+    if (!rig.bones.some((b) => b.motion)) return rig;
+    return {
+      ...rig,
+      bones: rig.bones.map((b) => {
+        if (!b.motion) return b;
+        const copy = { ...b };
+        delete copy.motion;
+        return copy;
+      }),
+    };
+  }
+  if (!palette || !palette.length) return rig;
+  let dealt = false;
+  const bones = rig.bones.map((b) => {
+    if (b.motion) return b; // the record wins over the deal, always
+    const source = dealBoneSource(palette, seed, hand, boneHandOf(b));
+    if (!source) return b;
+    dealt = true;
+    return { ...b, motion: { source } };
+  });
+  return dealt ? { ...rig, bones } : rig;
+}
+
+/**
+ * The same, for a linkage figure's motion map (keyed by bar name, the beam included): frozen → no map at
+ * all (the bars ride the linkage exactly); live → the recorded map with Davis's deal filled into the
+ * names that carry no entry. Returns the rig's own map untouched when nothing is dealt.
+ */
+function effectiveLinkageMotion(rig, { frozen, palette, seed, hand }) {
+  if (frozen) return undefined;
+  const recorded = rig.motion || {};
+  if (!palette || !palette.length) return rig.motion;
+  let out = null;
+  for (const name of [...LINKAGE_BAR_NAMES, BEAM_ID]) {
+    if (recorded[name]) continue; // the record wins over the deal, always
+    const source = dealBoneSource(palette, seed, hand, name);
+    if (source) (out ??= { ...recorded })[name] = { source };
+  }
+  return out || rig.motion;
+}
+
+/**
  * #1960 — a beast tile's expansion: the linkage posed bar by bar, each bar bone wearing a part. The 12 bar NAMES are dealt
  * once (a bar is dealt as a depth-0 limb of its own hand) and every leg wears the same set; the beam takes a body-fit
  * deal and stands in for the tile's own mark (the beast IS the linkage, so `it` is not pushed). A stillbirth → [].
  */
-function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, glow, phase, roamOpt, trace }) {
+function expandBeast(
+  it,
+  rig,
+  pile,
+  { seed, t, frozen, variety, roleDeal, hand, glow, phase, roamOpt, trace, poseFigureFn, motion, seedOffset, tileKey },
+) {
   const linkage = { ...rig.linkage, phase: rig.linkage.phase + phase };
   // #1867 — the travelling home: the body advances by its own stance stroke and steers by differential crank phase
   // (engine/beastRoam.js). A frozen frame is home at rest; `roamOpt === false` is the A/B switch (S3b's walk in place).
@@ -514,7 +592,11 @@ function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, 
   const spec = { seedKey: `${seed >>> 0}|${hand}|${it.key}`, stride: strideTileUnits(rig.linkage.measures), params };
   const roam = roamOpt === false ? null : roamAt(spec, frozen ? 0 : t);
   const crank = roam ? { a: roam.phaseA, b: roam.phaseB } : null;
-  let pose = poseLinkage(linkage, frozen ? 0 : t, 1, crank);
+  // #2119 step 3.3 — through poseFigure when the seam hands it in (the motion map is the effective one:
+  // recorded entries plus Davis's deal, or none under frozen); the native solver call otherwise
+  let pose = poseFigureFn
+    ? poseFigureFn(linkage, frozen ? 0 : t, { drive: 1, crank, motion, seedOffset, tileKey })
+    : poseLinkage(linkage, frozen ? 0 : t, 1, crank);
   if (!pose) return [];
   if (roam && (roam.x || roam.y || roam.heading)) {
     // lay the body's place and heading over the posed bones: rotate about the tile's centre, then travel
@@ -588,10 +670,18 @@ function placeMark(it, m, i, glow, co, si, flip) {
  * @param {Array} instances the contract's instances (not mutated)
  * @param {Map<string, object>|null} overlayById customAssets by id
  * @param {{ seed: number, t: number, frozen: boolean, collapsed: boolean, face?: string, davis?: string,
- *   fitOf?: (id: string) => object|null, pileOnly?: Set<string>|null }} opts
+ *   fitOf?: (id: string) => object|null, pileOnly?: Set<string>|null,
+ *   poseFigure?: Function|null, sourcePalette?: string[]|null }} opts
  *   fitOf = #1945's id → { limb, head, mass, elong } (absent = Davis deals as he always did, byte for byte);
  *   pileOnly = #1945's kit triad pool: the pile is the stage's assets ∩ it, and with no overlap the stage's pile
  *   face = Lois's live face (her gait), davis = Davis's live state (how varied his deal is) — #1949
+ *   poseFigure = #2119 step 3.3: the Motion Core figure poser (motionCore/rigSources), handed in by the
+ *   scene-contract seam — the same injection shape as fitOf, and for the same reason: the adapter reads
+ *   this module (poseRig, LOIS_GAITS), so this module cannot import it back. When it is handed in, posing
+ *   flows through it — tree figures, linkage figures and mobiles alike — honouring each bone's recorded
+ *   motion and Davis's dealt sources; when it is absent, the native calls pose exactly as they always have.
+ *   sourcePalette = Davis's source palette for the deal (dealBoneSource): the kinemes the stage is already
+ *   running, resolved by the seam (§11 ruling 1); absent or empty deals nothing.
  * @returns {Array} the original array when nothing expands, else a new one
  */
 /** The library solid a beast's trace marks are drawn with (a plain ellipse when stretched). */
@@ -613,6 +703,8 @@ export function expandCreatureInstances(
     pileOnly = null,
     beastRoam = null,
     beastTrace = null,
+    poseFigure = null,
+    sourcePalette = null,
   } = {},
 ) {
   if (!overlayById) return instances;
@@ -644,6 +736,7 @@ export function expandCreatureInstances(
     if (inKits.length) stageAssets = inKits; // no overlap → the stage pile, untouched
   }
   const roleDeal = typeof fitOf === 'function' ? { fitOf } : null;
+  const poseFigureFn = typeof poseFigure === 'function' ? poseFigure : null;
   const gait = gaitFor(face);
   const variety = varietyFor(davis);
   const out = [];
@@ -683,11 +776,28 @@ export function expandCreatureInstances(
           phase,
           roamOpt: beastRoam,
           trace: beastTrace,
+          poseFigureFn,
+          motion: poseFigureFn
+            ? effectiveLinkageMotion(rig, { frozen, palette: sourcePalette, seed, hand })
+            : rig.motion,
+          seedOffset: it.seedOffset,
+          tileKey: it.key,
         }),
       );
       continue;
     }
-    const pose = poseRig(rig, frozen ? 0 : t, gait, phase);
+    // #2119 step 3.3 — through poseFigure when the seam hands it in: the effective rig carries the
+    // record's motion plus Davis's deal (or no motion at all under frozen), and a placed mobile poses
+    // from its authored rest instead of through the gait — 3.2's stated limitation, retired. Lois's
+    // face still chooses the gait, through the adapter's own gaitFor read of opts.face.
+    const pose = poseFigureFn
+      ? poseFigureFn(effectiveFigureRig(rig, { frozen, palette: sourcePalette, seed, hand }), frozen ? 0 : t, {
+          face,
+          phase,
+          seedOffset: it.seedOffset,
+          tileKey: it.key,
+        })
+      : poseRig(rig, frozen ? 0 : t, gait, phase);
     const th = rad(it.rotation);
     const co = Math.cos(th);
     const si = Math.sin(th);

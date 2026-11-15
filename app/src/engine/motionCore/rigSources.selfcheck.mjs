@@ -255,10 +255,15 @@ ok('no behaviour change: beastRig and beastRoam are untouched, and nothing outsi
     }
   };
   walk(join(root, 'src'));
+  // #2119 step 3.3: the census gains exactly one production importer — gl/sceneContract.js, the seam
+  // step 3.3 re-pipes the creature expansion through (this file's header always said "until step 3.3").
+  // The seam hands poseFigure to the expansion as an opt; creatureRig.js itself still does not import
+  // the adapter (it cannot — the adapter reads poseRig / LOIS_GAITS from it). Every other non-selfcheck
+  // importer still fails here.
   assert.deepEqual(
-    hits.filter((p) => !p.endsWith('rigSources.js')),
+    hits.filter((p) => !p.endsWith('rigSources.js') && !p.endsWith('gl/sceneContract.js')),
     [],
-    'only selfchecks import the rig adapter',
+    'only selfchecks and the scene-contract seam import the rig adapter',
   );
 });
 

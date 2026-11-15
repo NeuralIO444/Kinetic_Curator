@@ -7,8 +7,10 @@
 // #2119 step 3.1 (P7, figures-spec §6): poseFigure grew from a per-bone delta view into the figure poser — it returns
 // POSED bones (the shape placePart consumes) and honours each bone's baked `motion` (per-bone sources through the
 // registry, composed parent ∘ source; the part and region kinemes stay downstream in the contract, untouched). The
-// registry sources above are exactly P2b's; nothing but selfchecks imports this file until step 3.3 re-pipes the
-// expansion through poseFigure.
+// registry sources above are exactly P2b's; nothing but selfchecks imported this file until step 3.3 re-piped the
+// expansion through poseFigure — the scene-contract seam (gl/sceneContract.js) is the one production importer: it
+// hands poseFigure to expandCreatureInstances as an opt, since the expansion's own module cannot import this one
+// back (the adapter reads poseRig / LOIS_GAITS from it).
 // #2119 step 3.2: a mobile (a rig marked `figure: 'mobile'`) poses through poseMobileFigure — no native pass, no
 // gait: every bone composes locally from the authored rest, each on its own source.
 //
