@@ -228,7 +228,26 @@ ok('shed: the freeze holds the rest pose; the collapse is the body alone; reduce
   // #1947 re-pin (cause: the family shimmer — parts' opacity breathes with time; frozen, it rests at full): the pose
   // is compared without opacity, and a frozen part keeps its body's opacity
   const pose = (parts) => parts.map(({ opacity, ...rest }) => rest);
-  assert.deepEqual(pose(frozen(0.9)), pose(partsOf(contract({ kinemeTime: 0 }))), 'frozen = the rest pose');
+  // #2119 step 3.3 re-pin (cause: the Davis source deal, §11 ruling 1 — Davis deals the kinemes the stage
+  // is already running to a figure's bare bones. This stage runs kinemes in its regions — the squiggle's
+  // bend, the flora's rock and pulse — so a live t = 0 contract now poses the creature's bare bones on
+  // dealt sources, at their phases — not the rest pose. Frozen still poses the rest, so the comparison
+  // runs against a live t = 0 contract whose stage runs nothing: every region default on the stage
+  // tombstoned off, leaving the stage, the pile and the part deal exactly as they are.)
+  const restContract = contract({
+    kinemeTime: 0,
+    regionKinemes: {
+      line_squiggle_03: { 'rm-000000-4-4': null },
+      flora_flower_01: {
+        'rm-000000-4-2': null,
+        'rm-000000-2-4': null,
+        'rm-ff2d95-4-4': null,
+        'rm-000000-6-4': null,
+        'rm-000000-4-6': null,
+      },
+    },
+  });
+  assert.deepEqual(pose(frozen(0.9)), pose(partsOf(restContract)), 'frozen = the rest pose');
   assert.ok(
     frozen(0.9).every((p) => p.opacity === 1),
     'frozen: no shimmer',

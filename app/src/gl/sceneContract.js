@@ -37,6 +37,8 @@ import {
 } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { expandCreatureInstances, davisFitOf } from '../engine/creatureRig.js'; // #1851 — creature rigs, #1945 role deal
+import { poseFigure } from '../engine/motionCore/rigSources.js'; // #2119 step 3.3 — the figure poser the expansion is re-piped through
+import '../engine/motionCore/kinemeSources.js'; // #2119 step 3.3 — registration is the consuming seam's job (step 3.1's note): the kineme sources poseFigure resolves bone sources through
 import { contractLight } from '../data/light.js';
 import { sanitizeWorld } from '../data/world.js'; // #2104: the Canon world record
 import { chapterStyleResponse, applyMaterialLight } from '../data/canon/response.js'; // #2104 Q2: the standing style's material answers the sun
@@ -714,8 +716,27 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       // false` (or window.__KC_DAVIS_ROLE_OFF = true, for the live app) is the named A/B switch (the deal is then exactly what it was). `kitPool` (optional ids) narrows the pile.
       const fitOf =
         doc.davisRoleDeal === false || globalThis.__KC_DAVIS_ROLE_OFF === true ? null : davisFitOf(overlayById);
+      // #2119 step 3.3 — Davis's source palette (§11 ruling 1): the kinemes this stage is already
+      // running — the placed marks' own asset kinemes and their region assignments, resolved from
+      // the same doc fields the kineme pass below reads. (Layer spin is not in the palette: its
+      // kinemes are synthetic per-variant records, not library sources a bone can name.) Sorted —
+      // the palette's order is part of the deal's key, so the deal is a pure function of the stage.
+      const paletteIds = new Set();
+      const assetKinemeMap = sanitizeAssetKineme(doc.assetKineme) || {};
+      const paletteSeen = new Set();
+      for (const inst of instances) {
+        const own = getAssetKineme(assetKinemeMap[inst.asset]);
+        if (own) paletteIds.add(own.id);
+        if (paletteSeen.has(inst.asset)) continue;
+        paletteSeen.add(inst.asset);
+        const assignment = regionAssignmentFor(inst.asset, doc.regionKinemes, overlayById.get(inst.asset));
+        if (assignment) for (const kid of Object.values(assignment)) paletteIds.add(kid);
+      }
+      const sourcePalette = [...paletteIds].sort().map((id) => `kineme:${id}`);
       const expanded = expandCreatureInstances(instances, overlayById, {
         fitOf,
+        poseFigure,
+        sourcePalette: sourcePalette.length ? sourcePalette : null,
         pileOnly: Array.isArray(doc.kitPool) && doc.kitPool.length ? new Set(doc.kitPool.map(String)) : null,
         seed: Number(doc.seed) || 0,
         t: Number(doc.kinemeTime) || 0,

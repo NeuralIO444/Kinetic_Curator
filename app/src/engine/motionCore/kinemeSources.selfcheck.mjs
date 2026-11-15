@@ -156,9 +156,13 @@ ok('nothing in the app imports the adapter (renderer untouched); the module is p
   const importers = files.filter((f) => /kinemeSources/.test(readFileSync(f, 'utf8')));
   const names = importers.map((f) => f.slice(srcRoot.length)).sort();
   // #2116: a selfcheck elsewhere (gl/kinemeScatter) may read the CPU reference; what must stay true is that no NON-test file does
+  // #2119 step 3.3: exactly one more non-test file names it — gl/sceneContract.js, the consuming seam,
+  // which imports it for its registration side effect so poseFigure can resolve kineme bone sources on
+  // the stage (step 3.1's registration note named this seam and this step). The census stays exact:
+  // these two files, no others.
   assert.deepEqual(
     names.filter((f) => !/\.selfcheck\.mjs$/.test(f)),
-    ['engine/motionCore/kinemeSources.js'],
+    ['engine/motionCore/kinemeSources.js', 'gl/sceneContract.js'],
     names.join(', '),
   );
   const text = readFileSync(new URL('./kinemeSources.js', import.meta.url), 'utf8');
