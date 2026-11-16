@@ -46,7 +46,12 @@ Pipeline already kind-sniffs IMPORT (#1216: bundle vs project vs taste.json vs p
 - **Receipt** is one quiet line: `Look pack "Name" · 6 Looks installed to Library · 1 already there · 1 item quarantined — Name: reason`.
 - **Export:** `↓ LOOKS` (shown when the Library has Looks) writes every installed Look as one `kc-pack/1` file. Selecting which
   Looks to export waits for the Library browser (step 2).
-- **Not yet:** the 16 Look slots and `looks/` in the loot folder (steps 3–4 of #2148); `lootClassify` still says "looks not supported yet".
+- **Step 4 — `looks/` in the loot folder (#2148, slice 10), as built:** a `.kclook` (one Look) or `.kcpack` (a `kc-pack/1` of Looks) in the
+  loot folder's `looks/` joins the Library on the next scan, through the same door as IMPORT (`loot/lootLooks.mjs` → `installLookFile`
+  → `kc-look/1`); `lootClassify` no longer says "looks not supported yet" for them. Library only: a dropped file never fills a slot or
+  touches the scene. A file that does not read is held in the scan log with its named reason; the good ones still install. A file is
+  read once — a Look removed from the Library does not come back on the next scan. The shelf's own `.json` keep exports in `looks/` are
+  untouched, and the shelf's disk run skips Look files. All four steps of #2148 are built.
 
 **As built — step 2, the Library browser (#2148).** BUILD gains a last section, **⑦ Looks** (`panels/layout/LookLibrarySection.jsx`,
 view model `lookLibraryRows.mjs`): the installed Looks in install order, each with its mode, palette, param count and `seeded` tag;
