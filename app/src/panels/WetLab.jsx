@@ -1144,6 +1144,7 @@ export function WetLab({ assetId, onClose }) {
           </aside>
         </div>
         <WetLabDealStrip
+          subject={selRecord}
           onTap={(id) => {
             setSelectedId(id);
             setCultivateOpen(false);

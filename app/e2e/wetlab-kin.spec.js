@@ -72,6 +72,43 @@ test('the empty lab opens from the USER section; KIN deals six; a tap banks; cle
   expect(errors).toEqual([]);
 });
 
+test('CUR narrows from the creature on the stage: needs one, deals close neighbours, marks a pick, a tap banks and walks on', async ({
+  page,
+}) => {
+  const errors = await boot(page, { width: 1280, height: 900 });
+  await openEmptyLab(page);
+  await expect(page.getByTestId('cur-press')).toBeDisabled(); // nothing on the stage yet
+  await page.getByTestId('kin-press').click();
+  await page.getByTestId('kin-tile').first().click();
+  await expect(page.getByTestId('bank-tile')).toHaveCount(1);
+  await expect(page.getByTestId('cur-press')).toBeEnabled();
+
+  const cap = page.getByTestId('cur-cap');
+  await expect(cap).toHaveText('NEAR');
+  await cap.click();
+  await expect(cap).toHaveText('LOOSE');
+  await cap.click();
+  await expect(cap).toHaveText('TIGHT');
+  await cap.click();
+  await expect(cap).toHaveText('NEAR');
+
+  await page.getByTestId('cur-press').click();
+  const n = await page.getByTestId('kin-tile').count();
+  expect(n).toBeGreaterThan(0);
+  expect(n).toBeLessThanOrEqual(3);
+  await expect(page.getByTestId('cur-pick')).toHaveCount(1);
+  await shot(page, '6-cur-hand');
+
+  const before = await page.getByTestId('bank-tile').count();
+  await page.getByTestId('kin-tile').first().click();
+  await expect(page.getByTestId('bank-tile')).toHaveCount(before + 1); // banked beside its source
+  await expect(page.getByTestId('cur-press')).toBeEnabled(); // and it is the new subject: CUR walks on
+  await page.getByTestId('cur-press').click();
+  await expect(page.getByTestId('kin-tile').first()).toBeVisible();
+  await shot(page, '7-cur-walked-on');
+  expect(errors).toEqual([]);
+});
+
 test('the width pill steps OFF → WEAK → MED → KOZ and the hand follows it', async ({ page }) => {
   const errors = await boot(page, { width: 1280, height: 900 });
   await openEmptyLab(page);
@@ -91,11 +128,12 @@ test('the width pill steps OFF → WEAK → MED → KOZ and the hand follows it'
 
 test('a lab opened on a shape keeps hand-picking and gains the strip', async ({ page }) => {
   const errors = await boot(page, { width: 1280, height: 900 });
+  await expect(page.getByRole('button', { name: /in the wet lab/i }).first()).toBeAttached();
   await page
     .getByRole('button', { name: /in the wet lab/i })
     .first()
     .click({ force: true });
-  await expect(page.getByTestId('wet-lab')).toBeVisible();
+  await expect(page.getByTestId('wet-lab')).toBeVisible({ timeout: 20_000 }); // the lab is a lazy import
   await expect(page.getByTestId('lab-mode-assemble')).toBeVisible();
   await expect(page.getByTestId('wet-lab-stage')).toBeVisible();
   await expect(page.getByTestId('kin-strip')).toBeVisible();
