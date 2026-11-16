@@ -177,6 +177,56 @@ export function applyCultureScale(soa, ctx, still = null) {
   return touched;
 }
 
+// ---------------------------------------------------------------- #2152 slice 1: LIFE on the assets (fade and die)
+//
+// Matt 2026-11-12: "I just want it to do it to the assets on the stage." The culture's cells already age: alive (level 1) →
+// decaying (level fading) → dead (level 0). This consumer reads that same publication and lets each mark LIVE it: a mark over a
+// decaying cell fades, over a dead cell it is gone. Stateless (the decay states carry the history), so a take replays it and a still
+// equals live. Its own dial (the LIFE dial, 0 = off) — separate from the coupling dial, so the gentle swell and the deaths are
+// independent (Matt, 2026-11-16). Dial 0 → no work, bit-identical frame. Nothing is edited in place: only the ephemeral SoA alpha and
+// scale channels move, and stage C recomputes them every call, so nothing accumulates. Held / locked / pinned marks are skipped.
+// Slice 2 adds births, slice 3 eases the cycle roll (docs/design/dish-life-on-assets.md).
+
+/** A mark whose life factor is at or below this is gone (alpha 0): the end of the decay, not a lingering ghost. */
+export const LIFE_GONE_BELOW = 0.04;
+/** How far a dying mark's SCALE eases down with its fade: factor 1 → ×1, factor 0 → ×(1 − LIFE_SHRINK). */
+export const LIFE_SHRINK = 0.4;
+
+/**
+ * The life factor for one mark: how alive the cell under it is, folded by the dial. dial 0 → exactly 1 for any level (off);
+ * dial 1 → the level itself (alive 1, decaying between, dead 0); between, a straight blend. Below LIFE_GONE_BELOW it is 0 (gone).
+ */
+export function cultureLifeFactor(level, dial) {
+  const d = clampCoupling(dial);
+  if (!(d > 0)) return 1;
+  const f = 1 - d * (1 - clamp01(level));
+  return f < LIFE_GONE_BELOW ? 0 : f;
+}
+
+/**
+ * The LIFE applier, in the buildPlacements ephemeral-pass shape: folds the life factor into the SoA's alpha (fade) and scale
+ * (ease down) at each mark's presented position. ctx = { life, sampler } with `life` ALREADY shed-folded by the caller. Pinned
+ * (`still[k]`) marks are skipped. Returns how many marks it moved (0 when the gate is closed: no ctx, dial 0, no sampler).
+ */
+export function applyCultureLife(soa, ctx, still = null) {
+  if (!soa || !ctx || !(ctx.life > 0) || !ctx.sampler || typeof ctx.sampler.sample !== 'function') return 0;
+  const n = soa.n | 0;
+  const out = { level: 0, activity: 0 };
+  let touched = 0;
+  for (let k = 0; k < n; k++) {
+    if (still && still[k]) continue;
+    if (!ctx.sampler.sample(soa.x[k], soa.y[k], out)) continue;
+    const f = cultureLifeFactor(out.level, ctx.life);
+    if (f === 1) continue;
+    soa.alpha[k] *= f;
+    const s = 1 - LIFE_SHRINK * (1 - f);
+    soa.scale[k] *= s;
+    soa.scaleY[k] *= s;
+    touched++;
+  }
+  return touched;
+}
+
 // ---------------------------------------------------------------- slice C: the pattern modes
 //
 // Pattern modes place no items — a layer resolves to ONE generated texture from its dealt parameters —

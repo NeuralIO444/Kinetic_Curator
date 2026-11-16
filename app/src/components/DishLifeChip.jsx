@@ -40,6 +40,8 @@ export function DishLifeChip() {
   const setDishLife = useStore((s) => s.setDishLife);
   const setStrength = useStore((s) => s.setDishLifeStrength);
   const setCoupling = useStore((s) => s.setDishLifeCoupling);
+  const dishLifeAssets = useStore((s) => s.dishLifeAssets); // #2152 slice 1
+  const setLifeAssets = useStore((s) => s.setDishLifeAssets);
   const setCycleGens = useStore((s) => s.setDishLifeCycleGens);
   const pulseSeed = useStore((s) => s.pulseDishLifeSeed);
   const m = dishLifeChipModel({ dishLife, dishLifeAwake, dishLifeShed, dishLifeStrength, dishLifeCycleGens });
@@ -149,6 +151,18 @@ export function DishLifeChip() {
             onChange={onCoupling}
             ariaLabel="Dish life coupling"
             hint={`${helpText('dish-life-coupling')} (${couplingPct}%)`}
+          />
+          <RangeRow
+            layout="bare"
+            className="dish-life-dial"
+            min={0}
+            max={100}
+            step={5}
+            value={Math.round(dishLifeAssets * 100)}
+            defaultValue={0}
+            onChange={(pct) => setLifeAssets(Number(pct) / 100)}
+            ariaLabel="Dish life on the marks"
+            hint={`${helpText('dish-life-assets')} (${Math.round(dishLifeAssets * 100)}%)`}
           />
           <button
             type="button"

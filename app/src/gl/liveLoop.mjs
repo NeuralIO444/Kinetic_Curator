@@ -850,6 +850,7 @@ export function createLiveLoop(
     let dishLifeStamp = null;
     let dishFieldStamp = null; // #1923 Phase 2 — set below, only while the coupling dial is up
     let dishFieldCoupling = 0;
+    let dishFieldLife = 0; // #2152 slice 1
     if (dishLifeOn) {
       const touched = consumeTouch();
       if (touched) dishLifePhase.touch(loopTimeMs, touched.source, touched.level);
@@ -876,7 +877,10 @@ export function createLiveLoop(
       // stamp. The dial rides beside it (dishFieldCoupling) so the take's input log accounts for
       // the exact strength that acted, frame by frame — no dial, no keys, the older input shape.
       const couplingDial = Number.isFinite(s.dishLifeCoupling) ? s.dishLifeCoupling : 0;
-      if (couplingDial > 0) {
+      // #2152 slice 1 — the LIFE dial (assets fade and die) is its own dial; either dial alone wakes the field culture. Each rides
+      // the input beside the stamp (dishFieldCoupling / dishFieldLife) so a take's log accounts for what acted.
+      const lifeDial = Number.isFinite(s.dishLifeAssets) ? s.dishLifeAssets : 0;
+      if (couplingDial > 0 || lifeDial > 0) {
         // #1923 Phase 4 — the re-seed interval detent rides the stamp as cycleGens (it has ridden
         // every field stamp since Phase 1; the control only chooses its value), and a consumed
         // seed press rides THIS frame's stamp as `seed` — an early boundary in the recorded
@@ -888,6 +892,7 @@ export function createLiveLoop(
         });
         if (seedPressed) dishFieldStamp = { ...dishFieldStamp, seed: true };
         dishFieldCoupling = couplingDial;
+        dishFieldLife = lifeDial;
       }
     } else {
       clearTouch();
@@ -1011,7 +1016,9 @@ export function createLiveLoop(
     const resolved = resolver.resolveLayers({
       ...(worldNow ? { world: worldNow } : {}),
       ...(dishLifeStamp ? { dishLife: dishLifeStamp, ...(dishCultureCells ? { dishCultureCells } : {}) } : {}),
-      ...(dishFieldStamp ? { dishField: dishFieldStamp, dishFieldCoupling } : {}), // #1923 Phase 2
+      ...(dishFieldStamp
+        ? { dishField: dishFieldStamp, dishFieldCoupling, ...(dishFieldLife > 0 ? { dishFieldLife } : {}) }
+        : {}), // #1923 Phase 2 (+ #2152 LIFE dial, only when up)
       ...(dishFluidStamp
         ? {
             dishFluid: dishFluidStamp,

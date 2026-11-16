@@ -928,15 +928,20 @@ export function createLiveResolver() {
     // it as scale (slice A) and the kineme ctx carries it as fieldBreath (slice B) — same dial,
     // same shed fold, same one-frame-behind publication.
     const couplingNow = effectiveCoupling(input.dishFieldCoupling, input.dishField?.shed);
-    const fieldSamplerNow = couplingNow > 0 ? fieldSampler(dishFieldStage.publishedField, W, H) : null;
-    const cultureScale = fieldSamplerNow ? { coupling: couplingNow, sampler: fieldSamplerNow } : null;
+    // #2152 slice 1 — the LIFE dial (input.dishFieldLife) is its own dial, shed-folded the same way; it reads the same field
+    // publication, so either dial alone opens the one sampler and rides the one ctx ({ coupling, life, sampler }).
+    const lifeNow = effectiveCoupling(input.dishFieldLife, input.dishField?.shed);
+    const fieldSamplerNow = couplingNow > 0 || lifeNow > 0 ? fieldSampler(dishFieldStage.publishedField, W, H) : null;
+    const cultureScale = fieldSamplerNow
+      ? { coupling: couplingNow, sampler: fieldSamplerNow, ...(lifeNow > 0 ? { life: lifeNow } : {}) }
+      : null;
     // #1923 Phase 2 slice D — the background consumer's read, taken HERE, at the one coupling read:
     // the dish-mean level of the same publication, under the same shed fold (it exists only under
     // cultureScale). It is published at the end of the resolve (getLastCouplingBackground) for the
     // loop, which owns the stage background and folds the hex it dealt. No resolved output changes:
     // the background is not a layer, and this channel is the slice's only resolver footprint.
     let couplingBackgroundRead = null;
-    if (cultureScale) {
+    if (cultureScale && couplingNow > 0) {
       const mean = fieldMean(dishFieldStage.publishedField);
       if (mean) couplingBackgroundRead = { meanLevel: mean.level, coupling: couplingNow };
     }
@@ -1057,14 +1062,14 @@ export function createLiveResolver() {
     const patternMeanNow = () => {
       if (!patternMeanDone) {
         patternMeanDone = true;
-        patternMean = cultureScale ? fieldMean(dishFieldStage.publishedField) : null;
+        patternMean = cultureScale && couplingNow > 0 ? fieldMean(dishFieldStage.publishedField) : null;
       }
       return patternMean;
     };
     const patternGridNow = () => {
       if (!patternGridDone) {
         patternGridDone = true;
-        patternGrid = cultureScale ? fieldLevelGrid(dishFieldStage.publishedField) : null;
+        patternGrid = cultureScale && couplingNow > 0 ? fieldLevelGrid(dishFieldStage.publishedField) : null;
       }
       return patternGrid;
     };
