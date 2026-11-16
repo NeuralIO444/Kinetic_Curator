@@ -10,11 +10,20 @@
 /** The kernels a take stamps, in header order. */
 export const SIM_KERNELS = Object.freeze(['fluid', 'culture', 'swarm']);
 
+/**
+ * K3 slice 2c/2d (#2188, Matt 2026-11-16: optional key): kernels a take MAY also stamp. Absent = the kernel ran in JS (every take before
+ * the contacts producer, and every take that never recorded GPU contact stamps), so the header of such a take is byte-for-byte what it
+ * was. 'gpu.contacts.v1' is the GPU dish-contact DETECTION: its pair list rides the take as the recorded input.dishContactStamps and
+ * the CPU resolves exactly that list, so it replays anywhere.
+ */
+export const OPTIONAL_SIM_KERNELS = Object.freeze(['contacts']);
+
 /** Every backend id this build KNOWS (can validate), per kernel. */
 export const KNOWN_SIM_BACKENDS = Object.freeze({
   fluid: Object.freeze(['js.gs.v1', 'gpu.gs.v1']),
   culture: Object.freeze(['js.life.v1', 'gpu.life.v1']),
   swarm: Object.freeze(['js.swarm.v1']),
+  contacts: Object.freeze(['js.contacts.v1', 'gpu.contacts.v1']),
 });
 
 /**
@@ -26,6 +35,7 @@ export const RUNNABLE_SIM_BACKENDS = Object.freeze({
   fluid: Object.freeze(['js.gs.v1', 'gpu.gs.v1']),
   culture: Object.freeze(['js.life.v1', 'gpu.life.v1']),
   swarm: Object.freeze(['js.swarm.v1']),
+  contacts: Object.freeze(['js.contacts.v1', 'gpu.contacts.v1']),
 });
 
 /** What every take recorded before this stamp existed ran on: all-JS. */
@@ -35,12 +45,14 @@ const isJs = (id) => typeof id === 'string' && id.startsWith('js.');
 
 /** The law a set of backends implies. Pure. */
 export function simLawFor(backends) {
-  return SIM_KERNELS.every((k) => isJs(backends[k])) ? 'js-exact' : 'decisions-exact';
+  const named = [...SIM_KERNELS, ...OPTIONAL_SIM_KERNELS.filter((k) => backends[k] !== undefined)];
+  return named.every((k) => isJs(backends[k])) ? 'js-exact' : 'decisions-exact';
 }
 
 /** The stamp a recording writes now: the backends this build is running, and the law they imply. Pure. */
 export function currentSimStamp(backends = DEFAULT_SIM_BACKENDS) {
   const simBackends = { fluid: backends.fluid, culture: backends.culture, swarm: backends.swarm };
+  for (const k of OPTIONAL_SIM_KERNELS) if (backends[k] !== undefined) simBackends[k] = backends[k]; // omitted unless named: the JS-era header is unchanged
   return { simLaw: simLawFor(simBackends), simBackends };
 }
 
@@ -55,9 +67,12 @@ export function checkSimStamp(simLaw, simBackends) {
   if (!simBackends || typeof simBackends !== 'object' || Array.isArray(simBackends))
     throw new Error('simBackends must be an object');
   const keys = Object.keys(simBackends);
-  if (keys.length !== SIM_KERNELS.length || !SIM_KERNELS.every((k) => keys.includes(k)))
-    throw new Error(`simBackends must name exactly ${SIM_KERNELS.join(', ')}`);
-  for (const k of SIM_KERNELS) {
+  const extra = keys.filter((k) => !SIM_KERNELS.includes(k));
+  if (!SIM_KERNELS.every((k) => keys.includes(k)) || !extra.every((k) => OPTIONAL_SIM_KERNELS.includes(k)))
+    throw new Error(
+      `simBackends must name exactly ${SIM_KERNELS.join(', ')}${OPTIONAL_SIM_KERNELS.length ? ` (and may also name ${OPTIONAL_SIM_KERNELS.join(', ')})` : ''}`,
+    );
+  for (const k of keys) {
     if (!KNOWN_SIM_BACKENDS[k].includes(simBackends[k]))
       throw new Error(`simBackends.${k} "${String(simBackends[k])}" is not a known backend`);
   }
@@ -68,5 +83,7 @@ export function checkSimStamp(simLaw, simBackends) {
 
 /** Kernels whose recorded backend this build cannot run — [] when everything the take names is runnable. Pure. */
 export function unrunnableSimBackends(simBackends) {
-  return SIM_KERNELS.filter((k) => !RUNNABLE_SIM_BACKENDS[k].includes(simBackends[k]));
+  return [...SIM_KERNELS, ...OPTIONAL_SIM_KERNELS.filter((k) => simBackends[k] !== undefined)].filter(
+    (k) => !RUNNABLE_SIM_BACKENDS[k].includes(simBackends[k]),
+  );
 }
