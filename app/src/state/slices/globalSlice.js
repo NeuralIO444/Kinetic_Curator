@@ -645,6 +645,12 @@ export const createGlobalSlice = (set) => ({
   dishLifeCoupling: 0,
   setDishLifeCoupling: (v) =>
     set({ dishLifeCoupling: Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0 }),
+  /** #2152 slice 1 — the LIFE dial: how hard the culture's life and death plays on the assets themselves (marks over decaying
+   * cells fade, over dead cells vanish). Its own dial, separate from the coupling dial (Matt, 2026-11-16); 0 = off. Runtime only,
+   * never serialized (the coupling dial's class); junk reads as 0. */
+  dishLifeAssets: 0,
+  setDishLifeAssets: (v) =>
+    set({ dishLifeAssets: Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0 }),
   setDishLifeShed: (n) => set({ dishLifeShed: Number.isFinite(n) ? Math.max(0, Math.min(2, Math.round(n))) : 0 }),
   /** #1923 Phase 4 — the "seed from stage" press, as a counter the live loop consumes once per frame
    * (the chip's other controls reach the resolver the same way: store → loop → stamp). The loop
