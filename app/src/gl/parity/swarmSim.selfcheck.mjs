@@ -7,7 +7,7 @@ import { ParticleSystem } from '../../engine/particles.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../../data/layout-modes.js';
 import { swarmTextureLayout, SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from '../swarmSim.mjs';
 import { hashBase, hashU01, CH } from '../../engine/kernel/rng.js';
-import { levyStep } from '../../engine/organisms/behave.js';
+import { levyStep, lorenzAdvance, lorenzSeed, LORENZ_DT } from '../../engine/organisms/behave.js';
 import { decodeTypedInto } from '../../engine/kernel/stateCodec.mjs';
 import { createScentField } from '../../engine/kernel/field/scent.js';
 import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
@@ -287,6 +287,64 @@ try {
       `max rel err ${worstRel.toExponential(2)}, strongest force seen ${strongest.toFixed(2)}`,
     );
     check('levy — the walk is exercised (some flights are strong)', strongest > 0.5, `${strongest.toFixed(2)}`);
+  }
+
+  // ---- Lorenz: per-agent attractor state advances like behave.js lorenzAdvance, and its direction steers
+  {
+    const count = 150;
+    const lp = lpFor(count);
+    const sys = new ParticleSystem();
+    sys.init(count, W, H, assets, palette, SEED);
+    const lz0 = { x: [], y: [], z: [] };
+    for (let i = 0; i < count; i++) {
+      const l = lorenzSeed(
+        hashU01(SEED, CH.dyn, 9000 + i),
+        hashU01(SEED, CH.dyn, 9500 + i),
+        hashU01(SEED, CH.dyn, 9900 + i),
+      );
+      lz0.x.push(l.x);
+      lz0.y.push(l.y);
+      lz0.z.push(l.z);
+    }
+    const st = { ...stateOf(sys), lorenz: lz0 };
+    const RHO = 28;
+    const GAIN = 0.7;
+    const STEPS = 60;
+    const run = (lorenz, steps) =>
+      page.evaluate((r) => window.__kcSwarmRun(r), {
+        n: count,
+        state: st,
+        steps,
+        params: { ...coreParams(lp, null), lorenz },
+      });
+    // state: 60 RK2 steps against the JS reference (float32 vs float64; Lorenz is chaotic but 0.36 time units is short)
+    const got = (await run({ rho: RHO, gain: 0 }, STEPS)).samples[STEPS].lz;
+    let worst = 0;
+    for (let i = 0; i < count; i++) {
+      let s = { x: lz0.x[i], y: lz0.y[i], z: lz0.z[i] };
+      for (let k = 0; k < STEPS; k++) s = lorenzAdvance(s.x, s.y, s.z, RHO, LORENZ_DT);
+      worst = Math.max(worst, Math.abs(got.x[i] - s.x), Math.abs(got.y[i] - s.y), Math.abs(got.z[i] - s.z) / 4);
+    }
+    check(
+      'lorenz — per-agent state after 60 RK2 steps matches the JS integrator',
+      worst < 5e-3,
+      `max |d| ${worst.toExponential(2)}`,
+    );
+    // steering: one step, gain on vs off
+    const off = (await run({ rho: RHO, gain: 0 }, 1)).samples[1];
+    const on = (await run({ rho: RHO, gain: GAIN }, 1)).samples[1];
+    let fw = 0;
+    for (let i = 0; i < count; i++) {
+      const a = lorenzAdvance(lz0.x[i], lz0.y[i], lz0.z[i], RHO, LORENZ_DT);
+      const mag = Math.hypot(a.dx, a.dy);
+      const m = st.mass[i];
+      const ex = (((a.dx / mag) * GAIN) / m) * SWARM_CORE_CLOUD.damping;
+      const ey = (((a.dy / mag) * GAIN) / m) * SWARM_CORE_CLOUD.damping;
+      if (Math.hypot(on.vx[i], on.vy[i]) > 7.9 || Math.hypot(off.vx[i], off.vy[i]) > 7.5) continue;
+      fw = Math.max(fw, Math.abs(on.vx[i] - off.vx[i] - ex), Math.abs(on.vy[i] - off.vy[i] - ey));
+    }
+    check('lorenz — the ride direction steers the agent (gain / mass)', fw < 1e-3, `max |d| ${fw.toExponential(2)}`);
+    check('lorenz — steering is not a no-op', maxDiff(off.vx, on.vx) + maxDiff(off.vy, on.vy) > 1e-3);
   }
 
   // ---- properties over a long run (the swarm is chaotic: trajectories are not compared, behaviour is)
