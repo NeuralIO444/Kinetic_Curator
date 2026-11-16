@@ -652,6 +652,7 @@ node src/state/rollPool.selfcheck.mjs
 node src/state/rollKits.selfcheck.mjs
 node src/data/styleLooks.selfcheck.mjs
 node src/data/lookPreset.selfcheck.mjs
+node src/data/lookPack.selfcheck.mjs
 node src/data/voiceDeck.selfcheck.mjs
 node src/data/chapters.selfcheck.mjs
 node src/data/canon/canon.selfcheck.mjs

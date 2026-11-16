@@ -8,6 +8,7 @@ import { createExportSlice } from './slices/exportSlice.js';
 import { createLayersSlice } from './slices/layersSlice.js';
 import { createPaletteLibrarySlice } from './slices/paletteLibrarySlice.js';
 import { createVoiceSlice } from './slices/voiceSlice.js';
+import { createLookLibrarySlice } from './slices/lookLibrarySlice.js'; // #2148
 import { createMidiSlice } from './slices/midiSlice.js';
 import { createMathMacrosSlice } from './slices/mathMacrosSlice.js';
 import { onSessionOnly } from './sessionOnly.mjs';
@@ -21,6 +22,7 @@ export const useStore = create((set, get) => ({
   ...createLayersSlice(set, get),
   ...createPaletteLibrarySlice(set, get),
   ...createVoiceSlice(set, get),
+  ...createLookLibrarySlice(set, get),
   ...createMidiSlice(set, get),
   ...createMathMacrosSlice(set, get),
 }));
