@@ -1,4 +1,4 @@
-// node src/engine/kernel/simBackends.selfcheck.mjs
+// node src/gl/simBackends.selfcheck.mjs
 // K1 slice 1 (#2186, K0 R1/R4): the sim stamp in a take.
 //   A the pure module: the law follows the backends; a malformed or inconsistent stamp is refused; absent is lawful
 //   B a fresh recording carries the stamp (all-JS, 'js-exact'); both committed fixtures (recorded before the stamp
@@ -14,13 +14,8 @@ import {
   currentSimStamp,
   checkSimStamp,
   unrunnableSimBackends,
-} from './simBackends.js';
-import {
-  unpackPerformance,
-  checkPerformance,
-  verifyPerformance,
-  PerformanceFileError,
-} from '../../gl/performanceFile.mjs';
+} from '../engine/kernel/simBackends.js';
+import { unpackPerformance, checkPerformance, verifyPerformance, PerformanceFileError } from './performanceFile.mjs';
 
 let n = 0;
 const ok = (name, fn) =>
@@ -51,7 +46,7 @@ const fixtures = ['replayGate', 'creatureRepipe'];
 const perfs = {};
 for (const f of fixtures)
   perfs[f] = await unpackPerformance(
-    new Uint8Array(fs.readFileSync(new URL(`../../gl/fixtures/${f}.kcperf`, import.meta.url))),
+    new Uint8Array(fs.readFileSync(new URL(`./fixtures/${f}.kcperf`, import.meta.url))),
   );
 
 await ok('B: pre-stamp fixtures still parse and verify, read as all-JS', () => {
