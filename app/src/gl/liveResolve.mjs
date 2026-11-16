@@ -37,6 +37,7 @@ import {
   checkParallaxStoreSnapshot,
 } from '../engine/parallaxDrift.js'; // #1576: the parallax drift store
 import { ParticleSystem } from '../engine/particles.js';
+import { createGpuSwarmHost, gpuSwarmWanted } from './gpuSwarmHost.mjs'; // K3 wiring: the GPU swarm in SHADOW (JS stays authoritative); OFF unless asked for
 import { isLiveSwarmMode, isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
 import { getQualityCaps } from '../data/quality.js';
@@ -436,6 +437,23 @@ export function getLastCouplingBackground() {
  * built without a loop (suites, census) never register: the dish
  * reads its enrolment scalars, as #1413 shipped.
  */
+// K3 wiring (#2188) — the loop registers a getter for its GL context; the GPU swarm shadow is created lazily, only while a layer asks
+// for it (layout param gpuSwarm, window.__KC_GPU_SWARM, or ?gpuSwarm=1). Nothing the shadow computes reaches the screen or the take.
+let liveSwarmGl = null;
+let swarmShadow = null;
+let swarmShadowDead = false;
+export function setLiveSwarmShadowGL(getter) {
+  liveSwarmGl = typeof getter === 'function' ? getter : null;
+  if (!liveSwarmGl && swarmShadow) {
+    swarmShadow.dispose();
+    swarmShadow = null;
+  }
+  swarmShadowDead = false;
+}
+/** The shadow's running parity + cost numbers (null when it never ran): window-readable from the loop for the stage run. */
+export function getGpuSwarmShadowStats() {
+  return swarmShadow ? swarmShadow.stats : null;
+}
 let liveWetSampler = null;
 export function setLiveWetSampler(fn) {
   liveWetSampler = typeof fn === 'function' ? fn : null;
@@ -748,32 +766,55 @@ export function createLiveResolver() {
       // Spine C (#389): forward motionSmoothing for critically damped heading.
       // Spine E: forward safeParticles as float particleCount for fade spawn/death.
       // Spine F (#392): forward shared world noise + domain offset.
+      const updLp = {
+        ...ctx.layoutParams,
+        particleCount: ctx.safeParticles,
+        maxParticles: ctx.caps?.maxParticles,
+        motionSmoothing: ctx.motionSmoothing,
+        noise: ctx.noise,
+        noiseDomainOffset: ctx.noiseDomainOffset,
+        // #509 phase 1 — last tick's MOD steering for this layer (undefined
+        // = identity; particles.js defaults). Spread-only, never stored.
+        modSteer: modSteerByLayer.get(layerId),
+        // #509 phase 2 — the shared scent field (spread-only, never
+        // stored). All organism layers deposit into and read one ground.
+        scentField: sharedScent,
+        // #1407 — the shared dish session (spread-only, never stored).
+        // Armed once per resolve; the pass runs inside the first
+        // enrolled system's update.
+        dishSession,
+        // #1410 — the stillness flag (spread-only, never stored): the
+        // deform step renders rest under reduced-motion.
+        reducedMotion: !!ctx.reducedMotion,
+        // #1412 — the governor's tier-2 shed for pigment exchange
+        // (spread-only, never stored), computed per layer at the
+        // swarmItems call site from the frame's governor state.
+        pigmentShed: !!ctx.pigmentShed,
+      };
+      // K3 wiring — the GPU swarm shadow: one GPU step from this layer's pre-step state, compared after the JS step below.
+      let shadowTok = null;
+      if (
+        liveSwarmGl &&
+        !swarmShadowDead &&
+        gpuSwarmWanted(ctx.layoutParams, typeof window !== 'undefined' ? window : null)
+      ) {
+        try {
+          if (!swarmShadow) swarmShadow = createGpuSwarmHost(liveSwarmGl());
+          shadowTok = swarmShadow.pre(layerId, st.system, updLp, {
+            attractor: ctx.attractor,
+            canvasW: W,
+            canvasH: H,
+            loopTimeMs: ctx.loopTimeMs,
+            seedOffsets: ctx.seedOffsets,
+            slowRender: ctx.slowRender,
+          });
+        } catch (e) {
+          swarmShadowDead = true; // fail soft: the JS swarm is the reference and never waits on the shadow
+          console.warn('[gpuSwarm] shadow disabled for this session:', e && e.message ? e.message : e);
+        }
+      }
       st.system.update(
-        {
-          ...ctx.layoutParams,
-          particleCount: ctx.safeParticles,
-          maxParticles: ctx.caps?.maxParticles,
-          motionSmoothing: ctx.motionSmoothing,
-          noise: ctx.noise,
-          noiseDomainOffset: ctx.noiseDomainOffset,
-          // #509 phase 1 — last tick's MOD steering for this layer (undefined
-          // = identity; particles.js defaults). Spread-only, never stored.
-          modSteer: modSteerByLayer.get(layerId),
-          // #509 phase 2 — the shared scent field (spread-only, never
-          // stored). All organism layers deposit into and read one ground.
-          scentField: sharedScent,
-          // #1407 — the shared dish session (spread-only, never stored).
-          // Armed once per resolve; the pass runs inside the first
-          // enrolled system's update.
-          dishSession,
-          // #1410 — the stillness flag (spread-only, never stored): the
-          // deform step renders rest under reduced-motion.
-          reducedMotion: !!ctx.reducedMotion,
-          // #1412 — the governor's tier-2 shed for pigment exchange
-          // (spread-only, never stored), computed per layer at the
-          // swarmItems call site from the frame's governor state.
-          pigmentShed: !!ctx.pigmentShed,
-        },
+        updLp,
         ctx.activeAssets,
         ctx.palette,
         ctx.seed,
@@ -782,6 +823,7 @@ export function createLiveResolver() {
         ctx.seedOffsets,
         ctx.dtSec,
       );
+      if (shadowTok) swarmShadow.post(shadowTok, st.system);
     }
     let items = st.system.getItems(ctx.activeAssets).map((item) => {
       const swatches = ctx.palette.swatches || [];

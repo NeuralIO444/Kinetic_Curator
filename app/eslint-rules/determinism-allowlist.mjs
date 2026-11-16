@@ -165,6 +165,12 @@ export const DETERMINISM_ALLOWLIST = {
       why: 'the loop\u2019s clock SOURCE: reads performance.now to produce loopTimeMs / driver time and frame-timing stats for everything downstream. Downstream code uses loop time, never the wall clock (audit fixes 3b/3d) — the source itself has to read it. Audit fix 5 (#1680) removed the #268 swell\u2019s two reads (17 → 15): the envelope now runs on loopTimeMs',
     },
   },
+  'gl/gpuSwarmHost.mjs': {
+    'performance.now': {
+      count: 1,
+      why: 'the GPU swarm SHADOW\u2019s cost meter (K3 wiring, #2188): times the GPU step + readback for the stage-hardware measurement; the number goes to stats only and never feeds the sim (the JS swarm stays authoritative, the shadow reaches neither screen nor take)',
+    },
+  },
   'gl/parity/costBench.mjs': {
     'Date.now': {
       count: 4,
