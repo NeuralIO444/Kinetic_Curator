@@ -37,6 +37,7 @@ import {
   getLastDishHostSeed,
   getLastCouplingBackground,
   setLiveWetSampler,
+  setLiveSwarmShadowGL,
 } from './liveResolve.mjs';
 import { cultureBackgroundShift, cultureBackgroundHex } from '../engine/dishLifeCouple.mjs'; // #1923 Phase 2 slice D: the background fold's law (the seam)
 import { sanitizeWorld } from '../data/world.js'; // #2104: the standing Canon world, read through its door
@@ -417,6 +418,7 @@ export function createLiveLoop(
   // above this point and reads the registration per frame; cleared at
   // teardown below, beside the service's dispose.
   setLiveWetSampler((x, y) => wetFrame.sampleWet(x, y));
+  setLiveSwarmShadowGL(() => live.getGL()); // K3 wiring: the GPU swarm shadow's context (lazy; OFF unless a layer asks)
   // #1923 DISH LIFE: the idle clock. Off unless the flag is set (state.dishLife or window.__KC_DISH_LIFE); the
   // touch listeners only note a pending touch — this loop consumes it per frame on the loop clock.
   const dishLifePhase = createDishLifePhase({ enabled: false });
@@ -2133,6 +2135,7 @@ export function createLiveLoop(
     disposeDishFluidMagnets(); // #1997
     clearTouch();
     setLiveWetSampler(null); // #1841: the dish's read dies with the loop that served it
+    setLiveSwarmShadowGL(null); // K3 wiring: the shadow dies with the loop that served it
     clearWetMode(); // #1841: the show block's shed line clears with the session
     resolver.dispose();
     live.dispose();

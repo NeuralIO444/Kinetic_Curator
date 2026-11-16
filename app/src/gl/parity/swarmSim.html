@@ -5,6 +5,9 @@
 <canvas id="c" width="4" height="4"></canvas>
 <script type="module">
 import { createGpuSwarm } from '../swarmSim.mjs';
+import { createGpuSwarmHost } from '../gpuSwarmHost.mjs';
+import { ParticleSystem } from '../../engine/particles.js';
+import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../../data/layout-modes.js';
 // window.__kcSwarmRun({ n, state: { x, y, vx, vy, mass }, steps, params, sampleAt: [steps...] }) -> { samples: { step: {x,y,vx,vy} } }
 // Seeds the GPU swarm, runs `steps` substeps under `params`; returns the state after each step listed in sampleAt (and the last).
 const gl = document.getElementById('c').getContext('webgl2', { alpha: false, antialias: false });
@@ -32,6 +35,29 @@ window.__kcSwarmRun = (p) => {
   }
   g.dispose();
   return { samples };
+};
+// window.__kcShadowRun({ n, steps, seed }) -> stats: the K3 wiring shadow over a real ParticleSystem (pre -> JS step -> post, per step).
+window.__kcShadowRun = (p) => {
+  const W = 1000;
+  const H = 700;
+  const assets = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+  const palette = { swatches: ['#ff0000', '#00ff00', '#0000ff', '#ffff00'] };
+  const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', behave: 'cruise', particleCount: p.n, ...(p.lp || {}) });
+  const sys = new ParticleSystem();
+  sys.init(p.n, W, H, assets, palette, p.seed);
+  const host = createGpuSwarmHost(gl);
+  const T0 = 1_000_000;
+  let toks = 0;
+  for (let s = 0; s < p.steps; s++) {
+    const t = T0 + s * (1000 / 60);
+    const tok = host.pre('L', sys, lp, { attractor: null, canvasW: W, canvasH: H, loopTimeMs: t, seedOffsets: null, slowRender: false });
+    if (tok) toks++;
+    sys.update(lp, assets, palette, p.seed, t, null);
+    host.post(tok, sys);
+  }
+  const out = { ...host.stats, toks };
+  host.dispose();
+  return out;
 };
 window.__kcReady = true;
 </script>
