@@ -134,14 +134,28 @@ try {
       ['strength 0.3', 0.3, 21, 40],
       ['strength 0 is the plain culture', 0, 5, 20],
     ]) {
-      const c = createCulture({ cols: COLS, rows: ROWS, rule: CULTURE_RULE, seed: seedRandom(COLS, ROWS, seed, 0.3), mask, bedrock });
+      const c = createCulture({
+        cols: COLS,
+        rows: ROWS,
+        rule: CULTURE_RULE,
+        seed: seedRandom(COLS, ROWS, seed, 0.3),
+        mask,
+        bedrock,
+      });
       const start = Uint8Array.from(c.cur);
       const blocked = new Uint8Array(N);
       for (let i = 0; i < N; i++) blocked[i] = (mask && !mask[i]) || bedrock[i] ? 1 : 0;
-      const g = await page.evaluate(
-        (r) => window.__kcCultureBirthsRun(r),
-        { cols: COLS, rows: ROWS, state: Array.from(start), blocked: Array.from(blocked), rule: CULTURE_RULE, density: Array.from(density), strength, seed, gens },
-      );
+      const g = await page.evaluate((r) => window.__kcCultureBirthsRun(r), {
+        cols: COLS,
+        rows: ROWS,
+        state: Array.from(start),
+        blocked: Array.from(blocked),
+        rule: CULTURE_RULE,
+        density: Array.from(density),
+        strength,
+        seed,
+        gens,
+      });
       let bad = 0;
       let firstBad = -1;
       for (let n = 0; n < gens; n++) {
@@ -153,7 +167,11 @@ try {
         if (diff && firstBad < 0) firstBad = n + 1;
         bad += diff;
       }
-      check(label + ' — in-shader births byte-identical to injectFluidBirths + stepCulture every generation', bad === 0, bad ? `${bad} cells differ, first at gen ${firstBad}` : '');
+      check(
+        label + ' — in-shader births byte-identical to injectFluidBirths + stepCulture every generation',
+        bad === 0,
+        bad ? `${bad} cells differ, first at gen ${firstBad}` : '',
+      );
     }
   }
 } finally {
