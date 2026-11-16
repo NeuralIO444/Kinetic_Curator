@@ -324,15 +324,19 @@ test('KIN cools by gliding: its width passes through many in-between values, nev
   await boot(page);
   const kin = group(page).locator('.kinetic-btn');
   const rest = await width(kin);
-  for (let i = 0; i < 4; i++) {
+  // the K key: click() waits for the opening label to settle, and the taps would drift apart. Tap until the button has
+  // actually heated (a loaded runner delays or drops taps, so a fixed four can leave it short of the threshold)
+  for (let i = 0; i < 12; i++) {
     await page.keyboard.press('k');
     await page.waitForTimeout(110);
-  } // the K key: click() waits for the opening label to settle, and the taps would drift apart
+    if ((await width(kin)) > rest + 40) break;
+  }
   await expect.poll(async () => width(kin)).toBeGreaterThan(rest + 40);
-  await page.mouse.move(600, 600);
+  // start the sampler BEFORE the cooling begins: awaiting the evaluate first lets a loaded runner spend the whole glide
+  // in the round-trip, so the sampler would see only the finished state (no in-between widths at all)
   // each sample carries its own timestamp: a loaded runner stretches the frame tick (a stalled tick would otherwise read
   // as a "jump"), so the glide is judged by its SPEED between samples, never by the size of one step
-  let samples = await page.evaluate(async () => {
+  const sampling = page.evaluate(async () => {
     const el = document.querySelector('.kc-topbar-curator .kinetic-btn');
     const out = [];
     let glide = null; // the width transition the button wears while it cools (#1103)
@@ -350,6 +354,8 @@ test('KIN cools by gliding: its width passes through many in-between values, nev
     }
     return { out, glide };
   });
+  await page.mouse.move(600, 600); // the cooling the sampler is already watching
+  let samples = await sampling;
   // the mechanism, not the runner's frame rate: while cooling, min-width eases between the heat ticks (a step would be 0 s)
   expect(samples.glide, 'the button was seen cooling').not.toBeNull();
   expect(samples.glide.present && samples.glide.seconds, 'min-width glides while it cools').toBeGreaterThan(0);
