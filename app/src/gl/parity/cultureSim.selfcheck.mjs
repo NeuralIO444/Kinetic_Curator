@@ -11,6 +11,8 @@ import {
   DEFAULT_RULE,
 } from '../../engine/dishLife.mjs';
 import { cultureRuleMasks } from '../cultureSim.mjs';
+import { hashBase, hashU32 } from '../../engine/kernel/rng.js';
+import { injectFluidBirths, FLUID_BIRTH_CHANNEL } from '../../engine/dishFluidCouple.mjs';
 import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
 
 // ---- pure: the rule masks agree with the JS luts
@@ -32,6 +34,24 @@ import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
   // junk entries are ignored, as the JS lut ignores them
   assert.equal(cultureRuleMasks({ birth: [3, 9, -1, 1.5, 'x'], survive: [], states: 8 }).birth, 1 << 3);
   console.log('  [ok] rule masks match the JS luts');
+}
+
+// ---- pure: the birth shader's integer hash (base ^ index*c, avalanche) is hashU32 — bit for bit
+{
+  const avalanche = (base, index) => {
+    let h = (base ^ Math.imul(index, 0x85ebca6b)) | 0;
+    h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
+    h = Math.imul(h ^ (h >>> 15), 0x846ca68b);
+    h = (h ^ (h >>> 16)) >>> 0;
+    return h || 1;
+  };
+  for (const seed of [0, 1, 7, 444, -5, 0x7fffffff]) {
+    const base = hashBase(seed, FLUID_BIRTH_CHANNEL);
+    for (const idx of [0, 1, 95, 5183, 8192 * 3 + 17, 8192 * 4000 + 5183]) {
+      assert.equal(avalanche(base, idx), hashU32(seed, FLUID_BIRTH_CHANNEL, idx), `seed ${seed} idx ${idx}`);
+    }
+  }
+  console.log('  [ok] hashBase + the shader avalanche reproduce hashU32 exactly');
 }
 
 const COLS = 96;
@@ -102,6 +122,57 @@ try {
       label + ' — final grid identical',
       c.cur.every((v, i) => v === g.final[i]),
     );
+  }
+
+  // ---- in-shader fluid births (K2 slice 2): per generation, against injectFluidBirths + stepCulture
+  {
+    const N = COLS * ROWS;
+    const density = new Float32Array(N);
+    for (let i = 0; i < N; i++) density[i] = ((i * 37) % 128) / 128; // exactly representable; spans the 0.25 floor
+    for (const [label, strength, seed, gens] of [
+      ['strength 0.8', 0.8, 9, 40],
+      ['strength 0.3', 0.3, 21, 40],
+      ['strength 0 is the plain culture', 0, 5, 20],
+    ]) {
+      const c = createCulture({
+        cols: COLS,
+        rows: ROWS,
+        rule: CULTURE_RULE,
+        seed: seedRandom(COLS, ROWS, seed, 0.3),
+        mask,
+        bedrock,
+      });
+      const start = Uint8Array.from(c.cur);
+      const blocked = new Uint8Array(N);
+      for (let i = 0; i < N; i++) blocked[i] = (mask && !mask[i]) || bedrock[i] ? 1 : 0;
+      const g = await page.evaluate((r) => window.__kcCultureBirthsRun(r), {
+        cols: COLS,
+        rows: ROWS,
+        state: Array.from(start),
+        blocked: Array.from(blocked),
+        rule: CULTURE_RULE,
+        density: Array.from(density),
+        strength,
+        seed,
+        gens,
+      });
+      let bad = 0;
+      let firstBad = -1;
+      for (let n = 0; n < gens; n++) {
+        injectFluidBirths(c, density, strength, seed);
+        stepCulture(c);
+        const grid = g.samples[n];
+        let diff = 0;
+        for (let i = 0; i < N; i++) if (c.cur[i] !== grid[i]) diff++;
+        if (diff && firstBad < 0) firstBad = n + 1;
+        bad += diff;
+      }
+      check(
+        label + ' — in-shader births byte-identical to injectFluidBirths + stepCulture every generation',
+        bad === 0,
+        bad ? `${bad} cells differ, first at gen ${firstBad}` : '',
+      );
+    }
   }
 } finally {
   await close();
