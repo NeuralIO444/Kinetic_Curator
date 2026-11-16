@@ -86,6 +86,15 @@ export function hashU32(seed, channel, index = 0, offsets = null) {
   return h || 1;
 }
 
+/**
+ * K2 slice 2 (#2187) — the pre-avalanche word of hashU32 for (seed, channel) with no seed offsets, i.e. everything in the
+ * hash that does not depend on the index: hashU32(seed, channel, i) = avalanche(base ^ imul(i, 0x85ebca6b)). A GPU kernel
+ * takes this as one uniform and runs the same integer avalanche per cell, so its draws are bit-identical to hashU32's.
+ */
+export function hashBase(seed, channel) {
+  return ((seed | 0) ^ Math.imul(resolveChannel(channel), 0x9e3779b9)) >>> 0;
+}
+
 /** FNV-1a → uint32: stable string→channel mix. */
 function hashChannel(s) {
   let h = 2166136261;
