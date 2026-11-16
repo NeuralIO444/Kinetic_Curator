@@ -11,7 +11,7 @@ const gl = document.getElementById('c').getContext('webgl2', { alpha: false, ant
 window.__kcSwarmRun = (p) => {
   const g = createGpuSwarm(gl, p.n);
   const f32 = (a) => Float32Array.from(a);
-  g.seed({ x: f32(p.state.x), y: f32(p.state.y), vx: f32(p.state.vx), vy: f32(p.state.vy), mass: f32(p.state.mass), seedOffset: p.state.seedOffset ? f32(p.state.seedOffset) : undefined, lorenz: p.state.lorenz ? { x: f32(p.state.lorenz.x), y: f32(p.state.lorenz.y), z: f32(p.state.lorenz.z) } : undefined });
+  g.seed({ x: f32(p.state.x), y: f32(p.state.y), vx: f32(p.state.vx), vy: f32(p.state.vy), mass: f32(p.state.mass), seedOffset: p.state.seedOffset ? f32(p.state.seedOffset) : undefined, energy: p.state.energy ? f32(p.state.energy) : undefined, drive: p.state.drive ? f32(p.state.drive) : undefined, leakRgb: p.state.leakRgb ? f32(p.state.leakRgb) : undefined, lorenz: p.state.lorenz ? { x: f32(p.state.lorenz.x), y: f32(p.state.lorenz.y), z: f32(p.state.lorenz.z) } : undefined });
   if (p.scent) g.setScent(Float32Array.from(p.scent.cells), p.scent.cols, p.scent.rows);
   const at = new Set(p.sampleAt || [p.steps]);
   const samples = {};
@@ -20,6 +20,10 @@ window.__kcSwarmRun = (p) => {
     if (at.has(s)) {
       const r = g.read();
       samples[s] = { x: Array.from(r.x), y: Array.from(r.y), vx: Array.from(r.vx), vy: Array.from(r.vy) };
+      if (p.state.energy) {
+        const d = g.readDrives();
+        samples[s].dr = { energy: Array.from(d.energy), drive: Array.from(d.drive), leakRgb: Array.from(d.leakRgb) };
+      }
       if (p.state.lorenz) {
         const l = g.readLorenz();
         samples[s].lz = { x: Array.from(l.x), y: Array.from(l.y), z: Array.from(l.z) };

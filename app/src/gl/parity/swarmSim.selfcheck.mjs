@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { ParticleSystem } from '../../engine/particles.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../../data/layout-modes.js';
 import { swarmTextureLayout, SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from '../swarmSim.mjs';
+import { createNoise } from '../../engine/noise.js';
 import { hashBase, hashU01, CH } from '../../engine/kernel/rng.js';
 import { levyStep, lorenzAdvance, lorenzSeed, LORENZ_DT } from '../../engine/organisms/behave.js';
 import { decodeTypedInto } from '../../engine/kernel/stateCodec.mjs';
@@ -345,6 +346,119 @@ try {
     }
     check('lorenz — the ride direction steers the agent (gain / mass)', fw < 1e-3, `max |d| ${fw.toExponential(2)}`);
     check('lorenz — steering is not a no-op', maxDiff(off.vx, on.vx) + maxDiff(off.vy, on.vy) > 1e-3);
+  }
+
+  // ---- drives (fatigue / feeding / curiosity walk + detour, vigor) and leak (pigment drift), against the JS formulas
+  {
+    const count = 120;
+    const lp = lpFor(count);
+    const sys = new ParticleSystem();
+    sys.init(count, W, H, assets, palette, SEED);
+    const base = stateOf(sys);
+    const f32 = Math.fround;
+    const st = {
+      ...base,
+      x: base.x.map(f32),
+      y: base.y.map(f32),
+      seedOffset: Array.from(sys.seedOffset.subarray(0, count)).map(f32),
+      energy: Array.from({ length: count }, (_, i) => f32(0.2 + 0.7 * hashU01(SEED, CH.dyn, 777 + i))),
+      drive: Array.from({ length: count }, (_, i) => f32(hashU01(SEED, CH.dyn, 888 + i))),
+      leakRgb: Array.from({ length: count * 3 }, (_, i) => f32(255 * hashU01(SEED, CH.dyn, 999 + i))),
+    };
+    const META = 1.2;
+    const LEAK = 0.6;
+    const STEP = 321;
+    const FREQ = 0.005;
+    const NT = 1.75;
+    const noise = createNoise(SEED);
+    const run = (params, state = st) =>
+      page.evaluate((r) => window.__kcSwarmRun(r), { n: count, state, steps: 1, params });
+    const wind = { seed: SEED, freq: FREQ, offX: 0, offY: 0, nt: NT };
+    const drives = { meta: META, step: STEP, base: hashBase(SEED, CH.dyn) };
+    // (a) isolation: radii 1 => no neighbours => the only force is the curiosity detour, damped by vigor
+    const iso = {
+      ...coreParams(lp, null),
+      sepR: 1,
+      aliR: 1,
+      cohR: 1,
+      wind: null,
+      drives: { ...drives },
+      windOnlyFor: 0,
+    };
+    iso.wind = { ...wind };
+    // wind term would also fire (windOn): neutralise it by mul 0 so only the drives detour acts
+    iso.wind.mul = 0;
+    const off = (await run({ ...iso, drives: null })).samples[1];
+    const on = (await run(iso)).samples[1];
+    let worstE = 0;
+    let worstD = 0;
+    let worstF = 0;
+    for (let i = 0; i < count; i++) {
+      const e0 = st.energy[i];
+      const e = Math.min(1, Math.max(0, e0 - 0.0016 * META)); // no neighbours, no scent
+      const h = hashU01(SEED, CH.dyn, STEP * 131071 + 104729 + i);
+      const dd = Math.min(1, Math.max(0, st.drive[i] + (h - 0.5) * 0.06 * META));
+      worstE = Math.max(worstE, Math.abs(on.dr.energy[i] - e));
+      worstD = Math.max(worstD, Math.abs(on.dr.drive[i] - dd));
+      let fx = 0;
+      let fy = 0;
+      if (dd > 0.001) {
+        const wa =
+          noise.noise3D(st.x[i] * FREQ + 500, st.y[i] * FREQ + 500, NT + st.seedOffset[i] * 0.0001 + 7.3) * 2 * Math.PI;
+        const wm = (dd * META * 0.6) / st.mass[i];
+        fx = Math.cos(wa) * wm;
+        fy = Math.sin(wa) * wm;
+      }
+      const vigor = 0.45 + 0.55 * e;
+      if (Math.hypot(on.vx[i], on.vy[i]) > 7.9 || Math.hypot(off.vx[i], off.vy[i]) > 7.5) continue;
+      worstF = Math.max(
+        worstF,
+        Math.abs(on.vx[i] - off.vx[i] - fx * vigor * SWARM_CORE_CLOUD.damping),
+        Math.abs(on.vy[i] - off.vy[i] - fy * vigor * SWARM_CORE_CLOUD.damping),
+      );
+    }
+    check('drives — energy fatigue matches', worstE < 1e-5, `${worstE.toExponential(2)}`);
+    check('drives — curiosity walk (kernel hash) matches', worstD < 1e-5, `${worstD.toExponential(2)}`);
+    check('drives — detour force, damped by vigor, matches', worstF < 3e-3, `${worstF.toExponential(2)}`);
+    // (b) company: real radii => feeding (+0.0012) when cohCount > 0, and the pigment drifts to the neighbour mean (leak)
+    const co = { ...coreParams(lp, null), wind: null, drives: { ...drives }, leak: LEAK };
+    const gotC = (await run(co)).samples[1];
+    let worstFeed = 0;
+    let worstLeak = 0;
+    let fed = 0;
+    for (let i = 0; i < count; i++) {
+      let n = 0;
+      const sum = [0, 0, 0];
+      for (let j = 0; j < count; j++) {
+        if (j === i) continue;
+        const dx = st.x[j] - st.x[i];
+        const dy = st.y[j] - st.y[i];
+        const d2 = dx * dx + dy * dy;
+        if (d2 > 0 && d2 < SWARM_CORE_CLOUD.cohR ** 2) {
+          n++;
+          for (let c = 0; c < 3; c++) sum[c] += st.leakRgb[j * 3 + c];
+        }
+      }
+      let e = st.energy[i] - 0.0016 * META + (n > 0 ? 0.0012 * META : 0);
+      e = Math.min(1, Math.max(0, e));
+      worstFeed = Math.max(worstFeed, Math.abs(gotC.dr.energy[i] - e));
+      if (n > 0) fed++;
+      for (let c = 0; c < 3; c++) {
+        const cur = st.leakRgb[i * 3 + c];
+        const exp = n > 0 ? cur + (sum[c] / n - cur) * (LEAK * 0.004) : cur;
+        worstLeak = Math.max(worstLeak, Math.abs(gotC.dr.leakRgb[i * 3 + c] - exp));
+      }
+    }
+    check(
+      'drives — feeding in company matches',
+      worstFeed < 1e-5 && fed > 10,
+      `${worstFeed.toExponential(2)} (${fed} fed)`,
+    );
+    check(
+      'leak — pigment drifts toward the neighbour mean',
+      worstLeak < 5e-3,
+      `${worstLeak.toExponential(2)} (0..255 scale)`,
+    );
   }
 
   // ---- properties over a long run (the swarm is chaotic: trajectories are not compared, behaviour is)
