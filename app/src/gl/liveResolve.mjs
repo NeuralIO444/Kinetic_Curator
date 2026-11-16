@@ -120,6 +120,7 @@ const POEM_ONLY_IDS = new Set(
 );
 import { isCultureCells, unpackCultureCells } from '../engine/dishCultureCells.mjs';
 import { createDishLifeStage, isTerrain } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
+import { isContactStamps } from '../engine/dishContactStamps.mjs'; // K3 slice 2c: the GPU contact list as a recorded input (consumed by the dish pass)
 import { isFluidCells, unpackFluidCells } from '../engine/dishFluidCells.mjs'; // K1 slice 4b: the GPU field as a recorded input
 import { createDishFluidStage } from '../engine/dishFluidStage.mjs'; // #1997: the ferrofluid, driven by input.dishFluid (absent = no work)
 import { fieldBodyBudgetFor, fieldBodyScaleBase } from '../engine/dishFluidChannel.mjs'; // #2178: the fluid's attached body is a GPU channel — the resolver publishes its descriptor on the plan, never items
@@ -1109,6 +1110,9 @@ export function createLiveResolver() {
     // (the order the loop below resolves in). Arms only when at least two
     // enrolled strata have contacts on; otherwise every update below
     // stays bit-identical to the per-system engine.
+    // K3 slice 2c — the recorded contact list for this frame's pass (null = the grid pass finds the pairs, as always). Set per
+    // resolve so a stale list can never survive into a later frame; the pass consumes it once.
+    dishSession.contactStamps = isContactStamps(input.dishContactStamps) ? input.dishContactStamps : null;
     armDish(
       dishSession,
       (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false).map((l) => l.id),

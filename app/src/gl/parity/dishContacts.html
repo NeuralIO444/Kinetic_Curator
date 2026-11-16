@@ -5,6 +5,7 @@
 <canvas id="c" width="4" height="4"></canvas>
 <script type="module">
 import { createGpuContacts } from '../dishContactsGpu.mjs';
+import { createGpuContactResolve } from '../dishContactsResolveGpu.mjs';
 // window.__kcContactsRun({ table: {nb,x,y,r,stratum,cgroup,umask,index}, slots, mode }) -> { contacts, overflow }
 // mode 'sync' = detect(); 'async' = submit() then poll() until the fence signals.
 const gl = document.getElementById('c').getContext('webgl2', { alpha: false, antialias: false });
@@ -21,6 +22,13 @@ window.__kcContactsRun = async (p) => {
   }
   g.dispose();
   return r;
+};
+// window.__kcResolveRun({ table }) -> { dx, dy, dvx, dvy, count } (K3 slice 2b: the Jacobi resolution deltas)
+window.__kcResolveRun = (p) => {
+  const g = createGpuContactResolve(gl, Math.max(p.table.nb, 1));
+  const r = g.resolve(p.table);
+  g.dispose();
+  return { dx: Array.from(r.dx), dy: Array.from(r.dy), dvx: Array.from(r.dvx), dvy: Array.from(r.dvy), count: Array.from(r.count) };
 };
 window.__kcReady = true;
 </script>
