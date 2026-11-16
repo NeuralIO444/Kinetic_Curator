@@ -385,6 +385,16 @@ export function getLastDishFluidPlan() {
 }
 
 /**
+ * K1 slice 3c (#2186, S1) — the births the culture dealt under the live fluid bias, as Tier D data: [{ gen, indices }]
+ * in generation order, or null when the frame did not ask to record (input.dishBirthRecord). The take stores this list;
+ * a replay hands it back as input.dishBirthReplay. Module-level, last-resolver-wins (the getLastDishFluidPlan law).
+ */
+let lastDishBirths = null;
+export function getLastDishBirths() {
+  return lastDishBirths;
+}
+
+/**
  * #1923 Phase 2 slice D — the last resolved frame's coupling BACKGROUND read, published by the
  * resolver for the loop's background fold (the getLastDishWet pattern): { meanLevel, coupling } —
  * the dish-mean level of the very publication this frame's coupling read used (one frame behind,
@@ -436,6 +446,8 @@ export function createLiveResolver() {
   // the culture's births the same way (the dish's standing read discipline). Absent stamp = no state, and a
   // build without one is byte-identical to one without this stage.
   const dishFluid = createDishFluidStage();
+  let birthReplayIn = null; // K1 slice 3c — the last input.dishBirthReplay / dishBirthRecord handed to the life stage
+  let birthRecordIn = false;
   // #606: scene units follow the authored canvas (set per resolveLayers).
   let W = CANVAS_W;
   let H = CANVAS_H;
@@ -819,6 +831,22 @@ export function createLiveResolver() {
     // A frame without fluid input sets neither (the bias setter gets null: the culture's step
     // loop stays the pre-#1997 loop, number for number).
     const fluidCoupleField = dishLife.cultureField();
+    {
+      // K1 slice 3c — births as data. A recorded list (input.dishBirthReplay) is applied in place of the bias; a
+      // record request (input.dishBirthRecord) logs them. Both act only on a CHANGE of the input (the setters rebuild
+      // state), and absent = off: the culture's step loop is then the pre-3c loop, number for number.
+      const replayIn = Array.isArray(input.dishBirthReplay) ? input.dishBirthReplay : null;
+      if (replayIn !== birthReplayIn) {
+        dishLife.replayBirths(replayIn);
+        birthReplayIn = replayIn;
+      }
+      const recordIn = input.dishBirthRecord === true && !replayIn;
+      if (recordIn !== birthRecordIn) {
+        dishLife.recordBirths(recordIn);
+        birthRecordIn = recordIn;
+      }
+      lastDishBirths = recordIn ? dishLife.birthLog() : null;
+    }
     {
       const fStamped = input.dishFluid != null;
       const fDial =
@@ -1788,6 +1816,8 @@ export function createLiveResolver() {
       magnets: input.dishFluidMagnets,
       dial: input.dishFluidDial,
       coupleField: fluidCoupleField,
+      // K1 slice 3c — a host-owned (GPU) field, one or more frames behind: { step, density }. Absent = the JS kernel.
+      external: input.dishFluidExternal ?? null,
       W,
       H,
     });

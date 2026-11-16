@@ -21,13 +21,16 @@
 //                   fluid-bias rider, and a fresh resolver restored from it continues
 //                   bit-identically, descriptor publishing throughout; checkResolverSnapshot
 //                   accepts the genuine keys and refuses malformed fluid / rider shapes
+//   births      K1 slice 3c (#2186): input.dishBirthRecord logs the biased culture's births without changing a frame;
+//               input.dishBirthReplay reproduces those frames with NO fluid at all; input.dishFluidExternal publishes the
+//               host's density on the plan and the culture reads it; all absent = the pre-3c resolver
 //   vocabulary      on a stage with nothing dealt (a swarm layer with no particles), the
 //                   descriptor's vocabulary is the stage's own asset pool — every shape a
 //                   real pool asset, wider than the marks chapter (letters/stamps ride the
 //                   pool), and the poem-only alphabets never appear (not pool assets)
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { createLiveResolver, checkResolverSnapshot, getLastDishFluidPlan } from './liveResolve.mjs';
+import { createLiveResolver, checkResolverSnapshot, getLastDishFluidPlan, getLastDishBirths } from './liveResolve.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { ASSETS } from '../data/assets/index.js';
 import { ASSETS_KANA } from '../data/assets/assets-kana.js';
@@ -281,6 +284,49 @@ const N = 60;
     'poem-only stamps never appear — they are not pool assets',
   );
   r.dispose();
+}
+
+// 7. K1 slice 3c — births as data, and a host-owned field
+{
+  const framesOf = (r, n, over) => {
+    const out = [];
+    for (let f = 0; f < n; f++)
+      out.push(hash(r.resolveLayers({ ...inputAt(f, over.fluid), ...(over.extra ? over.extra(f) : {}) })));
+    return out;
+  };
+  const live = createLiveResolver();
+  const liveHs = framesOf(live, N, { fluid: { from: 0, couple: 0.8 } });
+  const rec = createLiveResolver();
+  const recHs = framesOf(rec, N, { fluid: { from: 0, couple: 0.8 }, extra: () => ({ dishBirthRecord: true }) });
+  assert.deepEqual(recHs, liveHs, 'recording births changes no frame');
+  const log = getLastDishBirths();
+  assert.ok(Array.isArray(log) && log.length > 0, 'a biased run records its births');
+  // the recorded list alone (no fluid stamp anywhere) reproduces the live frames
+  const replay = createLiveResolver();
+  const replayHs = framesOf(replay, N, {
+    fluid: null,
+    extra: () => ({ dishBirthReplay: JSON.parse(JSON.stringify(log)) }),
+  });
+  assert.deepEqual(replayHs, liveHs, 'the recorded births reproduce the biased frames without the fluid');
+  // absent = off: no log is published, and the plain run is the plain run
+  const plain = createLiveResolver();
+  framesOf(plain, 5, { fluid: null });
+  assert.equal(getLastDishBirths(), null, 'no record request = no log');
+  // a host-owned field: the plan publishes the host's array and step, and the culture reads it
+  const ext = { step: 777, density: new Float32Array(96 * 54).fill(0.9) };
+  const hosted = createLiveResolver();
+  let sawExternal = false;
+  for (let f = 0; f < 6; f++) {
+    hosted.resolveLayers({ ...inputAt(f, { from: 0, couple: 0.8 }), dishFluidExternal: ext });
+    const plan = getLastDishFluidPlan();
+    if (plan.density === ext.density && plan.step === 777) sawExternal = true;
+  }
+  assert.ok(sawExternal, 'the published plan carries the host density and its step');
+  live.dispose();
+  rec.dispose();
+  replay.dispose();
+  plain.dispose();
+  hosted.dispose();
 }
 
 console.log('liveResolve.dishFluid.selfcheck: ok');
