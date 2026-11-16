@@ -15,6 +15,7 @@ import { runScan } from '../../loot/lootRun.mjs';
 import { loadShelfPrefs } from '../../loot/shelfPrefsLoad.mjs';
 import { takeInImages, ingestVia } from '../../loot/lootIngest.mjs';
 import { takeInPalettes } from '../../loot/lootPalettes.mjs';
+import { takeInLookFiles } from '../../loot/lootLooks.mjs';
 import { takeInAudio } from '../../loot/lootAudio.mjs';
 import { takeInLooks, applyShelfDiskScan } from '../../loot/shelfDiskRun.mjs';
 import { registerShelfDiskPort, clearShelfDiskPort, kickShelfExports } from '../../loot/shelfDiskPort.mjs';
@@ -144,8 +145,16 @@ export function LootRow() {
         index: taken.index,
         importPalettes: (list) => useStore.getState().importUserPalettes(list),
       });
+      // #2148 step 4 — Look files (.kclook / .kcpack) in looks/ install into the Look Library through the same door as IMPORT
+      // (the Library only: a scan never fills a slot or touches the scene)
+      setBusy('adding Looks...');
+      const lk = await takeInLookFiles({
+        native,
+        index: pals.index,
+        installLookFile: (text) => useStore.getState().installLookFile(text),
+      });
       // audio is only validated here; STIMULI offers it as a pick (a scan never switches the source)
-      const aud = await takeInAudio({ native, index: pals.index });
+      const aud = await takeInAudio({ native, index: lk.index });
       // #1591 — keeps: the folder's looks/*.json are the shelf's disk
       // tier. Read them in, fold the scan's verdict (present / gone)
       // into the store, then apply preferences — the armed export
@@ -173,12 +182,14 @@ export function LootRow() {
         added: r.summary.add,
         skipped: r.summary.skipped,
         missing: r.summary.missing,
-        taken: taken.summary.taken + pals.summary.files + aud.summary.taken + looks.summary.takenIn,
+        taken: taken.summary.taken + pals.summary.files + lk.summary.files + aud.summary.taken + looks.summary.takenIn,
         held:
           taken.summary.poolFull +
           taken.summary.rejected +
           pals.summary.rejected +
           pals.summary.unreadable +
+          lk.summary.rejected +
+          lk.summary.unreadable +
           aud.summary.rejected +
           aud.summary.unreadable +
           looks.summary.held,

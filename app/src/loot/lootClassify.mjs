@@ -4,7 +4,8 @@
 // ignored; a file inside one that cannot be used is SKIPPED with a reason, never dropped silently. Matt's v1 choices
 // (2026-10-14): SVG only for images (rasters are recognised and logged "not supported yet"). looks/ was recognised
 // and logged as not-yet-supported until the keeps shelf's disk tier landed (K3, #1591): a look JSON is now a real
-// file the shelf reads — its own exports live there. (.kclook stays a future format, still named, still skipped.)
+// file the shelf reads — its own exports live there. #2148 step 4: `.kclook` / `.kcpack` are Look files — they join the Look Library
+// through the same validation as Pipeline IMPORT (loot/lootLooks.mjs); the shelf never reads them.
 export const LOOT_SUBFOLDERS = Object.freeze({ images: 'image', audio: 'audio', palettes: 'palette', looks: 'look' });
 export const MAX_REL_LENGTH = 512;
 
@@ -20,7 +21,7 @@ const EXT = Object.freeze({
   },
   audio: { '.wav': { ok: true }, '.mp3': { ok: true }, '.aif': { ok: true }, '.aiff': { ok: true } },
   palette: { '.json': { ok: true } },
-  look: { '.json': { ok: true }, '.kclook': { ok: false, reason: 'looks not supported yet' } },
+  look: { '.json': { ok: true }, '.kclook': { ok: true }, '.kcpack': { ok: true } },
 });
 
 /** A path as POSIX segments, or null when it is unsafe or malformed. Never throws. */
