@@ -118,6 +118,7 @@ const POEM_ONLY_IDS = new Set(
   ].map((a) => a.id),
 );
 import { createDishLifeStage, isTerrain } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
+import { isFluidCells, unpackFluidCells } from '../engine/dishFluidCells.mjs'; // K1 slice 4b: the GPU field as a recorded input
 import { createDishFluidStage } from '../engine/dishFluidStage.mjs'; // #1997: the ferrofluid, driven by input.dishFluid (absent = no work)
 import { fieldBodyBudgetFor, fieldBodyScaleBase } from '../engine/dishFluidChannel.mjs'; // #2178: the fluid's attached body is a GPU channel — the resolver publishes its descriptor on the plan, never items
 import { coverageField } from '../engine/dishLifeSeed.mjs'; // #1997: the terrain coverage the attachment's bedrock mask is derived from (the culture seed's own field)
@@ -446,6 +447,22 @@ export function createLiveResolver() {
   // the culture's births the same way (the dish's standing read discipline). Absent stamp = no state, and a
   // build without one is byte-identical to one without this stage.
   const dishFluid = createDishFluidStage();
+  // K1 slice 4b — input.dishFluidCells (the recorded, sparse, 8-bit field) unpacked once per distinct object (the input log
+  // keeps identity, so an unchanged field is not re-unpacked); it wins over a raw dishFluidExternal (a dense host array).
+  let cellsIn = null;
+  let cellsOut = null;
+  const externalFluid = (inp) => {
+    const c = inp.dishFluidCells;
+    if (isFluidCells(c)) {
+      if (c !== cellsIn) {
+        cellsOut = { step: Math.floor(Number(c.step)), density: unpackFluidCells(c) };
+        cellsIn = c;
+      }
+      return cellsOut;
+    }
+    cellsIn = null;
+    return inp.dishFluidExternal ?? null;
+  };
   let birthReplayIn = null; // K1 slice 3c — the last input.dishBirthReplay / dishBirthRecord handed to the life stage
   let birthRecordIn = false;
   // #606: scene units follow the authored canvas (set per resolveLayers).
@@ -1817,7 +1834,7 @@ export function createLiveResolver() {
       dial: input.dishFluidDial,
       coupleField: fluidCoupleField,
       // K1 slice 3c — a host-owned (GPU) field, one or more frames behind: { step, density }. Absent = the JS kernel.
-      external: input.dishFluidExternal ?? null,
+      external: externalFluid(input),
       W,
       H,
     });
