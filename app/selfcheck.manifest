@@ -202,6 +202,7 @@ node src/engine/dishFluidRender.selfcheck.mjs
 node src/engine/dishFluidChannel.selfcheck.mjs
 node src/engine/dishFluidPull.selfcheck.mjs
 node src/engine/dishFluidDrift.selfcheck.mjs
+node src/engine/dishFluidDuplicates.selfcheck.mjs
 node src/gl/fieldBody.selfcheck.mjs
 node src/engine/kinemeCulture.selfcheck.mjs
 node src/engine/dishLifeSpike.selfcheck.mjs
