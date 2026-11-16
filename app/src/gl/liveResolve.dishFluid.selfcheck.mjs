@@ -8,8 +8,7 @@
 // published plan, never in the resolved layers. Pinned here:
 //   off parity      no fluid keys → frames byte-identical between independent resolvers, no
 //                   dishFluid key in the snapshot, no descriptor published. With the fluid
-//                   present at COUPLE 0 and PULL 0 (since the one force seam, PULL leans the
-//                   stage's own marks — pinned in engine/dishFluidDrift.selfcheck.mjs), frames are byte-identical to the no-fluid run WHOLE
+//                   present at COUPLE 0, frames are byte-identical to the no-fluid run WHOLE
 //                   (nothing to strip — there are no body items), while the descriptor
 //                   publishes from the first frame: the body is presentation now, and the
 //                   culture never reads the fluid while uncoupled
@@ -112,7 +111,7 @@ const inputAt = (f, fluid) => {
   if (fluid && f >= fluid.from) {
     over.dishFluid = fluidStamp(t, { shed: 0 });
     over.dishFluidMagnets = MAGNETS;
-    over.dishFluidDial = { flow: 0.5, pull: fluid.pull ?? 0.7, couple: fluid.couple };
+    over.dishFluidDial = { flow: 0.5, pull: 0.7, couple: fluid.couple };
   }
   return baseInput(over);
 };
@@ -145,11 +144,11 @@ const N = 60;
     'no fluid keys → frames byte-identical between independent resolvers',
   );
   const uncoupled = createLiveResolver();
-  const uncoupledHs = run(uncoupled, N, { from: 0, couple: 0, pull: 0 });
+  const uncoupledHs = run(uncoupled, N, { from: 0, couple: 0 });
   assert.deepEqual(
     uncoupledHs.map((f) => f.full),
     plainHs.map((f) => f.full),
-    'fluid present at COUPLE 0 and PULL 0: every frame is the no-fluid frame, whole — the body is not in the output',
+    'fluid present at COUPLE 0: every frame is the no-fluid frame, whole — the body is not in the output',
   );
   assert.ok(uncoupledHs[0].descriptor, 'the descriptor publishes from the first frame (the seeded field)');
   assert.ok(uncoupledHs[N - 1].descriptor, 'and the descriptor is still published at the last frame');
@@ -163,7 +162,7 @@ const N = 60;
 // 2. coupling is real, and nothing moves before the first biased generation can occur
 {
   const coupled = createLiveResolver();
-  const coupledHs = run(coupled, N, { from: 0, couple: 0.8, pull: 0 }); // PULL 0: this section isolates the culture coupling (the marks' lean is pinned in dishFluidDrift.selfcheck)
+  const coupledHs = run(coupled, N, { from: 0, couple: 0.8 });
   const plain = createLiveResolver();
   const plainHs = run(plain, N, null);
   assert.equal(coupledHs[0].full, plainHs[0].full, 'frame 0: the fluid has published nothing yet — no bias can act');
@@ -185,9 +184,9 @@ const N = 60;
 // 3. a one-frame-later fluid start leaves the same early frames identical
 {
   const onTime = createLiveResolver();
-  const onTimeHs = run(onTime, N, { from: 0, couple: 0.8, pull: 0 });
+  const onTimeHs = run(onTime, N, { from: 0, couple: 0.8 });
   const late = createLiveResolver();
-  const lateHs = run(late, N, { from: 1, couple: 0.8, pull: 0 });
+  const lateHs = run(late, N, { from: 1, couple: 0.8 });
   assert.equal(lateHs[0].descriptor, false, 'the late run’s frame 0 has no fluid at all — no descriptor');
   assert.ok(onTimeHs[0].descriptor, 'the on-time run’s frame 0 already publishes the descriptor');
   assert.equal(lateHs[0].full, onTimeHs[0].full, 'frame 0 identical in both runs');
@@ -302,13 +301,9 @@ const N = 60;
     return out;
   };
   const live = createLiveResolver();
-  // PULL 0: the births list carries the culture's half only; the marks' lean reads the field itself (the cells, below)
-  const liveHs = framesOf(live, N, { fluid: { from: 0, couple: 0.8, pull: 0 } });
+  const liveHs = framesOf(live, N, { fluid: { from: 0, couple: 0.8 } });
   const rec = createLiveResolver();
-  const recHs = framesOf(rec, N, {
-    fluid: { from: 0, couple: 0.8, pull: 0 },
-    extra: () => ({ dishBirthRecord: true }),
-  });
+  const recHs = framesOf(rec, N, { fluid: { from: 0, couple: 0.8 }, extra: () => ({ dishBirthRecord: true }) });
   assert.deepEqual(recHs, liveHs, 'recording births changes no frame');
   const log = getLastDishBirths();
   assert.ok(Array.isArray(log) && log.length > 0, 'a biased run records its births');

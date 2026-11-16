@@ -980,10 +980,12 @@ export function createLiveResolver() {
     // One force seam slice 1 (docs/design/one-force-seam.md) — the ferrofluid's lean on the marks, order 2 after LIFE. It
     // reads the fluid plan from the last applied frame (the stage applies at the bottom of this resolve — the same
     // one-frame-behind publication the culture's fluid bias reads above). Inert (null) unless this frame stamps a fluid,
-    // the plan is live, a magnet stands and PULL is up — so a frame without the ferrofluid is bit-identical.
+    // the plan is live, a magnet stands and PULL is up — so a frame without the ferrofluid is bit-identical. The live loop
+    // stamps input.dishFluidMarks = 1 beside the fluid: a take recorded before the seam lacks it and replays unchanged.
     const fPlan = dishFluid.plan;
     const fluidDrift =
       input.dishFluid != null &&
+      input.dishFluidMarks === 1 &&
       fPlan.active &&
       fPlan.density &&
       Array.isArray(fPlan.magnets) &&

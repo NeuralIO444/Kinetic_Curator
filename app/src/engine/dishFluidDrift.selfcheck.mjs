@@ -8,7 +8,8 @@
 //             is never written
 //   resolver  no fluid, or a fluid with no magnet, is byte-identical to the plain resolver; with a magnet the same marks
 //             (same count, same assets) lean toward it by at most DRIFT_MAX_PX and nothing else changes (alpha and scale
-//             stay the culture's to decide); the same stream replays bit-identically
+//             stay the culture's to decide); the same stream replays bit-identically; a take recorded before the seam
+//             (no dishFluidMarks marker) replays exactly as recorded
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { markDriftDelta, applyFluidDrift, DRIFT_MAX_PX, DRIFT_DENSITY_FLOOR } from './dishFluidDrift.mjs';
@@ -181,6 +182,7 @@ const fluidOver = (t, magnets, pull = 0.7) => ({
   dishFluid: fluidStamp(t, { shed: 0 }),
   dishFluidMagnets: magnets,
   dishFluidDial: { flow: 0.5, pull, couple: 0 },
+  dishFluidMarks: 1,
 });
 const run = (over) => {
   const r = createLiveResolver();
@@ -224,6 +226,15 @@ ok('resolver: with a magnet the same marks lean toward it, by at most DRIFT_MAX_
     }
   }
   assert.ok(moved > 0, `some marks leaned (${moved} mark-frames)`);
+});
+
+ok('resolver: a take recorded before the seam (no dishFluidMarks marker) replays exactly as recorded', () => {
+  const old = run((t) => {
+    const o = fluidOver(t, [MAG]);
+    delete o.dishFluidMarks;
+    return o;
+  });
+  for (let f = 0; f < FRAMES; f++) assert.equal(hash(itemsOf(old[f])), hash(itemsOf(plain[f])), `frame ${f}`);
 });
 
 ok('resolver: no fluid at all is untouched, and the same stream replays bit-identically', () => {
