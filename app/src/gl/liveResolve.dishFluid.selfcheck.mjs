@@ -24,11 +24,8 @@
 //   births      K1 slice 3c (#2186): input.dishBirthRecord logs the biased culture's births without changing a frame;
 //               input.dishBirthReplay reproduces those frames with NO fluid at all; input.dishFluidExternal publishes the
 //               host's density on the plan and the culture reads it; all absent = the pre-3c resolver
-<<<<<<< HEAD
 //   cells       K1 slice 4b: input.dishFluidCells (the GPU field as a recorded, sparse, 8-bit input) drives the culture and
 //               the plan; a JSON round-trip through the input log replays the very same frames; a malformed object is inert
-=======
->>>>>>> origin/main
 //   vocabulary      on a stage with nothing dealt (a swarm layer with no particles), the
 //                   descriptor's vocabulary is the stage's own asset pool — every shape a
 //                   real pool asset, wider than the marks chapter (letters/stamps ride the
@@ -336,7 +333,6 @@ const N = 60;
   hosted.dispose();
 }
 
-<<<<<<< HEAD
 // 8. K1 slice 4b — the field as a recorded input: live == replay, no fluid kernel needed
 {
   const NN = 96 * 54;
@@ -388,6 +384,4 @@ const N = 60;
   for (const r of [a, b, js, c, m, j2]) r.dispose();
 }
 
-=======
->>>>>>> origin/main
 console.log('liveResolve.dishFluid.selfcheck: ok');
