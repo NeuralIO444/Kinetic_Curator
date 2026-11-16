@@ -29,6 +29,7 @@ Each section ends in a numbered ruling with a recommendation. Matt rules section
 
 - `simLaw`: `'js-exact'` (every sim kernel ran in JS) or `'decisions-exact'` (at least one kernel ran on the GPU).
 - `simBackends`: `{ fluid: 'js.gs.v1' | 'gpu.gs.v1', culture: …, swarm: … }` — which implementation produced each kernel, versioned like `kernelVersion` so a changed kernel is detectable.
+  - **Optional `contacts` key (K3, Matt 2026-11-16):** `'js.contacts.v1' | 'gpu.contacts.v1'`. Absent means the dish contacts ran in JS (every take before the contacts producer; the header of such a take is unchanged byte for byte). `'gpu.contacts.v1'` means a frame's GPU-detected contact list rode the take as the recorded `input.dishContactStamps`; the CPU resolves exactly that list, so it replays anywhere, and it implies `simLaw: 'decisions-exact'`. The recorder stamps it exactly when a frame carried a list.
 - `device`: a **numeric-class probe**, not a renderer string — a small fixed shader run at record time, its output hashed, plus float-texture format support and highp range/precision. Browsers mask or coarsen `UNMASKED_RENDERER`, so a string cannot answer "will this device reproduce the sim"; a probe can.
 
 **R1 (recommend: adopt).** The three-tier law and the three header keys above. Tier D is the take; Tier S is "same device or it is not a proof"; Tier P is not in the proof.
