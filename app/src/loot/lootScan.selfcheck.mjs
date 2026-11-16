@@ -36,7 +36,10 @@ ok('the folder contract: the subfolder is the intent; anything outside is ignore
 ok('what is recognised but not supported yet is reported with a reason, never guessed at', () => {
   assert.equal(classify('images/photo.png').reason, 'raster not supported yet');
   assert.equal(classify('images/photo.JPEG').reason, 'raster not supported yet');
-  assert.equal(classify('looks/pretty.kclook').reason, 'looks not supported yet'); // the future format stays named + skipped (K3)
+  // #2148 step 4: .kclook / .kcpack are Look files now (they join the Library); the pin that said 'looks not supported yet' retired
+  assert.equal(classify('looks/pretty.kclook').ok, true);
+  assert.equal(classify('looks/pretty.kcpack').ok, true);
+  assert.equal(classify('looks/pretty.txt').reason, 'not a look file (.txt)');
   assert.equal(classify('audio/song.flac').reason, 'not a audio file (.flac)');
   assert.equal(classify('palettes/noext').reason, 'no file extension');
   assert.equal(classify('images/a.svg.txt').ok, false);
