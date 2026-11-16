@@ -43,8 +43,8 @@ ok('orbit is kind 7, at the spec numbers; a whole mark and a region both take it
   assert.deepStrictEqual(sanitizeAssetKineme({ a: 'orbit' }), { a: 'orbit' }, 'a whole mark takes it');
   assert.deepStrictEqual(sanitizeRegionKinemes({ [PETALS[0]]: 'orbit' }, flora.regions), { [PETALS[0]]: 'orbit' });
   assert.deepStrictEqual(
-    KINEMES.map((k) => k.id).slice(-2),
-    ['scatter', 'orbit'],
+    KINEMES.map((k) => k.id).slice(-3),
+    ['scatter', 'orbit', 'assemble'],
     'appended last: earlier slots unmoved',
   );
   // the shader's second-member (stack) switch has no orbit branch, so a stack must not name it

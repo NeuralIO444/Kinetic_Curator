@@ -1,6 +1,6 @@
 # Kineme break-up — regions that leave home and come back (Motion Core P4, #2116, step 1)
 
-Status: **SPEC ONLY — nothing is built.** This stops for Matt's approval of the numbers (§9). Epic #2109; phase 0 (the motion
+Status: **SCATTER, ORBIT AND ASSEMBLE ARE BUILT** (see the as-built notes under §2.1–§2.3); the rest of this file is the step-1 spec. This stops for Matt's approval of the numbers (§9). Epic #2109; phase 0 (the motion
 map, `motion-map.md`) is merged and phase 2a (#2113, the CPU reference) is merged, so step 2 is unblocked once this is approved.
 Paths are under `app/src/`. Every claim below was re-read on `main` @ `312da5c`; none of it was run except the throwaway
 float32 check in §8 (not committed).
@@ -99,6 +99,27 @@ off = d · B · amp · e
 - The audio path uses both: an onset sets `tOut` (pieces fly out in `K`), the next downbeat sets `tIn` (they settle in).
 - Landing (Look or chapter) sets `tIn` only, but starts the pieces **displaced**: the picture is arriving. See §6 for the
   `t = 0` question this raises.
+
+**As built (#2116 step 2c, assemble — the last kind).** What the lines above did not settle:
+
+- **Ruling (Matt, 2026-11-15): a landing starts displaced on its first frame** (not a fade-in). Stills, exports and every scene
+  with no trigger stay exact rest.
+- **`u_break` is a `vec3`**: `(tOut, tIn, armed)`. `armed = 0` is the uniform's default and what an idle scene writes, so rest
+  needs no sentinel arithmetic in the shader; it uploads only while a trigger is live (and once more to disarm).
+- **Where the stamps come from.** `curator/breakLive.js` only bumps the store's monotone `breakSeq { out, in }` (new
+  `bumpBreak` action): `in` on `kinetic:tap`, `layout:preset`, `layout:curate`, a chapter landing (`kineticLanding.seq`) and the
+  downbeat after a scatter; `out` on an `audio:onset` at or above `BREAK_ONSET_STRENGTH` (0.8, exported from `data/kinemes.js`),
+  at most one per bar. The fold `engine/motionCore/breakTrigger.js` (one line in `liveLoop.mjs`, as for phrases) stamps the
+  kineme-clock time of the first frame it sees a counter move, and returns `null` when nothing is live — so the contract
+  carries `kinemeBreak` only for a scene that uses an assemble region while a trigger is live.
+- **Fold rules.** The first frame adopts the counters (a take that opens at n is not displaced); several bumps in one frame are
+  one settle; a hit scatters only pieces that are home (one already out or mid-settle would snap back to start the flight); a
+  scatter nobody settles settles itself after `2 x per`; fully home (`(1 + ripple) x per`) forgets; kineme time running
+  backwards (a loop restart) rests everything. State snapshots/restores like the clock's.
+- **Region-only; not stackable; not a phrase step.** `assemble` carries the same packed vector as scatter (`a_brk`); no stride
+  change. It is excluded from stacks and from the shipped phrases (a fade between two break-up kinds already cuts).
+- **Not yet:** the fold's state is not in take snapshots (phrases have the same gap), and there is no picker UI: assign with
+  `setRegionKineme(asset, region, 'assemble')`.
 
 ## 3. Cost, packing, table budget
 

@@ -57,7 +57,11 @@ ok('every stack is two distinct, plain singles; ids are unique and never shadow 
     KINEME_STACKS.map((s) => s.id),
     ['rock+bob', 'pulse+spin', 'pulse+blink', 'spin+bob'],
   );
-  assert.strictEqual(KINEMES.length, 8, 'the single library is unchanged by stacking (#2116 appended orbit)');
+  assert.strictEqual(
+    KINEMES.length,
+    9,
+    'the single library is unchanged by stacking (#2116 appended orbit, then assemble)',
+  );
 });
 
 ok('getAssetKineme resolves a single as itself and a stack to its two records; getKineme stays single-only', () => {

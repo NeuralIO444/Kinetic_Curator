@@ -447,6 +447,10 @@ export const createGlobalSlice = (set) => ({
   enabledAssets: initialEnabledAssets,
   assetWeightOverrides: {},
   /** #781 KINEME — { assetId: kinemeId }: which assets move, and how. Assets stay static sources. */
+  // #2116 assemble: the recorded trigger counters — `out` a strong audio hit (scatter), `in` a landing or a downbeat after a scatter
+  // (settle). Monotone and never persisted: event handlers (curator/breakLive.js) only bump them; the loop's fold turns a
+  // change into a kineme-clock stamp (engine/motionCore/breakTrigger.js), so no handler ever reads a clock.
+  breakSeq: { out: 0, in: 0 },
   assetKineme: { ...DEFAULT_ASSET_KINEME }, // #705 — micro-HUD ornaments move out of the box
   /** #1434 — { assetId: { regionId: kinemeId | null } }: the artist's per-region overrides over the family
    * defaults. null is a tombstone: that region is still on purpose. Rides the document. */
@@ -1276,6 +1280,13 @@ export const createGlobalSlice = (set) => ({
    * the baked/auto-tagged defaults at resolve time, and a re-bake or
    * re-tag never touches this map.
    */
+  /** #2116 — bump a break-up trigger counter: 'out' (an audio hit scatters the pieces) or 'in' (a landing / downbeat settles them). */
+  bumpBreak: (which) =>
+    set((state) => {
+      if (which !== 'out' && which !== 'in') return {};
+      const cur = state.breakSeq || { out: 0, in: 0 };
+      return { breakSeq: { ...cur, [which]: (cur[which] || 0) + 1 } };
+    }),
   setRegionKineme: (assetId, regionId, value) =>
     set((state) => {
       if (!assetId || typeof assetId !== 'string' || !regionId || typeof regionId !== 'string') return {};

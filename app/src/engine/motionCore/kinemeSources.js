@@ -14,6 +14,7 @@
 //   169  kind 4 blink:  kVis = ph < km.z ? 1.0 : 0.0             (km.z is the duty; v_opacity = a_inst1.y * kVis, :229)
 //   170  kind 5 bob  :  kOff = vec2(0.0, km.z * wav)             (added to the instance's world position, :226)
 //   171+ kind 6 scatter (#2116): kOff = a_brk * (km.z * e), e from u = fract(t / per - phase * 0.4) — see scatterPose
+//        kind 8 assemble (#2116): kOff = a_brk * (km.z * e), e from the trigger stamps (u_break) — see assemblePose
 //        kind 7 orbit   (#2116): kOff = box * |km.z| * Rot(2 pi phase) * (cos th - 1, +/- sin th), th = 2 pi fract(t / per) — see orbitPose
 //
 // Pose mapping: spin / osc -> dRot (degrees); pulse -> sx, sy; bob -> dy (scene units); blink -> dAlpha, where the shader's
@@ -30,7 +31,7 @@
 // declare `kineme` so a later phase converts the right clock.
 //
 // Browser-safe, pure: no clock, no chance (the phase comes from the node).
-import { KINEMES, KINEME_STACKS, KINEME_KINDS, SCATTER_WINDOW, SCATTER_RIPPLE, getKinemePhrase, KINEME_PHRASES } from '../../data/kinemes.js';
+import { KINEMES, KINEME_STACKS, KINEME_KINDS, SCATTER_WINDOW, SCATTER_RIPPLE, ASSEMBLE_RIPPLE, ASSEMBLE_KICK, getKinemePhrase, KINEME_PHRASES } from '../../data/kinemes.js';
 import { musicalView, resolvePhrase, phraseCycleAt, phrasePairFades, PHRASE_BEATS_PER_BAR } from '../../data/kinemePhrases.js';
 import { registerCostTier } from '../kernel/costRegistry.mjs';
 import { registerMotionSource, composePose, POSE_IDENTITY } from './index.js';
@@ -96,6 +97,26 @@ export function orbitPose(kineme, t, phase01, brk = [0, 0]) {
   return { dx: r * (ox * lc - oy * ls) + 0, dy: r * (ox * ls + oy * lc) + 0 }; // + 0: a rest of -0 reads as 0
 }
 
+/**
+ * kind 8 (#2116, the shader's assemble branch): a triggered one-shot on the kineme clock. `trig` = [tOut, tIn] (the trigger
+ * fold's stamps, -1e30 = never) or null/absent for no trigger — rest. A settle (tIn >= tOut) starts displaced and eases home
+ * on a cubic ease-out, delayed by phase * RIPPLE * per; a scatter (tOut > tIn) flies out in KICK seconds and holds. -> dx, dy.
+ */
+export function assemblePose(kineme, t, phase01, brk = [0, 0], trig = null) {
+  if (!Array.isArray(trig)) return { dx: 0, dy: 0 };
+  const per = Math.max(kineme.period, 1e-3);
+  let e;
+  if (trig[0] > trig[1]) {
+    const x = 1 - Math.min(1, Math.max(0, (t - trig[0]) / ASSEMBLE_KICK));
+    e = 1 - x * x * x;
+  } else {
+    const x = 1 - Math.min(1, Math.max(0, (t - trig[1] - phase01 * ASSEMBLE_RIPPLE * per) / per));
+    e = x * x * x;
+  }
+  const k = kineme.amp * e;
+  return { dx: brk[0] * k + 0, dy: brk[1] * k + 0 }; // + 0: a rest of -0 reads as 0
+}
+
 const BY_KIND = Object.freeze({
   [KINEME_KINDS.spin]: spinPose,
   [KINEME_KINDS.osc]: oscPose,
@@ -104,13 +125,14 @@ const BY_KIND = Object.freeze({
   [KINEME_KINDS.bob]: bobPose,
   [KINEME_KINDS.scatter]: scatterPose,
   [KINEME_KINDS.orbit]: orbitPose,
+  [KINEME_KINDS.assemble]: assemblePose,
 });
 
 /** The pose delta of a kineme record ({ kind, period, amp }) at motion time t (seconds) for an instance phase in [0, 1). */
-export function kinemePose(kineme, tSec, phase01 = 0, brk) {
+export function kinemePose(kineme, tSec, phase01 = 0, brk, trig) {
   const fn = kineme && BY_KIND[KINEME_KINDS[kineme.kind]];
   if (!fn) throw new TypeError(`[kinemeSources] unknown kineme kind "${String(kineme && kineme.kind)}"`);
-  return fn(kineme, tSec, phase01, brk);
+  return fn(kineme, tSec, phase01, brk, trig);
 }
 
 /** The source id a library kineme registers under. */
@@ -132,8 +154,10 @@ for (const k of KINEMES) {
     timeBase: 'kineme',
     costTier: 'motionCore/kineme-adapter',
     anchorNodes: ANCHOR_NODES,
-    // a scatter or orbit node carries its packed break-up vector as `node.brk` (the shader's a_brk); others ignore it
-    evaluate: (node, t) => kinemePose(k, t, node && Number.isFinite(node.phase01) ? node.phase01 : 0, node && node.brk),
+    // a scatter, orbit or assemble node carries its packed break-up vector as `node.brk` (the shader's a_brk); an assemble node also
+    // carries the trigger stamps as `node.trig` (the shader's u_break); others ignore both
+    evaluate: (node, t) =>
+      kinemePose(k, t, node && Number.isFinite(node.phase01) ? node.phase01 : 0, node && node.brk, node && node.trig),
   });
 }
 
