@@ -33,6 +33,7 @@ import {
   getLastSpawnDecisions,
   getLastDishWet,
   getLastDishFluidPlan,
+  getLastDishCultureField,
   getLastCouplingBackground,
   setLiveWetSampler,
 } from './liveResolve.mjs';
@@ -55,6 +56,8 @@ import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469
 
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
+import { createGpuFluidHost } from './gpuFluidHost.mjs'; // K1 slice 4c: the GPU fluid, render-side; OFF unless window.__KC_GPU_FLUID
+import { packFluidCells } from '../engine/dishFluidCells.mjs';
 import { fluidStamp } from '../engine/dishFluid.mjs'; // #1997: the ferrofluid's cycle stamp (the loop only stamps; since #2178 the resolver publishes the plan and the renderer seats the body)
 import { installDishFluidMagnets } from './dishFluidMagnetsDom.mjs'; // #1997: the magnet placement gesture (armed by the chip)
 import { consumeTouch, clearTouch } from '../engine/dishLifeTouch.mjs';
@@ -419,6 +422,12 @@ export function createLiveLoop(
   // on) and the governor's awake sensor state. The gesture writes only store magnet actions;
   // the loop stamps the list beside the fluid stamp every frame the mode is on.
   let dishFluidWasAwake = false;
+  // K1 slice 4c — the GPU fluid (backend gpu.gs.v1). OFF by default: only while the fluid runs AND window.__KC_GPU_FLUID is set.
+  // The host runs the kernel on the GPU and reads back late; the loop hands the field to the resolver as the RECORDED input
+  // input.dishFluidCells (sparse 8-bit, above the 0.25 floor), so births and bone pull read exactly what a replay reads.
+  let gpuFluidHost = null;
+  let gpuHostField = null; // the host's last handed field object, so an unchanged readback keeps its identity
+  let gpuCells = null;
   const disposeDishFluidMagnets = installDishFluidMagnets(canvas, getState);
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
@@ -893,6 +902,38 @@ export function createLiveLoop(
       dishFluidWasAwake = dishFluidStamp !== null;
       s.setDishFluidAwake?.(dishFluidWasAwake); // the governor's sensor — published on transitions only
     }
+    // K1 slice 4c — the GPU fluid's field for this frame, as the recorded input (null = the JS kernel runs, as always).
+    let dishFluidCells = null;
+    if (dishFluidStamp && typeof window !== 'undefined' && window.__KC_GPU_FLUID) {
+      try {
+        if (!gpuFluidHost && !live.getGL().isContextLost()) gpuFluidHost = createGpuFluidHost(live.getGL());
+        const field = gpuFluidHost
+          ? gpuFluidHost.frame({
+              stamp: dishFluidStamp,
+              seed: s.seed,
+              magnets: s.dishFluidMagnets || [],
+              dial: dishFluidDial,
+              aspectHW: canvasW > 0 && canvasH > 0 ? canvasH / canvasW : 0.7,
+              coupleField: getLastDishCultureField(),
+            })
+          : null;
+        if (field) {
+          if (field !== gpuHostField) {
+            gpuHostField = field;
+            gpuCells = packFluidCells(field.density, field.step);
+          }
+          dishFluidCells = gpuCells;
+        }
+      } catch (e) {
+        console.warn('[gpuFluid] disabled for this session:', e && e.message ? e.message : e);
+        window.__KC_GPU_FLUID = false; // fail soft: the JS kernel is the reference backend (K0 R4)
+      }
+    } else if (gpuFluidHost) {
+      gpuFluidHost.dispose();
+      gpuFluidHost = null;
+      gpuHostField = null;
+      gpuCells = null;
+    }
     // #2006 slice 3 — the review morph stamp: while the standing review
     // record carries a ladder adjustment, the resolver settles the repair
     // as one planned morph (gl/liveResolve's review channel). The stamp
@@ -923,8 +964,13 @@ export function createLiveLoop(
       ...(dishLifeStamp ? { dishLife: dishLifeStamp } : {}),
       ...(dishFieldStamp ? { dishField: dishFieldStamp, dishFieldCoupling } : {}), // #1923 Phase 2
       ...(dishFluidStamp
-        ? { dishFluid: dishFluidStamp, dishFluidMagnets: s.dishFluidMagnets || [], dishFluidDial }
-        : {}), // #1997 — stamp + magnets + dials, only while the mode is on
+        ? {
+            dishFluid: dishFluidStamp,
+            dishFluidMagnets: s.dishFluidMagnets || [],
+            dishFluidDial,
+            ...(dishFluidCells ? { dishFluidCells } : {}),
+          }
+        : {}), // #1997 (+ K1 4c: the GPU field, when that backend runs) — stamp + magnets + dials, only while the mode is on
       ...(reviewMorphStamp ? { reviewMorph: reviewMorphStamp } : {}),
       canvasW,
       canvasH,

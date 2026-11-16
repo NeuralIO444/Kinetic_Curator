@@ -38,7 +38,9 @@ await ok('A: the law follows the backends; stamps are validated; absent is lawfu
   assert.throws(() => checkSimStamp('js-exact', gpu.simBackends), /does not match/);
   assert.throws(() => checkSimStamp('decisions-exact', DEFAULT_SIM_BACKENDS), /does not match/);
   assert.deepEqual(unrunnableSimBackends(DEFAULT_SIM_BACKENDS), []);
-  assert.deepEqual(unrunnableSimBackends(gpu.simBackends), ['fluid']);
+  // K1 4c: a gpu.gs.v1 take REPLAYS everywhere (its field is the recorded input.dishFluidCells); an id this build has never heard of cannot
+  assert.deepEqual(unrunnableSimBackends(gpu.simBackends), []);
+  assert.deepEqual(unrunnableSimBackends({ ...DEFAULT_SIM_BACKENDS, fluid: 'warp.9' }), ['fluid']);
   assert.deepEqual([...SIM_KERNELS], ['fluid', 'culture', 'swarm']);
 });
 
@@ -75,14 +77,17 @@ await ok('C: the file door is fail-closed', () => {
   checkPerformance({ ...base, ...currentSimStamp() }); // a well-formed stamp passes
 });
 
-await ok('D: a take naming a backend this build cannot run parses, and verify reports it', () => {
-  const stamp = currentSimStamp({ ...DEFAULT_SIM_BACKENDS, fluid: 'gpu.gs.v1' });
-  const p = { ...perfs.replayGate, ...stamp };
-  checkPerformance(p);
-  const v = verifyPerformance(p);
-  assert.equal(v.simLaw, 'decisions-exact');
-  assert.deepEqual(v.simUnrunnable, ['fluid']);
-  assert.equal(v.ok, true, 'the decision chain still verifies — nothing here re-ran the fluid on another backend');
-});
+await ok(
+  'D: a gpu.gs.v1 take parses, verifies, and reports itself runnable (its field is a recorded input — K1 4c)',
+  () => {
+    const stamp = currentSimStamp({ ...DEFAULT_SIM_BACKENDS, fluid: 'gpu.gs.v1' });
+    const p = { ...perfs.replayGate, ...stamp };
+    checkPerformance(p);
+    const v = verifyPerformance(p);
+    assert.equal(v.simLaw, 'decisions-exact');
+    assert.deepEqual(v.simUnrunnable, [], 'every known backend replays here; the unrunnable report is pinned in A');
+    assert.equal(v.ok, true, 'the decision chain still verifies — nothing here re-ran the fluid on another backend');
+  },
+);
 
 console.log(`simBackends.selfcheck: OK (${n} groups) — K1 slice 1 #2186`);
