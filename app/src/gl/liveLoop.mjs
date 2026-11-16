@@ -63,6 +63,7 @@ import { fieldStamp, clampCycleGens } from '../engine/dishLifeField.mjs'; // #19
 import { installDishLifeTouch } from './dishLifeTouchDom.mjs';
 import { createKinemeClock } from '../data/kinemes.js';
 import { createPhraseClock } from '../data/kinemePhrases.js'; // #2118: kineme phrases read the musical position
+import { createBreakTrigger } from '../engine/motionCore/breakTrigger.js'; // #2116: the assemble trigger fold
 import { createMusicalClock } from './musicalClock.mjs'; // #2118
 import { gateWeaveOffset } from './gateWeave.mjs';
 import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
@@ -188,6 +189,7 @@ export function createLiveLoop(
   // musical clock runs (composition/clockLive.js), kept here so the loop imports nothing from composition/.
   const phraseMusic = createMusicalClock();
   const phraseClock = createPhraseClock();
+  const breakTrigger = createBreakTrigger(); // #2116 assemble: breakSeq -> trigger stamps on the kineme clock
   // #278 — VJ MIX: palette crossfade state machine (pure) + the last
   // presented frame's target (the outgoing deck snapshot source).
   const paletteMix = createPaletteMix();
@@ -1086,6 +1088,10 @@ export function createLiveLoop(
     // rides on top of the layout squash dial (the #594 squash-and-stretch
     // amount, u_smear.z). 0 on the default table (routes.squash undefined)
     // → the contract is exactly as built, today's render bit-identical.
+    const kinemeNow = kinemeClock.at(
+      loopTimeMs / 1000,
+      applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate),
+    );
     const contract = buildSceneContract({
       doc: {
         seed: s.seed,
@@ -1097,11 +1103,9 @@ export function createLiveLoop(
         world: worldNow, // #2104: the standing world (the contract omits the key when none stands)
         squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0),
         assetKineme: s.assetKineme,
-        kinemeTime: kinemeClock.at(
-          loopTimeMs / 1000,
-          applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate),
-        ),
+        kinemeTime: kinemeNow,
         musical: phraseClock.at(phraseMusic.advance(loopTimeMs, s.beatBpm)), // #2118: read by the contract only when a phrase is assigned
+        kinemeBreak: breakTrigger.at(s.breakSeq, kinemeNow), // #2116: null unless a trigger is live; read by the contract only for an assemble region
         palette: activePalette,
         // #1433 — the governor state the region shed ladder reads
         // (sceneContract.regionKinemesFrozen / regionCollapseShed /

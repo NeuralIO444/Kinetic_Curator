@@ -324,6 +324,7 @@ export const RENDERER_PROGRAMS = [
       'u_kinemeB',
       'u_kinemeF',
       'u_kinemeTime',
+      'u_break',
       'u_hands',
       'u_spec',
       'u_specA',
@@ -861,7 +862,11 @@ function expandRegionInstances(instances, cells, regionAnim, kinemeTable = null,
       // units (the mark's own rotation applied, y-down) x the mark's box side. Only scatter slots get one, so every other
       // instance packs exactly the zeros it packed before.
       // (#2118: a fading phrase pair may carry the scatter as its second member)
-      if (slot > 0 && entryHasKind(kinemeTable && kinemeTable[slot - 1], KINEME_KINDS.scatter)) {
+      if (
+        slot > 0 &&
+        (entryHasKind(kinemeTable && kinemeTable[slot - 1], KINEME_KINDS.scatter) ||
+          entryHasKind(kinemeTable && kinemeTable[slot - 1], KINEME_KINDS.assemble)) // #2116: assemble flies out along the same vector
+      ) {
         placed.brk = breakVector(lx, ly, co, si, it, kinemePhase(it.asset, r.id));
       }
       // #2116 — orbit sizes its circle by the MARK's box, which a region instance (it carries the region's own scale) cannot
@@ -1343,6 +1348,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let hands = { crooked: 0, open: 0 };
   let kinemeTable = null; // #781: the frame's kineme table (null = nothing moves)
   let kinemeTime = 0;
+  let kinemeBreak = null; // #2116: the contract's assemble trigger stamps [tOut, tIn] (null = no trigger live)
+  let kinemeBreakWritten = false; // true while the GPU's u_break is armed, so a trigger-free frame disarms it once
   // #2104 step 4: the frame's standing world, set by renderFrameInto from the contract
   // (absent = no world: every world read below is its pre-world value). The boil binds the
   // pattern element kinemes and the cell library's line-boil; the finish is the final pass.
@@ -1693,6 +1700,12 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       kinemeFWritten = hasFade;
     }
     gl.uniform1f(U(quadProg, 'u_kinemeTime'), kinemeTime);
+    // #2116: the assemble trigger uploads only while one is live (and once more to disarm), so a scene with none writes nothing.
+    if (kinemeBreak || kinemeBreakWritten) {
+      if (kinemeBreak) gl.uniform3f(U(quadProg, 'u_break'), kinemeBreak[0], kinemeBreak[1], 1);
+      else gl.uniform3f(U(quadProg, 'u_break'), 0, 0, 0);
+      kinemeBreakWritten = !!kinemeBreak;
+    }
     gl.uniform2f(U(quadProg, 'u_hands'), hands.crooked || 0, hands.open || 0);
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));
     // #1482 P3: off uploads nothing and sends zeros, so the shader's branch never enters (byte-identical frame).
@@ -2171,6 +2184,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     distortHeat = Number.isFinite(contract.distortHeat) ? contract.distortHeat : 1; // #2010 P3: the shed lands on heat
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;
+    kinemeBreak = contract.kinemeBreak || null;
     // #2104 step 4 — the contract's world (door-clean by construction): its boil grid and
     // its finish grain ride the frame. No world on the contract → both 0 → every consumer
     // below runs its pre-world path.

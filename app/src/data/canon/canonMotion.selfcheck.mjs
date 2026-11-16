@@ -254,10 +254,11 @@ const ids = (rs) => rs.map((r) => r.id);
     behave: [BEHAVE, '91d27a8073e94f12'],
     chips: [MOTION_MODES, 'aa29e3d08723ec0a'],
     // #2116: the six pre-break-up library entries keep their ORIGINAL pin (unchanged); scatter and orbit, appended after them,
-    // each have their own
-    kinemes: [KINEMES.filter((k) => k.id !== 'scatter' && k.id !== 'orbit'), '1eb9700ee0f39603'],
+    // and assemble each have their own
+    kinemes: [KINEMES.filter((k) => k.id !== 'scatter' && k.id !== 'orbit' && k.id !== 'assemble'), '1eb9700ee0f39603'],
     kinemeScatter: [getKineme('scatter'), '24a566123a69c594'],
     kinemeOrbit: [getKineme('orbit'), '126acb08a20551cd'],
+    kinemeAssemble: [getKineme('assemble'), '33d1c81b1c426bd7'],
     cells: [CELL_KINEMES, 'dc73f5991acc6120'],
     patterns: [KINEME_PATTERNS, '14d8d39d4e08501c'],
     drivers: [KINEME_DRIVERS, 'f6d51e735553ecdd'],

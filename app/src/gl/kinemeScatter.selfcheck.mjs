@@ -55,7 +55,11 @@ ok('scatter is kind 6, region-only; a whole mark cannot take it, a region can', 
     { [PETALS[0]]: 'scatter' },
     'a region takes it',
   );
-  assert.strictEqual(KINEMES.filter((k) => k.regionOnly).length, 1, 'only scatter is region-only');
+  assert.deepStrictEqual(
+    KINEMES.filter((k) => k.regionOnly).map((k) => k.id),
+    ['scatter', 'assemble'],
+    'only scatter and assemble (#2116) are region-only',
+  );
   assert.ok(SCATTER_WINDOW + SCATTER_RIPPLE <= 1, 'the window and the ripple fit in one cycle');
 });
 

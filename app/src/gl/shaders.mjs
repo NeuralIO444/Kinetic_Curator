@@ -98,6 +98,7 @@ uniform vec3 u_kineme[16];
 uniform vec3 u_kinemeB[16]; // #2117 stacking: each slot's SECOND member (kind 0 = a single kineme, never enters)
 uniform float u_kinemeF[16]; // #2118 phrases: a slot's cross-fade weight w (0 = no fade, never enters): the member plays at 1 - w, the second at w
 uniform float u_kinemeTime;
+uniform vec3 u_break; // #2116 assemble: (tOut, tIn, armed) on the kineme clock; armed 0 (the default, and every scene with no trigger) = rest
 uniform vec2 u_hands;     // x crooked, y open. 0 is today's quad and today's ink.
 // #1482 P3 — the spectrum the marks listen to. u_spec is a 256x4 R8 texture (rows: smoothed, peak, waveform, flux);
 // u_specA = (map, scale, displace, colour); u_specN = instances in this draw. All amounts 0 never enters (today's quad).
@@ -190,6 +191,22 @@ void main() {
       float ol = 6.28318530718 * a_inst4.w;
       float lc = cos(ol), ls = sin(ol);
       kOff = (ob * abs(km.z)) * vec2(oc.x * lc - oc.y * ls, oc.x * ls + oc.y * lc);
+    }
+    else if (kind == 8) {
+      // #2116 assemble: a triggered one-shot. Armed only while a trigger is live (u_break.z), so an idle scene is rest.
+      // A settle (tIn >= tOut) starts displaced and eases home, delayed by phase * 0.5 * per so pieces land in a ripple;
+      // a scatter (tOut > tIn, an audio hit) flies out in 0.12 s and holds until the next settle. Cubic ease-out.
+      if (u_break.z > 0.5) {
+        float ae;
+        if (u_break.x > u_break.y) {
+          float ax = 1.0 - clamp((u_kinemeTime - u_break.x) / 0.12, 0.0, 1.0);
+          ae = 1.0 - ax * ax * ax;
+        } else {
+          float ax = 1.0 - clamp((u_kinemeTime - u_break.y - a_inst4.w * 0.5 * per) / per, 0.0, 1.0);
+          ae = ax * ax * ax;
+        }
+        kOff = a_brk * (km.z * ae);
+      }
     }
     // #2118 phrases: while a step change cross-fades, the outgoing kineme plays at 1 - w (a pulse arrives pre-scaled in its
     // amp). 0 = no fade: a still, a single kineme and a stack never enter.

@@ -71,6 +71,7 @@ import { isPlaybackActive, setPlaybackFrameTap, subscribePlayback } from './gl/p
 import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
+import { startBreak } from './curator/breakLive.js'; // #2116: the assemble trigger
 import { startLean } from './curator/leanLive.js'; // #1640: the dial lean, applied in silence
 import { startTrio } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
 import { createShowSpectrum } from './curator/showSpectrum.js'; // #1483 stage 2: the spectrum the personas are told
@@ -162,6 +163,14 @@ function AppInner() {
     // them) and the creature rigs walk Lois's gait and wear Davis's deal. Registered below, once roomCodes exists.
     // #1460 — the pace: once a phrase it may ease the BEAT toward a confident audio tempo (her mark shows while it does)
     const stopPace = startPace({ getBpm: () => useStore.getState().beatBpm, context: roomNow });
+    // #2116 — assemble: landings and strong hits bump the trigger counters (recorded input; the loop's fold stamps them)
+    const stopBreak = startBreak({
+      bump: (which) => useStore.getState().bumpBreak(which),
+      watchLanding: (cb) =>
+        useStore.subscribe((s, prev) => {
+          if ((s.kineticLanding?.seq || 0) !== (prev.kineticLanding?.seq || 0)) cb();
+        }),
+    });
     // #1640 — the dial lean: in silence, once a phrase, she may lean the WETNESS and EVOLVE dials toward her
     // validated read of the room (her mark shows while she does); a hand on either dial releases her
     const stopLean = startLean({
@@ -374,6 +383,7 @@ function AppInner() {
       unKeep();
       stopDirectorBeat();
       stopPace();
+      stopBreak();
       stopLean();
       stopMind();
       canonBus.stop();

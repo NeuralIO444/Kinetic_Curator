@@ -29,7 +29,7 @@ import { useStore } from '../state/store.js';
 // below via rock, bend's own per-slice behaviour is regionLines' subject.
 assert.deepStrictEqual(
   KINEMES.map((k) => k.id),
-  ['spin', 'rock', 'pulse', 'blink', 'bob', 'bend', 'scatter', 'orbit'],
+  ['spin', 'rock', 'pulse', 'blink', 'bob', 'bend', 'scatter', 'orbit', 'assemble'],
 );
 // #2116: scatter is region-only — a whole mark cannot take it
 assert.deepStrictEqual(getKineme('scatter'), {
