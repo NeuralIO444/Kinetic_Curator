@@ -56,6 +56,8 @@ export function WetLabDealStrip({ subject = null, onTap }) {
     setHandKind('kin');
     setPicked(null);
     setPressN(pressN + 1);
+    // the lead creature lands on the stage at once, like a KINETIC deal on the main stage; the rest wait in the hand
+    if (r.hand.length) tap(r.hand[0]);
   };
   const narrowPress = () => {
     const r = curPress({ subject, cap, seed, press: curN, library, assetAttach, bank });
@@ -130,7 +132,9 @@ export function WetLabDealStrip({ subject = null, onTap }) {
       </span>
       <div style={scroll}>
         <div style={row} data-testid="kin-hand">
-          {hand === null && <span style={hint}>press KIN — a hand of creatures to pick from</span>}
+          {hand === null && (
+            <span style={hint}>press KIN — a creature lands on the stage, the rest of the hand waits here</span>
+          )}
           {hand !== null && hand.length === 0 && (
             <span style={hint}>
               {handKind === 'cur'

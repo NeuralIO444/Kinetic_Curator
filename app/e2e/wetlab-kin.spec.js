@@ -37,7 +37,7 @@ async function openEmptyLab(page) {
   await expect(page.getByTestId('wet-lab')).toBeVisible();
 }
 
-test('the empty lab opens from the USER section; KIN deals six; a tap banks; clear unkept takes it back', async ({
+test('the empty lab opens from the USER section; KIN lands a creature on the stage and deals six; a tap banks another; clear unkept takes them back', async ({
   page,
 }) => {
   const errors = await boot(page, { width: 1280, height: 900 });
@@ -48,24 +48,25 @@ test('the empty lab opens from the USER section; KIN deals six; a tap banks; cle
   await expect(page.getByTestId('kin-tile')).toHaveCount(0);
   await shot(page, '1-empty-lab');
 
+  // one press: the lead creature lands on the stage at once, and the hand of six waits beside it
   await page.getByTestId('kin-press').click();
   await expect(page.getByTestId('kin-tile')).toHaveCount(6);
-  await shot(page, '2-kin-hand');
+  await expect(page.getByTestId('bank-tile')).toHaveCount(1);
+  await expect(page.getByTestId('kin-tile').first()).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('creature-stage')).toBeVisible();
+  await shot(page, '2-kin-lands');
 
   const firstHand = await page.getByTestId('kin-tile').evaluateAll((els) => els.map((e) => e.getAttribute('title')));
   await page.getByTestId('kin-press').click();
   const secondHand = await page.getByTestId('kin-tile').evaluateAll((els) => els.map((e) => e.getAttribute('title')));
-  expect(secondHand).not.toEqual(firstHand); // a new press, a new hand
-
-  await page.getByTestId('kin-tile').first().click();
-  await expect(page.getByTestId('bank-tile')).toHaveCount(1);
-  await expect(page.getByTestId('kin-tile').first()).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('creature-stage')).toBeVisible();
-  await shot(page, '3-tapped-banked');
-
-  await page.getByTestId('kin-tile').nth(1).click();
+  expect(secondHand).not.toEqual(firstHand); // a new press, a new hand, a new creature on the stage
   await expect(page.getByTestId('bank-tile')).toHaveCount(2);
-  await expect(page.getByTestId('kin-clear')).toContainText('2');
+  await shot(page, '3-second-press');
+
+  // another creature of the hand is one tap away: it banks beside and takes the stage
+  await page.getByTestId('kin-tile').nth(1).click();
+  await expect(page.getByTestId('bank-tile')).toHaveCount(3);
+  await expect(page.getByTestId('kin-clear')).toContainText('3');
   await page.getByTestId('kin-clear').click();
   await expect(page.getByTestId('bank-tile')).toHaveCount(0);
   await expect(page.getByTestId('kin-clear')).toBeDisabled();
@@ -78,8 +79,7 @@ test('CUR narrows from the creature on the stage: needs one, deals close neighbo
   const errors = await boot(page, { width: 1280, height: 900 });
   await openEmptyLab(page);
   await expect(page.getByTestId('cur-press')).toBeDisabled(); // nothing on the stage yet
-  await page.getByTestId('kin-press').click();
-  await page.getByTestId('kin-tile').first().click();
+  await page.getByTestId('kin-press').click(); // the lead creature lands on the stage by itself
   await expect(page.getByTestId('bank-tile')).toHaveCount(1);
   await expect(page.getByTestId('cur-press')).toBeEnabled();
 
