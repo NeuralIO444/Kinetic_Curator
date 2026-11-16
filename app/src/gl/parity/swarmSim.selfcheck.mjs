@@ -149,6 +149,49 @@ try {
     check('point wind — is not a no-op', off > 1e-3, `wind-off differs by ${off.toExponential(2)}`);
   }
 
+  // ---- curl wind (organism default kernel), windMul 1.3, one step from live state
+  {
+    const count = 150;
+    const lp = { ...lpFor(count), windMode: 'curl' };
+    delete lp.noise;
+    const sys = new ParticleSystem();
+    sys.init(count, W, H, assets, palette, SEED);
+    const T0 = 2_000_000;
+    for (let s = 0; s < 20; s++) sys.update(lp, assets, palette, SEED, T0 + s * (1000 / 60), null);
+    const start = { ...stateOf(sys), seedOffset: Array.from(sys.seedOffset.subarray(0, sys.n)) };
+    const tNext = T0 + 20 * (1000 / 60);
+    sys.update(lp, assets, palette, SEED, tNext, null);
+    const after = stateOf(sys);
+    const params = {
+      ...coreParams(lp, null),
+      wind: {
+        seed: SEED,
+        freq: lp.noiseFreq ?? 0.005,
+        offX: 0,
+        offY: 0,
+        nt: tNext * (lp.noiseSpeed ?? 0.5) * 0.001,
+        curl: true,
+      },
+    };
+    const g = await page.evaluate((r) => window.__kcSwarmRun(r), { n: count, state: start, steps: 1, params });
+    const got = g.samples[1];
+    const d = Math.max(
+      maxDiff(after.x, got.x),
+      maxDiff(after.y, got.y),
+      maxDiff(after.vx, got.vx),
+      maxDiff(after.vy, got.vy),
+    );
+    check('curl wind — one step matches the JS swarm to float noise', d < 1e-3, `max |d| ${d.toExponential(2)}`);
+    const g0 = await page.evaluate((r) => window.__kcSwarmRun(r), {
+      n: count,
+      state: start,
+      steps: 1,
+      params: { ...params, wind: { ...params.wind, curl: false } },
+    });
+    const diff = Math.max(maxDiff(after.vx, g0.samples[1].vx), maxDiff(after.vy, g0.samples[1].vy));
+    check('curl wind — differs from the point kernel', diff > 1e-3, `${diff.toExponential(2)}`);
+  }
+
   // ---- properties over a long run (the swarm is chaotic: trajectories are not compared, behaviour is)
   {
     const count = 350;
