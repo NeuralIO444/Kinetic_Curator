@@ -4,7 +4,7 @@ Status: **costing pass for Matt's review** (no code). K3's own issue and K0 §K 
 
 ## 1. What the swarm actually is
 
-- `engine/particles.js` is 2,252 lines: one `ParticleSystem` (SoA typed arrays), `init` / `update` / `getItems`. It is the swarm *and* the hype organisms. (K3's issue says `gl/particles.js`; K0 already corrected that.)
+- `engine/particles.js` is 2,252 lines: one `ParticleSystem` (SoA typed arrays), `init` / `update` / `getItems`. It is the swarm _and_ the hype organisms. (K3's issue says `gl/particles.js`; K0 already corrected that.)
 - Per step each particle runs: boids separation / alignment / cohesion over a uniform-grid neighbour set (~25 neighbours, the file's own header), plus behave-driven forces: curl wind, point-wind (seek / flee / scatter / cruise), chemotaxis, Lévy flights, Lorenz phase, cling, drives and leak accumulators — each gated by a behave-eased gain (`organisms/behaveEase.mjs`).
 - Separate pass: `dishContacts.mjs` runs cross-strata contacts on a shared grid. It reads and writes swarm particles and is **not** part of the swarm kernel.
 - State that must survive: `snapshotState` / `restoreState` (`particlesSnapshot.mjs`), the Lorenz re-entry reseed (#710), per-agent uniqueness channels (#558: phaseOffset, driftMul, speedMul, noiseSeed, mass — all from seeded hashes).
@@ -12,12 +12,12 @@ Status: **costing pass for Matt's review** (no code). K3's own issue and K0 §K 
 
 ## 2. Disposition of what K0 left for K3
 
-| Selfcheck | What it pins | Disposition |
-|---|---|---|
-| `particles.lorenzReseed` | Re-entering lorenz restarts the *same* phase state from seed (#710) | **Survives unchanged, as a decision.** The seed → phase-state map is hash-derived, so it stays CPU-side and is *uploaded* to the GPU state on entry. Test the upload equals today's values. |
-| `particles.uniqueness` | Per-agent channels come from seeded hashes, never the clock; sibling phase divergence is statistical | **Survives unchanged.** These are init-time seeds uploaded as static textures. Nothing numeric moves. |
-| `particles.seekFleeSwarm` | The chips act (mean distance orders seek < cruise < flee); cruise == scatter bit-identical | **Becomes a property test.** Ordering stays valid on the GPU. "Bit-identical" does not (Tier S): keep it as the shader-side check that cruise and scatter share one code path (same uniforms ⇒ same output on the same device). |
-| `particles.selfcheck` + `reference` | SoA == pre-SoA reference, every field | **Keep while the JS swarm exists** (K0). For the GPU swarm: bounded speed, no NaN, and alignment / cohesion / separation statistics inside a band at matched seed and count. |
+| Selfcheck                           | What it pins                                                                                         | Disposition                                                                                                                                                                                                                     |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `particles.lorenzReseed`            | Re-entering lorenz restarts the _same_ phase state from seed (#710)                                  | **Survives unchanged, as a decision.** The seed → phase-state map is hash-derived, so it stays CPU-side and is _uploaded_ to the GPU state on entry. Test the upload equals today's values.                                     |
+| `particles.uniqueness`              | Per-agent channels come from seeded hashes, never the clock; sibling phase divergence is statistical | **Survives unchanged.** These are init-time seeds uploaded as static textures. Nothing numeric moves.                                                                                                                           |
+| `particles.seekFleeSwarm`           | The chips act (mean distance orders seek < cruise < flee); cruise == scatter bit-identical           | **Becomes a property test.** Ordering stays valid on the GPU. "Bit-identical" does not (Tier S): keep it as the shader-side check that cruise and scatter share one code path (same uniforms ⇒ same output on the same device). |
+| `particles.selfcheck` + `reference` | SoA == pre-SoA reference, every field                                                                | **Keep while the JS swarm exists** (K0). For the GPU swarm: bounded speed, no NaN, and alignment / cohesion / separation statistics inside a band at matched seed and count.                                                    |
 
 ## 3. Integration scheme — recommendation
 
@@ -36,12 +36,12 @@ WebGL2 has no compute shaders or atomics, so the CPU's counting-sort grid does n
 
 ## 5. Cap
 
-Do not raise it in the first slice. The proposal for Matt: build the GPU swarm at the current 350 for matched-capture parity, then raise in steps (350 → 1,024 → 2,048) with a frame-profile capture on the stage iPad at each step. The raise is a *feel* change, so it is Matt's merge.
+Do not raise it in the first slice. The proposal for Matt: build the GPU swarm at the current 350 for matched-capture parity, then raise in steps (350 → 1,024 → 2,048) with a frame-profile capture on the stage iPad at each step. The raise is a _feel_ change, so it is Matt's merge.
 
 ## 6. Recorded vs per-device (K0's split, applied)
 
 - **Decisions (Tier D, recorded):** the behave id and gains, attractor position, seed, counts, Lorenz re-entry, per-agent seeds — all inputs today and unchanged.
-- **Sim outcomes (Tier S, recording device's):** positions and velocities. The swarm's chain contribution today is the `items` the resolver emits; under a GPU swarm those items come from a readback (or the field is consumed post-contract). **Open for K3 slice 1:** which of the two. This is the same S2-style question K1 answered with a recorded sparse input; the swarm's items are denser (350+ × position), so the cheaper answer is probably *post-contract presentation of GPU positions, with the recorded swarm limited to decisions*. Needs Matt's ruling before it is built, because it changes what a take replays.
+- **Sim outcomes (Tier S, recording device's):** positions and velocities. The swarm's chain contribution today is the `items` the resolver emits; under a GPU swarm those items come from a readback (or the field is consumed post-contract). **Open for K3 slice 1:** which of the two. This is the same S2-style question K1 answered with a recorded sparse input; the swarm's items are denser (350+ × position), so the cheaper answer is probably _post-contract presentation of GPU positions, with the recorded swarm limited to decisions_. Needs Matt's ruling before it is built, because it changes what a take replays.
 
 ## 7. Proposed slices
 
@@ -73,3 +73,28 @@ Nothing changes in the product from this document.
 - **Slice 1d**: chemotaxis. The scent field stays JS-owned (a 64×36 grid, deposit / diffuse / decay unchanged); the caller uploads its cells as an R32F texture (`setScent`), and the kernel ports `sample` (cell-centred bilinear, clamp 0..4) and the central-difference `gradient`, adding `gradient × gain / mass`. The force it adds matches the JS gradient to 1e-5. **Open: deposits** — mold deposits from particle positions each frame, so a fully-GPU colony needs either a position readback or an in-shader splat; that is a design choice for the wiring slice, not made here.
 - **Slice 1e**: Lévy flights. The draws use the kernel's own integer hash in-shader (`hashBase(seed, CH.dyn)` as a uniform + the same avalanche as K2's births), keyed by the per-agent phase-staggered 45-frame flight epoch, so the GPU draws the same flights as `particles.js`. Force agrees with the JS draws to 2e-4 relative (the float32 `u` is the only divergence); strongest flight seen 9.0, so the heavy tail is exercised.
 - **Not yet:** Lorenz (needs per-agent xyz state — a second render target), cling, drives, leak, breeding, contacts, heading and spine integrators, any wiring or flag. **Cost is unmeasured** (software GL only; the all-pairs loop's real cost needs the stage iPad, #2183).
+
+## 11. `dishContacts` on the GPU — sizing and slice plan (2026-11-16)
+
+Ruling 9.3 puts `dishContacts` on the GPU with its contacts stamped as a recorded input. Read against `dishContacts.mjs` (731 lines), that is much bigger than a swarm force, so it is sized here before any code.
+
+**What the pass is.** One shared counting-sort grid over every enrolled _stratum_ (several `ParticleSystem`s), one cross-strata pair pass in canonical order (stratum, then index). Per pair: mass-weighted depenetration (always); a bounce impulse when both strata's modes are impulse modes; the medium (#1413 cling, #1595 friction, #1596 spin torque Δω); and side effects: `feedDishDeform` (per-body dent), `noteDishContactStamp` (press stamps drained into the wet field), `buildDishDensity` (per-cell counts published as a field), trail and ecology enrolment.
+
+**Why it is not a one-slice port.**
+
+1. _Strata._ The GPU swarm today is ONE system (one state texture). The pass spans several; a GPU pass needs the strata resident together (a shared body table with a stratum id) before it can run.
+2. _Order._ The CPU result depends on canonical visit order (sequential, in place: a later pair sees an earlier pair's push). A GPU pair pass is parallel (reads last state). The match is therefore NOT byte-exact; it is a documented, property-tested law (no overlap beyond epsilon, momentum, mass weighting), like the swarm's own parity — and ruling 9.3's stamp makes that safe: the _recorded_ contact list, not the pass, is what the resolver replays.
+3. _Outputs are many._ Pose/velocity/omega deltas, plus deform, wet stamps, density, trails, ecology. Of these, only the **stamp list + density field** feed the resolver/look; the rest are live-column state of the strata.
+
+**Proposed slices (each behind the same OFF flag, K1 pattern).**
+
+- **2a. Contact detection → stamp list.** All-pairs (or the shared grid, if 2.9.2's measurement demands it) over a unified body table → compact list of `{a, b, nx, ny, overlap}` per frame, read back through the existing PBO + fence path (`gpuFluidHost` pattern). Pure planner + GL half + property tests. No state change yet.
+- **2b. Resolution on the GPU.** Depenetration + bounce + medium (cling, friction, spin) as a pass over the same body table; parity = properties against `runDishContacts` on identical bodies (not bitwise).
+- **2c. Stamped recording.** The contact list rides the resolve input as a recorded sparse input (`dishContactStamps`, K1 `dishFluidCells` pattern: packed typed arrays, identity-preserving), so a replay of a GPU-contacts take applies the recorded contacts exactly.
+- **2d. Side effects.** `feedDishDeform` / wet stamps / density derive from the recorded list on the CPU side (they are cheap, sparse, and already consume `session` state), so they do not need a GPU port at all.
+
+**Open decisions (not blocking 2a):**
+
+1. Unified body table across strata vs one pass per stratum pair — recommended: one table with a stratum-id column.
+2. Whether `session.density` (the per-cell field #1412 publishes) is rebuilt on CPU from the recorded list (recommended) or read back from the GPU grid.
+3. The cap ladder (ruling 9.2) and the contacts all-pairs cost must be measured together on the stage iPad (#2183): contacts is all-pairs over _every_ stratum, so it is the term that decides whether a grid is needed.
