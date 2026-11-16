@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>KC GPU culture kernel probe (K2 #2187)</title></head>
+<body>
+<canvas id="c" width="4" height="4"></canvas>
+<script type="module">
+import { createGpuCulture } from '../cultureSim.mjs';
+// window.__kcCultureRun({ cols, rows, state, blocked, rule, gens, sampleEvery }) -> { final, samples: [{ gen, grid }] }
+// Seeds the GPU culture, runs `gens` generations under `rule`; returns the final grid and (every `sampleEvery`) the grid.
+const gl = document.getElementById('c').getContext('webgl2', { alpha: false, antialias: false });
+window.__kcCultureRun = (p) => {
+  const g = createGpuCulture(gl, p.cols, p.rows);
+  g.seed(Uint8Array.from(p.state), p.blocked ? Uint8Array.from(p.blocked) : null);
+  const samples = [];
+  const every = p.sampleEvery || 0;
+  let done = 0;
+  while (done < p.gens) {
+    const n = every ? Math.min(every, p.gens - done) : p.gens - done;
+    g.step(n, p.rule);
+    done += n;
+    if (every) samples.push({ gen: done, grid: Array.from(g.read()) });
+  }
+  return { final: Array.from(g.read()), samples };
+};
+window.__kcReady = true;
+</script>
+</body>
+</html>
