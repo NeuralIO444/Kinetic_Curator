@@ -384,6 +384,8 @@ export function getLastDishWet() {
  * Not drained: the value is a frame fact, re-published
  * by every resolve. Module-level, last-resolver-wins (the getLastFrameMotion law).
  */
+/** One force seam slice 3 — a poem glyph (an armed FIELD form's stamp: buildPlacements keys them `field-<poet>-<piece>-<j>`). */
+const isPoemItem = (it) => typeof it.key === 'string' && it.key.startsWith('field-');
 let lastDishFluidPlan = null;
 export function getLastDishFluidPlan() {
   return lastDishFluidPlan;
@@ -2013,7 +2015,8 @@ export function createLiveResolver() {
       if (content.length) {
         const marks = [];
         for (const e of content)
-          for (const it of e.items) if (it && !isTerrain(it) && !isFluidDuplicate(it)) marks.push(it);
+          for (const it of e.items)
+            if (it && !isTerrain(it) && !isFluidDuplicate(it) && !isPoemItem(it)) marks.push(it); // the poem is never copied
         const dups = fluidDuplicateItems(dishFluid.plan, marks, { W, H, culture: cultureScale });
         if (dups.length) {
           const top = content[content.length - 1];
