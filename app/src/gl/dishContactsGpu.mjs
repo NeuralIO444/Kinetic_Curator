@@ -20,7 +20,7 @@ const SLOTS_PER_PASS = 3;
 /**
  * Flatten enrolled strata into the unified body table, in the CPU pass's canonical order (stratum order, then particle
  * index; dead bodies skipped; radius = contactBodyRadius). `active` is [{ sys, radius, umask }], exactly activeEntries().
- * Returns typed arrays of length nb: x, y, r, stratum, cgroup, umask, index (the particle's index in its own system).
+ * Returns typed arrays of length nb: x, y, r, stratum, cgroup, umask, index (the particle's index in its own system), plus the 2b resolution inputs vx, vy, mass, impulse (the stratum's bounce/stick mode) and restitution.
  */
 export function packContactBodies(active) {
   let cap = 0;
@@ -32,6 +32,12 @@ export function packContactBodies(active) {
   const cgroup = new Int32Array(cap);
   const umask = new Int32Array(cap);
   const index = new Int32Array(cap);
+  // 2b: the resolution inputs (velocity, mass, and the stratum's impulse mode + restitution; a stick/none stratum has restitution 0)
+  const vx = new Float64Array(cap);
+  const vy = new Float64Array(cap);
+  const mass = new Float64Array(cap);
+  const impulse = new Int32Array(cap);
+  const restitution = new Float64Array(cap);
   let nb = 0;
   for (let s = 0; s < active.length; s++) {
     const e = active[s];
@@ -45,6 +51,11 @@ export function packContactBodies(active) {
       cgroup[nb] = sys.cgroup[i];
       umask[nb] = e.umask | 0;
       index[nb] = i;
+      vx[nb] = sys.vx ? sys.vx[i] : 0;
+      vy[nb] = sys.vy ? sys.vy[i] : 0;
+      mass[nb] = sys.mass ? sys.mass[i] : 1;
+      impulse[nb] = e.impulse ? 1 : 0;
+      restitution[nb] = e.restitution || 0;
       nb++;
     }
   }
@@ -57,6 +68,11 @@ export function packContactBodies(active) {
     cgroup: cgroup.subarray(0, nb),
     umask: umask.subarray(0, nb),
     index: index.subarray(0, nb),
+    vx: vx.subarray(0, nb),
+    vy: vy.subarray(0, nb),
+    mass: mass.subarray(0, nb),
+    impulse: impulse.subarray(0, nb),
+    restitution: restitution.subarray(0, nb),
   };
 }
 
