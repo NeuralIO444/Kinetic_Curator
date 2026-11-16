@@ -1,6 +1,6 @@
 # K1 — the resolver seam for a GPU dish fluid
 
-Status: **proposal for Matt's ruling** (no code). Follows K0 (`K0_TAKE_SEMANTICS.md`, ruled 2026-11-15) and K1 stage 1 (#2195: the GPU Gray-Scott kernel exists, wired to nothing, matches the JS kernel to float noise). Wiring it in crosses the K0 R3 decision seam, so this names every reader of the fluid and what each must become. Verified against main by grep, not memory.
+Status: **shipped OFF by default (slices 3a–4c, #2186); rulings below adopted 2026-11-15.** Section 4 records what actually landed and what did not. The text below is the original proposal. Follows K0 (`K0_TAKE_SEMANTICS.md`, ruled 2026-11-15) and K1 stage 1 (#2195: the GPU Gray-Scott kernel exists, wired to nothing, matches the JS kernel to float noise). Wiring it in crosses the K0 R3 decision seam, so this names every reader of the fluid and what each must become. Verified against main by grep, not memory.
 
 ## 1. Who reads the fluid today
 
@@ -33,3 +33,15 @@ The reverse direction (culture level → fluid feed) already exists in the kerne
 3. **S4** — OK to take the readback measurement on stage hardware before enabling anything, with the GPU fluid shipping OFF by default like WS3/WS4?
 
 Nothing changes on stage until these are ruled and the wiring PR merges OFF-by-default.
+
+## 4. What shipped (K1 slices 3a–4c)
+
+Rulings: S1 stamp born cells, S2 stamp bone-cell densities, S3/S4 GPU fluid OFF by default until readback is measured on stage hardware (#2183).
+
+- **S1 as ruled.** `dishLifeStage` records births (`recordBirths` / `birthLog`) and replays them (`replayBirths`); step order is replay, then record, then live injection. Replay needs no fluid.
+- **S2 refined.** Instead of bone-cell bytes, the recorded input is the whole sparse field: `input.dishFluidCells` = `{step, idx:Uint16Array, q:Uint8Array}`, cells above the 0.25 birth floor at 8 bits (`engine/dishFluidCells.mjs`). Births, the plan density and the bone pull all read it, so live == replay through the JSON input log. Matches `FLUID_BIRTH_FLOOR` / `MATTER_DENSITY_FLOOR`, so nothing below the floor can matter.
+- **Seam.** `dishFluidStage.apply` accepts `ctx.external = {step, density}` and skips the JS step/seek; `liveResolve` unpacks cells once per distinct object. Malformed cells are inert.
+- **Host.** `gl/gpuFluidHost.mjs` steps the GPU kernel to the stamp's step, reads density back through a PBO + fence (newest completed read, discarded across a reseed), and `liveLoop` packs and feeds it. Gated by `window.__KC_GPU_FLUID` (OFF); any failure flips the flag off and the JS fluid resumes.
+- **Stamp.** A take containing `dishFluidCells` stamps `simBackends.fluid = gpu.gs.v1` (`simLaw` decisions-exact). `gpu.gs.v1` is runnable on replay because replay uses the recorded field, not a GPU. JS stays the reference (R4).
+
+Not done: **S3** (the field body still reads the packed density, not the sim texture directly) and the **stage-hardware readback measurement** (#2183, Matt). Until that is measured the flag stays OFF.
