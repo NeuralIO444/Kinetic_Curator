@@ -6,7 +6,7 @@
 // wrap at a 120 px pad; organism: bounce off an 8 px margin). State is one RGBA32F texture, one texel per particle
 // (x, y, vx, vy), ping-ponged; mass rides a static texture (the per-agent uniqueness channel, uploaded once).
 //
-// Slice 1b adds the cloud swarm's POINT wind (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
+// Slice 1b adds the cloud swarm's POINT wind; slice 1c the CURL wind (organisms) and the windMul (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
 // What is NOT here yet (later K3 slices): the curl wind (organisms), chemotaxis, Lévy, Lorenz, cling, drives, leak, breeding,
 // contacts, the heading and spine integrators. A caller that wants parity with the JS swarm runs it with wind 0 (see the
 // selfcheck, which drives the real ParticleSystem and this kernel from the same state).
@@ -58,7 +58,8 @@ uniform float u_maxSpeed;
 uniform vec4 u_attract;      // x, y, strength (gravityWells*attractMul*GAIN*seekMul), enabled (0/1)
 uniform vec2 u_canvas;
 uniform vec4 u_wind;         // noiseFreq, domainOffsetX, domainOffsetY, nt (time * noiseSpeed * 0.001)
-uniform float u_windOn;      // 1 = point wind (cloud swarm: windMul is 1, the wind knob is ignored)
+uniform float u_windOn;      // 0 = off, 1 = point wind (noise3D -> angle), 2 = curl wind (curl2, organisms)
+uniform float u_windMul;     // cloud swarm: 1 (the wind knob is ignored); organism: wind * profile.wind
 uniform int u_bounce;        // 0 = wrap (cloud), 1 = bounce (organism)
 layout(location = 0) out vec4 o_state;
 
@@ -74,12 +75,22 @@ void main() {
   vec2 f = vec2(0.0);
 
   if (u_windOn > 0.5) {
-    // particles.js point wind: noise3D -> angle, a second sample (+200) -> shape; windMul is 1 for the cloud swarm.
     float fx = p.x * u_wind.x + u_wind.y;
     float fy = p.y * u_wind.x + u_wind.z;
-    float ang = kcNoise3D(fx, fy, u_wind.w + mt.g * 0.0001) * 6.283185307179586;
-    float shape = (kcNoise3D(fx + 200.0, fy + 200.0, u_wind.w) + 1.0) * 0.4;
-    f += vec2(cos(ang), sin(ang)) * shape / m;
+    float tz = u_wind.w + mt.g * 0.0001;
+    if (u_windOn > 1.5) {
+      // particles.js curl wind: curl2 = central differences of 3-octave fBm, eps 0.5
+      float n1 = kcFbm3D(fx, fy + 0.5, tz, 3, 2.0, 0.5);
+      float n2 = kcFbm3D(fx, fy - 0.5, tz, 3, 2.0, 0.5);
+      float n3 = kcFbm3D(fx + 0.5, fy, tz, 3, 2.0, 0.5);
+      float n4 = kcFbm3D(fx - 0.5, fy, tz, 3, 2.0, 0.5);
+      f += vec2(n1 - n2, n4 - n3) * (0.8 * u_windMul) / m;
+    } else {
+      // noise3D -> angle, a second sample (+200) -> shape
+      float ang = kcNoise3D(fx, fy, tz) * 6.283185307179586;
+      float shape = (kcNoise3D(fx + 200.0, fy + 200.0, u_wind.w) + 1.0) * 0.4;
+      f += vec2(cos(ang), sin(ang)) * shape * u_windMul / m;
+    }
   }
 
   if (u_attract.w > 0.5) {
@@ -147,7 +158,7 @@ export function swarmTextureLayout(n, width = 128) {
  * The GPU swarm core on an existing WebGL2 context (EXT_color_buffer_float required — the renderer already demands it).
  *   seed({ x, y, vx, vy, mass, seedOffset })   upload n particles (Float32Array / number arrays)
  *   step(params)                   one substep; params: { dtFrames, sepR, aliR, cohR, sepW, aliW, cohW, damping, maxSpeed,
- *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt} | null, bounds: 'wrap'|'bounce', canvasW, canvasH }
+ *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt, curl?, mul?} | null, bounds: 'wrap'|'bounce', canvasW, canvasH }
  *   read()                         { x, y, vx, vy } as Float32Arrays (synchronous: tests / measurement)
  */
 export function createGpuSwarm(gl, n) {
@@ -250,7 +261,8 @@ export function createGpuSwarm(gl, n) {
       gl.uniform1i(U('u_bounce'), p.bounds === 'bounce' ? 1 : 0);
       const wd = p.wind && Number.isFinite(p.wind.nt) ? p.wind : null;
       gl.uniform4f(U('u_wind'), wd ? wd.freq : 0, wd ? wd.offX || 0 : 0, wd ? wd.offY || 0 : 0, wd ? wd.nt : 0);
-      gl.uniform1f(U('u_windOn'), wd ? 1 : 0);
+      gl.uniform1f(U('u_windOn'), wd ? (wd.curl ? 2 : 1) : 0);
+      gl.uniform1f(U('u_windMul'), wd && Number.isFinite(wd.mul) ? wd.mul : 1);
       gl.uniform1i(U('u_perm'), 2);
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, permFor(wd ? wd.seed : 444));
