@@ -25,7 +25,7 @@ This re-orders the deferred "Studio labs" pile (`CLAUDE.md`) for this item only.
 CURATOR pass, hammering reaches CHAOS. A scope pill cycles OFF → WEAK → MED → KOZ (`state/kineticScope.mjs`, pure
 data): the ceiling over every tap, from the 19 curated 4-shape sets up to the whole library. The passes themselves
 (`lookPass`, `voicePass`, `curatorPass`) are pure functions of `(state, rng)` in `state/kineticSweep.mjs`. They are
-*applied* by store actions (`kineticLookPass` in `state/slices/layoutSlice.js`) that are welded to the stage:
+_applied_ by store actions (`kineticLookPass` in `state/slices/layoutSlice.js`) that are welded to the stage:
 chapters, the world record, the poem, pattern layers, one undo step.
 
 **CURATOR on the stage.** `panels/layout/CuratorBar.jsx` rolls `CURATE_CANDIDATES = 8` scenes and keeps the pick of
@@ -39,7 +39,7 @@ breed from three chosen parents (with tag/kit filters) and cultivate. Seed comes
 (`assembleCreature` in `state/slices/globalSlice.js`).
 
 **The creature engine already has a "KINETIC + CURATOR" inside it.** `engine/kineticBirths.mjs` (#2037) pre-breeds a
-*hand* of candidate children (`deriveBirthHand`, `KINETIC_BIRTH_HAND_SIZE = 3`, bounded by
+_hand_ of candidate children (`deriveBirthHand`, `KINETIC_BIRTH_HAND_SIZE = 3`, bounded by
 `KINETIC_BIRTH_HAND_DRAWS = 24`), drops the stillborn ones through the cultivate gate (`cultivationNote`), and lets
 the trio score and order the survivors (`scoreBirthChild`, `orderBirthHand`; ordering only, it never vetoes). It is
 pure and clock-free; randomness is string-keyed hashing of `(seed, press, attempt)`, not a shared stream. Breeding
@@ -54,35 +54,35 @@ Two pure modules, new directory `deal/`, no store, no React, no clock (a press p
 does today):
 
 - **`deal/kineticEngine.mjs` — the wide engine.** Owns the scope ladder (ordered ceilings with labels), the press
-  run, and the heat routing when a host wants it. `press(adapter, run, scope, seed)` returns a *hand* of candidates.
+  run, and the heat routing when a host wants it. `press(adapter, run, scope, seed)` returns a _hand_ of candidates.
   It reuses `kineticHeat.mjs` and the `kineticScope.mjs` cycle by import; it does not copy them.
 - **`deal/curatorEngine.mjs` — the narrow engine.** `narrow(adapter, hand, curator, rng, opts)` scores, gates and
   picks. It never adds a candidate to a hand it was given; for the fine-grained step it asks the adapter for
-  *nearby* candidates (`near`) and then does the same scoring. Same law as `pickCurated` and `orderBirthHand`:
+  _nearby_ candidates (`near`) and then does the same scoring. Same law as `pickCurated` and `orderBirthHand`:
   taste orders and picks, it never deals into a hand it was handed and never vetoes what the gate passed.
 
 **The adapter** is the only thing a host writes. All members are pure:
 
-| member | job |
-| --- | --- |
-| `scopes` | the ordered ceilings, with labels (what "wide" means in this editor) |
-| `deal(scope, ctx)` | the wide deal: returns candidates for a seed + press |
-| `near(candidate, cap, ctx)` | the fine deal: candidates that differ from one by at most `cap` |
-| `gate(candidate, ctx)` | hard viability (creatures: the cultivate note reads viable) |
-| `read(candidate, ctx)` | measured reads and scores for the curator (creatures: `scoreBirthChild`) |
-| `key(candidate)` | the stable id (ties break on it, as `orderBirthHand` does) |
+| member                      | job                                                                      |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `scopes`                    | the ordered ceilings, with labels (what "wide" means in this editor)     |
+| `deal(scope, ctx)`          | the wide deal: returns candidates for a seed + press                     |
+| `near(candidate, cap, ctx)` | the fine deal: candidates that differ from one by at most `cap`          |
+| `gate(candidate, ctx)`      | hard viability (creatures: the cultivate note reads viable)              |
+| `read(candidate, ctx)`      | measured reads and scores for the curator (creatures: `scoreBirthChild`) |
+| `key(candidate)`            | the stable id (ties break on it, as `orderBirthHand` does)               |
 
 A host applies a pick itself (the stage through its store action, the lab through `bankCreature`). The engines never
 write state. That is what keeps them reusable: an editor needs an adapter and a button, nothing else.
 
 **Recommendation (stage).** Do not refactor the live stage in the first build. The engines ship with the creature
-adapter and a synthetic test adapter. A *stage adapter* that re-homes `lookPass` / `voicePass` / `curatorPass` is a
+adapter and a synthetic test adapter. A _stage adapter_ that re-homes `lookPass` / `voicePass` / `curatorPass` is a
 later, optional slice, proven byte-identical by the existing KINETIC selfchecks, and only on Matt's order. The
 instrument that is running does not carry the risk of the experiment.
 
 ## 3. The creature adapter
 
-- **Founders (empty bank).** Breeding needs three parents, so from nothing KINETIC deals *assemblies*: a body shape
+- **Founders (empty bank).** Breeding needs three parents, so from nothing KINETIC deals _assemblies_: a body shape
   from the dealable library, its points from `attachPointsFor(asset, assetAttach)` (`engine/autoAttach.js`, the
   shape's AUTO points when the artist set none), look and voice dealt from the seed by `assembleCreature`.
 - **Wide ladder (ruled, Q1).** OFF: founders from the curated 4-shape sets (`CURATED_SETS`). WEAK: founders from
@@ -96,7 +96,7 @@ instrument that is running does not carry the risk of the experiment.
   `handEditRecord` in `engine/creatureBreed.js`) and breeds with it, each within a stated cap. Fewer candidates than
   the wide deal, all close to the pick.
 - **Determinism.** No `Date.now`, no `Math.random`. Draws are string-keyed hashes of `(project seed, lab press
-  counter, attempt)`, the `kineticBirths.mjs` pattern, so no change to the kernel's `CH` ids. A hand is a pure
+counter, attempt)`, the `kineticBirths.mjs` pattern, so no change to the kernel's `CH` ids. A hand is a pure
   function of `(seed, press counter, bank fingerprint, scope)`: nothing new is stored to be able to re-derive it.
   Lab presses must not touch the stage's undo or the stage's seed.
 
