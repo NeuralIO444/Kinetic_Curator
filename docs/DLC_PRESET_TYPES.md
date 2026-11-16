@@ -46,8 +46,13 @@ Pipeline already kind-sniffs IMPORT (#1216: bundle vs project vs taste.json vs p
 - **Receipt** is one quiet line: `Look pack "Name" · 6 Looks installed to Library · 1 already there · 1 item quarantined — Name: reason`.
 - **Export:** `↓ LOOKS` (shown when the Library has Looks) writes every installed Look as one `kc-pack/1` file. Selecting which
   Looks to export waits for the Library browser (step 2).
-- **Not yet:** the Library UI, the 16 Look slots, and `looks/` in the loot folder (steps 2–4 of #2148); `lootClassify` still
-  says "looks not supported yet".
+- **Not yet:** the 16 Look slots and `looks/` in the loot folder (steps 3–4 of #2148); `lootClassify` still says "looks not supported yet".
+
+**As built — step 2, the Library browser (#2148).** BUILD gains a last section, **⑦ Looks** (`panels/layout/LookLibrarySection.jsx`,
+view model `lookLibraryRows.mjs`): the installed Looks in install order, each with its mode, palette, param count and `seeded` tag;
+pick Looks with the checkboxes and `↓ SELECTED` (or `↓ ALL`) writes a `kc-pack/1`; `✕` removes one after a `REMOVE? / KEEP` confirm.
+It **lists only**: it never applies a Look to the scene and never touches the slots — loading from the Library into a slot is step 3,
+an explicit act of its own. Unlocks stays ⑥ (nothing renumbered). The empty state says where Looks come from.
 
 ## 3. Trio affect — subtle, honest, alive
 

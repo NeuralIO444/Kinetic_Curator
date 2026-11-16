@@ -24,7 +24,8 @@ import { HypeSliders } from './layout/HypeSliders.jsx'; // #1694 S3 — the hype
 import { AppearanceSliders } from './layout/AppearanceSliders.jsx';
 import { MaterialSliders } from './layout/MaterialSliders.jsx'; // #1585 — material body tunables (Materials M4)
 import { ChiaroscuroSection } from './layout/ChiaroscuroSection.jsx';
-import { UnlockTreeSection } from './layout/UnlockTreeSection.jsx'; // #1630 — the unlock tree, bottom of BUILD
+import { UnlockTreeSection } from './layout/UnlockTreeSection.jsx'; // #1630 — the unlock tree
+import { LookLibrarySection } from './layout/LookLibrarySection.jsx'; // #2148 — the Look Library, bottom of BUILD
 import { LayerStack } from './build/LayerStack.jsx';
 import { BuildSection } from './build/BuildSection.jsx';
 import { MathSection } from './build/MathSection.jsx';
@@ -144,6 +145,12 @@ export function BuildPanel() {
             now, and what lights it. Read-only — nodes never apply anything. */}
             <BuildSection num="6" title="Unlocks">
               <UnlockTreeSection layoutParams={layoutParams} />
+            </BuildSection>
+
+            {/* ⑦ LOOKS — #2148: the Look Library. What Pipeline IMPORT installed: browse, pick, remove, export.
+            Lists only — it never applies a Look and never touches the slots (loading into slots is the next step). */}
+            <BuildSection num="7" title="Looks">
+              <LookLibrarySection />
             </BuildSection>
           </div>
         </DockProvider>
