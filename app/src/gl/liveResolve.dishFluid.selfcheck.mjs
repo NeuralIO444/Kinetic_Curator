@@ -24,6 +24,8 @@
 //   births      K1 slice 3c (#2186): input.dishBirthRecord logs the biased culture's births without changing a frame;
 //               input.dishBirthReplay reproduces those frames with NO fluid at all; input.dishFluidExternal publishes the
 //               host's density on the plan and the culture reads it; all absent = the pre-3c resolver
+//   cells       K1 slice 4b: input.dishFluidCells (the GPU field as a recorded, sparse, 8-bit input) drives the culture and
+//               the plan; a JSON round-trip through the input log replays the very same frames; a malformed object is inert
 //   vocabulary      on a stage with nothing dealt (a swarm layer with no particles), the
 //                   descriptor's vocabulary is the stage's own asset pool — every shape a
 //                   real pool asset, wider than the marks chapter (letters/stamps ride the
@@ -37,6 +39,8 @@ import { ASSETS_KANA } from '../data/assets/assets-kana.js';
 import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
 import { quietStamp } from '../engine/dishLifeQuiet.mjs';
 import { fluidStamp } from '../engine/dishFluid.mjs';
+import { packFluidCells } from '../engine/dishFluidCells.mjs';
+import { createInputLog, replayInputs } from '../engine/kernel/replay/inputLog.js';
 
 const L = (id) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1 });
 const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, count: 60, particleCount: 60, ...over });
@@ -327,6 +331,57 @@ const N = 60;
   replay.dispose();
   plain.dispose();
   hosted.dispose();
+}
+
+// 8. K1 slice 4b — the field as a recorded input: live == replay, no fluid kernel needed
+{
+  const NN = 96 * 54;
+  const cellsAt = (f) => {
+    const d = new Float32Array(NN);
+    for (let i = 0; i < NN; i++) d[i] = ((i * 37 + f * 11) % 100) / 100; // a varied field that moves every frame
+    return packFluidCells(d, f);
+  };
+  const FR = 40;
+  const drive = (r, inputs) => inputs.map((inp) => hash(r.resolveLayers(inp)));
+  const withCells = (f) => ({ ...inputAt(f, { from: 0, couple: 0.8 }), dishFluidCells: cellsAt(f) });
+  const liveInputs = Array.from({ length: FR }, (_, f) => withCells(f));
+  const log = createInputLog();
+  for (const inp of liveInputs) log.record(inp);
+  const replayInputsArr = [...replayInputs(JSON.parse(JSON.stringify(log.finish())))];
+  const a = createLiveResolver();
+  const liveHs = drive(a, liveInputs);
+  const b = createLiveResolver();
+  const replayHs = drive(b, replayInputsArr);
+  assert.deepEqual(replayHs, liveHs, 'a JSON round-trip of the recorded cells replays the very same frames');
+  // the cells are what the culture reads: a run on the JS fluid differs
+  const js = createLiveResolver();
+  const jsHs = drive(
+    js,
+    Array.from({ length: FR }, (_, f) => inputAt(f, { from: 0, couple: 0.8 })),
+  );
+  assert.notDeepEqual(jsHs, liveHs, 'the recorded field, not the JS kernel, drives the bias');
+  // the plan carries the field the readers saw, at the recorded step
+  const c = createLiveResolver();
+  c.resolveLayers(withCells(5));
+  const plan = getLastDishFluidPlan();
+  assert.equal(plan.step, 5);
+  assert.equal(plan.density.length, NN);
+  // a malformed cells object is inert: the JS kernel runs as if it were absent
+  const m = createLiveResolver();
+  const mHs = drive(
+    m,
+    Array.from({ length: 10 }, (_, f) => ({ ...inputAt(f, { from: 0, couple: 0.8 }), dishFluidCells: { junk: 1 } })),
+  );
+  const j2 = createLiveResolver();
+  assert.deepEqual(
+    mHs,
+    drive(
+      j2,
+      Array.from({ length: 10 }, (_, f) => inputAt(f, { from: 0, couple: 0.8 })),
+    ),
+    'junk cells = no cells',
+  );
+  for (const r of [a, b, js, c, m, j2]) r.dispose();
 }
 
 console.log('liveResolve.dishFluid.selfcheck: ok');

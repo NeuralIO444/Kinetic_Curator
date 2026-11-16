@@ -697,3 +697,4 @@ node src/gl/fieldRecon.selfcheck.mjs
 node src/gl/parity/fluidSim.selfcheck.mjs
 node src/gl/simBackends.selfcheck.mjs
 node src/gl/gpuFluidHost.selfcheck.mjs
+node src/engine/dishFluidCells.selfcheck.mjs
