@@ -78,7 +78,7 @@ layout(location=10) in vec4 a_engA;    // Phase 2 S4: engraving spine joints 0-1
 layout(location=11) in vec4 a_engB;    // Phase 2 S4: engraving spine joints 2-3
 layout(location=12) in vec4 a_engC;    // Phase 2 S4: engraving spine joints 4-5
 layout(location=13) in vec4 a_engP;    // Phase 2 S4: engraving params — x joint count (0 = no finish), y spacing, z width, w strength
-layout(location=15) in vec2 a_brk;     // #2116 break-up: the region's home-to-centroid vector (scene units, unit direction x mark box side); 0 = not a region
+layout(location=15) in vec2 a_brk;     // #2116 break-up: a scatter region's home-to-centroid vector (scene units, unit direction x mark box side); an orbit region's (mark box side, 0); 0 = neither
 layout(location=14) in vec4 a_dist;    // #2010 P3 distortion channel: (shear, melt, tear, seed) — all 0 = the old quad (gl/itemDistort.mjs)
 uniform vec2 u_canvas;
 uniform float u_distHeat; // #2010 P3: the distortion channel's heat — 1 full, lowered (never 0) by the tier-2 shed
@@ -91,7 +91,8 @@ uniform vec4 u_sun;       // x, y (scene units), height above the plane, w = on 
 uniform vec4 u_sunLight;  // rgb = palette-slot colour, a = intensity
 uniform float u_ambient;  // light that reaches a mark facing away from the sun
 // #781 KINEME: whole-mark motion. Slot i = (kind, period s, amp); kinds
-// 1 spin (amp < 0: reversed), 2 osc (± deg), 3 pulse (± scale), 4 blink (duty), 5 bob (± units).
+// 1 spin (amp < 0: reversed), 2 osc (± deg), 3 pulse (± scale), 4 blink (duty), 5 bob (± units),
+// 6 scatter (region out-and-back, x mark box), 7 orbit (circle through home, radius x mark box; amp < 0: reversed).
 // Per instance a_inst4.z = slot + 1 (0 = still), a_inst4.w = phase [0,1).
 uniform vec3 u_kineme[16];
 uniform vec3 u_kinemeB[16]; // #2117 stacking: each slot's SECOND member (kind 0 = a single kineme, never enters)
@@ -176,6 +177,18 @@ void main() {
       float us = fract(u_kinemeTime / per - a_inst4.w * 0.4);
       float es = us < 0.6 ? 0.5 * (1.0 - cos(6.28318530718 * us / 0.6)) : 0.0;
       kOff = a_brk * (km.z * es);
+    }
+    else if (kind == 7) {
+      // #2116 orbit: a circle of radius box * |amp| that passes through home, leaning at the piece's phase; a negative amp
+      // circles the other way. The box side is the MARK's: packed in a_brk.x for a region, the quad's own for a whole mark.
+      // cos(t) - 1 is written -2 sin^2(t / 2), so t = 0 is exactly (0, 0) — rest for every phase.
+      float ob = a_brk.x > 0.0 ? a_brk.x : 100.0 * max(abs(a_inst0.z), abs(a_inst0.w));
+      float ot = 6.28318530718 * fract(u_kinemeTime / per);
+      float oh = sin(0.5 * ot);
+      vec2 oc = vec2(-2.0 * oh * oh, (km.z < 0.0 ? -1.0 : 1.0) * sin(ot));
+      float ol = 6.28318530718 * a_inst4.w;
+      float lc = cos(ol), ls = sin(ol);
+      kOff = (ob * abs(km.z)) * vec2(oc.x * lc - oc.y * ls, oc.x * ls + oc.y * lc);
     }
     // #2117 stacking: a stack's second member, same phase, combined commutatively with the first (rotations and offsets add,
     // scale and visibility multiply). Gated on its kind, so a still or single-kineme instance never enters.
