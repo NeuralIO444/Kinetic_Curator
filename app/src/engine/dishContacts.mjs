@@ -65,6 +65,7 @@
 // bit (pinned in dishWet.selfcheck).
 
 import { feedDishDeform } from './dishDeform.mjs'; // #1410 — the dent across the seam (feed call site below)
+import { contactStampsFit } from './dishContactStamps.mjs'; // K3 slice 2c — the GPU pass's contact list as a recorded input
 import { buildDishDensity } from './dishDensity.mjs'; // #1412 — the pass's per-cell counts, published as a field
 import { ensureEntryTrails, createDishTrailField, TRAIL_CELLS } from './dishTrails.mjs'; // #1415 — the trail substrate's enrolment (the law lives in the module)
 import { encodeTyped, decodeTyped } from './kernel/stateCodec.mjs'; // #1367 — session snapshots
@@ -528,190 +529,203 @@ export function runDishContacts(session, callerSys) {
   // — nothing in the pass reads it back.
   stampDensity(session, buildDishDensity({ cellStart, cols, rows, cellSize, minCx, minCy }));
 
-  // Pair loop: ascending canonical body order; per body the same
-  // ox-outer/oy-inner 3x3 walk as the boids/contact loops; each unordered
-  // cross-strata pair once, from the canonically lower body.
-  for (let a = 0; a < nb; a++) {
+  // K3 slice 2c — one pair’s resolution, the same maths whether the pair came from the grid walk below or from a recorded contact list.
+  const resolvePair = (a, b) => {
     const ea = active[bEntry[a]];
     const sysA = ea.sys;
     const ia = bIdx[a];
     const ga = sysA.cgroup[ia];
-    const cx = Math.floor(sysA.x[ia] / cellSize) - minCx;
-    const cy = Math.floor(sysA.y[ia] / cellSize) - minCy;
-    for (let ox = -1; ox <= 1; ox++) {
-      const ncx = cx + ox;
-      if (ncx < 0 || ncx >= cols) continue;
-      for (let oy = -1; oy <= 1; oy++) {
-        const ncy = cy + oy;
-        if (ncy < 0 || ncy >= rows) continue;
-        const c = ncy * cols + ncx;
-        const end = cellStart[c + 1];
-        for (let k = cellStart[c]; k < end; k++) {
-          const b = order[k];
-          if (b <= a) continue;
-          const eb = active[bEntry[b]];
-          if (eb === ea) continue; // same stratum: the system's own pass owns it
-          const sysB = eb.sys;
-          const ib = bIdx[b];
-          const gb = sysB.cgroup[ib];
-          // collideMask, generalised symmetrically: each stratum's mask
-          // must admit both groups, exactly as the single-system rule
-          // admits both pair members.
-          if (!((ea.umask >>> ga) & 1) || !((ea.umask >>> gb) & 1)) continue;
-          if (!((eb.umask >>> ga) & 1) || !((eb.umask >>> gb) & 1)) continue;
-          // #1408 — per-body disc sum; both discs positive, or no contact
-          // (the same edge rule as the per-system pass).
-          const ra = bRad[a];
-          const rb = bRad[b];
-          if (!(ra > 0) || !(rb > 0)) continue;
-          const rr = ra + rb;
-          const rr2 = rr * rr;
-          // Re-read: a may already have moved this pass.
-          const xi = sysA.x[ia];
-          const yi = sysA.y[ia];
-          const dx = sysB.x[ib] - xi;
-          const dy = sysB.y[ib] - yi;
-          const d2 = dx * dx + dy * dy;
-          if (d2 >= rr2) continue;
-          let dist = Math.sqrt(d2);
-          let nx;
-          let ny;
-          if (dist > 1e-9) {
-            nx = dx / dist;
-            ny = dy / dist;
-          } else {
-            // Exactly coincident discs: deterministic golden-angle normal
-            // from the canonical pair identity — never NaN, never random.
-            const sa = bEntry[a];
-            const sb = bEntry[b];
-            const ang = ((sa * 131 + ia) * 2.399963229728653 + (sb * 131 + ib) * 1.2) % TAU;
-            nx = Math.cos(ang);
-            ny = Math.sin(ang);
-            dist = 0;
-          }
-          const overlap = rr - dist;
-          const m1 = sysA.mass[ia];
-          const m2 = sysB.mass[ib];
-          const w1 = 1 / m1;
-          const w2 = 1 / m2;
-          const wSum = w1 + w2;
-          // 1 — positional depenetration, mass-weighted. Always: bodies
-          // occupy space across strata regardless of either mode.
-          const corr = overlap / wSum;
-          sysA.x[ia] = xi - nx * corr * w1;
-          sysA.y[ia] = yi - ny * corr * w1;
-          sysB.x[ib] = sysB.x[ib] + nx * corr * w2;
-          sysB.y[ib] = sysB.y[ib] + ny * corr * w2;
-          // 2 — bounce impulse on approach, only when both strata are
-          // impulse modes; restitution is the pair's average (a stick
-          // stratum contributes 0, so any pair touching one is inelastic
-          // in proportion).
-          let dvA = 0;
-          let dvB = 0; // #1410 — per-body normal Δv, for the feed
-          let jnTotal = 0; // #1595 (D1) — the normal impulse this pair exchanges this step; friction's budget
-          // #1413 — the pair's medium: wetness averaged across the seam
-          // (the restitution precedent above), resolved through the one
-          // law (dishMedium.mjs). A dry pair resolves no medium at all:
-          // the pre-C1 numbers below run bit for bit.
-          // #1841 — with the shared field attached, the pair's wetness
-          // is the field sampled at the pair's midpoint (the positions
-          // the pair test just read): "how wet is it here" has one
-          // answer, and it is not a per-stratum scalar any more.
-          const pairWet = session.wetSampler
-            ? session.wetSampler(xi + dx / 2, yi + dy / 2)
-            : (ea.wetness + eb.wetness) / 2;
-          const pairMed = pairWet > 0 ? dishMediumFor(pairWet) : null;
-          if (ea.impulse && eb.impulse) {
-            const vn = (sysB.vx[ib] - sysA.vx[ia]) * nx + (sysB.vy[ib] - sysA.vy[ia]) * ny;
-            if (vn < 0) {
-              const eBase = (ea.restitution + eb.restitution) / 2;
-              const e = pairMed ? eBase * pairMed.restK : eBase;
-              const jimp = (-(1 + e) * vn) / wSum;
-              sysA.vx[ia] -= nx * jimp * w1;
-              sysA.vy[ia] -= ny * jimp * w1;
-              sysB.vx[ib] += nx * jimp * w2;
-              sysB.vy[ib] += ny * jimp * w2;
-              dvA = jimp * w1;
-              dvB = jimp * w2;
-              jnTotal = Math.abs(jimp);
-            }
-          }
-          // #1413 — cling across the seam: the same capture law as the
-          // per-system pass (dishMedium.mjs), read on the post-impulse
-          // velocities, for every mode pair — the medium biases, the
-          // mode decides. A wet pair that starts to separate slowly is
-          // held by the tension; a fast one tears free minus the budget.
-          if (pairMed && pairMed.clingK > 0) {
-            const vnNow = (sysB.vx[ib] - sysA.vx[ia]) * nx + (sysB.vy[ib] - sysA.vy[ia]) * ny;
-            if (vnNow > 0) {
-              const cap = mediumClingCapture(pairMed.clingK, vnNow);
-              if (cap > 0) {
-                const jc = -cap / wSum;
-                sysA.vx[ia] -= nx * jc * w1;
-                sysA.vy[ia] -= ny * jc * w1;
-                sysB.vx[ib] += nx * jc * w2;
-                sysB.vy[ib] += ny * jc * w2;
-                dvA += Math.abs(jc) * w1;
-                dvB += Math.abs(jc) * w2;
-                jnTotal += Math.abs(jc);
-              }
-            }
-          }
-          // #1595 (D1) — friction across the seam: the tangential
-          // half of the impulse (law in dishMedium.mjs). The pair's
-          // μ comes from the pair's medium; the budget is the normal
-          // impulse exchanged above, so a dry pair (pairMed null,
-          // fricK 0) never enters and a light touch barely grips.
-          // #1596 (D2) — the slide is read at the contact point
-          // (v + ω×r) and spread over the spin-inclusive tangential
-          // mass (law in dishSpin.mjs), and the same clamped jt
-          // torques both discs (Δω = −R·jt/I): no new budget, no
-          // second friction. The #1410 feed below still reads normal
-          // Δv only: whether tangential drag — or spin — should shear
-          // the dent is a feel question for after the stage plays
-          // (D1's deliberate non-witness, carried).
-          if (pairMed && pairMed.fricK > 0) {
-            const mu = FRIC_MAX * pairMed.fricK;
-            const tx = -ny,
-              ty = nx;
-            const vt = spinContactVt(
-              (sysB.vx[ib] - sysA.vx[ia]) * tx + (sysB.vy[ib] - sysA.vy[ia]) * ty,
-              sysA.omega[ia],
-              ra,
-              sysB.omega[ib],
-              rb,
-            );
-            if (vt !== 0) {
-              const iA = spinInertia(m1, ra);
-              const iB = spinInertia(m2, rb);
-              const jt = mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum, ra, iA, rb, iB));
-              if (jt !== 0) {
-                sysA.vx[ia] -= tx * jt * w1;
-                sysA.vy[ia] -= ty * jt * w1;
-                sysB.vx[ib] += tx * jt * w2;
-                sysB.vy[ib] += ty * jt * w2;
-                sysA.omega[ia] += spinDeltaOmega(ra, jt, iA);
-                sysB.omega[ib] += spinDeltaOmega(rb, jt, iB);
-              }
-            }
-          }
-          // #1410 — the dent across the seam: this resolution's impulse
-          // + pressure feed both bodies' deform springs (law in
-          // dishDeform.mjs). State only — the pass's positions and
-          // velocities are already final for this pair.
-          feedDishDeform(sysA, ia, sysB, ib, nx, ny, dvA, dvB, overlap, rr);
-          // #1841 — the press: a contacting pair stamps the shared
-          // field at its midpoint, scaled by the wet it carries (the
-          // law in dishMedium.mjs). Recorded, not applied — the
-          // driver serves the stamps with the next frame request, so
-          // the field stays the service's alone to step.
-          if (session.wetSampler) {
-            noteDishContactStamp(session.wetStamps, xi + dx / 2, yi + dy / 2, pairWet);
+    const eb = active[bEntry[b]];
+    if (eb === ea) return; // same stratum: the system's own pass owns it
+    const sysB = eb.sys;
+    const ib = bIdx[b];
+    const gb = sysB.cgroup[ib];
+    // collideMask, generalised symmetrically: each stratum's mask
+    // must admit both groups, exactly as the single-system rule
+    // admits both pair members.
+    if (!((ea.umask >>> ga) & 1) || !((ea.umask >>> gb) & 1)) return;
+    if (!((eb.umask >>> ga) & 1) || !((eb.umask >>> gb) & 1)) return;
+    // #1408 — per-body disc sum; both discs positive, or no contact
+    // (the same edge rule as the per-system pass).
+    const ra = bRad[a];
+    const rb = bRad[b];
+    if (!(ra > 0) || !(rb > 0)) return;
+    const rr = ra + rb;
+    const rr2 = rr * rr;
+    // Re-read: a may already have moved this pass.
+    const xi = sysA.x[ia];
+    const yi = sysA.y[ia];
+    const dx = sysB.x[ib] - xi;
+    const dy = sysB.y[ib] - yi;
+    const d2 = dx * dx + dy * dy;
+    if (d2 >= rr2) return;
+    let dist = Math.sqrt(d2);
+    let nx;
+    let ny;
+    if (dist > 1e-9) {
+      nx = dx / dist;
+      ny = dy / dist;
+    } else {
+      // Exactly coincident discs: deterministic golden-angle normal
+      // from the canonical pair identity — never NaN, never random.
+      const sa = bEntry[a];
+      const sb = bEntry[b];
+      const ang = ((sa * 131 + ia) * 2.399963229728653 + (sb * 131 + ib) * 1.2) % TAU;
+      nx = Math.cos(ang);
+      ny = Math.sin(ang);
+      dist = 0;
+    }
+    const overlap = rr - dist;
+    const m1 = sysA.mass[ia];
+    const m2 = sysB.mass[ib];
+    const w1 = 1 / m1;
+    const w2 = 1 / m2;
+    const wSum = w1 + w2;
+    // 1 — positional depenetration, mass-weighted. Always: bodies
+    // occupy space across strata regardless of either mode.
+    const corr = overlap / wSum;
+    sysA.x[ia] = xi - nx * corr * w1;
+    sysA.y[ia] = yi - ny * corr * w1;
+    sysB.x[ib] = sysB.x[ib] + nx * corr * w2;
+    sysB.y[ib] = sysB.y[ib] + ny * corr * w2;
+    // 2 — bounce impulse on approach, only when both strata are
+    // impulse modes; restitution is the pair's average (a stick
+    // stratum contributes 0, so any pair touching one is inelastic
+    // in proportion).
+    let dvA = 0;
+    let dvB = 0; // #1410 — per-body normal Δv, for the feed
+    let jnTotal = 0; // #1595 (D1) — the normal impulse this pair exchanges this step; friction's budget
+    // #1413 — the pair's medium: wetness averaged across the seam
+    // (the restitution precedent above), resolved through the one
+    // law (dishMedium.mjs). A dry pair resolves no medium at all:
+    // the pre-C1 numbers below run bit for bit.
+    // #1841 — with the shared field attached, the pair's wetness
+    // is the field sampled at the pair's midpoint (the positions
+    // the pair test just read): "how wet is it here" has one
+    // answer, and it is not a per-stratum scalar any more.
+    const pairWet = session.wetSampler ? session.wetSampler(xi + dx / 2, yi + dy / 2) : (ea.wetness + eb.wetness) / 2;
+    const pairMed = pairWet > 0 ? dishMediumFor(pairWet) : null;
+    if (ea.impulse && eb.impulse) {
+      const vn = (sysB.vx[ib] - sysA.vx[ia]) * nx + (sysB.vy[ib] - sysA.vy[ia]) * ny;
+      if (vn < 0) {
+        const eBase = (ea.restitution + eb.restitution) / 2;
+        const e = pairMed ? eBase * pairMed.restK : eBase;
+        const jimp = (-(1 + e) * vn) / wSum;
+        sysA.vx[ia] -= nx * jimp * w1;
+        sysA.vy[ia] -= ny * jimp * w1;
+        sysB.vx[ib] += nx * jimp * w2;
+        sysB.vy[ib] += ny * jimp * w2;
+        dvA = jimp * w1;
+        dvB = jimp * w2;
+        jnTotal = Math.abs(jimp);
+      }
+    }
+    // #1413 — cling across the seam: the same capture law as the
+    // per-system pass (dishMedium.mjs), read on the post-impulse
+    // velocities, for every mode pair — the medium biases, the
+    // mode decides. A wet pair that starts to separate slowly is
+    // held by the tension; a fast one tears free minus the budget.
+    if (pairMed && pairMed.clingK > 0) {
+      const vnNow = (sysB.vx[ib] - sysA.vx[ia]) * nx + (sysB.vy[ib] - sysA.vy[ia]) * ny;
+      if (vnNow > 0) {
+        const cap = mediumClingCapture(pairMed.clingK, vnNow);
+        if (cap > 0) {
+          const jc = -cap / wSum;
+          sysA.vx[ia] -= nx * jc * w1;
+          sysA.vy[ia] -= ny * jc * w1;
+          sysB.vx[ib] += nx * jc * w2;
+          sysB.vy[ib] += ny * jc * w2;
+          dvA += Math.abs(jc) * w1;
+          dvB += Math.abs(jc) * w2;
+          jnTotal += Math.abs(jc);
+        }
+      }
+    }
+    // #1595 (D1) — friction across the seam: the tangential
+    // half of the impulse (law in dishMedium.mjs). The pair's
+    // μ comes from the pair's medium; the budget is the normal
+    // impulse exchanged above, so a dry pair (pairMed null,
+    // fricK 0) never enters and a light touch barely grips.
+    // #1596 (D2) — the slide is read at the contact point
+    // (v + ω×r) and spread over the spin-inclusive tangential
+    // mass (law in dishSpin.mjs), and the same clamped jt
+    // torques both discs (Δω = −R·jt/I): no new budget, no
+    // second friction. The #1410 feed below still reads normal
+    // Δv only: whether tangential drag — or spin — should shear
+    // the dent is a feel question for after the stage plays
+    // (D1's deliberate non-witness, carried).
+    if (pairMed && pairMed.fricK > 0) {
+      const mu = FRIC_MAX * pairMed.fricK;
+      const tx = -ny,
+        ty = nx;
+      const vt = spinContactVt(
+        (sysB.vx[ib] - sysA.vx[ia]) * tx + (sysB.vy[ib] - sysA.vy[ia]) * ty,
+        sysA.omega[ia],
+        ra,
+        sysB.omega[ib],
+        rb,
+      );
+      if (vt !== 0) {
+        const iA = spinInertia(m1, ra);
+        const iB = spinInertia(m2, rb);
+        const jt = mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum, ra, iA, rb, iB));
+        if (jt !== 0) {
+          sysA.vx[ia] -= tx * jt * w1;
+          sysA.vy[ia] -= ty * jt * w1;
+          sysB.vx[ib] += tx * jt * w2;
+          sysB.vy[ib] += ty * jt * w2;
+          sysA.omega[ia] += spinDeltaOmega(ra, jt, iA);
+          sysB.omega[ib] += spinDeltaOmega(rb, jt, iB);
+        }
+      }
+    }
+    // #1410 — the dent across the seam: this resolution's impulse
+    // + pressure feed both bodies' deform springs (law in
+    // dishDeform.mjs). State only — the pass's positions and
+    // velocities are already final for this pair.
+    feedDishDeform(sysA, ia, sysB, ib, nx, ny, dvA, dvB, overlap, rr);
+    // #1841 — the press: a contacting pair stamps the shared
+    // field at its midpoint, scaled by the wet it carries (the
+    // law in dishMedium.mjs). Recorded, not applied — the
+    // driver serves the stamps with the next frame request, so
+    // the field stays the service's alone to step.
+    if (session.wetSampler) {
+      noteDishContactStamp(session.wetStamps, xi + dx / 2, yi + dy / 2, pairWet);
+    }
+  };
+
+  // Pair loop: ascending canonical body order; per body the same
+  // ox-outer/oy-inner 3x3 walk as the boids/contact loops; each unordered
+  // cross-strata pair once, from the canonically lower body.
+  // K3 slice 2c — a recorded contact list (input.dishContactStamps, set on the session by the resolver, consumed once) replaces the
+  // grid walk: the touching pairs were decided on the recording device, and this resolves exactly that list, in its order.
+  // One that does not fit this frame's table is ignored and the grid pass runs, as always.
+  const stamps = session.contactStamps;
+  session.contactStamps = null;
+  if (contactStampsFit(stamps, nb)) {
+    for (let k = 0; k < stamps.a.length; k++) resolvePair(stamps.a[k], stamps.b[k]);
+  } else
+    for (let a = 0; a < nb; a++) {
+      const sysA = active[bEntry[a]].sys;
+      const ia = bIdx[a];
+      const cx = Math.floor(sysA.x[ia] / cellSize) - minCx;
+      const cy = Math.floor(sysA.y[ia] / cellSize) - minCy;
+      for (let ox = -1; ox <= 1; ox++) {
+        const ncx = cx + ox;
+        if (ncx < 0 || ncx >= cols) continue;
+        for (let oy = -1; oy <= 1; oy++) {
+          const ncy = cy + oy;
+          if (ncy < 0 || ncy >= rows) continue;
+          const c = ncy * cols + ncx;
+          const end = cellStart[c + 1];
+          for (let k = cellStart[c]; k < end; k++) {
+            const b = order[k];
+            if (b <= a) continue;
+            resolvePair(a, b);
           }
         }
       }
     }
-  }
 
   // Organism bodies: depenetration moved heads after spines were built;
   // re-pin segment 0, the same correction the per-system pass applies.
