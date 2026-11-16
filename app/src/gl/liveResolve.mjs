@@ -390,6 +390,14 @@ export function getLastDishFluidPlan() {
  * in generation order, or null when the frame did not ask to record (input.dishBirthRecord). The take stores this list;
  * a replay hands it back as input.dishBirthReplay. Module-level, last-resolver-wins (the getLastDishFluidPlan law).
  */
+let lastDishCultureField = null;
+/**
+ * K1 slice 4c — the culture's published field from the last resolve ({ active, cols, rows, level, gen } or null), for the
+ * render-side GPU fluid's culture→fluid feed (one frame behind, like the JS stage's own). Last-resolver-wins.
+ */
+export function getLastDishCultureField() {
+  return lastDishCultureField;
+}
 let lastDishBirths = null;
 export function getLastDishBirths() {
   return lastDishBirths;
@@ -848,6 +856,23 @@ export function createLiveResolver() {
     // A frame without fluid input sets neither (the bias setter gets null: the culture's step
     // loop stays the pre-#1997 loop, number for number).
     const fluidCoupleField = dishLife.cultureField();
+    lastDishCultureField = fluidCoupleField;
+    {
+      // K1 slice 3c — births as data. A recorded list (input.dishBirthReplay) is applied in place of the bias; a
+      // record request (input.dishBirthRecord) logs them. Both act only on a CHANGE of the input (the setters rebuild
+      // state), and absent = off: the culture's step loop is then the pre-3c loop, number for number.
+      const replayIn = Array.isArray(input.dishBirthReplay) ? input.dishBirthReplay : null;
+      if (replayIn !== birthReplayIn) {
+        dishLife.replayBirths(replayIn);
+        birthReplayIn = replayIn;
+      }
+      const recordIn = input.dishBirthRecord === true && !replayIn;
+      if (recordIn !== birthRecordIn) {
+        dishLife.recordBirths(recordIn);
+        birthRecordIn = recordIn;
+      }
+      lastDishBirths = recordIn ? dishLife.birthLog() : null;
+    }
     {
       // K1 slice 3c — births as data. A recorded list (input.dishBirthReplay) is applied in place of the bias; a
       // record request (input.dishBirthRecord) logs them. Both act only on a CHANGE of the input (the setters rebuild

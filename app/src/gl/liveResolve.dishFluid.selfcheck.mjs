@@ -40,6 +40,7 @@ import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
 import { quietStamp } from '../engine/dishLifeQuiet.mjs';
 import { fluidStamp } from '../engine/dishFluid.mjs';
 import { packFluidCells } from '../engine/dishFluidCells.mjs';
+import { createPerformanceRecorder, verifyPerformance, checkPerformance } from './performanceFile.mjs';
 import { createInputLog, replayInputs } from '../engine/kernel/replay/inputLog.js';
 
 const L = (id) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1 });
@@ -382,6 +383,38 @@ const N = 60;
     'junk cells = no cells',
   );
   for (const r of [a, b, js, c, m, j2]) r.dispose();
+}
+
+// 9. K1 slice 4c — a take recorded with the GPU field stamps gpu.gs.v1, round-trips JSON, and verifies on any device
+{
+  const NN = 96 * 54;
+  const cellsAt = (f) => {
+    const d = new Float32Array(NN);
+    for (let i = 0; i < NN; i++) d[i] = ((i * 53 + f * 7) % 100) / 100;
+    return packFluidCells(d, f);
+  };
+  const record = (withCells) => {
+    const rec = createPerformanceRecorder();
+    const r = createLiveResolver();
+    for (let f = 0; f < 130; f++) {
+      const inp = { ...inputAt(f, { from: 0, couple: 0.8 }), ...(withCells ? { dishFluidCells: cellsAt(f) } : {}) };
+      rec.onInput(inp);
+      rec.onOutput(r.resolveLayers(inp));
+    }
+    r.dispose();
+    return rec.finish();
+  };
+  const gpu = record(true);
+  assert.equal(gpu.simBackends.fluid, 'gpu.gs.v1');
+  assert.equal(gpu.simLaw, 'decisions-exact');
+  const back = JSON.parse(JSON.stringify(gpu));
+  assert.equal(checkPerformance(back).simBackends.fluid, 'gpu.gs.v1');
+  const v = verifyPerformance(back);
+  assert.equal(v.ok, true, 'the recorded field replays the take with no GPU');
+  assert.deepEqual(v.simUnrunnable, []);
+  const js = record(false);
+  assert.equal(js.simBackends.fluid, 'js.gs.v1', 'no GPU field = the all-JS stamp, as before');
+  assert.equal(js.simLaw, 'js-exact');
 }
 
 console.log('liveResolve.dishFluid.selfcheck: ok');

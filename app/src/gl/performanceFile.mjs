@@ -16,7 +16,12 @@
 import { createLiveResolver, checkResolverSnapshot } from './liveResolve.mjs';
 import { createInputLog, replayInputs, INPUT_LOG_VERSION } from '../engine/kernel/replay/inputLog.js';
 import { KERNEL_VERSION } from '../engine/kernel/version.js';
-import { currentSimStamp, checkSimStamp, unrunnableSimBackends } from '../engine/kernel/simBackends.js';
+import {
+  currentSimStamp,
+  checkSimStamp,
+  unrunnableSimBackends,
+  DEFAULT_SIM_BACKENDS,
+} from '../engine/kernel/simBackends.js';
 import { sanitizeWorld } from '../data/world.js';
 
 export const PERFORMANCE_FORMAT = 'kc-performance';
@@ -224,6 +229,7 @@ export function createPerformanceRecorder({
   const chain = createHashChain(initialState ? initialState.chainSeed : null);
   let truncated = false;
   let pending = false; // an input was recorded and its output has not arrived yet
+  let gpuFluid = false; // K1 slice 4c — some frame's fluid field came from the GPU (input.dishFluidCells)
   return {
     get frames() {
       return log.frames;
@@ -241,6 +247,7 @@ export function createPerformanceRecorder({
         pending = false;
         return;
       }
+      if (input && input.dishFluidCells) gpuFluid = true;
       log.record(input);
       pending = true;
     },
@@ -265,7 +272,8 @@ export function createPerformanceRecorder({
         format: PERFORMANCE_FORMAT,
         version: PERFORMANCE_VERSION,
         kernelVersion: KERNEL_VERSION,
-        ...currentSimStamp(), // K1 slice 1 (K0 R1): which implementation ran each sim kernel; all-JS today
+        // K1 slice 1 (K0 R1): which implementation ran each sim kernel — all-JS unless the GPU fluid fed a frame (4c)
+        ...currentSimStamp(gpuFluid ? { ...DEFAULT_SIM_BACKENDS, fluid: 'gpu.gs.v1' } : DEFAULT_SIM_BACKENDS),
         frames,
         truncated,
         machineKeys: [...MACHINE_KEYS],

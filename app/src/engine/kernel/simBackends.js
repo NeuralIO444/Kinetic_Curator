@@ -17,9 +17,12 @@ export const KNOWN_SIM_BACKENDS = Object.freeze({
   swarm: Object.freeze(['js.swarm.v1']),
 });
 
-/** The backends this build can actually RUN. Slice 3 adds 'gpu.gs.v1' here when the GPU fluid is wired. */
+/**
+ * The backends this build can actually RUN. 'gpu.gs.v1' REPLAYS everywhere (K1 slice 4c): its field rides the take as the
+ * recorded input.dishFluidCells, so replay needs no GPU; only RECORDING with it needs the GPU host.
+ */
 export const RUNNABLE_SIM_BACKENDS = Object.freeze({
-  fluid: Object.freeze(['js.gs.v1']),
+  fluid: Object.freeze(['js.gs.v1', 'gpu.gs.v1']),
   culture: Object.freeze(['js.life.v1']),
   swarm: Object.freeze(['js.swarm.v1']),
 });
