@@ -10,7 +10,13 @@
 //                 same inputs re-deal the same births; the generation re-deals a refused cell
 import assert from 'node:assert/strict';
 import { createCulture, stepCulture, seedRandom, cultureHash, setBedrock } from './dishLife.mjs';
-import { injectFluidBirths, fluidBirthChance, FLUID_BIRTH_FLOOR } from './dishFluidCouple.mjs';
+import {
+  injectFluidBirths,
+  fluidBirthChance,
+  FLUID_BIRTH_FLOOR,
+  fluidBirthSet,
+  applyBirths,
+} from './dishFluidCouple.mjs';
 
 const seeded = (seed = 4242) => {
   const c = createCulture({ cols: 48, rows: 27, seed: 1 });
@@ -96,6 +102,69 @@ const dense = (v) => new Float32Array(48 * 27).fill(v);
   stepCulture(c);
   const second = injectFluidBirths(c, dense(0.8), 0.7, 314);
   assert.ok(second >= 0, 'the deal runs at the new generation');
+}
+
+// ---- E: K1 slice 2 (#2186, S1) — the birth set as recorded data
+{
+  // set + apply is injectFluidBirths, exactly (same count, same grid), across seeds, strengths and generations
+  for (const [seed, strength, level] of [
+    [77, 1, 0.9],
+    [5, 0.4, 0.6],
+    [123456, 0.8, 0.45],
+  ]) {
+    const a = seeded();
+    const b = seeded();
+    const live = injectFluidBirths(a, dense(level), strength, seed);
+    const bBefore = Uint8Array.from(b.cur);
+    const set = fluidBirthSet(b, dense(level), strength, seed);
+    assert.deepEqual(Uint8Array.from(b.cur), bBefore, 'fluidBirthSet mutates nothing');
+    assert.equal(applyBirths(b, set), live, 'applying the set births as many as the live deal');
+    assert.deepEqual(Uint8Array.from(b.cur), Uint8Array.from(a.cur), 'set + apply = the live injection, cell for cell');
+    assert.ok(
+      set.every((v, i) => i === 0 || set[i - 1] < v),
+      'the set is ascending',
+    );
+  }
+  // the S1 property: a culture driven by RECORDED sets replays the one driven by the live fluid — the density is not
+  // consulted on replay (the replaying run is handed a field that would deal something else entirely)
+  const live = seeded();
+  const replay = seeded();
+  const recorded = [];
+  for (let g = 0; g < 24; g++) {
+    const density = dense(0.35 + 0.025 * (g % 20));
+    const set = fluidBirthSet(live, density, 0.8, 909);
+    recorded.push(set);
+    applyBirths(live, set);
+    stepCulture(live);
+  }
+  for (let g = 0; g < 24; g++) {
+    assert.ok(
+      recorded.some((r) => r.length > 0),
+      'the drill actually births cells',
+    );
+    applyBirths(replay, recorded[g]);
+    stepCulture(replay);
+  }
+  assert.equal(cultureHash(replay), cultureHash(live), 'replaying the recorded births reproduces the culture');
+  assert.equal(cultureHash(replay) === cultureHash(seeded()), false, 'and it is not the un-biased culture');
+  // fail-closed on a corrupt or stale recorded list
+  const c = seeded();
+  setBedrock(
+    c,
+    new Uint8Array(48 * 27).map((_, i) => (i % 7 === 0 ? 1 : 0)),
+  );
+  const alive = c.cur.findIndex((v) => v !== 0);
+  const bedrock = c.bedrock.findIndex((v) => v);
+  const before = Uint8Array.from(c.cur);
+  assert.equal(
+    applyBirths(c, [-1, 48 * 27, 1.5, NaN, 'x', null, alive, bedrock]),
+    0,
+    'junk, alive and bedrock are all skipped',
+  );
+  assert.deepEqual(Uint8Array.from(c.cur), before, 'nothing moved');
+  assert.equal(applyBirths(c, null), 0);
+  assert.equal(applyBirths(null, [1]), 0);
+  assert.deepEqual(fluidBirthSet(c, dense(0.9), 0, 1), [], 'strength 0 deals no set');
 }
 
 console.log('dishFluidCouple.selfcheck: ok');

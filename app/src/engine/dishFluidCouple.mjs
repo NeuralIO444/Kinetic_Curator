@@ -44,6 +44,47 @@ export function fluidBirthChance(density, strength) {
 }
 
 /**
+ * K1 slice 2 (#2186, S1) — the births a generation WOULD deal, as data: the ascending indices of the dead, unblocked
+ * cells whose seeded draw clears their chance. Pure (reads the culture, mutates nothing). This is the decision a GPU
+ * fluid makes discrete: under a Tier S field the take records THIS list (Tier D) and replay applies it, instead of
+ * re-deriving it from a density the replaying device may not reproduce (K0 R3).
+ */
+export function fluidBirthSet(culture, density, strength, seed = 0) {
+  const out = [];
+  if (!culture || !density || !(Number(strength) > 0)) return out;
+  const n = culture.cur.length;
+  if (density.length !== n) return out;
+  const gen = culture.gen | 0;
+  for (let i = 0; i < n; i++) {
+    if (culture.cur[i] !== 0) continue;
+    const chance = fluidBirthChance(density[i], strength);
+    if (!(chance > 0)) continue;
+    if (blocked(culture, i)) continue;
+    if (hashU01(seed | 0, FLUID_BIRTH_CHANNEL, gen * 8192 + i) < chance) out.push(i);
+  }
+  return out;
+}
+
+/**
+ * Apply a birth list to a culture's current grid (dead → alive only), returning how many were born. FAIL-CLOSED on a
+ * recorded list: a non-integer or out-of-range index, a blocked cell, or a cell already alive is skipped, so a corrupt
+ * or stale list can never touch the terrain or a living cell. Call BEFORE stepCulture, like the live bias.
+ */
+export function applyBirths(culture, indices) {
+  if (!culture || !indices || typeof indices.length !== 'number') return 0;
+  const n = culture.cur.length;
+  let born = 0;
+  for (let k = 0; k < indices.length; k++) {
+    const i = indices[k];
+    if (!Number.isInteger(i) || i < 0 || i >= n) continue;
+    if (culture.cur[i] !== 0 || blocked(culture, i)) continue;
+    culture.cur[i] = 1;
+    born++;
+  }
+  return born;
+}
+
+/**
  * Bias one generation's births: for every dead, unblocked cell whose fluid density clears
  * the floor, deal a birth from the seeded stream at (seed, generation, index). Mutates the
  * culture's current grid in place (dead → alive only) and returns how many cells were born.
@@ -51,20 +92,5 @@ export function fluidBirthChance(density, strength) {
  * g + 1, never sticky. Call BEFORE stepCulture for the generation it should feed.
  */
 export function injectFluidBirths(culture, density, strength, seed = 0) {
-  if (!culture || !density || !(Number(strength) > 0)) return 0;
-  const n = culture.cur.length;
-  if (density.length !== n) return 0;
-  const gen = culture.gen | 0;
-  let born = 0;
-  for (let i = 0; i < n; i++) {
-    if (culture.cur[i] !== 0) continue;
-    const chance = fluidBirthChance(density[i], strength);
-    if (!(chance > 0)) continue;
-    if (blocked(culture, i)) continue;
-    if (hashU01(seed | 0, FLUID_BIRTH_CHANNEL, gen * 8192 + i) < chance) {
-      culture.cur[i] = 1;
-      born++;
-    }
-  }
-  return born;
+  return applyBirths(culture, fluidBirthSet(culture, density, strength, seed));
 }
