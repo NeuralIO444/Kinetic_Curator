@@ -54,6 +54,14 @@ pick Looks with the checkboxes and `↓ SELECTED` (or `↓ ALL`) writes a `kc-pa
 It **lists only**: it never applies a Look to the scene and never touches the slots — loading from the Library into a slot is step 3,
 an explicit act of its own. Unlocks stays ⑥ (nothing renumbered). The empty state says where Looks come from.
 
+**As built — step 3, Look slots (#2148).** Each Library row gets **LOAD**: an explicit act that opens a slot picker — `＋ FREE SLOT`
+or a numbered occupied slot (`REPLACE? n / KEEP` confirm). `curator/lookSlot.mjs` (pure) + store action `loadLookToSlot`: the Look
+becomes a hand keep (cost 1) in the collection and takes the stage slot through the shelf's own law (`admitToStage` / `swapSlots`):
+the performing Look's slot is pinned, a full stage refuses with its line, and a refused load adds nothing. A replaced keep leaves the
+stage but stays in the collection — nothing is lost. **LOAD fills the slot only; it never applies the Look to the scene** (the
+existing slot press plays it). Seed: a seeded Look keeps its seed; a seedless one is stamped with the session's current seed at load
+time and the line says so (Matt, 2026-11-16) — the slot is a frozen plate. Closes open question 2 for slots.
+
 ## 3. Trio affect — subtle, honest, alive
 
 The voice marks (§12 of the variant spec) say _what_ each Voice suggests. The affect layer says _that they're alive while suggesting it_ — affective computing, KC-1 style: expression mapped to real internal state, never decoration.

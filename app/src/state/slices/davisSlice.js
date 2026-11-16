@@ -57,6 +57,14 @@ const SHELF_ASSETS_BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
 const SHELF_PALETTES_BY_ID = new Map(PALETTES.map((p) => [p.id, p]));
 const shelfLabelOf = (rec) =>
   shelfRow(rec, [], { assetsById: SHELF_ASSETS_BY_ID, palettesById: SHELF_PALETTES_BY_ID }).label;
+import {
+  lookToKeepRecord,
+  lookSeedFor,
+  planLookLoad,
+  lookLoadedLine,
+  LOOK_GONE_COPY,
+  LOOK_NOT_LOADED_COPY,
+} from '../../curator/lookSlot.mjs'; // #2148 step 3: Library Look → stage slot
 import { sanitizeGateVerdict } from '../../curator/loisJudge.mjs'; // #1590: stored E4 verdicts ride keeps
 import { getTaste } from '../../curator/tasteStore.js'; // #762: the loaded taste (the Queen's head)
 import { scoreLayout, headUsable } from '../../curator/tasteHead.js'; // the scorer interface (§7 door)
@@ -1235,6 +1243,37 @@ export const createDavisSlice = (set) => {
           shelfHistory,
           ...(imported ? { shelfDiskRecords: imported.shelfDiskRecords, shelfDiskStubs: imported.shelfDiskStubs } : {}),
           shelfNotice: imported ? `back from disk — ${shelfLabelOf(keeps.find((k) => k.id === keepId))}` : null,
+        };
+      }),
+    /**
+     * #2148 step 3 — load a Library Look into a stage slot (curator/lookSlot.mjs owns the law). The Look becomes a hand keep in
+     * the collection and takes a free slot (outId null) or replaces the chosen slot in place; nothing is applied to the scene.
+     * A refusal lands in shelfNotice and changes nothing: the keep is only added when the slot move is legal.
+     */
+    loadLookToSlot: (libraryId, outId = null) =>
+      set((state) => {
+        const entry = (state.lookLibrary || []).find((e) => e.id === libraryId);
+        if (!entry) return { shelfNotice: LOOK_GONE_COPY };
+        const at = new Date().getTime();
+        const keep = sanitizeFavorite(lookToKeepRecord(entry, { seed: state.seed, at, id: genId() }));
+        if (!keep) return { shelfNotice: LOOK_NOT_LOADED_COPY };
+        const plan = planLookLoad([...allKeeps(state), keep], state.keepStage, keep.id, outId, {
+          performingKeepId: state.performingKeepId,
+        });
+        if (!plan.ok) return { shelfNotice: plan.copy };
+        const staged = { ...keep, stagedCount: 1, lastStagedAt: at };
+        const keeps = [...state.keeps, staged];
+        const shelfHistory = withShelfHistory(state, swapHistoryRecord(outId, staged.id, at));
+        persistKeeps(keeps);
+        persistStage(plan.stageIds);
+        return {
+          keeps,
+          keepStage: plan.stageIds,
+          shelfHistory,
+          shelfNotice: lookLoadedLine(entry.name, {
+            stamped: lookSeedFor(entry.look, state.seed).stamped,
+            replaced: plan.replaced,
+          }),
         };
       }),
     /**
