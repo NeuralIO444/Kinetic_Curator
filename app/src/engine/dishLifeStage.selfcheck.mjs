@@ -6,6 +6,8 @@
 //   D replay    the same stamp sequence = the same frames, frame by frame; any generation is the same culture however it was reached
 //   E terrain   held/locked marks are never seeded or consumed, stay on their own layer exactly as dealt, colonies grow around them
 //   F snapshot  a take can begin mid-culture: restore() continues bit-identically
+//   G births    K1 slice 3b (#2186): recordBirths logs the live bias's born cells; replayBirths reproduces the culture from
+//               the log alone (no density), seeks back identically, and is inert/off by default
 import assert from 'node:assert/strict';
 import { createDishLifeStage, isTerrain, isSpeck, SHED_STEPS } from './dishLifeStage.mjs';
 
@@ -396,5 +398,49 @@ const stamp = (gen, wakeMs = 5000, shed = 0) => ({ wakeMs, gen, shed });
   const fresh = createDishLifeStage();
   fresh.apply({ mode: 'quiet', wakeMs: 1, gen: 0, cycleGens: 48, shed: 0, strength: 0.5 }, wake, W, H);
   assert.equal(fresh.snapshot().marks.length, small().length, 'specks are not marks');
+}
+
+// ---- G: births as data (K1 slice 3b)
+{
+  const N = 96 * 54;
+  const density = new Float32Array(N);
+  for (let i = 0; i < N; i++) density[i] = ((i * 37) % 100) / 100; // a fixed, varied field
+  const run = (setup, gens) => {
+    const stage = createDishLifeStage();
+    setup(stage);
+    for (let g = 0; g <= gens; g++) stage.apply(stamp(g), layers(), W, H);
+    return stage;
+  };
+  const key = (stage) => {
+    const grid = stage.snapshot().fluidGrid;
+    return grid ? `${grid.length}:${grid.reduce((h, v, i) => (h * 31 + v * (i + 1)) % 1000003, 7)}` : 'no-grid';
+  };
+  const live = run((st) => st.setFluidBias(density, 1), 24);
+  const rec = run((st) => {
+    st.setFluidBias(density, 1);
+    st.recordBirths(true);
+  }, 24);
+  assert.equal(key(rec), key(live), 'recording does not change the culture (the same births, dealt as a list)');
+  const log = rec.birthLog();
+  assert.ok(log.length > 0 && log.every((b) => b.indices.length > 0), 'a biased run logs its born cells');
+  assert.ok(
+    log.every((b, i) => i === 0 || log[i - 1].gen < b.gen),
+    'in generation order',
+  );
+  // replay: NO bias handed in — the log alone reproduces the culture
+  const replay = run((st) => st.replayBirths(log), 24);
+  assert.equal(key(replay), key(live), 'the recorded births reproduce the live culture without the density');
+  // a seek back rebuilds to the same culture
+  replay.apply(stamp(10), layers(), W, H);
+  for (let i = 0; i < 30; i++) replay.apply(stamp(24), layers(), W, H); // a seek catches up at the shed bound
+  assert.equal(key(replay), key(live), 'seek back and forward lands on the same culture');
+  // a corrupt list is fail-closed and an empty/absent one deals nothing
+  const bad = run((st) => st.replayBirths([{ gen: 1, indices: [-1, 1.5, 99999999, 'x'] }, null, { gen: 'a' }]), 6);
+  const none = run((st) => st.replayBirths([]), 6);
+  assert.ok(bad.snapshot() && none.snapshot(), 'junk entries are skipped without throwing');
+  // off by default: no recorder, no replay
+  assert.equal(createDishLifeStage().birthLog(), null);
+  const off = run((st) => st.recordBirths(false), 6);
+  assert.equal(off.birthLog(), null);
 }
 console.log('dishLifeStage.selfcheck: ok');

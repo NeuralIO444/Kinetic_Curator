@@ -36,7 +36,7 @@ import { createCulture, stepCulture, setBedrock, restoreCultureGrid, CULTURE_RUL
 import { seedFromMarks, coverageField } from './dishLifeSeed.mjs';
 import { nearestMarks, cultureFrame, speckItems } from './dishLifeRender.mjs';
 import { cultureSampler, envelope } from './dishLifeQuiet.mjs';
-import { injectFluidBirths } from './dishFluidCouple.mjs'; // #1997 — the ferrofluid's bias on this culture's births
+import { injectFluidBirths, fluidBirthSet, applyBirths } from './dishFluidCouple.mjs'; // #1997 — the ferrofluid's bias on this culture's births
 
 /** Culture grid resolution (the spike's grid). */
 export const STAGE_COLS = 96;
@@ -80,6 +80,12 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
   let fluidBias = null;
   let biasUsed = false;
   const biasSeed = () => ((Math.floor(st.wakeMs) | 0) ^ 0x85ebca6b) | 0;
+  // K1 slice 3b (#2186, S1) — births as Tier D data. RECORD: while on, each generation that took a live bias logs
+  // its born-cell list ({gen, indices}); the Take stores it. REPLAY: a recorded list (gen → indices) is applied in
+  // place of the bias, so the culture reproduces without the density that made it (which a replaying device need
+  // not reproduce — K0 R3). Both are off by default: the step loop is then the pre-3b loop, number for number.
+  let birthLog = null;
+  let birthReplay = null;
 
   // #1994 — the field mode's publication surface: ONE stable object for the stage's whole life. Its fields are
   // re-pointed at the live culture's published arrays on every field-mode frame (never copied — the core's
@@ -261,7 +267,15 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     // behind: fluidBias is the density published at the last applied frame). No bias handed in
     // → the loop is the pre-#1997 loop verbatim.
     for (let n = 0; st.culture.gen < target && n < SHED_STEPS[shed]; n++) {
-      if (fluidBias) {
+      if (birthReplay) {
+        applyBirths(st.culture, birthReplay.get(st.culture.gen) || []);
+        biasUsed = true;
+      } else if (fluidBias && birthLog) {
+        const indices = fluidBirthSet(st.culture, fluidBias.density, fluidBias.strength, biasSeed());
+        if (indices.length) birthLog.push({ gen: st.culture.gen, indices });
+        applyBirths(st.culture, indices);
+        biasUsed = true;
+      } else if (fluidBias) {
         injectFluidBirths(st.culture, fluidBias.density, fluidBias.strength, biasSeed());
         biasUsed = true;
       }
@@ -321,6 +335,28 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
         density && density.length === cols * rows && Number(strength) > 0
           ? { density, strength: Math.min(1, Number(strength)) }
           : null;
+    },
+    /** K1 slice 3b — start (true) or stop (false) logging the births each biased generation deals. Starting clears the log. */
+    recordBirths(on) {
+      birthLog = on ? [] : null;
+    },
+    /** The log so far: [{gen, indices}] in generation order (a copy), or null when not recording. */
+    birthLog() {
+      return birthLog ? birthLog.map((b) => ({ gen: b.gen, indices: b.indices.slice() })) : null;
+    },
+    /**
+     * K1 slice 3b — replay recorded births: [{gen, indices}] (or null to return to live). While set, a generation is dealt
+     * exactly its recorded list (none = none), applied fail-closed; the live bias is not consulted.
+     */
+    replayBirths(list) {
+      if (!Array.isArray(list)) {
+        birthReplay = null;
+        return;
+      }
+      birthReplay = new Map();
+      for (const b of list) {
+        if (b && Number.isInteger(b.gen) && Array.isArray(b.indices)) birthReplay.set(b.gen, b.indices);
+      }
     },
     reset() {
       st = null;
