@@ -9,6 +9,7 @@
 // IMPORT sniffs the file kind and routes to the existing parser for each:
 // bundle → the bundle confirm/apply path; project → the project confirm/apply
 // path; taste.json → the taste store; palettes → the palette importer (merge);
+// looks (a kc-look preset or a kc-pack of Looks, #2148) → the Look Library (install only, never the slots);
 // hits → the embedded project via the project path (the keeps rows are the
 // studio's feed, not restorable ledger entries).
 import { buildBundle, bundleFilename, isBundle } from '../../state/bundle.js';
@@ -19,6 +20,7 @@ import { validateTaste } from '../../curator/tasteHead.js';
 import { getBiologyPolicy } from '../../biology/policy.js';
 import { readUserPresets } from '../../data/canvasPresets.js';
 import { parseProject } from '../../state/projectDocument.js';
+import { sniffLookFile } from '../../data/lookPack.mjs'; // #2148
 
 /** Version of the hits feed envelope (matches the old ↓ HITS export). */
 export const HITS_ENVELOPE_VERSION = 1;
@@ -79,6 +81,7 @@ export function downloadJsonFile(obj, filename) {
 export function sniffImportKind(raw) {
   if (raw === null || typeof raw !== 'object') return 'unknown';
   if (isBundle(raw)) return 'bundle';
+  if (sniffLookFile(raw)) return 'looks'; // #2148: a kc-look/N preset or a kc-pack/N of Looks
   if (!Array.isArray(raw)) {
     if (validateTaste(raw).ok) return 'taste';
     if (Array.isArray(raw.hits)) return 'hits';

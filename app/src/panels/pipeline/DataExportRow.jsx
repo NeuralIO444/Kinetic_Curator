@@ -23,6 +23,7 @@ import { writeUserPresets } from '../../data/canvasPresets.js';
 import { parseBundle, bundleSummary, bundleMessage, bundleConfirmLine, isBundle } from '../../state/bundle.js';
 import { BUNDLE_SANITIZERS } from '../../state/bundleParts.js';
 import { buildExportBundle, downloadJsonFile, exportEnvelopeFilename, sniffImportKind } from './bundleFile.js';
+import { lookReceipt, buildLookPack, lookPackFilename, sniffLookFile } from '../../data/lookPack.mjs'; // #2148
 
 // onMessage: shown by the parent, the same slot batch-completion writes to —
 // matches the original single status line under this section.
@@ -77,6 +78,8 @@ export function DataExportRow({
   );
   const importTasteToStore = useStore((s) => s.importTaste);
   const importShelf = useStore((s) => s.importShelf); // #1051
+  const installLookFile = useStore((s) => s.installLookFile); // #2148: Looks install into the Library, never the slots
+  const lookLibrary = useStore((s) => s.lookLibrary);
   const userVoices = useStore((s) => s.userVoices); // #1063
   const importUserVoices = useStore((s) => s.importUserVoices); // #1063
   const [nudgeTick, setNudgeTick] = useState(0); // #925 — re-render after dismissing the retrain nudge
@@ -139,6 +142,37 @@ export function DataExportRow({
     setBehind(Boolean(dirtyMessage(exportedPayload.current, JSON.stringify(buildProjectPayload(projectFields)))));
   }, [projectFields]);
 
+  // #2148 — pasted JSON: a Look preset or a pack of Looks from the clipboard, through the same install as the file path.
+  const pasteLooks = async () => {
+    let text;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      onMessage('Paste: the clipboard could not be read');
+      return;
+    }
+    let raw;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      onMessage('Paste: the clipboard is not valid JSON');
+      return;
+    }
+    if (!sniffLookFile(raw)) {
+      onMessage('Paste: not a Look (kc-look/1) or a Look pack (kc-pack/1)');
+      return;
+    }
+    const { read, merged } = installLookFile(raw);
+    onMessage(lookReceipt(read, merged));
+  };
+
+  // #2148 — the Library out as one shareable pack file (a Library browser with selection is the next step).
+  const exportLooks = () => {
+    if (!lookLibrary.length) return;
+    downloadJsonFile(buildLookPack(lookLibrary), lookPackFilename());
+    onMessage(`Look pack exported · ${lookLibrary.length} ${lookLibrary.length === 1 ? 'Look' : 'Looks'}`);
+  };
+
   // #1216 — one drop zone: sniff the kind, route to the existing parser.
   const importSniffed = (e) => {
     const file = e.target.files[0];
@@ -186,6 +220,13 @@ export function DataExportRow({
         applyImport(file.name, result.doc, result.sanitized);
         return;
       }
+      if (kind === 'looks') {
+        // #2148 — a Look preset or a pack of Looks: validated through kc-look/1, installed to the Library (never the slots),
+        // a quiet receipt; an item that does not read is quarantined by name and the rest still install.
+        const { read, merged } = installLookFile(raw);
+        onMessage(lookReceipt(read, merged));
+        return;
+      }
       if (kind === 'taste') {
         // #762 — a bad file says why and changes nothing.
         const r = importTasteToStore(raw);
@@ -223,7 +264,7 @@ export function DataExportRow({
         applyImport(file.name, result.doc, result.sanitized, note);
         return;
       }
-      onMessage('Import: not a KC-1 file (bundle, project, taste, palettes, or hits)');
+      onMessage('Import: not a KC-1 file (bundle, project, taste, palettes, hits, or Looks)');
     };
     // #640 — a failed file read (disk error, permissions) must say so
     // instead of failing silently.
@@ -341,17 +382,33 @@ export function DataExportRow({
           className="big-btn act"
           onClick={() => fileInputRef.current?.click()}
           style={{ flex: 1 }}
-          title="Import a bundle, project, taste, palettes, or hits file"
+          title="Import a bundle, project, taste, palettes, hits, or Look file (.kclook / .kcpack)"
         >
           ↑ IMPORT
         </button>
         <input
           ref={fileInputRef}
           type="file"
-          accept=".json,application/json"
+          accept=".json,.kclook,.kcpack,application/json"
           onChange={importSniffed}
           style={{ display: 'none' }}
         />
+        <button
+          className="big-btn act"
+          onClick={pasteLooks}
+          title="Paste a Look or a Look pack (JSON) from the clipboard into the Library"
+        >
+          ⎘ PASTE LOOK
+        </button>
+        {lookLibrary.length > 0 && (
+          <button
+            className="big-btn dl act"
+            onClick={exportLooks}
+            title="Export every Look in the Library as one shareable pack file"
+          >
+            ↓ LOOKS
+          </button>
+        )}
       </div>
       {pendingImport && (
         <div

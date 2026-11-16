@@ -8,15 +8,16 @@
 
 One loader, typed payloads. Every DLC thing becomes a versioned preset type with the same contract: sniff `format`, validate, fail closed.
 
-| Type | Status | Payload |
-|---|---|---|
-| `kc-style/1` | exists (2026-09-28) | FX chain + blend + opacity. Strict scope, unchanged. |
-| `kc-look/1` | **new** | A Look: `{ mode, layoutParams, paletteId, seed? }`. Seed optional — seedless Looks apply to the live scene; seeded Looks are frozen compositions. |
-| `kc-voice/1` | **new** | A Voice: `{ name, mark, verdicts[], sway }`. `mark` = the icon glyph. `verdicts` = its NOD/VIBE/BURN-style vocabulary. `sway` = how it biases params toward kept taste. The Trio ship as the three canonical `kc-voice/1` records. |
-| `kc-variant/1` | drafted (2026-10-11) | Aesthetic discipline overlays (Swiss/Japan). See variant spec. |
-| `kc-pack/1` | **new** (container) | `{ kind: 'styles'|'looks'|'voices'|'variants', name, author, version, items: [...] }`. One file, human-readable, paste-able like recipes. |
+| Type           | Status               | Payload                                                                                                                                                                                                                            |
+| -------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kc-style/1`   | exists (2026-09-28)  | FX chain + blend + opacity. Strict scope, unchanged.                                                                                                                                                                               |
+| `kc-look/1`    | **new**              | A Look: `{ mode, layoutParams, paletteId, seed? }`. Seed optional — seedless Looks apply to the live scene; seeded Looks are frozen compositions.                                                                                  |
+| `kc-voice/1`   | **new**              | A Voice: `{ name, mark, verdicts[], sway }`. `mark` = the icon glyph. `verdicts` = its NOD/VIBE/BURN-style vocabulary. `sway` = how it biases params toward kept taste. The Trio ship as the three canonical `kc-voice/1` records. |
+| `kc-variant/1` | drafted (2026-10-11) | Aesthetic discipline overlays (Swiss/Japan). See variant spec.                                                                                                                                                                     |
+| `kc-pack/1`    | **new** (container)  | `{ kind: 'styles'                                                                                                                                                                                                                  | 'looks' | 'voices' | 'variants', name, author, version, items: [...] }`. One file, human-readable, paste-able like recipes. |
 
 Rules (shared with the style draft):
+
 - Unknown `format` → refused with a named error, never half-applied.
 - Unknown fields ignored; out-of-range values clamped; hostile JSON quarantined exactly like project docs.
 - Types never cross their scope: a style can't set palette, a look can't set FX, a voice can't set geometry. The split-brain bug class stays dead.
@@ -28,14 +29,32 @@ Pipeline already kind-sniffs IMPORT (#1216: bundle vs project vs taste.json vs p
 
 - **Import:** drop zone / file picker in the IMPORT section accepts `.kcpack`, `.kcstyle`, `.kclook`, `.kcvoice`, `.kcvariant`, or pasted JSON. Sniff → validate → show a quiet receipt ("Style pack · 6 styles · installed to Library") → items appear in the Library browsers. Failures quarantine with the item name, never applied.
 - **Export:** select Library items → "Export as pack" → one JSON download (or copy-as-text for sharing).
-- **Library UI** lives where each type is played (Styles in Build/Appearance, Looks in Build, Voices in Director, Variants on the mode tiles) — Pipeline only *installs*. No new panel; the loader is one row in IMPORT.
+- **Library UI** lives where each type is played (Styles in Build/Appearance, Looks in Build, Voices in Director, Variants on the mode tiles) — Pipeline only _installs_. No new panel; the loader is one row in IMPORT.
 - Packs declare `cost.tier` aggregates where relevant (styles); the governor needs no new logic.
+
+**As built — step 1, the Look pack loader (#2148).** `data/lookPack.mjs` (pure) + `state/slices/lookLibrarySlice.js` + the IMPORT row:
+
+- **Accepts** a `.kclook` / pasted `kc-look/1`, or a `kc-pack/1` container with `kind: 'looks'` (the §1 shape, scoped to Looks; the
+  voices / styles / variants kinds stay separate calls). The row's file picker takes `.kclook` and `.kcpack`; **PASTE LOOK** reads
+  the clipboard through the same install.
+- **Each item goes through the `kc-look/1` type unchanged.** An item that does not read is **quarantined with its name and the
+  reason** (never installed, never repaired); the items that do read still install. `name` is pack metadata read from the item
+  wrapper (the type carries none). A pack past 200 items reads the first 200; one file past 2 MB is refused unread.
+- **Installs to the Library only** (`lookLibrary`, `localStorage` key `kc:look-library:v1`, cap 200, deduped by a content id
+  that ignores name and key order; an installed Look is never overwritten). No slot, scene, palette or project state moves.
+  The stored list is re-read through the type on load.
+- **Receipt** is one quiet line: `Look pack "Name" · 6 Looks installed to Library · 1 already there · 1 item quarantined — Name: reason`.
+- **Export:** `↓ LOOKS` (shown when the Library has Looks) writes every installed Look as one `kc-pack/1` file. Selecting which
+  Looks to export waits for the Library browser (step 2).
+- **Not yet:** the Library UI, the 16 Look slots, and `looks/` in the loot folder (steps 2–4 of #2148); `lootClassify` still
+  says "looks not supported yet".
 
 ## 3. Trio affect — subtle, honest, alive
 
-The voice marks (§12 of the variant spec) say *what* each Voice suggests. The affect layer says *that they're alive while suggesting it* — affective computing, KC-1 style: expression mapped to real internal state, never decoration.
+The voice marks (§12 of the variant spec) say _what_ each Voice suggests. The affect layer says _that they're alive while suggesting it_ — affective computing, KC-1 style: expression mapped to real internal state, never decoration.
 
 **State (ephemeral, never serialized):**
+
 ```js
 voiceAffect: {
   lois:  { suggesting: bool, conviction: 0..1, targetId },
@@ -43,16 +62,19 @@ voiceAffect: {
   queen: { suggesting: bool, conviction: 0..1, targetId },
 }
 ```
+
 `conviction` derives from the existing machinery — LOIS/Davis verdict strengths, the Queen's keep-ledger sway. No new opinion timers, ever (LOIS rule).
 
 **Expression (ambient, DS-disciplined):**
-- **LOIS pill** (left of LIVE): at rest, flat. When suggesting, a slow red edge-breathe; intensity tracks conviction. He *leans in*.
-- **Davis kaleidoscope face**: at rest, still. When suggesting, a barely-there rotation drift in amber. He *turns it over*.
-- **Queen 👸🏽** (right of B, unnamed, no tooltip): existing sway pulse stays; when she holds a *specific* suggestion, the pulse shortens — same voice, different sentence.
+
+- **LOIS pill** (left of LIVE): at rest, flat. When suggesting, a slow red edge-breathe; intensity tracks conviction. He _leans in_.
+- **Davis kaleidoscope face**: at rest, still. When suggesting, a barely-there rotation drift in amber. He _turns it over_.
+- **Queen 👸🏽** (right of B, unnamed, no tooltip): existing sway pulse stays; when she holds a _specific_ suggestion, the pulse shortens — same voice, different sentence.
 - **Voice marks in submenus**: the mark's opacity/scale tracks conviction — a strongly-held suggestion sits at full ink, a weak one is a ghost. You read certainty without reading text.
 - **Silence is default**: no suggestions anywhere → all three rest. The instrument goes quiet the way a room does when nobody's talking.
 
 **Constraints:**
+
 - `prefers-reduced-motion`: affect collapses to static marks. Stillness is first-class.
 - Affect never blocks input, never steals focus, never toasts. If you never look at the pill, you never know it breathed.
 - All expression is a pure function of `voiceAffect` — screenshot-testable, no timers with opinions.
