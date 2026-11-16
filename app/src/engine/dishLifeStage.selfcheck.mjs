@@ -443,4 +443,32 @@ const stamp = (gen, wakeMs = 5000, shed = 0) => ({ wakeMs, gen, shed });
   const off = run((st) => st.recordBirths(false), 6);
   assert.equal(off.birthLog(), null);
 }
+// ---- H: K2 slice 2b — hostSeed(): what a GPU culture needs to follow this one
+{
+  const stage = createDishLifeStage();
+  assert.equal(stage.hostSeed(), null, 'no culture, no seed');
+  stage.apply(stamp(0), layers(), W, H);
+  const a = stage.hostSeed();
+  assert.ok(
+    a && a.cells.length === 96 * 54 && a.blocked.length === 96 * 54,
+    'a seed grid and a blocked grid of the stage size',
+  );
+  assert.equal(a.cols, 96);
+  assert.ok(
+    a.cells.some((v) => v === 1),
+    "the seed is the wake's marks",
+  );
+  for (let g = 0; g < 12; g++) stage.apply(stamp(g), layers(), W, H);
+  const b = stage.hostSeed();
+  assert.equal(b.key, a.key, 'the key holds while the seed does');
+  assert.deepEqual(
+    Array.from(b.cells),
+    Array.from(a.cells),
+    'and the seed grid is the generation-0 grid, not the running one',
+  );
+  stage.apply(stamp(0, 9000), layers(), W, H);
+  assert.notEqual(stage.hostSeed().key, a.key, 'a new wake is a new key');
+  stage.reset();
+  assert.equal(stage.hostSeed(), null, 'reset drops it');
+}
 console.log('dishLifeStage.selfcheck: ok');

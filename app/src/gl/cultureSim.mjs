@@ -159,6 +159,19 @@ export function createGpuCulture(gl, cols, rows) {
       upload(tex[cur], state);
       upload(blockedTex, blocked && blocked.length === cols * rows ? blocked : new Uint8Array(cols * rows));
     },
+    /** Replace the blocked grid (1 = glass or bedrock) without touching the state — terrain can change mid-wake. */
+    setBlocked(blocked) {
+      upload(blockedTex, blocked && blocked.length === cols * rows ? blocked : new Uint8Array(cols * rows));
+    },
+    /** Queue an async readback of the state grid (R8UI) into a PIXEL_PACK_BUFFER — no stall. */
+    readInto(pbo) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+      gl.pixelStorei(gl.PACK_ALIGNMENT, 1);
+      gl.readPixels(0, 0, cols, rows, gl.RED_INTEGER, gl.UNSIGNED_BYTE, 0);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    },
     /** The generation the next step()/births() is dealt at. */
     get gen() {
       return gen;

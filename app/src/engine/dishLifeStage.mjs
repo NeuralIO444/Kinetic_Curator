@@ -173,6 +173,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       terrain: (terrain || []).map(freeze),
       nearest: withNearest ? nearestMarks(marks, geom(W, H)) : null,
       culture: createCulture({ cols, rows, rule, bedrock, seed: seed.cells }),
+      seed0: Uint8Array.from(seed.cells), // K2 slice 2b — the generation-0 grid, for a GPU host that must follow this culture
       // #1923 Phase 4 — every build starts as its wake's own seed (epoch 0); apply() raises the
       // epoch when the build is a "seed from stage" press inside a standing wake, and the seek-back
       // rebuild / restore() preserve the epoch of the seed they rebuild.
@@ -333,6 +334,21 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
      */
     cultureField() {
       return culturePublication;
+    },
+    /**
+     * K2 slice 2b — what a render-side GPU culture needs to follow THIS culture: the seed it was built from (gen 0), the
+     * blocked grid it lives under right now (glass or bedrock = 1), its rule, and a key that changes whenever the seed does
+     * (a new wake, a press, a rebuild). Read-only, fresh arrays for the blocked grid; null when no culture stands.
+     */
+    hostSeed() {
+      if (!st) return null;
+      const c = st.culture;
+      const blocked = new Uint8Array(c.cur.length);
+      for (let i = 0; i < blocked.length; i++)
+        blocked[i] = (c.mask && !c.mask[i]) || (c.bedrock && c.bedrock[i]) ? 1 : 0;
+      const cells = Uint8Array.from(st.seed0);
+      for (let i = 0; i < cells.length; i++) if (blocked[i]) cells[i] = 0; // a blocked cell is dead, as createCulture makes it
+      return { key: `${st.wakeMs}|${st.seedEpoch | 0}|${st.W}x${st.H}`, cells, blocked, rule: c.rule, cols, rows };
     },
     /**
      * #1997 — hand the culture its ferrofluid birth bias for the coming apply: the fluid
