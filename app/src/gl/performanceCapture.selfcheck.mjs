@@ -81,7 +81,16 @@ const play = (n, seed = 0xbeef) => {
   const v = verifyPerformance(await unpackPerformance(take.bytes));
   assert.deepEqual(
     v,
-    { ok: true, frames: 181, checked: 4, firstMismatchFrame: null, kernelMismatch: false },
+    {
+      ok: true,
+      frames: 181,
+      checked: 4,
+      firstMismatchFrame: null,
+      kernelMismatch: false,
+      simLaw: 'js-exact',
+      simBackends: { fluid: 'js.gs.v1', culture: 'js.life.v1', swarm: 'js.swarm.v1' },
+      simUnrunnable: [],
+    },
     'a mid-session take replays to every checkpoint',
   );
 }
