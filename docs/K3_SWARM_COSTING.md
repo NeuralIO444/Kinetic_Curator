@@ -64,3 +64,8 @@ Nothing changes in the product from this document.
 2. **All-pairs, measure first**; cap raised only in measured steps (350, then 1,024, then 2,048). Grid only if the measurement demands it.
 3. **`dishContacts` moves to the GPU too** (not left on JS). It is therefore in scope: it needs its own slice after the swarm kernel, and a contacts readback or GPU-side consumer must be designed; the contacts feed the resolver, so this crosses the K0 R3 seam and needs the same stamp-or-post-contract decision K1 had.
    Ruled (Matt, 2026-11-16): the contacts are **stamped as a recorded input** (a small list per frame, as K1), not made post-contract. The resolver stays exact; the look follows the recording device.
+
+## 10. Shipped
+
+- **Slice 1a** (`gl/swarmSim.mjs`): the swarm core on the GPU, standalone and wired to nothing. Boids separation / alignment / cohesion (all-pairs), the point attractor (seek / flee = its seekGain sign), semi-implicit Euler with dt-correct damping, the speed clamp, wrap (cloud) and bounce (organism) boundaries; RGBA32F state ping-pong, mass static. One step from the same state agrees with the real `ParticleSystem` to float noise (≤ 1e-4 in position, with the JS wind injected to zero); over 350 particles × 300 steps: no NaN, speed ≤ clamp, seek < cruise < flee, boundaries hold. Selfcheck: `parity/swarmSim.selfcheck.mjs` (real GL; skips with no browser).
+- **Not yet:** wind (curl and point noise — needs a GLSL port of `noise.js`), chemotaxis, Lévy, Lorenz, cling, drives, leak, breeding, contacts, heading and spine integrators, any wiring or flag. **Cost is unmeasured** (software GL only; the all-pairs loop's real cost needs the stage iPad, #2183).

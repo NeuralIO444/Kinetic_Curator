@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>KC GPU swarm kernel probe (K3 #2188)</title></head>
+<body>
+<canvas id="c" width="4" height="4"></canvas>
+<script type="module">
+import { createGpuSwarm } from '../swarmSim.mjs';
+// window.__kcSwarmRun({ n, state: { x, y, vx, vy, mass }, steps, params, sampleAt: [steps...] }) -> { samples: { step: {x,y,vx,vy} } }
+// Seeds the GPU swarm, runs `steps` substeps under `params`; returns the state after each step listed in sampleAt (and the last).
+const gl = document.getElementById('c').getContext('webgl2', { alpha: false, antialias: false });
+window.__kcSwarmRun = (p) => {
+  const g = createGpuSwarm(gl, p.n);
+  const f32 = (a) => Float32Array.from(a);
+  g.seed({ x: f32(p.state.x), y: f32(p.state.y), vx: f32(p.state.vx), vy: f32(p.state.vy), mass: f32(p.state.mass) });
+  const at = new Set(p.sampleAt || [p.steps]);
+  const samples = {};
+  for (let s = 1; s <= p.steps; s++) {
+    g.step(p.params);
+    if (at.has(s)) {
+      const r = g.read();
+      samples[s] = { x: Array.from(r.x), y: Array.from(r.y), vx: Array.from(r.vx), vy: Array.from(r.vy) };
+    }
+  }
+  g.dispose();
+  return { samples };
+};
+window.__kcReady = true;
+</script>
+</body>
+</html>
