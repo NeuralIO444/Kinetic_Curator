@@ -977,6 +977,28 @@ export function createLiveResolver() {
     const cultureScale = fieldSamplerNow
       ? { coupling: couplingNow, sampler: fieldSamplerNow, ...(lifeNow > 0 ? { life: lifeNow } : {}) }
       : null;
+    // One force seam slice 1 (docs/design/one-force-seam.md) — the ferrofluid's lean on the marks, order 2 after LIFE. It
+    // reads the fluid plan from the last applied frame (the stage applies at the bottom of this resolve — the same
+    // one-frame-behind publication the culture's fluid bias reads above). Inert (null) unless this frame stamps a fluid,
+    // the plan is live, a magnet stands and PULL is up — so a frame without the ferrofluid is bit-identical.
+    const fPlan = dishFluid.plan;
+    const fluidDrift =
+      input.dishFluid != null &&
+      fPlan.active &&
+      fPlan.density &&
+      Array.isArray(fPlan.magnets) &&
+      fPlan.magnets.length &&
+      fPlan.dial &&
+      Number(fPlan.dial.pull) > 0
+        ? {
+            density: fPlan.density,
+            magnets: fPlan.magnets,
+            pull: Number(fPlan.dial.pull),
+            aspectHW: fPlan.aspectHW,
+            W,
+            H,
+          }
+        : null;
     // #1923 Phase 2 slice D — the background consumer's read, taken HERE, at the one coupling read:
     // the dish-mean level of the same publication, under the same shed fold (it exists only under
     // cultureScale). It is published at the end of the resolve (getLastCouplingBackground) for the
@@ -1375,6 +1397,7 @@ export function createLiveResolver() {
           layerId: layer.id, // #1245 — unknown-sampler diagnostic key
           kineme,
           cultureScale, // #1923 Phase 2 — the coupling's scale fold (null unless the dial is up and a field is published)
+          fluidDrift, // one force seam slice 1 — the ferrofluid's lean on the marks (null unless a fluid runs with a magnet)
           // #1574 — the travel input: the resolver's store + this frame's
           // spine-A delta + the governor's shed. Mode/leash/strength ride
           // layoutParams (recipe data); buildPlacements gates on them, so
