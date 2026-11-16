@@ -6,7 +6,7 @@
 // wrap at a 120 px pad; organism: bounce off an 8 px margin). State is one RGBA32F texture, one texel per particle
 // (x, y, vx, vy), ping-ponged; mass rides a static texture (the per-agent uniqueness channel, uploaded once).
 //
-// Slice 1b adds the cloud swarm's POINT wind; slice 1c the CURL wind (organisms) and the windMul (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
+// Slice 1b adds the cloud swarm's POINT wind; slice 1c the CURL wind (organisms) and the windMul; slice 1d chemotaxis (reads an uploaded scent grid) (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
 // What is NOT here yet (later K3 slices): the curl wind (organisms), chemotaxis, Lévy, Lorenz, cling, drives, leak, breeding,
 // contacts, the heading and spine integrators. A caller that wants parity with the JS swarm runs it with wind 0 (see the
 // selfcheck, which drives the real ParticleSystem and this kernel from the same state).
@@ -59,9 +59,33 @@ uniform vec4 u_attract;      // x, y, strength (gravityWells*attractMul*GAIN*see
 uniform vec2 u_canvas;
 uniform vec4 u_wind;         // noiseFreq, domainOffsetX, domainOffsetY, nt (time * noiseSpeed * 0.001)
 uniform float u_windOn;      // 0 = off, 1 = point wind (noise3D -> angle), 2 = curl wind (curl2, organisms)
+uniform sampler2D u_scent;   // R32F cols x rows: the scent field's cells, uploaded by the caller (JS still owns deposit/diffuse/decay)
+uniform vec3 u_chem;         // chemotaxis gain (0 = off), scent cols, scent rows
 uniform float u_windMul;     // cloud swarm: 1 (the wind knob is ignored); organism: wind * profile.wind
 uniform int u_bounce;        // 0 = wrap (cloud), 1 = bounce (organism)
 layout(location = 0) out vec4 o_state;
+
+float scentAt(int x, int y) {
+  int cx = clamp(x, 0, int(u_chem.y) - 1);
+  int cy = clamp(y, 0, int(u_chem.z) - 1);
+  return texelFetch(u_scent, ivec2(cx, cy), 0).r;
+}
+float scentSample(vec2 n) {
+  float gx = min(u_chem.y - 1.001, max(0.0, n.x * u_chem.y - 0.5));
+  float gy = min(u_chem.z - 1.001, max(0.0, n.y * u_chem.z - 0.5));
+  float fx0 = floor(gx);
+  float fy0 = floor(gy);
+  float fx = gx - fx0;
+  float fy = gy - fy0;
+  int x0 = int(fx0);
+  int y0 = int(fy0);
+  float a = scentAt(x0, y0);
+  float b = scentAt(x0 + 1, y0);
+  float c = scentAt(x0, y0 + 1);
+  float d = scentAt(x0 + 1, y0 + 1);
+  float v = a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+  return clamp(v, 0.0, 4.0);
+}
 
 void main() {
   ivec2 tp = ivec2(gl_FragCoord.xy);
@@ -91,6 +115,16 @@ void main() {
       float shape = (kcNoise3D(fx + 200.0, fy + 200.0, u_wind.w) + 1.0) * 0.4;
       f += vec2(cos(ang), sin(ang)) * shape * u_windMul / m;
     }
+  }
+
+  if (u_chem.x != 0.0) {
+    // scent.js: bilinear sample (cell-centred, clamped, value clamped to 0..4) and its central-difference gradient, normalised coords
+    vec2 nrm = p / u_canvas;
+    float ex = 1.0 / u_chem.y;
+    float ey = 1.0 / u_chem.z;
+    float gx = (scentSample(vec2(nrm.x + ex, nrm.y)) - scentSample(vec2(nrm.x - ex, nrm.y))) / (2.0 * ex);
+    float gy = (scentSample(vec2(nrm.x, nrm.y + ey)) - scentSample(vec2(nrm.x, nrm.y - ey))) / (2.0 * ey);
+    f += vec2(gx, gy) * u_chem.x / m;
   }
 
   if (u_attract.w > 0.5) {
@@ -158,7 +192,7 @@ export function swarmTextureLayout(n, width = 128) {
  * The GPU swarm core on an existing WebGL2 context (EXT_color_buffer_float required — the renderer already demands it).
  *   seed({ x, y, vx, vy, mass, seedOffset })   upload n particles (Float32Array / number arrays)
  *   step(params)                   one substep; params: { dtFrames, sepR, aliR, cohR, sepW, aliW, cohW, damping, maxSpeed,
- *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt, curl?, mul?} | null, bounds: 'wrap'|'bounce', canvasW, canvasH }
+ *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt, curl?, mul?} | null, chemotaxis (gain; needs setScent), bounds: 'wrap'|'bounce', canvasW, canvasH }
  *   read()                         { x, y, vx, vy } as Float32Arrays (synchronous: tests / measurement)
  */
 export function createGpuSwarm(gl, n) {
@@ -189,6 +223,8 @@ export function createGpuSwarm(gl, n) {
   };
   const tex = [mkTex(null), mkTex(null)];
   const massTex = mkTex(new Float32Array(w * h * 4).fill(1));
+  let scentTex = null;
+  let scentDim = [1, 1];
   const permTex = new Map(); // noise seed -> R8UI 512x1 (the exact bytes permTableFor gives, as fieldRunner uploads them)
   const permFor = (seed) => {
     const key = seed >>> 0;
@@ -236,6 +272,21 @@ export function createGpuSwarm(gl, n) {
       upload(tex[cur], st);
       upload(massTex, ms);
     },
+    /** Upload the scent field's cells (Float32Array cols*rows, row-major) for the chemotaxis term. */
+    setScent(cells, cols, rows) {
+      if (!scentTex) {
+        scentTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, scentTex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      }
+      gl.bindTexture(gl.TEXTURE_2D, scentTex);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, cols, rows, 0, gl.RED, gl.FLOAT, cells);
+      scentDim = [cols, rows];
+    },
     step(p) {
       const dt = Number.isFinite(p.dtFrames) ? p.dtFrames : 1;
       const a = p.attractor && Number.isFinite(p.attractor.x) && Number.isFinite(p.attractor.y) ? p.attractor : null;
@@ -263,6 +314,13 @@ export function createGpuSwarm(gl, n) {
       gl.uniform4f(U('u_wind'), wd ? wd.freq : 0, wd ? wd.offX || 0 : 0, wd ? wd.offY || 0 : 0, wd ? wd.nt : 0);
       gl.uniform1f(U('u_windOn'), wd ? (wd.curl ? 2 : 1) : 0);
       gl.uniform1f(U('u_windMul'), wd && Number.isFinite(wd.mul) ? wd.mul : 1);
+      const chem = scentTex && Number.isFinite(p.chemotaxis) ? p.chemotaxis : 0;
+      gl.uniform3f(U('u_chem'), chem, scentDim[0], scentDim[1]);
+      gl.uniform1i(U('u_scent'), 3);
+      if (scentTex) {
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, scentTex);
+      }
       gl.uniform1i(U('u_perm'), 2);
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, permFor(wd ? wd.seed : 444));
@@ -299,6 +357,7 @@ export function createGpuSwarm(gl, n) {
     dispose() {
       gl.deleteProgram(prog);
       for (const t of [...tex, massTex, ...permTex.values()]) gl.deleteTexture(t);
+      if (scentTex) gl.deleteTexture(scentTex);
       for (const f of fbo) gl.deleteFramebuffer(f);
     },
   };
