@@ -458,4 +458,41 @@ const N = 60;
   for (const r of [a, b, js, m]) r.dispose();
 }
 
+// 11. K2 slice 2b — a take recorded with the GPU culture stamps gpu.life.v1 (and gpu.gs.v1 beside a GPU fluid), round-trips JSON,
+// and verifies on any device
+{
+  const NN = 96 * 54;
+  const gridAt = (f) => {
+    const g = new Uint8Array(NN);
+    for (let i = 0; i < NN; i++) g[i] = (i * 13 + f * 5) % 7 < 2 ? 1 + ((i + f) % 3) : 0;
+    return g;
+  };
+  const record = (withCulture, withFluid) => {
+    const rec = createPerformanceRecorder();
+    const r = createLiveResolver();
+    for (let f = 0; f < 60; f++) {
+      const inp = {
+        ...inputAt(f, withFluid ? { from: 0, couple: 0.8 } : null),
+        ...(withCulture ? { dishCultureCells: packCultureCells(gridAt(f), f) } : {}),
+      };
+      rec.onInput(inp);
+      rec.onOutput(r.resolveLayers(inp));
+    }
+    r.dispose();
+    return rec.finish();
+  };
+  const gpu = record(true, false);
+  assert.equal(gpu.simBackends.culture, 'gpu.life.v1');
+  assert.equal(gpu.simBackends.fluid, 'js.gs.v1');
+  assert.equal(gpu.simLaw, 'decisions-exact');
+  const back = JSON.parse(JSON.stringify(gpu));
+  assert.equal(checkPerformance(back).simBackends.culture, 'gpu.life.v1');
+  const v = verifyPerformance(back);
+  assert.equal(v.ok, true, 'the recorded grid replays the take with no GPU');
+  assert.deepEqual(v.simUnrunnable, []);
+  const js = record(false, false);
+  assert.equal(js.simBackends.culture, 'js.life.v1', 'no GPU grid = the all-JS stamp, as before');
+  assert.equal(js.simLaw, 'js-exact');
+}
+
 console.log('liveResolve.dishFluid.selfcheck: ok');

@@ -229,6 +229,7 @@ export function createPerformanceRecorder({
   const chain = createHashChain(initialState ? initialState.chainSeed : null);
   let truncated = false;
   let pending = false; // an input was recorded and its output has not arrived yet
+  let gpuCulture = false; // K2 slice 2b — some frame's culture grid came from the GPU (input.dishCultureCells)
   let gpuFluid = false; // K1 slice 4c — some frame's fluid field came from the GPU (input.dishFluidCells)
   return {
     get frames() {
@@ -248,6 +249,7 @@ export function createPerformanceRecorder({
         return;
       }
       if (input && input.dishFluidCells) gpuFluid = true;
+      if (input && input.dishCultureCells) gpuCulture = true;
       log.record(input);
       pending = true;
     },
@@ -273,7 +275,11 @@ export function createPerformanceRecorder({
         version: PERFORMANCE_VERSION,
         kernelVersion: KERNEL_VERSION,
         // K1 slice 1 (K0 R1): which implementation ran each sim kernel — all-JS unless the GPU fluid fed a frame (4c)
-        ...currentSimStamp(gpuFluid ? { ...DEFAULT_SIM_BACKENDS, fluid: 'gpu.gs.v1' } : DEFAULT_SIM_BACKENDS),
+        ...currentSimStamp({
+          ...DEFAULT_SIM_BACKENDS,
+          ...(gpuFluid ? { fluid: 'gpu.gs.v1' } : {}),
+          ...(gpuCulture ? { culture: 'gpu.life.v1' } : {}),
+        }),
         frames,
         truncated,
         machineKeys: [...MACHINE_KEYS],

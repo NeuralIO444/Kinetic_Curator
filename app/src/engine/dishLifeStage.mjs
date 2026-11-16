@@ -348,7 +348,15 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
         blocked[i] = (c.mask && !c.mask[i]) || (c.bedrock && c.bedrock[i]) ? 1 : 0;
       const cells = Uint8Array.from(st.seed0);
       for (let i = 0; i < cells.length; i++) if (blocked[i]) cells[i] = 0; // a blocked cell is dead, as createCulture makes it
-      return { key: `${st.wakeMs}|${st.seedEpoch | 0}|${st.W}x${st.H}`, cells, blocked, rule: c.rule, cols, rows };
+      return {
+        key: `${st.wakeMs}|${st.seedEpoch | 0}|${st.W}x${st.H}`,
+        cells,
+        blocked,
+        rule: c.rule,
+        cols,
+        rows,
+        biasSeed: biasSeed(),
+      };
     },
     /**
      * #1997 — hand the culture its ferrofluid birth bias for the coming apply: the fluid
