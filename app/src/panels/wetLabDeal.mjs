@@ -4,6 +4,7 @@
 // turns the lab's data into the adapter's `ctx`, and the three small facts the strip needs besides: a tile's drawing,
 // the press counter's legal range, and which banked creatures are "unkept" (ruling Q4). Pure: no clock, no Math.random.
 import { press as kineticPress, nextScope, sanitizeScope } from '../deal/kineticEngine.mjs';
+import { funnel } from '../deal/curatorEngine.mjs';
 import { creatureAdapter, CREATURE_SCOPES, CREATURE_DEFAULT_SCOPE } from '../deal/creatureAdapter.mjs';
 import { dealableRecords } from '../state/rollPool.mjs';
 import { creatureTileId } from '../engine/creatureTileId.js';
@@ -54,4 +55,37 @@ export function unkeptIds(dealtIds, bank, enabledAssets) {
 export function bodySvgOf(record, library) {
   const a = (library || []).find((x) => x && record && x.id === record.body);
   return a && typeof a.svg === 'string' ? a.svg : null;
+}
+
+/**
+ * CUR's closeness steps (ruling, 2026-11-16): the most of a creature's genes a neighbour may change. NEAR is the
+ * funnel's own default (NEAR_CAP_DEFAULT). A pill steps them: TIGHT → NEAR → LOOSE → TIGHT.
+ */
+export const CUR_CAPS = Object.freeze([
+  { id: 'tight', label: 'TIGHT', cap: 0.1 },
+  { id: 'near', label: 'NEAR', cap: 0.25 },
+  { id: 'loose', label: 'LOOSE', cap: 0.5 },
+]);
+export const CUR_DEFAULT_CAP = 'near';
+export const sanitizeCurCap = (id) => (CUR_CAPS.some((c) => c.id === id) ? id : CUR_DEFAULT_CAP);
+export const nextCurCap = (id) => {
+  const i = CUR_CAPS.findIndex((c) => c.id === sanitizeCurCap(id));
+  return CUR_CAPS[(i + 1) % CUR_CAPS.length].id;
+};
+
+/**
+ * One CUR press: the funnel's narrow deal around `subject` — a hand of three neighbours within the closeness, ordered
+ * by the trio's read (best first) with the top one marked as the pick. Taste only orders; the artist taps any.
+ * Returns { hand, picked } — `hand` the ordered candidates, `picked` the one CUR would choose (or null).
+ */
+export function curPress({ subject, cap, seed, press, library, assetAttach, bank, lookId = null, voiceId = null }) {
+  if (!subject) return { hand: [], picked: null };
+  const step = CUR_CAPS.find((c) => c.id === sanitizeCurCap(cap));
+  const r = funnel(creatureAdapter, subject, {
+    cap: step.cap,
+    seed: seed >>> 0,
+    press: sanitizePress(press),
+    ctx: { library, assetAttach: assetAttach || {}, bank: bank || [], lookId, voiceId },
+  });
+  return { hand: r.ordered.map((o) => o.candidate), picked: r.picked };
 }

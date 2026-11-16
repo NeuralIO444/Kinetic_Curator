@@ -1,15 +1,23 @@
-// WetLabDealStrip.jsx — #2232 step 3: the WetLab's KIN strip. The auto-generate: press KIN, get a hand of creatures,
+// WetLabDealStrip.jsx — #2232 steps 3 and 4: the WetLab's KIN and CUR strip. The auto-generate: press KIN, get a hand of creatures,
 // tap one to bank it, then modify it with the lab's own tools. Hand-picking (assemble / breed) stays where it was.
 //
 // It runs the KINETIC engine over the creature adapter (deal/); this file is only the surface. The hand is a pure
 // function of (project seed, press number, bank, width), so nothing but the press number is held here — a lab opened
 // again deals the same first hand. A tap banks through the store's one door (bankDealtCreature → bankCreature).
+//
+// CUR (step 4) is the fine step: from the creature on the lab's stage, a hand of three neighbours within a closeness
+// (TIGHT / NEAR / LOOSE), ordered best first with the pick marked. Tapping one banks it beside its source and it takes
+// the stage, so CUR walks on from there. Taste only orders and marks; any neighbour can be tapped.
 import { useMemo, useState } from 'react';
 import { useStore } from '../state/store.js';
 import { ASSETS } from '../data/assets/index.js';
 import { lookName, MAX_CREATURE_RECORDS } from '../engine/creatureAssembler.js';
 import { OVERLAY_CAP } from '../assets/overlay.js';
 import {
+  CUR_CAPS,
+  CUR_DEFAULT_CAP,
+  curPress,
+  nextCurCap,
   CREATURE_SCOPES,
   KIN_DEFAULT_SCOPE,
   dealLibrary,
@@ -21,7 +29,7 @@ import {
 
 const label = (scope) => (CREATURE_SCOPES.find((s) => s.id === scope) || CREATURE_SCOPES[0]).label;
 
-export function WetLabDealStrip({ onTap }) {
+export function WetLabDealStrip({ subject = null, onTap }) {
   const seed = useStore((s) => s.seed);
   const bank = useStore((s) => s.creatureRecords);
   const customAssets = useStore((s) => s.customAssets);
@@ -33,6 +41,10 @@ export function WetLabDealStrip({ onTap }) {
   const [scope, setScope] = useState(KIN_DEFAULT_SCOPE);
   const [pressN, setPressN] = useState(0); // the lab's press counter: the nth press is the nth hand, re-derivable
   const [hand, setHand] = useState(null); // null = not pressed yet
+  const [handKind, setHandKind] = useState('kin'); // which button dealt the hand on show: 'kin' | 'cur'
+  const [picked, setPicked] = useState(null); // CUR's marked pick (a record id) in a CUR hand
+  const [cap, setCap] = useState(CUR_DEFAULT_CAP);
+  const [curN, setCurN] = useState(0); // CUR's own press counter
   const [dealtIds, setDealtIds] = useState([]); // what this strip banked this session (the "unkept" pool)
   const library = useMemo(() => dealLibrary(ASSETS, customAssets), [customAssets]);
   const banked = new Set((bank || []).map((r) => r.id));
@@ -41,7 +53,16 @@ export function WetLabDealStrip({ onTap }) {
   const press = () => {
     const r = kinPress({ scope, seed, press: pressN, library, assetAttach, bank });
     setHand(r.hand);
+    setHandKind('kin');
+    setPicked(null);
     setPressN(pressN + 1);
+  };
+  const narrowPress = () => {
+    const r = curPress({ subject, cap, seed, press: curN, library, assetAttach, bank });
+    setHand(r.hand);
+    setHandKind('cur');
+    setPicked(r.picked ? r.picked.id : null);
+    setCurN(curN + 1);
   };
   const tap = (rec) => {
     bankDealt(rec);
@@ -59,31 +80,63 @@ export function WetLabDealStrip({ onTap }) {
   return (
     <div style={strip} data-testid="kin-strip">
       <span style={ctl}>
-        <button
-          type="button"
-          className="chip-btn act"
-          data-testid="kin-scope"
-          title="How wide the deal reaches: OFF the curated sets · WEAK the whole library · MED also breeds from the bank (three or more) · KOZ adds extra mutation. Tap to step."
-          onClick={() => setScope(nextKinScope(scope))}
-        >
-          {label(scope)}
-        </button>
-        <button
-          type="button"
-          className="chip-btn act"
-          style={kinBtn}
-          data-testid="kin-press"
-          title="Deal a hand of creatures at this width"
-          onClick={press}
-        >
-          KIN
-        </button>
+        <span style={ctlRow}>
+          <button
+            type="button"
+            className="chip-btn act"
+            data-testid="kin-scope"
+            title="How wide the deal reaches: OFF the curated sets · WEAK the whole library · MED also breeds from the bank (three or more) · KOZ adds extra mutation. Tap to step."
+            onClick={() => setScope(nextKinScope(scope))}
+          >
+            {label(scope)}
+          </button>
+          <button
+            type="button"
+            className="chip-btn act"
+            style={kinBtn}
+            data-testid="kin-press"
+            title="Deal a hand of creatures at this width"
+            onClick={press}
+          >
+            KIN
+          </button>
+        </span>
+        <span style={ctlRow}>
+          <button
+            type="button"
+            className="chip-btn act"
+            data-testid="cur-cap"
+            title="How close CUR's neighbours stay to the creature on the stage: TIGHT changes at most 10% of its genes, NEAR 25%, LOOSE 50%. Tap to step."
+            onClick={() => setCap(nextCurCap(cap))}
+          >
+            {(CUR_CAPS.find((c) => c.id === cap) || CUR_CAPS[1]).label}
+          </button>
+          <button
+            type="button"
+            className="chip-btn act"
+            style={kinBtn}
+            data-testid="cur-press"
+            disabled={!subject}
+            title={
+              subject
+                ? 'Deal three close neighbours of the creature on the stage; the one CUR would pick is marked'
+                : 'Bank or select a creature first — CUR narrows from the one on the stage'
+            }
+            onClick={narrowPress}
+          >
+            CUR
+          </button>
+        </span>
       </span>
       <div style={scroll}>
         <div style={row} data-testid="kin-hand">
           {hand === null && <span style={hint}>press KIN — a hand of creatures to pick from</span>}
           {hand !== null && hand.length === 0 && (
-            <span style={hint}>nothing viable came up at this width — press again</span>
+            <span style={hint}>
+              {handKind === 'cur'
+                ? 'no neighbour came up within that closeness — press again, or loosen it'
+                : 'nothing viable came up at this width — press again'}
+            </span>
           )}
           {(hand || []).map((rec) => {
             const svg = bodySvgOf(rec, library);
@@ -95,7 +148,7 @@ export function WetLabDealStrip({ onTap }) {
                 style={{ ...tile, ...(on ? tileOn : null) }}
                 data-testid="kin-tile"
                 aria-pressed={on}
-                title={`${rec.id} · ${lookName(rec.look) || rec.look} · tap to ${on ? 'select' : 'bank'} it`}
+                title={`${rec.id} · ${lookName(rec.look) || rec.look}${rec.id === picked ? ' · CUR’s pick' : ''} · tap to ${on ? 'select' : 'bank'} it`}
                 onClick={() => tap(rec)}
               >
                 {svg ? (
@@ -108,6 +161,11 @@ export function WetLabDealStrip({ onTap }) {
                   />
                 ) : (
                   <span style={{ display: 'block', height: 44, lineHeight: '44px', color: 'var(--dim)' }}>—</span>
+                )}
+                {rec.id === picked && (
+                  <span style={pickMark} data-testid="cur-pick">
+                    pick
+                  </span>
                 )}
                 <span style={tileId}>{on ? 'banked' : rec.id}</span>
               </button>
@@ -148,6 +206,15 @@ const strip = {
   flex: '0 0 auto',
 };
 const ctl = { display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto', alignItems: 'stretch' };
+const ctlRow = { display: 'flex', gap: 4 };
+const pickMark = {
+  position: 'absolute',
+  top: 2,
+  left: 3,
+  fontSize: 8,
+  letterSpacing: '0.08em',
+  color: 'var(--accent)',
+};
 const kinBtn = { fontWeight: 700, letterSpacing: '0.08em' };
 const scroll = { flex: '1 1 auto', minWidth: 0, overflowX: 'auto' };
 const row = {
