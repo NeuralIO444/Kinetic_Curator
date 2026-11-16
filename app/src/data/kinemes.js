@@ -12,14 +12,24 @@
 // Browser-safe, pure.
 
 /** Shader kind ids (QUAD_VS switches on these). 0 is reserved for "none". */
-export const KINEME_KINDS = Object.freeze({ spin: 1, osc: 2, pulse: 3, blink: 4, bob: 5, scatter: 6, orbit: 7 });
+export const KINEME_KINDS = Object.freeze({
+  spin: 1,
+  osc: 2,
+  pulse: 3,
+  blink: 4,
+  bob: 5,
+  scatter: 6,
+  orbit: 7,
+  assemble: 8,
+});
 
 /**
  * The library. `period` in seconds; `amp` per kind: osc = ± degrees,
  * pulse = ± scale fraction, blink = duty (fraction of the period visible),
  * bob = ± scene units along the screen's y, scatter = the peak distance a REGION leaves home, as a fraction of its mark's
  * box side (#2116 break-up; docs/design/kineme-breakup-spec.md), orbit = the radius of the circle, as a fraction of the
- * mark's box side (a negative amp circles the other way). spin ignores amp (one turn/period).
+ * mark's box side (a negative amp circles the other way), assemble = how far a REGION starts from home on a trigger, as a
+ * fraction of its mark's box side (period = the settle time; #2116). spin ignores amp (one turn/period).
  */
 export const KINEMES = Object.freeze(
   [
@@ -44,6 +54,10 @@ export const KINEMES = Object.freeze(
     // The ring leans at the piece's own seed-hash phase, so neighbours circle off in different directions. Works on a region
     // and on a whole mark (it needs no centroid direction).
     { id: 'orbit', kind: 'orbit', period: 4.0, amp: 0.06 },
+    // #2116 — assemble: a TRIGGERED one-shot, not a loop. A new Look, a Book chapter landing or a strong audio hit throws the
+    // pieces out along their own centroid directions; they settle home on a cubic ease-out, in a ripple. Idle (no trigger
+    // fired) it is exactly rest. Region-only, like scatter. `period` is the settle time.
+    { id: 'assemble', kind: 'assemble', period: 1.6, amp: 0.3, regionOnly: true },
   ].map(Object.freeze),
 );
 
@@ -54,6 +68,18 @@ export const KINEMES = Object.freeze(
  */
 export const SCATTER_WINDOW = 0.6;
 export const SCATTER_RIPPLE = 0.4;
+
+/**
+ * #2116 — the assemble one-shot, shared by the shader (QUAD_VS, literal copies), the CPU reference, the trigger fold and the
+ * selfchecks. A settle runs `e = 1 - ease((t - tIn - phase * RIPPLE * per) / per)`, ease(x) = 1 - (1 - clamp(x, 0, 1))^3, so
+ * it is exactly 0 once `t - tIn >= (1 + RIPPLE) * per`. An audio scatter flies out in KICK seconds. A scatter nobody settles
+ * (no downbeat) settles itself after HOLD_PERIODS settle times, so a piece is never stranded.
+ */
+export const ASSEMBLE_RIPPLE = 0.5;
+export const ASSEMBLE_KICK = 0.12;
+export const ASSEMBLE_HOLD_PERIODS = 2;
+/** The one onset strength an audio hit needs to scatter the pieces (audio:onset strength is clamp01((flux - thr) / 0.2 + 0.25)). Tune by ear. */
+export const BREAK_ONSET_STRENGTH = 0.8;
 
 /** #1435 R4 — the kineme id whose region playback subdivides stroke regions. */
 export const BEND_KINEME_ID = 'bend';

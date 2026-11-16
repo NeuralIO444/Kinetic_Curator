@@ -969,7 +969,17 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       return { ...(Number.isFinite(t) ? { kinemeTime: t } : {}), ...regionAnim };
     }
     const t = Number(doc.kinemeTime);
-    return { kinemes: table, kinemeTime: Number.isFinite(t) ? t : 0, ...regionAnim };
+    // #2116 assemble: the trigger stamps ride the contract only while a scene uses an assemble region AND a trigger is live,
+    // so every other scene's contract (and hash) is exactly what it was.
+    const kb = doc.kinemeBreak;
+    const breakKey =
+      Array.isArray(kb) &&
+      Number.isFinite(kb[0]) &&
+      Number.isFinite(kb[1]) &&
+      table.some((k) => k.kind === KINEME_KINDS.assemble)
+        ? { kinemeBreak: [kb[0], kb[1]] }
+        : {};
+    return { kinemes: table, kinemeTime: Number.isFinite(t) ? t : 0, ...breakKey, ...regionAnim };
   })();
 
   const scene = {

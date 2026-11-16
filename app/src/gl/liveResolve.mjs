@@ -874,6 +874,22 @@ export function createLiveResolver() {
       lastDishBirths = recordIn ? dishLife.birthLog() : null;
     }
     {
+      // K1 slice 3c — births as data. A recorded list (input.dishBirthReplay) is applied in place of the bias; a
+      // record request (input.dishBirthRecord) logs them. Both act only on a CHANGE of the input (the setters rebuild
+      // state), and absent = off: the culture's step loop is then the pre-3c loop, number for number.
+      const replayIn = Array.isArray(input.dishBirthReplay) ? input.dishBirthReplay : null;
+      if (replayIn !== birthReplayIn) {
+        dishLife.replayBirths(replayIn);
+        birthReplayIn = replayIn;
+      }
+      const recordIn = input.dishBirthRecord === true && !replayIn;
+      if (recordIn !== birthRecordIn) {
+        dishLife.recordBirths(recordIn);
+        birthRecordIn = recordIn;
+      }
+      lastDishBirths = recordIn ? dishLife.birthLog() : null;
+    }
+    {
       const fStamped = input.dishFluid != null;
       const fDial =
         fStamped && input.dishFluidDial && typeof input.dishFluidDial === 'object' ? input.dishFluidDial : null;
