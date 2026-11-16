@@ -202,6 +202,7 @@ node src/engine/dishFluidRender.selfcheck.mjs
 node src/engine/dishFluidChannel.selfcheck.mjs
 node src/engine/dishFluidPull.selfcheck.mjs
 node src/engine/dishFluidDrift.selfcheck.mjs
+node src/engine/dishFluidDuplicates.selfcheck.mjs
 node src/gl/fieldBody.selfcheck.mjs
 node src/engine/kinemeCulture.selfcheck.mjs
 node src/engine/dishLifeSpike.selfcheck.mjs
@@ -254,6 +255,7 @@ node src/engine/contacts.selfcheck.mjs
 node src/engine/dishDeform.selfcheck.mjs
 node src/engine/dishCoalesce.selfcheck.mjs
 node src/engine/dishContactStamps.selfcheck.mjs
+node src/engine/dishContactStamps.effects.selfcheck.mjs
 node src/engine/dishPigment.selfcheck.mjs
 node src/engine/dishDensity.selfcheck.mjs
 node src/engine/dishMedium.selfcheck.mjs
