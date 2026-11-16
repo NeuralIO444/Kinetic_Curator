@@ -6,7 +6,7 @@
 // wrap at a 120 px pad; organism: bounce off an 8 px margin). State is one RGBA32F texture, one texel per particle
 // (x, y, vx, vy), ping-ponged; mass rides a static texture (the per-agent uniqueness channel, uploaded once).
 //
-// Slice 1b adds the cloud swarm's POINT wind; slice 1c the CURL wind (organisms) and the windMul; slice 1d chemotaxis (reads an uploaded scent grid) (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
+// Slice 1b adds the cloud swarm's POINT wind; slice 1c the CURL wind (organisms) and the windMul; slice 1d chemotaxis (reads an uploaded scent grid); slice 1e Levy flights (the kernel's own integer hash in-shader) (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
 // What is NOT here yet (later K3 slices): the curl wind (organisms), chemotaxis, Lévy, Lorenz, cling, drives, leak, breeding,
 // contacts, the heading and spine integrators. A caller that wants parity with the JS swarm runs it with wind 0 (see the
 // selfcheck, which drives the real ParticleSystem and this kernel from the same state).
@@ -61,9 +61,20 @@ uniform vec4 u_wind;         // noiseFreq, domainOffsetX, domainOffsetY, nt (tim
 uniform float u_windOn;      // 0 = off, 1 = point wind (noise3D -> angle), 2 = curl wind (curl2, organisms)
 uniform sampler2D u_scent;   // R32F cols x rows: the scent field's cells, uploaded by the caller (JS still owns deposit/diffuse/decay)
 uniform vec3 u_chem;         // chemotaxis gain (0 = off), scent cols, scent rows
+uniform vec4 u_levy;         // gain (0 = off), alpha (clamped 0.05..2), sim step, unused
+uniform uint u_levyBase;     // hashBase(seed, CH.dyn): the kernel's own pre-avalanche word
 uniform float u_windMul;     // cloud swarm: 1 (the wind knob is ignored); organism: wind * profile.wind
 uniform int u_bounce;        // 0 = wrap (cloud), 1 = bounce (organism)
 layout(location = 0) out vec4 o_state;
+
+uint hashAvalanche(uint base, uint index) {
+  uint h = base ^ (index * 0x85ebca6bu);
+  h = (h ^ (h >> 16)) * 0x7feb352du;
+  h = (h ^ (h >> 15)) * 0x846ca68bu;
+  h = h ^ (h >> 16);
+  return h == 0u ? 1u : h;
+}
+float hashU01(uint index) { return float(hashAvalanche(u_levyBase, index)) / 4294967296.0; }
 
 float scentAt(int x, int y) {
   int cx = clamp(x, 0, int(u_chem.y) - 1);
@@ -115,6 +126,20 @@ void main() {
       float shape = (kcNoise3D(fx + 200.0, fy + 200.0, u_wind.w) + 1.0) * 0.4;
       f += vec2(cos(ang), sin(ang)) * shape * u_windMul / m;
     }
+  }
+
+  if (u_levy.x != 0.0) {
+    // particles.js #582 Levy: hold one heading + one heavy-tailed magnitude for LEVY_FLIGHT_FRAMES (45), phase-staggered per agent
+    uint iu = uint(i);
+    float phase = hashU01(224717u + iu) * 45.0;
+    uint epoch = uint(floor((u_levy.z + phase) / 45.0));
+    float ul = hashU01(epoch * 7919u + 224737u + iu);
+    float ua = hashU01(epoch * 7919u + 224753u + iu);
+    float a = clamp(u_levy.y, 0.05, 2.0);
+    float L = pow(max(1.0 - ul, 1e-9), -1.0 / a) - 1.0;
+    float stride = min(L, 64.0) * u_levy.x;
+    float ang = ua * 6.283185307179586;
+    f += vec2(cos(ang), sin(ang)) * stride / m;
   }
 
   if (u_chem.x != 0.0) {
@@ -192,7 +217,7 @@ export function swarmTextureLayout(n, width = 128) {
  * The GPU swarm core on an existing WebGL2 context (EXT_color_buffer_float required — the renderer already demands it).
  *   seed({ x, y, vx, vy, mass, seedOffset })   upload n particles (Float32Array / number arrays)
  *   step(params)                   one substep; params: { dtFrames, sepR, aliR, cohR, sepW, aliW, cohW, damping, maxSpeed,
- *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt, curl?, mul?} | null, chemotaxis (gain; needs setScent), bounds: 'wrap'|'bounce', canvasW, canvasH }
+ *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt, curl?, mul?} | null, chemotaxis (gain; needs setScent), levy: {gain, alpha, step, base: hashBase(seed, CH.dyn)}, bounds: 'wrap'|'bounce', canvasW, canvasH }
  *   read()                         { x, y, vx, vy } as Float32Arrays (synchronous: tests / measurement)
  */
 export function createGpuSwarm(gl, n) {
@@ -316,6 +341,9 @@ export function createGpuSwarm(gl, n) {
       gl.uniform1f(U('u_windMul'), wd && Number.isFinite(wd.mul) ? wd.mul : 1);
       const chem = scentTex && Number.isFinite(p.chemotaxis) ? p.chemotaxis : 0;
       gl.uniform3f(U('u_chem'), chem, scentDim[0], scentDim[1]);
+      const lv = p.levy && Number.isFinite(p.levy.gain) && p.levy.gain !== 0 ? p.levy : null;
+      gl.uniform4f(U('u_levy'), lv ? lv.gain : 0, lv ? lv.alpha : 0, lv ? lv.step : 0, 0);
+      gl.uniform1ui(U('u_levyBase'), lv ? lv.base >>> 0 : 0);
       gl.uniform1i(U('u_scent'), 3);
       if (scentTex) {
         gl.activeTexture(gl.TEXTURE3);
