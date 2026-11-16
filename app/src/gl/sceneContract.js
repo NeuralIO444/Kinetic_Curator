@@ -44,10 +44,12 @@ import { sanitizeWorld } from '../data/world.js'; // #2104: the Canon world reco
 import { chapterStyleResponse, applyMaterialLight } from '../data/canon/response.js'; // #2104 Q2: the standing style's material answers the sun
 import { sanitizeFieldBody } from '../engine/dishFluidChannel.mjs'; // #2178: the ferrofluid's GPU field-body descriptor (the door)
 import { sanitizeMagnets, FLUID_GRID_COLS, FLUID_GRID_ROWS } from '../engine/dishFluid.mjs'; // #2178: the pull field's magnet door + dish grid
+import { musicalView, resolvePhrase, phraseEntry, phrasePairEntry, phrasePairFades } from '../data/kinemePhrases.js'; // #2118: kineme phrases
 import {
   KINEME_KINDS,
   KINEME_TABLE_MAX,
   getKineme,
+  getKinemePhrase,
   getAssetKineme,
   kinemePhase,
   sanitizeAssetKineme,
@@ -757,11 +759,11 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       const paletteSeen = new Set();
       for (const inst of instances) {
         const own = getAssetKineme(assetKinemeMap[inst.asset]);
-        if (own) paletteIds.add(own.id);
+        if (own && own.kind !== 'phrase') paletteIds.add(own.id); // #2118: a phrase is not a source a bone can name
         if (paletteSeen.has(inst.asset)) continue;
         paletteSeen.add(inst.asset);
         const assignment = regionAssignmentFor(inst.asset, doc.regionKinemes, overlayById.get(inst.asset));
-        if (assignment) for (const kid of Object.values(assignment)) paletteIds.add(kid);
+        if (assignment) for (const kid of Object.values(assignment)) if (!getKinemePhrase(kid)) paletteIds.add(kid);
       }
       const sourcePalette = [...paletteIds].sort().map((id) => `kineme:${id}`);
       const expanded = expandCreatureInstances(instances, overlayById, {
@@ -805,6 +807,32 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     const map = sanitizeAssetKineme(doc.assetKineme) || {};
     const table = [];
     const slot = new Map();
+    // #2118 — kineme PHRASES. A phrase mark resolves, HERE and every contract, to the kineme its step names (never stored):
+    // a pure function of (phrase, the doc's musical view, the mark's seed phase). The musical view is read only when a
+    // phrase id is present and never rides the scene, so a phrase-less contract is byte-identical. Slots: one per phrase
+    // kineme (shared by every phrase mark on it, key `phrase:<id>`), one per fading pair. Over budget a phrase mark drops
+    // to its phrase's FIRST step (allocated ahead of the active steps and the pairs, so the fallback exists), never a blank.
+    let phraseViewMemo = null;
+    const phraseView = () => (phraseViewMemo ||= musicalView(doc.musical));
+    const phraseT = Number.isFinite(Number(doc.kinemeTime)) ? Number(doc.kinemeTime) : 0;
+    const phraseSlot = (key, make) => {
+      if (slot.has(key)) return slot.get(key);
+      if (table.length >= KINEME_TABLE_MAX) return 0;
+      slot.set(key, table.length + 1);
+      table.push(make());
+      return table.length;
+    };
+    const phraseMemberSlot = (k) => phraseSlot(`phrase:${k.id}`, () => phraseEntry(k, phraseView(), phraseT));
+    /** The slot a resolved phrase position plays in: its fade pair, else its active step; the first step when over budget. */
+    const phrasePlaySlot = (r, firstSlot) => {
+      const active = phraseMemberSlot(r.out);
+      if (!r.in || !phrasePairFades(r.out, r.in)) return active || firstSlot;
+      const pair = phraseSlot(`phrase:${r.out.id}>${r.in.id}`, () =>
+        phrasePairEntry(r.out, r.in, r.w, phraseView(), phraseT),
+      );
+      return pair || firstSlot;
+    };
+    const phraseMarks = [];
     for (const inst of instances) {
       // #1127 — an asset with its own kineme keeps it; every other mark takes the layer's ROTATE spin, if it has one.
       // Each mark spins at its own speed and direction (kinemes.js spinVariant). Phase stays 0, so at motion time 0
@@ -813,6 +841,17 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       const own = getAssetKineme(map[inst.asset]); // #2117: a single kineme or a stack of two
       const k = own || (rev ? spinKineme(rev, spinVariant(inst.seedOffset, inst.key)) : null);
       if (!k) continue;
+      if (k.kind === 'phrase') {
+        // first steps join this pass (interleaved with the singles and stacks); actives and pairs follow it, below
+        const phase01 = kinemePhase(inst.seedOffset, inst.key);
+        phraseMarks.push({
+          inst,
+          phase01,
+          r: resolvePhrase(k, phraseView(), phase01),
+          first: phraseMemberSlot(k.steps[0].kineme),
+        });
+        continue;
+      }
       if (!slot.has(k.id)) {
         if (table.length >= KINEME_TABLE_MAX) continue; // ponytail: 16-slot cap; a bigger library needs a texture table
         slot.set(k.id, table.length + 1);
@@ -828,6 +867,14 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       }
       inst.kineme = slot.get(k.id);
       inst.kinemePhase = own ? kinemePhase(inst.seedOffset, inst.key) : 0;
+    }
+    // #2118: phrase active steps first, then the fade pairs (the spec's allocation order)
+    for (const m of phraseMarks) phraseMemberSlot(m.r.out);
+    for (const m of phraseMarks) {
+      const s = phrasePlaySlot(m.r, m.first);
+      if (!s) continue; // only where a single kineme in its place would also have been skipped by the cap
+      m.inst.kineme = s;
+      m.inst.kinemePhase = m.phase01;
     }
     // #1433 (R2) — per-region kinemes join the SAME table (one animation
     // system: region instances ride instance floats 18/19 like any
@@ -864,6 +911,14 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         for (const [regionId, kid] of Object.entries(assignment)) {
           if (!animated.has(regionId)) {
             entry[regionId] = 0;
+            continue;
+          }
+          // #2118 — a region phrase: its offset and phase are the region's own seed hash; first step before the active one
+          const phrase = getKinemePhrase(kid);
+          if (phrase) {
+            const phase01 = kinemePhase(inst.asset, regionId);
+            const first = phraseMemberSlot(phrase.steps[0].kineme);
+            entry[regionId] = phrasePlaySlot(resolvePhrase(phrase, phraseView(), phase01), first);
             continue;
           }
           const k = getKineme(kid); // sanitizeRegionKinemes proved it exists

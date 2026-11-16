@@ -1,6 +1,7 @@
 # Kineme phrases — motion sequenced on the bar (Motion Core P6, #2118, step 1)
 
-Status: **SPEC ONLY — nothing is built.** This stops for Matt's ruling on the starter phrases and the open items (§12). Epic
+Status: **BUILT (#2118 step 2) — see “As built” at the end for where the build differs from the text below.** The spec
+stopped for Matt's ruling on the starter phrases and the open items (§12). Epic
 #2109; phase 0 (the motion map, `motion-map.md`), phase 2a (#2113, the CPU reference), P4 (#2116, break-up) and P5 (#2117,
 stacking) are merged, so step 2 is unblocked once this is approved. Paths are under `app/src/`. Every claim below was
 re-read on `main` @ `58c7f11e`; none of it was run except the throwaway check in §11 (not committed).
@@ -288,3 +289,39 @@ I did not run the shader, the contract, or the live canvas. Nothing is built.
    (recommended — it is what the pose law says), or let blink members cut at the boundary.
 4. **Stack steps (§2):** excluded in v1; a step names one single kineme. Revisit if compound steps are wanted.
 5. **The `musical` doc field (§8)** touches the one-writer loop literal — one field, owner's eye at build time.
+
+## 13. As built (#2118 step 2)
+
+Matt's word on §12 (2026-11-15): build it, and **wire the loop** (item 5). Items 1–4 were built at the spec's
+recommendations: the three starter phrases, the caps (8 steps, 16 bars a step, 64 bars), blink cross-fades like every
+other kind, no stack steps. Where the build differs from the sections above:
+
+- **The cycle is counted from musical zero, not from each step's first beat (§6).** `c = fract(pos / beatsPerCycle)`,
+  the same for every mark. §6's per-step anchor and §7's "one slot, shared with every other mark on the same step"
+  cannot both hold once marks are staggered (§4): marks on the same kineme in different bar offsets would each need
+  their own slot. The budget won. A step therefore does not always start at cycle 0 — the fade (§5) already carries
+  the entry, and where a step's bars are a multiple of the snapped cycle (`lookout`'s spin at 120 BPM) it still does.
+- **The tempo fold is per kineme, not per mark (§6).** `createPhraseClock()` (`data/kinemePhrases.js`) holds one
+  `(anchorBeat, anchorCycle, beatsPerCycle)` per library kineme and re-anchors when a new BPM rounds to a different beat
+  count. Its output rides the doc as `musical.cyc`; a contract with no `cyc` uses the bare count.
+- **How the shader reads a musical cycle (§5, §6).** `QUAD_VS` evaluates every kind from `u_kinemeTime / period`. A
+  phrase kineme's table entry carries a synthetic period, chosen each contract so that `kinemeTime / period = 1 + c`. The
+  existing shader lines then land on `c` (to ~2.6e-7 of a cycle at any motion time) with no change to them. At motion
+  time 0 — a still, or a kineme clock frozen at rate 0 — every phrase kineme is at cycle 0. A slow `kinemeRate` does
+  not slow a phrase: its tempo is the musical clock's.
+- **The fade weight is a uniform, not pre-scaled amps (§5 GPU note).** Pre-scaling cannot fade a spin (it ignores its
+  amp) or a blink (its amp is a duty). The slot's weight rides `u_kinemeF[16]` (0 = no fade, never enters); the shader
+  scales the outgoing member's rotation, offset and visibility by `1 − w` and the incoming member's by `w`. A **pulse**
+  is the one kind still pre-scaled in its amp, because the shader folds a pulse straight into the quad. Visibility
+  cross-fades additively (`1 + (1 − w)(visA − 1) + w(visB − 1)`), which is the pose law's `dAlpha`.
+- **Scatter and orbit can be a second member**, so a region phrase can fade into either. A **scatter ↔ orbit**
+  boundary cuts instead of fading: the two read the one packed vector (`a_brk`) differently. No starter phrase has one.
+- **Over budget** as §7, with one precision: a fading mark whose pair has no slot plays its phrase's first step, as
+  written; a mark whose active step has no slot does too.
+- **The loop (§8).** `gl/liveLoop.mjs` gained the doc field `musical: phraseClock.at(phraseMusic.advance(loopTimeMs,
+s.beatBpm))` — its own musical clock, the same deterministic fold of (loop time, BEAT) the bus's clock runs, so the
+  loop imports nothing from `composition/`. The phrase clock's state is not yet carried in a take's snapshot; a take
+  that changes tempo mid-phrase re-derives it only if replayed from its start.
+- **Davis's source palette** (#2119) skips phrase ids: a phrase is not a library source a bone can name.
+- **Not built:** a phrase in a UI picker (assign one through the document, or `setAssetKineme` / `setRegionKineme`),
+  a Canon descriptor, default assignments on any asset.

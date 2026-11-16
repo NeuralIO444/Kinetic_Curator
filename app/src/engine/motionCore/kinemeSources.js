@@ -30,9 +30,10 @@
 // declare `kineme` so a later phase converts the right clock.
 //
 // Browser-safe, pure: no clock, no chance (the phase comes from the node).
-import { KINEMES, KINEME_STACKS, KINEME_KINDS, SCATTER_WINDOW, SCATTER_RIPPLE } from '../../data/kinemes.js';
+import { KINEMES, KINEME_STACKS, KINEME_KINDS, SCATTER_WINDOW, SCATTER_RIPPLE, getKinemePhrase, KINEME_PHRASES } from '../../data/kinemes.js';
+import { musicalView, resolvePhrase, phraseCycleAt, phrasePairFades, PHRASE_BEATS_PER_BAR } from '../../data/kinemePhrases.js';
 import { registerCostTier } from '../kernel/costRegistry.mjs';
-import { registerMotionSource, composePose } from './index.js';
+import { registerMotionSource, composePose, POSE_IDENTITY } from './index.js';
 
 const TAU = 6.28318530718; // the shader's literal, kept so the CPU reference matches it to the digit
 const fract = (x) => x - Math.floor(x);
@@ -157,5 +158,64 @@ for (const st of KINEME_STACKS) {
     costTier: 'motionCore/kineme-stack',
     anchorNodes: ANCHOR_NODES,
     evaluate: (node, t) => stackPose(a, b, t, node && Number.isFinite(node.phase01) ? node.phase01 : 0),
+  });
+}
+
+// #2118 — phrases: motion sequenced on the bar (docs/design/kineme-phrases-spec.md). The pose of a phrase mark is its active
+// step's kineme at the cycle position the musical clock gives it (period snapped to whole beats), and over the last beat of
+// a step the outgoing and incoming kinemes cross-faded per accumulator — the law the contract's table entries and QUAD_VS's
+// fade weight reproduce. Resolution is data/kinemePhrases.js; this is its CPU reference.
+registerCostTier('motionCore/kineme-phrase', {
+  tier: 0,
+  notes:
+    '#2118 kineme phrases. Contract-time arithmetic per phrase mark: one walk of at most 8 steps, one hash, two table lookups. ' +
+    'GPU: the existing kineme evaluation (two members during a fade beat). Sheds with the kineme / region ladder; no rung of its own.',
+});
+
+/** A pose scaled toward rest by weight w in [0, 1] — the fade of one member (offsets, rotation and alpha scale; scales ease to 1). */
+export function fadePose(p, w) {
+  const q = { ...POSE_IDENTITY, ...p };
+  return {
+    dx: w * q.dx + 0,
+    dy: w * q.dy + 0,
+    dRot: w * q.dRot + 0,
+    sx: 1 + w * (q.sx - 1),
+    sy: 1 + w * (q.sy - 1),
+    dAlpha: w * q.dAlpha + 0,
+  };
+}
+
+/**
+ * The pose of a phrase (a resolved record, getKinemePhrase) at a musical view ({ pos | bar, beat, phase, bpm, cyc? }) for a
+ * mark's seed phase. `brk` is the packed break-up vector a scatter / orbit step reads.
+ */
+export function phrasePose(phrase, view, phase01 = 0, brk) {
+  const v = musicalView(view);
+  const r = resolvePhrase(phrase, v, phase01);
+  // inside a phrase a kineme's cycle position is the musical clock's: evaluate it at t = c on a period of one
+  const at = (k) => kinemePose({ ...k, period: 1 }, phraseCycleAt(k, v), phase01, brk);
+  if (!r.in || !phrasePairFades(r.out, r.in)) return composePose(at(r.out), POSE_IDENTITY);
+  return composePose(fadePose(at(r.out), 1 - r.w), fadePose(at(r.in), r.w));
+}
+
+/** The source id a phrase registers under. */
+export const phraseSourceId = (id) => `kineme-phrase:${id}`;
+
+for (const p of KINEME_PHRASES) {
+  const phrase = getKinemePhrase(p.id);
+  registerMotionSource({
+    id: phraseSourceId(p.id),
+    family: 'kineme',
+    timeBase: 'bars',
+    costTier: 'motionCore/kineme-phrase',
+    anchorNodes: ANCHOR_NODES, // a phased mark starts at its offset bar by design: its rest is the phase-0 node at bar 0
+    // t is in bars; ctx may carry the tempo (`bpm`, default 120) and the phrase clock's folded cycle positions (`cyc`)
+    evaluate: (node, tBars, ctx) =>
+      phrasePose(
+        phrase,
+        { pos: tBars * PHRASE_BEATS_PER_BAR, bpm: ctx && ctx.bpm, cyc: ctx && ctx.cyc },
+        node && Number.isFinite(node.phase01) ? node.phase01 : 0,
+        node && node.brk,
+      ),
   });
 }
