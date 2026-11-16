@@ -386,6 +386,11 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // through bankCreature; the stage reaches every banked creature through its pool TILE alone, as before
     'deal/creatureAdapter.mjs',
     'deal/creatureAdapter.selfcheck.mjs',
+    // #2232: the lab's KIN strip (panels/WetLabDealStrip.jsx) reads the bank to deal and to breed from it, and
+    // taps bank through the store's one door; its suite is a test. The stage still reaches every banked
+    // creature through its pool TILE alone.
+    'panels/WetLabDealStrip.jsx',
+    'panels/wetLabDeal.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

@@ -473,6 +473,7 @@ export const createGlobalSlice = (set) => ({
   creatureBreedNote: null, // #1852 — what the last BREED did (the same statuses, plus need-three). Session-only.
   creatureBirthNote: null, // #2037 — what the last kept-take banking did: { id: null, status: 'banked', count }. Session-only.
   beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.
+  creatureDealNote: null, // #2232 — what the last KIN tap did: { id, status: banked | already | full | … }. Session-only.
   creatureAssembleNote: null, // #1849 — what the last ASSEMBLE did: { id, status: banked | already | full }. Session-only.
   creatureGeneNote: null, // #1870 — what the last hand edit did: { id, status: mutated | replaced | refused, why? }. Session-only.
   creatureCultivateNote: null, // #1872 — what the last CULTIVATE did: { id, status: viable | stillborn | refused | no-record }. Session-only.
@@ -1126,6 +1127,18 @@ export const createGlobalSlice = (set) => ({
         kept: picks ? picks.kept : undefined,
       });
       return rec ? bankCreature(state, rec) : {};
+    }),
+  /**
+   * #2232 — a creature dealt by the wet lab's KIN strip, banked on tap. The record comes from the deal engines, so it
+   * goes back through the door (sanitizeCreatureRecord) and must read viable; then it banks exactly as an assembled
+   * one does (bankCreature: the pool tile, the cap, the same statuses). A dishonest or stillborn record is 'nobody'.
+   */
+  bankDealtCreature: (record) =>
+    set((state) => {
+      const rec = sanitizeCreatureRecord(record);
+      if (!rec || !rec.cultivated || rec.cultivated.outcome !== 'viable')
+        return { creatureDealNote: { id: null, status: 'nobody' } };
+      return bankCreature(state, rec, 'creatureDealNote');
     }),
   /**
    * #1962 — ASSEMBLE A BEAST: deal the next Strandbeest off the project seed (inside the S2 gate — never a stillbirth)

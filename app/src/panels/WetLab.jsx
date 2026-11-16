@@ -40,6 +40,7 @@ import { sanitizeRig } from '../engine/creatureRig.js'; // #1872 — a beast row
 import { assemblyWarnings, keptFromWarnings, roleSetStrands } from '../components/strandBank.model.mjs'; // #1871
 import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature readout
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
+import { WetLabDealStrip } from './WetLabDealStrip.jsx'; // #2232 — KIN: the auto-generate strip
 
 /** #2150 — a glyph is never a creature body: the caps/digits pack, the solo
  * text stamps and the pixel letter-anatomy emblems (Q4) are not legal bodies
@@ -131,7 +132,10 @@ export function WetLab({ assetId, onClose }) {
   const beastNote = useStore((s) => s.beastAssembleNote);
   const breedCreature = useStore((s) => s.breedCreature); // #1852
   const breedNote = useStore((s) => s.creatureBreedNote);
-  const [mode, setMode] = useState('assemble'); // the rail's mode: which panel the right zone holds
+  const dealNote = useStore((s) => s.creatureDealNote); // #2232 — what the last KIN tap did
+  // the rail's mode: which panel the right zone holds. #2232 — opened with no shape (the empty lab), there is nothing
+  // to assemble from, so it opens on the genome panel and the KIN strip is the way in
+  const [mode, setMode] = useState(assetId ? 'assemble' : 'genome');
   const [tool, setTool] = useState('point'); // the rail's standing tool (point = the tap editor itself)
   const [selectedId, setSelectedId] = useState(''); // the record on the creature stage ('' = the default pick)
   const [cultivateOpen, setCultivateOpen] = useState(false); // #1872 — the stage card swapped for the dry-run
@@ -186,6 +190,10 @@ export function WetLab({ assetId, onClose }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a freshly bred child takes the stage
     if (breedNote && breedNote.status === 'banked') setSelectedId(breedNote.id);
   }, [breedNote]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a creature banked from a KIN tap takes the stage
+    if (dealNote && dealNote.status === 'banked') setSelectedId(dealNote.id);
+  }, [dealNote]);
 
   // the record on the stage: the performer's pick, else this shape's first record, else the bank's first
   const ownRecords = (allRecords || []).filter((r) => asset && r.body === asset.id);
@@ -203,8 +211,8 @@ export function WetLab({ assetId, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the tile is a pure function of the record + body
   }, [assets, selRecord, selBodyAsset && selBodyAsset.id]);
 
-  if (!asset) return null;
-  const points = isOwn ? own : autoAttachPoints(asset.svg);
+  if (!asset && assetId) return null; // a named shape that is not in the pool: nothing to open (the empty lab has no name)
+  const points = asset ? (isOwn ? own : autoAttachPoints(asset.svg)) : [];
 
   const click = (e) => {
     const rect = wrapRef.current.getBoundingClientRect();
@@ -274,10 +282,10 @@ export function WetLab({ assetId, onClose }) {
   // and the warnings the current combination carries. Warnings never block; assembling with them showing
   // records them on the record as kept.
   const roleSets = roleSetStrands(asset, own);
-  const warnings = assemblyWarnings({ asset, points });
+  const warnings = asset ? assemblyWarnings({ asset, points }) : [];
   const kept = keptFromWarnings(warnings);
   const card = (() => {
-    const rec = descById.get(asset.id);
+    const rec = asset ? descById.get(asset.id) : null;
     return rec ? shapeCard(rec) : null;
   })();
   const attachHelp = isOwn
@@ -285,7 +293,7 @@ export function WetLab({ assetId, onClose }) {
     : `These points were worked out from the shape. ${full ? 'All four are placed: tap a point to step it — H, then L, then gone.' : 'Tap the shape to add a point where another part may join. Tap a point to step it: plain, then H (the head), then L (where a limb may grow), then gone.'}`;
 
   const MODES = [
-    ['assemble', 'assemble'],
+    ...(asset ? [['assemble', 'assemble']] : []),
     ['breed', 'breed'],
     ['genome', 'genome'],
     ['lineage', 'lineage'],
@@ -298,7 +306,7 @@ export function WetLab({ assetId, onClose }) {
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={`Wet lab: ${asset.id}`}
+        aria-label={`Wet lab: ${asset ? asset.id : 'new creatures'}`}
         data-testid="wet-lab"
       >
         <header style={head}>
@@ -315,7 +323,9 @@ export function WetLab({ assetId, onClose }) {
             <span className="ttl" style={{ fontSize: 11 }}>
               wet lab
             </span>
-            <span style={{ color: 'var(--dim)', fontSize: 9, letterSpacing: '0.06em' }}>{asset.id}</span>
+            <span style={{ color: 'var(--dim)', fontSize: 9, letterSpacing: '0.06em' }}>
+              {asset ? asset.id : 'new creatures'}
+            </span>
           </span>
           <span style={{ ...headSide, justifyContent: 'flex-end' }}>
             <button type="button" className="chip-btn act" title="Close" onClick={onClose}>
@@ -339,141 +349,149 @@ export function WetLab({ assetId, onClose }) {
                 <span style={railLbl}>{label}</span>
               </button>
             ))}
-            <div style={railDiv} aria-hidden="true" />
-            <button
-              type="button"
-              style={{ ...railBtn, ...(tool === 'point' ? railBtnOn : null) }}
-              aria-pressed={tool === 'point'}
-              data-testid="tool-point"
-              title="Add a plain point at the next spot the shape offers (or tap the shape itself)"
-              onClick={toolPoint}
-            >
-              <RailIcon kind="point" />
-              <span style={railLbl}>point</span>
-            </button>
-            <button
-              type="button"
-              style={{ ...railBtn, ...(tool === 'head' ? railBtnOn : null) }}
-              aria-pressed={tool === 'head'}
-              data-testid="tool-head"
-              title="Step the topmost plain point to H — the head (any other H steps back to plain)"
-              onClick={toolHead}
-            >
-              <RailIcon kind="head" />
-              <span style={railLbl}>head</span>
-            </button>
-            <button
-              type="button"
-              style={{ ...railBtn, ...(tool === 'limb' ? railBtnOn : null) }}
-              aria-pressed={tool === 'limb'}
-              data-testid="tool-limb"
-              title="Step a point to L — where a limb may grow"
-              onClick={toolLimb}
-            >
-              <RailIcon kind="limb" />
-              <span style={railLbl}>limb</span>
-            </button>
-            <button
-              type="button"
-              style={{ ...railBtn, ...(!isOwn ? railBtnOn : null) }}
-              aria-pressed={!isOwn}
-              data-testid="attach-auto"
-              title="Drop your edits and use the points worked out from the shape"
-              onClick={() => autoAssetAttach(asset.id)}
-            >
-              <RailIcon kind="auto" />
-              <span style={railLbl}>auto</span>
-            </button>
-            <button
-              type="button"
-              style={{ ...railBtn, ...(points.length === 0 ? railBtnDim : null) }}
-              data-testid="attach-clear"
-              title="No attach points on this asset"
-              onClick={() => emit(Events.ATTACH_CLEAR, { assetId: asset.id })}
-            >
-              <RailIcon kind="clear" />
-              <span style={railLbl}>clear</span>
-            </button>
+            {asset && (
+              <>
+                <div style={railDiv} aria-hidden="true" />
+                <button
+                  type="button"
+                  style={{ ...railBtn, ...(tool === 'point' ? railBtnOn : null) }}
+                  aria-pressed={tool === 'point'}
+                  data-testid="tool-point"
+                  title="Add a plain point at the next spot the shape offers (or tap the shape itself)"
+                  onClick={toolPoint}
+                >
+                  <RailIcon kind="point" />
+                  <span style={railLbl}>point</span>
+                </button>
+                <button
+                  type="button"
+                  style={{ ...railBtn, ...(tool === 'head' ? railBtnOn : null) }}
+                  aria-pressed={tool === 'head'}
+                  data-testid="tool-head"
+                  title="Step the topmost plain point to H — the head (any other H steps back to plain)"
+                  onClick={toolHead}
+                >
+                  <RailIcon kind="head" />
+                  <span style={railLbl}>head</span>
+                </button>
+                <button
+                  type="button"
+                  style={{ ...railBtn, ...(tool === 'limb' ? railBtnOn : null) }}
+                  aria-pressed={tool === 'limb'}
+                  data-testid="tool-limb"
+                  title="Step a point to L — where a limb may grow"
+                  onClick={toolLimb}
+                >
+                  <RailIcon kind="limb" />
+                  <span style={railLbl}>limb</span>
+                </button>
+                <button
+                  type="button"
+                  style={{ ...railBtn, ...(!isOwn ? railBtnOn : null) }}
+                  aria-pressed={!isOwn}
+                  data-testid="attach-auto"
+                  title="Drop your edits and use the points worked out from the shape"
+                  onClick={() => autoAssetAttach(asset.id)}
+                >
+                  <RailIcon kind="auto" />
+                  <span style={railLbl}>auto</span>
+                </button>
+                <button
+                  type="button"
+                  style={{ ...railBtn, ...(points.length === 0 ? railBtnDim : null) }}
+                  data-testid="attach-clear"
+                  title="No attach points on this asset"
+                  onClick={() => emit(Events.ATTACH_CLEAR, { assetId: asset.id })}
+                >
+                  <RailIcon kind="clear" />
+                  <span style={railLbl}>clear</span>
+                </button>
+              </>
+            )}
           </nav>
           <div style={centerCol}>
-            <div style={cardBox}>
-              <div style={cardHead}>
-                <span style={secTitle} data-testid="attach-source">
-                  <span style={caps}>
-                    attach · {points.length}/{MAX_ATTACH} · {isOwn ? 'yours' : 'auto'}
-                  </span>
-                </span>
-                <span style={{ fontSize: 10, color: 'var(--dim)' }}>
-                  <span style={caps}>h</span> {heads} · <span style={caps}>l</span> {limbCount}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <div
-                  ref={wrapRef}
-                  data-testid="wet-lab-stage"
-                  onClick={click}
-                  title={attachHelp}
-                  style={{
-                    position: 'relative',
-                    width: SHAPE_PX,
-                    aspectRatio: '1 / 1',
-                    maxWidth: '100%',
-                    cursor: 'crosshair',
-                    flex: '0 0 auto',
-                  }}
-                >
-                  <svg
-                    viewBox="0 0 100 100"
-                    width="100%"
-                    height="100%"
-                    style={{ background: '#0a0a0a', border: '1px solid var(--line)', display: 'block' }}
-                    dangerouslySetInnerHTML={{ __html: asset.svg }}
-                  />
-                  <svg
-                    viewBox="0 0 100 100"
-                    width="100%"
-                    height="100%"
-                    aria-hidden="true"
-                    style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-                  >
-                    {points.map((p, i) => (
-                      <g key={i} transform={`translate(${p.x} ${p.y})`} data-testid="attach-point">
-                        <rect
-                          x="-3"
-                          y="-3"
-                          width="6"
-                          height="6"
-                          fill="#000"
-                          stroke="var(--kc-red)"
-                          strokeWidth="0.8"
-                          strokeDasharray={isOwn ? undefined : '1.5 1'}
-                        />
-                        <text y="1.6" textAnchor="middle" fontSize="4.5" fontWeight="700" fill="var(--kc-red)">
-                          {p.role || i + 1}
-                        </text>
-                      </g>
-                    ))}
-                  </svg>
-                </div>
-              </div>
-              {card && (
-                <div style={{ fontSize: 10, color: 'var(--dim)', lineHeight: 1.6 }} data-testid="shape-tags">
-                  {card.tags.map((t) => `${t.facet}: ${t.term}`).join(' · ') || 'no tags'}
-                </div>
-              )}
-            </div>
-            {card && (
-              <div style={fitsRow} data-testid="shape-card" title={card.hint ? card.hint.text : undefined}>
-                {card.roles.map(({ role, fit }) => (
-                  <div key={role} style={fitSeg} data-testid="shape-role">
-                    <span style={{ ...caps, fontSize: 9, color: 'var(--dim)' }}>{role}</span>
-                    <span style={barTrack} aria-hidden="true">
-                      <span style={{ ...barFill, width: `${Math.round(fit * 100)}%` }} />
+            {asset && (
+              <>
+                <div style={cardBox}>
+                  <div style={cardHead}>
+                    <span style={secTitle} data-testid="attach-source">
+                      <span style={caps}>
+                        attach · {points.length}/{MAX_ATTACH} · {isOwn ? 'yours' : 'auto'}
+                      </span>
                     </span>
-                    <span style={{ fontSize: 10 }}>{fit.toFixed(2)}</span>
+                    <span style={{ fontSize: 10, color: 'var(--dim)' }}>
+                      <span style={caps}>h</span> {heads} · <span style={caps}>l</span> {limbCount}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <div
+                      ref={wrapRef}
+                      data-testid="wet-lab-stage"
+                      onClick={click}
+                      title={attachHelp}
+                      style={{
+                        position: 'relative',
+                        width: SHAPE_PX,
+                        aspectRatio: '1 / 1',
+                        maxWidth: '100%',
+                        cursor: 'crosshair',
+                        flex: '0 0 auto',
+                      }}
+                    >
+                      <svg
+                        viewBox="0 0 100 100"
+                        width="100%"
+                        height="100%"
+                        style={{ background: '#0a0a0a', border: '1px solid var(--line)', display: 'block' }}
+                        dangerouslySetInnerHTML={{ __html: asset.svg }}
+                      />
+                      <svg
+                        viewBox="0 0 100 100"
+                        width="100%"
+                        height="100%"
+                        aria-hidden="true"
+                        style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+                      >
+                        {points.map((p, i) => (
+                          <g key={i} transform={`translate(${p.x} ${p.y})`} data-testid="attach-point">
+                            <rect
+                              x="-3"
+                              y="-3"
+                              width="6"
+                              height="6"
+                              fill="#000"
+                              stroke="var(--kc-red)"
+                              strokeWidth="0.8"
+                              strokeDasharray={isOwn ? undefined : '1.5 1'}
+                            />
+                            <text y="1.6" textAnchor="middle" fontSize="4.5" fontWeight="700" fill="var(--kc-red)">
+                              {p.role || i + 1}
+                            </text>
+                          </g>
+                        ))}
+                      </svg>
+                    </div>
+                  </div>
+                  {card && (
+                    <div style={{ fontSize: 10, color: 'var(--dim)', lineHeight: 1.6 }} data-testid="shape-tags">
+                      {card.tags.map((t) => `${t.facet}: ${t.term}`).join(' · ') || 'no tags'}
+                    </div>
+                  )}
+                </div>
+                {card && (
+                  <div style={fitsRow} data-testid="shape-card" title={card.hint ? card.hint.text : undefined}>
+                    {card.roles.map(({ role, fit }) => (
+                      <div key={role} style={fitSeg} data-testid="shape-role">
+                        <span style={{ ...caps, fontSize: 9, color: 'var(--dim)' }}>{role}</span>
+                        <span style={barTrack} aria-hidden="true">
+                          <span style={{ ...barFill, width: `${Math.round(fit * 100)}%` }} />
+                        </span>
+                        <span style={{ fontSize: 10 }}>{fit.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
             <div style={cardBox} data-testid="creature-stage">
               {cultivateOpen && selRecord ? (
@@ -617,7 +635,7 @@ export function WetLab({ assetId, onClose }) {
               })()}
           </div>
           <aside style={rightPanel}>
-            {mode === 'assemble' && (
+            {mode === 'assemble' && asset && (
               <div style={panelCol}>
                 {/* #1871 — the strand bank: the assembler rebuilt around named strands. The body is this shape
                     (strand asset:<id>); its role set is the shape's AUTO set or the artist's own (strands
@@ -939,7 +957,7 @@ export function WetLab({ assetId, onClose }) {
                           }}
                         >
                           <option value="">pick a parent</option>
-                          <option value="@shape">this shape · {asset.id}</option>
+                          {asset && <option value="@shape">this shape · {asset.id}</option>}
                           <optgroup label="a kit supplies the body">
                             {allKits.map((k) => (
                               <option key={k.id} value={`@kit:${k.id}`}>
@@ -1056,7 +1074,7 @@ export function WetLab({ assetId, onClose }) {
                       } else if (sl.kind === 'assembly') {
                         sources.push({
                           kind: 'assembly',
-                          assetId: asset.id,
+                          assetId: asset ? asset.id : '',
                           points,
                           lookId: sl.lookId,
                           voiceId: sl.voiceId,
@@ -1125,6 +1143,12 @@ export function WetLab({ assetId, onClose }) {
               ))}
           </aside>
         </div>
+        <WetLabDealStrip
+          onTap={(id) => {
+            setSelectedId(id);
+            setCultivateOpen(false);
+          }}
+        />
         <footer style={bankRail} data-testid="bank-rail">
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '0 0 auto' }}>
             <span className="ttl" style={{ fontSize: 10 }}>

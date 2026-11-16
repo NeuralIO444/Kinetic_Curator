@@ -286,6 +286,20 @@ export function AssetPoolPanel() {
               ))}
             </div>
           )}
+          {catFilter === 'user' && (
+            <div className="cat-weight" role="group" aria-label="wet lab">
+              <span className="insp-facet-name">wet lab</span>
+              <button
+                type="button"
+                className="chip-btn act"
+                data-testid="open-wetlab-empty"
+                title="Open the wet lab with no shape chosen: press KIN to deal creatures, tap one to bank it, then modify it"
+                onClick={() => openLab('')}
+              >
+                WETLAB · make creatures
+              </button>
+            </div>
+          )}
           <KitBar
             filters={filters}
             canSave={
@@ -562,7 +576,7 @@ export function AssetPoolPanel() {
           }}
         />
       )}
-      {Lab && labId && (
+      {Lab && labId !== null && (
         <Lab
           assetId={labId}
           onClose={() => {
