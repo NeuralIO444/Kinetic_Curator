@@ -694,3 +694,4 @@ node src/gl/creatureRepipe.selfcheck.mjs
 node src/gl/instanceStreams.selfcheck.mjs
 node src/gl/fieldRecon.selfcheck.mjs
 node src/gl/parity/fluidSim.selfcheck.mjs
+node src/gl/simBackends.selfcheck.mjs

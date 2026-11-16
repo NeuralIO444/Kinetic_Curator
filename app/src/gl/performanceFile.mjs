@@ -16,6 +16,7 @@
 import { createLiveResolver, checkResolverSnapshot } from './liveResolve.mjs';
 import { createInputLog, replayInputs, INPUT_LOG_VERSION } from '../engine/kernel/replay/inputLog.js';
 import { KERNEL_VERSION } from '../engine/kernel/version.js';
+import { currentSimStamp, checkSimStamp, unrunnableSimBackends } from '../engine/kernel/simBackends.js';
 import { sanitizeWorld } from '../data/world.js';
 
 export const PERFORMANCE_FORMAT = 'kc-performance';
@@ -264,6 +265,7 @@ export function createPerformanceRecorder({
         format: PERFORMANCE_FORMAT,
         version: PERFORMANCE_VERSION,
         kernelVersion: KERNEL_VERSION,
+        ...currentSimStamp(), // K1 slice 1 (K0 R1): which implementation ran each sim kernel; all-JS today
         frames,
         truncated,
         machineKeys: [...MACHINE_KEYS],
@@ -310,6 +312,12 @@ export function checkPerformance(p) {
     }
   }
   if (typeof p.kernelVersion !== 'string') throw new PerformanceFileError('kernelVersion must be a string');
+  // K1 slice 1 (K0 R1): the sim stamp — absent is lawful (every take before it ran all-JS); a present one must be well formed.
+  try {
+    checkSimStamp(p.simLaw, p.simBackends);
+  } catch (e) {
+    throw new PerformanceFileError(e.message);
+  }
   if (p.initialState != null) checkInitialState(p.initialState);
   if (p.world != null) checkWorld(p.world); // #2104 step 3 — absent is lawful (every take before the stamp, and world-less takes)
   return p;
@@ -319,10 +327,11 @@ export function checkPerformance(p) {
  * Replay a performance through a FRESH resolver and compare every checkpoint.
  * `firstMismatchFrame` is the first CHECKPOINT whose chain differs: the differing frame is at or before it, after
  * the previous checkpoint.
- * @returns {{ ok, frames, checked, firstMismatchFrame, kernelMismatch }}
+ * @returns {{ ok, frames, checked, firstMismatchFrame, kernelMismatch, simLaw, simBackends, simUnrunnable }}
  */
 export function verifyPerformance(perf, { resolverFactory = createLiveResolver } = {}) {
   const p = checkPerformance(perf);
+  const sim = checkSimStamp(p.simLaw, p.simBackends); // checkPerformance already refused a malformed stamp
   const want = new Map(p.checkpoints.map((c) => [c.frame, c.hash]));
   const resolver = resolverFactory();
   // #1367 — a mid-session take: the fresh resolver starts from the snapshot, and the chain from the seed,
@@ -353,6 +362,11 @@ export function verifyPerformance(perf, { resolverFactory = createLiveResolver }
     checked,
     firstMismatchFrame,
     kernelMismatch: p.kernelVersion !== KERNEL_VERSION,
+    // K1 slice 1 (K0 R1/R4): the recorded law and backends, and the kernels whose recorded backend this build cannot
+    // run (reported, never silently re-run on another backend). [] today: every recorded take is all-JS.
+    simLaw: sim.simLaw,
+    simBackends: sim.simBackends,
+    simUnrunnable: unrunnableSimBackends(sim.simBackends),
   };
 }
 

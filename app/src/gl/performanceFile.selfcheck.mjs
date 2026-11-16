@@ -155,7 +155,16 @@ function session(frames, opts = {}) {
   const v = verifyPerformance(back); // replay through a fresh resolver
   assert.deepEqual(
     v,
-    { ok: true, frames: 361, checked: 7, firstMismatchFrame: null, kernelMismatch: false },
+    {
+      ok: true,
+      frames: 361,
+      checked: 7,
+      firstMismatchFrame: null,
+      kernelMismatch: false,
+      simLaw: 'js-exact',
+      simBackends: { fluid: 'js.gs.v1', culture: 'js.life.v1', swarm: 'js.swarm.v1' },
+      simUnrunnable: [],
+    },
     'replay lands on every checkpoint of the live run',
   );
   console.log(
