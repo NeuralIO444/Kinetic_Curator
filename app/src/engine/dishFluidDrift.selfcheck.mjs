@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import { markDriftDelta, applyFluidDrift, DRIFT_MAX_PX, DRIFT_DENSITY_FLOOR } from './dishFluidDrift.mjs';
 import { FLUID_GRID_COLS, FLUID_GRID_ROWS, fluidStamp } from './dishFluid.mjs';
 import { createLiveResolver } from '../gl/liveResolve.mjs';
+import { isFluidDuplicate } from './dishFluidDuplicates.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
 let n = 0;
@@ -210,8 +211,8 @@ ok('resolver: with a magnet the same marks lean toward it, by at most DRIFT_MAX_
   const my = MAG.y * 720;
   for (let f = 0; f < FRAMES; f++) {
     const p = itemsOf(plain[f]);
-    const l = itemsOf(leaned[f]);
-    assert.equal(l.length, p.length, `frame ${f}: no item added or removed`);
+    const l = itemsOf(leaned[f]).filter((it) => !isFluidDuplicate(it)); // the copies are pinned in dishFluidDuplicates.selfcheck
+    assert.equal(l.length, p.length, `frame ${f}: no dealt mark added or removed`);
     for (let k = 0; k < p.length; k++) {
       assert.equal(l[k].assetId, p[k].assetId, 'same asset');
       assert.equal(l[k].alpha, p[k].alpha, 'alpha untouched by the fluid');

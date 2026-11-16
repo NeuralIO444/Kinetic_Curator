@@ -123,6 +123,7 @@ import { createDishLifeStage, isTerrain } from '../engine/dishLifeStage.mjs'; //
 import { isFluidCells, unpackFluidCells } from '../engine/dishFluidCells.mjs'; // K1 slice 4b: the GPU field as a recorded input
 import { createDishFluidStage } from '../engine/dishFluidStage.mjs'; // #1997: the ferrofluid, driven by input.dishFluid (absent = no work)
 import { fieldBodyBudgetFor, fieldBodyScaleBase } from '../engine/dishFluidChannel.mjs'; // #2178: the fluid's attached body is a GPU channel — the resolver publishes its descriptor on the plan, never items
+import { fluidDuplicateItems, isFluidDuplicate } from '../engine/dishFluidDuplicates.mjs'; // one force seam slice 1b — the fluid's density as copies of real marks
 import { coverageField } from '../engine/dishLifeSeed.mjs'; // #1997: the terrain coverage the attachment's bedrock mask is derived from (the culture seed's own field)
 import { FLUID_GRID_COLS, FLUID_GRID_ROWS } from '../engine/dishFluid.mjs'; // #1997: the dish grid the bedrock mask is sampled at
 import {
@@ -1999,6 +2000,23 @@ export function createLiveResolver() {
       }
     }
     dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion, external: externalCulture(input) }); // the tertiary specks hold still under reduced motion
+    // One force seam slice 1b — the ferrofluid's dense look as COPIES OF THE STAGE'S OWN MARKS (Matt, 2026-11-16: one
+    // system, no separate body): where the field is densest near a magnet, up to DUP_CAP copies of the nearest dealt mark
+    // ride the TOP content layer, culture-faded then leaned like any mark. Same gate as the marks' lean (fluidDrift: a
+    // stamped fluid with the recorded seam marker, a live plan, a magnet, PULL up), so a frame without it is untouched.
+    if (fluidDrift) {
+      const content = out.filter((e) => e && !e.isFx && !e.isPattern && Array.isArray(e.items));
+      if (content.length) {
+        const marks = [];
+        for (const e of content)
+          for (const it of e.items) if (it && !isTerrain(it) && !isFluidDuplicate(it)) marks.push(it);
+        const dups = fluidDuplicateItems(dishFluid.plan, marks, { W, H, culture: cultureScale });
+        if (dups.length) {
+          const top = content[content.length - 1];
+          top.items = top.items.concat(dups);
+        }
+      }
+    }
     prune(aliveIds, documentIds);
     // #1412 — publish the frame's contact-density field (engine/
     // dishDensity.mjs): the shared grid's per-cell body counts from
