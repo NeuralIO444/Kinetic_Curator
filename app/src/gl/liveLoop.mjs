@@ -1027,6 +1027,9 @@ export function createLiveLoop(
             dishFluidMagnets: s.dishFluidMagnets || [],
             dishFluidDial,
             ...(dishFluidCells ? { dishFluidCells } : {}),
+            // one force seam (Matt, 2026-11-16): the marker that the fluid moves the stage's own marks. A take recorded
+            // before the seam lacks it and replays exactly as it was recorded (no format break).
+            dishFluidMarks: 1,
           }
         : {}), // #1997 (+ K1 4c: the GPU field, when that backend runs) — stamp + magnets + dials, only while the mode is on
       ...(reviewMorphStamp ? { reviewMorph: reviewMorphStamp } : {}),

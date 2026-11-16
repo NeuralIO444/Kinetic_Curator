@@ -25,6 +25,7 @@ import { assignColor, resolveStrategy, applyLean, ACCENT_OFFSET } from './kernel
 import { hexToRgb255 } from './colorHex.mjs'; // #2018 — the plate ink rule measures distance in the palette's own RGB
 import { fillDishPoints } from './kernel/dish.js';
 import { applyCultureScale, applyCultureLife } from './dishLifeCouple.mjs'; // #1923 Phase 2 — the culture coupling's scale fold
+import { applyFluidDrift } from './dishFluidDrift.mjs'; // one force seam slice 1 — the ferrofluid leans the stage's own marks
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
 import { applyRiftShear } from './riftShear.mjs'; // #1183 rift: marks shear with the tear above them
 import { applyGroundSnap } from './groundSnap.js'; // #1183 palette snap
@@ -334,6 +335,10 @@ export function buildPlacements({
   // field (engine/dishLifeCouple.mjs). null — every caller but the live resolver with the dial
   // up — the pass never runs and the SoA is bit-identical to the pre-Phase-2 pipeline.
   cultureScale = null,
+  // One force seam slice 1 (docs/design/one-force-seam.md) — the ferrofluid's lean on the marks: { density, magnets,
+  // pull, aspectHW, W, H } from the live resolver while a fluid runs. Ephemeral per-frame input, NEVER in
+  // geometrySignature; null — every other caller — never runs the pass.
+  fluidDrift = null,
   // #2008 — the Riso field Look's breath channel. Ephemeral per-frame
   // input — NEVER in geometrySignature (the cultureScale deal): the live
   // resolver owns one breath state per riso layer and hands it in as
@@ -718,6 +723,9 @@ export function buildPlacements({
   // #2152 slice 1 — the LIFE consumer rides the same ctx (cultureScale.life, the LIFE dial already shed-folded) and runs right
   // after: marks over decaying cells fade, over dead cells vanish. Inert unless the LIFE dial is up.
   if (cultureScale && cultureScale.life > 0) applyCultureLife(soa, cultureScale, stillMarks);
+  // One force seam, order 2 — the fluid moves what the culture left: marks in dense field lean toward the nearest magnet.
+  // A position pass, so it is undone below with the others (first undone: applied last).
+  const undoFluidDrift = fluidDrift ? applyFluidDrift(soa, fluidDrift, stillMarks) : null;
 
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
   // (below sorts the array, see the pool guard for why that must stay
@@ -1225,6 +1233,7 @@ export function buildPlacements({
     }
   }
 
+  if (undoFluidDrift) undoFluidDrift(); // one force seam — reverse of application (applied last)
   if (undoSurge) undoSurge(); // #1576 — reverse of application
   if (undoParallaxDrift) undoParallaxDrift(); // #1576 — reverse of application
   if (undoTravel) undoTravel(); // #1574 — reverse of application
