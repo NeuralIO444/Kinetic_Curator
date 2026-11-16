@@ -62,6 +62,8 @@ import { quietStamp, DEFAULT_STRENGTH } from '../engine/dishLifeQuiet.mjs'; // #
 import { fieldStamp, clampCycleGens } from '../engine/dishLifeField.mjs'; // #1923 Phase 2: the field culture's cycle stamp (produced while the coupling dial is up); Phase 4: the re-seed interval's detent clamp
 import { installDishLifeTouch } from './dishLifeTouchDom.mjs';
 import { createKinemeClock } from '../data/kinemes.js';
+import { createPhraseClock } from '../data/kinemePhrases.js'; // #2118: kineme phrases read the musical position
+import { createMusicalClock } from './musicalClock.mjs'; // #2118
 import { gateWeaveOffset } from './gateWeave.mjs';
 import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
 import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // #624: WASH tint adoption state machine
@@ -182,6 +184,10 @@ export function createLiveLoop(
   let live = createLiveRenderer(canvas);
   const resolver = withResolveTap(createLiveResolver); // #1353: same resolver; observable, and restartable for a take
   const kinemeClock = createKinemeClock(); // #781 KINEME RATE (anchored)
+  // #2118 — the musical position a kineme phrase resolves on: the same deterministic fold of (loop time, BEAT) the bus's
+  // musical clock runs (composition/clockLive.js), kept here so the loop imports nothing from composition/.
+  const phraseMusic = createMusicalClock();
+  const phraseClock = createPhraseClock();
   // #278 — VJ MIX: palette crossfade state machine (pure) + the last
   // presented frame's target (the outgoing deck snapshot source).
   const paletteMix = createPaletteMix();
@@ -1095,6 +1101,7 @@ export function createLiveLoop(
           loopTimeMs / 1000,
           applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate),
         ),
+        musical: phraseClock.at(phraseMusic.advance(loopTimeMs, s.beatBpm)), // #2118: read by the contract only when a phrase is assigned
         palette: activePalette,
         // #1433 — the governor state the region shed ladder reads
         // (sceneContract.regionKinemesFrozen / regionCollapseShed /

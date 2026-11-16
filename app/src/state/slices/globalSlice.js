@@ -34,6 +34,7 @@ import {
   sanitizeAssetStill,
   getKineme,
   getAssetKineme,
+  getKinemePhrase,
   DEFAULT_ASSET_KINEME,
 } from '../../data/kinemes.js';
 import { sanitizeRegionKinemesDoc } from '../../data/regionKinemes.js';
@@ -1286,7 +1287,8 @@ export const createGlobalSlice = (set) => ({
       } else if (value === 'still') {
         if (per[regionId] === null) return {};
         per[regionId] = null;
-      } else if (typeof value === 'string' && getKineme(value)) {
+      } else if (typeof value === 'string' && (getKineme(value) || getKinemePhrase(value))) {
+        // #2118: a region may be assigned a phrase id as well as a single kineme
         if (per[regionId] === value) return {};
         per[regionId] = value;
       } else return {};

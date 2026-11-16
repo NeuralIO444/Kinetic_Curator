@@ -96,6 +96,7 @@ uniform float u_ambient;  // light that reaches a mark facing away from the sun
 // Per instance a_inst4.z = slot + 1 (0 = still), a_inst4.w = phase [0,1).
 uniform vec3 u_kineme[16];
 uniform vec3 u_kinemeB[16]; // #2117 stacking: each slot's SECOND member (kind 0 = a single kineme, never enters)
+uniform float u_kinemeF[16]; // #2118 phrases: a slot's cross-fade weight w (0 = no fade, never enters): the member plays at 1 - w, the second at w
 uniform float u_kinemeTime;
 uniform vec2 u_hands;     // x crooked, y open. 0 is today's quad and today's ink.
 // #1482 P3 — the spectrum the marks listen to. u_spec is a 256x4 R8 texture (rows: smoothed, peak, waveform, flux);
@@ -190,6 +191,15 @@ void main() {
       float lc = cos(ol), ls = sin(ol);
       kOff = (ob * abs(km.z)) * vec2(oc.x * lc - oc.y * ls, oc.x * ls + oc.y * lc);
     }
+    // #2118 phrases: while a step change cross-fades, the outgoing kineme plays at 1 - w (a pulse arrives pre-scaled in its
+    // amp). 0 = no fade: a still, a single kineme and a stack never enter.
+    float kfw = u_kinemeF[int(a_inst4.z + 0.5) - 1];
+    if (kfw > 0.0) {
+      float kfa = 1.0 - kfw;
+      kDeg *= kfa;
+      kOff *= kfa;
+      kVis = 1.0 + kfa * (kVis - 1.0);
+    }
     // #2117 stacking: a stack's second member, same phase, combined commutatively with the first (rotations and offsets add,
     // scale and visibility multiply). Gated on its kind, so a still or single-kineme instance never enters.
     vec3 kb = u_kinemeB[int(a_inst4.z + 0.5) - 1];
@@ -197,11 +207,34 @@ void main() {
       float phB = fract(u_kinemeTime / max(kb.y, 1e-3) + a_inst4.w);
       float wavB = sin(phB * 6.28318530718);
       int kindB = int(kb.x + 0.5);
+      float kDeg0 = kDeg; float kVis0 = kVis; vec2 kOff0 = kOff; // #2118: what the first member left, for the fade below
       if (kindB == 1) kDeg += (kb.z < 0.0 ? -phB : phB) * 360.0;
       else if (kindB == 2) kDeg += kb.z * wavB;
       else if (kindB == 3) c *= 1.0 + kb.z * wavB;
       else if (kindB == 4) kVis *= phB < kb.z ? 1.0 : 0.0;
       else if (kindB == 5) kOff += vec2(0.0, kb.z * wavB);
+      else if (kindB == 6) {
+        // #2118: scatter as a second member (a region phrase fading into it) — the kind-6 lines, added to the offset
+        float usB = fract(u_kinemeTime / max(kb.y, 1e-3) - a_inst4.w * 0.4);
+        float esB = usB < 0.6 ? 0.5 * (1.0 - cos(6.28318530718 * usB / 0.6)) : 0.0;
+        kOff += a_brk * (kb.z * esB);
+      }
+      else if (kindB == 7) {
+        // #2118: orbit as a second member — the kind-7 lines, added to the offset
+        float obB = a_brk.x > 0.0 ? a_brk.x : 100.0 * max(abs(a_inst0.z), abs(a_inst0.w));
+        float otB = 6.28318530718 * fract(u_kinemeTime / max(kb.y, 1e-3));
+        float ohB = sin(0.5 * otB);
+        vec2 ocB = vec2(-2.0 * ohB * ohB, (kb.z < 0.0 ? -1.0 : 1.0) * sin(otB));
+        float olB = 6.28318530718 * a_inst4.w;
+        float lcB = cos(olB), lsB = sin(olB);
+        kOff += (obB * abs(kb.z)) * vec2(ocB.x * lcB - ocB.y * lsB, ocB.x * lsB + ocB.y * lcB);
+      }
+      // #2118: the incoming kineme of a fade plays at w — its share of the rotation, the offset and the visibility
+      if (kfw > 0.0) {
+        kDeg = kDeg0 + kfw * (kDeg - kDeg0);
+        kOff = kOff0 + kfw * (kOff - kOff0);
+        if (kindB == 4) kVis = kVis0 + kfw * ((phB < kb.z ? 1.0 : 0.0) - 1.0);
+      }
     }
   }
   // #1482 P3 — spectrum marks. Which frequency a mark listens to (0..1 along the log axis, low to high):

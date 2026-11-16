@@ -24,7 +24,7 @@
  */
 
 import { ASSETS } from './assets/index.js';
-import { getKineme, kinemePhase } from './kinemes.js';
+import { getKineme, getKinemePhrase, kinemePhase } from './kinemes.js';
 
 /** Bake tags at most this many regions per asset (Matt's ruling on #1433, 2026-10-14). */
 export const REGION_TAG_CAP = 12;
@@ -57,7 +57,7 @@ export function sanitizeRegionKinemes(raw, records) {
   const out = {};
   for (const [regionId, kid] of Object.entries(raw)) {
     if (typeof regionId !== 'string' || !valid.has(regionId)) continue;
-    if (typeof kid !== 'string' || !getKineme(kid)) continue;
+    if (typeof kid !== 'string' || !(getKineme(kid) || getKinemePhrase(kid))) continue; // #2118: a region may name a phrase
     out[regionId] = kid;
     if (Object.keys(out).length >= REGION_TAG_CAP) break;
   }
@@ -115,7 +115,7 @@ export function sanitizeRegionKinemesDoc(raw) {
     for (const [regionId, v] of Object.entries(per)) {
       if (typeof regionId !== 'string' || !regionId) continue;
       if (v === null) clean[regionId] = null;
-      else if (typeof v === 'string' && getKineme(v)) clean[regionId] = v;
+      else if (typeof v === 'string' && (getKineme(v) || getKinemePhrase(v))) clean[regionId] = v; // #2118: or a phrase id
       if (Object.keys(clean).length >= REGION_TAG_CAP) break;
     }
     if (Object.keys(clean).length) out[assetId] = clean;

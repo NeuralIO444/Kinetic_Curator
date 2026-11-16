@@ -342,6 +342,7 @@ node src/gl/cellKinemePlayback.selfcheck.mjs
 node src/gl/regionPlayback.selfcheck.mjs
 node src/gl/kinemeScatter.selfcheck.mjs
 node src/gl/kinemeOrbit.selfcheck.mjs
+node src/gl/kinemePhrase.selfcheck.mjs
 node src/gl/regionLines.selfcheck.mjs
 node src/data/regionAssignment.selfcheck.mjs
 node src/gl/rotateSpin.selfcheck.mjs

@@ -100,6 +100,61 @@ export const KINEME_STACKS = Object.freeze(
 );
 const STACK_BY_ID = new Map(KINEME_STACKS.map((s) => [s.id, s]));
 
+/**
+ * #2118 — kineme PHRASES: motion sequenced on the bar (docs/design/kineme-phrases-spec.md). A phrase is an ordered list of
+ * steps `{ kineme, bars }` a mark or a region walks, looping; each step names ONE single kineme (no stack, no nesting) and a
+ * whole number of bars of the musical clock. A phrase is a library entry with its own id in the same namespace as the
+ * singles and the stacks, so `assetKineme: { mic_arrow: 'lookout' }` and `regionKinemes: { a: { r3: 'tide' } }` are still
+ * maps of string ids and an old document loads unchanged. Which step is active is never stored: it is a pure function of
+ * (phrase, bar, the mark's seed phase), resolved at contract time (data/kinemePhrases.js). A selfcheck holds the record
+ * rules below, so a bad record cannot ship.
+ */
+export const PHRASE_MAX_STEPS = 8;
+export const PHRASE_MAX_STEP_BARS = 16;
+export const PHRASE_MAX_BARS = 64;
+export const KINEME_PHRASES = Object.freeze(
+  [
+    {
+      id: 'lookout', // a sentry: it flickers, then sweeps
+      steps: [
+        { kineme: 'blink', bars: 2 },
+        { kineme: 'spin', bars: 2 },
+      ],
+    },
+    {
+      id: 'tide', // it floats for a while, then starts to sway
+      steps: [
+        { kineme: 'bob', bars: 4 },
+        { kineme: 'rock', bars: 4 },
+      ],
+    },
+    {
+      id: 'signal', // an indicator: breathes, flickers, turns
+      steps: [
+        { kineme: 'pulse', bars: 2 },
+        { kineme: 'blink', bars: 2 },
+        { kineme: 'spin', bars: 4 },
+      ],
+    },
+  ].map((p) => Object.freeze({ id: p.id, steps: Object.freeze(p.steps.map(Object.freeze)) })),
+);
+// A phrase resolved once to its members' records: { id, kind: 'phrase', steps: [{ kineme: record, bars }], totalBars }.
+const PHRASE_BY_ID = new Map(
+  KINEME_PHRASES.map((p) => [
+    p.id,
+    Object.freeze({
+      id: p.id,
+      kind: 'phrase',
+      steps: Object.freeze(p.steps.map((s) => Object.freeze({ kineme: BY_ID.get(s.kineme), bars: s.bars }))),
+      totalBars: p.steps.reduce((n, s) => n + s.bars, 0),
+    }),
+  ]),
+);
+/** The resolved phrase for an id (`{ id, kind: 'phrase', steps: [{ kineme: record, bars }], totalBars }`), or undefined. */
+export function getKinemePhrase(id) {
+  return PHRASE_BY_ID.get(id);
+}
+
 /** The kineme for an id, or undefined. */
 export function getKineme(id) {
   return BY_ID.get(id);
@@ -107,14 +162,15 @@ export function getKineme(id) {
 
 /**
  * #2117 — what an ASSET (a whole mark) may carry: a single kineme record, or a stack resolved to
- * `{ id, kind: 'stack', stack: [recordA, recordB] }`. `getKineme` stays single-only so the region paths, which refuse stacks
- * in v1, are untouched.
+ * `{ id, kind: 'stack', stack: [recordA, recordB] }`, or (#2118) a phrase resolved to `{ id, kind: 'phrase', steps, totalBars }`.
+ * `getKineme` stays single-only so the region paths, which refuse stacks in v1, are untouched.
  */
 export function getAssetKineme(id) {
   const one = BY_ID.get(id);
   if (one) return one;
   const st = STACK_BY_ID.get(id);
-  return st ? { id: st.id, kind: 'stack', stack: [BY_ID.get(st.stack[0]), BY_ID.get(st.stack[1])] } : undefined;
+  if (st) return { id: st.id, kind: 'stack', stack: [BY_ID.get(st.stack[0]), BY_ID.get(st.stack[1])] };
+  return PHRASE_BY_ID.get(id); // #2118: single -> stack -> phrase
 }
 
 /**
@@ -145,7 +201,10 @@ export function sanitizeAssetKineme(raw) {
       typeof assetId === 'string' &&
       assetId &&
       typeof kid === 'string' &&
-      ((BY_ID.has(kid) && !BY_ID.get(kid).regionOnly) || STACK_BY_ID.has(kid)) // #2117: a stack id is an asset kineme too
+      ((BY_ID.has(kid) && !BY_ID.get(kid).regionOnly) ||
+        STACK_BY_ID.has(kid) || // #2117: a stack id is an asset kineme too
+        // #2118: so is a phrase id — unless a step is region-only (a whole mark cannot play scatter, so not a phrase with one)
+        (PHRASE_BY_ID.has(kid) && !PHRASE_BY_ID.get(kid).steps.some((s) => s.kineme.regionOnly)))
     )
       out[assetId] = kid;
   }

@@ -167,7 +167,8 @@ ok('nothing in the app imports the adapter (renderer untouched); the module is p
   );
   const text = readFileSync(new URL('./kinemeSources.js', import.meta.url), 'utf8');
   const imports = [...text.matchAll(/^\s*import\s[^;]*?from\s+['"]([^'"]+)['"]/gm)].map((m) => m[1]);
-  assert.deepEqual(imports, ['../../data/kinemes.js', '../kernel/costRegistry.mjs', './index.js']);
+  // #2118: the phrase resolver (pure data, like the library) joins the imports
+  assert.deepEqual(imports, ['../../data/kinemes.js', '../../data/kinemePhrases.js', '../kernel/costRegistry.mjs', './index.js']);
   assert.ok(!/Date\.now|performance\.now|Math\.random/.test(text), 'no clock, no chance');
 });
 

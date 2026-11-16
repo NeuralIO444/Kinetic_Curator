@@ -322,6 +322,7 @@ export const RENDERER_PROGRAMS = [
       'u_pool',
       'u_kineme',
       'u_kinemeB',
+      'u_kinemeF',
       'u_kinemeTime',
       'u_hands',
       'u_spec',
@@ -734,6 +735,9 @@ function regionIndexFor(cells) {
   return idx;
 }
 
+/** #2118 — does a kineme table entry play this kind, as its member or (a stack, a fading phrase pair) its second? */
+const entryHasKind = (e, kind) => !!e && (e.kind === kind || (!!e.b && e.b.kind === kind));
+
 /**
  * #2116 — the break-up vector for a region whose pivot sits (lx, ly) from the mark's centre (mark-local, already scaled):
  * the unit direction rotated by the mark's rotation (co, si = its cos / sin) times the mark's box side, in scene units.
@@ -856,19 +860,15 @@ function expandRegionInstances(instances, cells, regionAnim, kinemeTable = null,
       // #2116 — a SELECTED scatter region carries its break-up vector: the mark-centre -> region-pivot direction in scene
       // units (the mark's own rotation applied, y-down) x the mark's box side. Only scatter slots get one, so every other
       // instance packs exactly the zeros it packed before.
-      if (slot > 0 && kinemeTable && kinemeTable[slot - 1] && kinemeTable[slot - 1].kind === KINEME_KINDS.scatter) {
+      // (#2118: a fading phrase pair may carry the scatter as its second member)
+      if (slot > 0 && entryHasKind(kinemeTable && kinemeTable[slot - 1], KINEME_KINDS.scatter)) {
         placed.brk = breakVector(lx, ly, co, si, it, kinemePhase(it.asset, r.id));
       }
       // #2116 — orbit sizes its circle by the MARK's box, which a region instance (it carries the region's own scale) cannot
       // know: an orbit piece carries the box side in the vector's x. That covers a selected orbit region and a region that
       // inherits a whole-mark orbit, so the mark still circles as one body. The remainder keeps the mark's scale: it needs none.
       const effSlot = placed.kineme;
-      if (
-        effSlot > 0 &&
-        kinemeTable &&
-        kinemeTable[effSlot - 1] &&
-        kinemeTable[effSlot - 1].kind === KINEME_KINDS.orbit
-      ) {
+      if (effSlot > 0 && entryHasKind(kinemeTable && kinemeTable[effSlot - 1], KINEME_KINDS.orbit)) {
         placed.brk = [100 * Math.max(Math.abs(it.scaleX), Math.abs(it.scaleY)), 0];
       }
       out.push(placed);
@@ -1356,6 +1356,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let regionAnim = null; // #1433: contract.regionAnim — region playback state (null = pre-R2 path)
   const kinemeBuf = new Float32Array(16 * 3);
   const kinemeBufB = new Float32Array(16 * 3); // #2117: each slot's second member (a stack); zeros otherwise
+  const kinemeBufF = new Float32Array(16); // #2118: each slot's phrase cross-fade weight; zeros otherwise
+  let kinemeFWritten = false; // true while the GPU's u_kinemeF holds a fade, so a fade-free scene re-zeroes it once
   let kinemeBWritten = false; // true while the GPU's u_kinemeB holds a stack, so a stack-free scene re-zeroes it once
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
   let distortHeat = 1; // #2010 P3: the distortion channel's heat (1 = full; the tier-2 shed lowers it, never to 0)
@@ -1678,6 +1680,17 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         });
       gl.uniform3fv(U(quadProg, 'u_kinemeB'), kinemeBufB);
       kinemeBWritten = hasStack;
+    }
+    // #2118: the fade weights upload only while a phrase pair is fading (and once more to clear them).
+    const hasFade = !!kinemeTable && kinemeTable.some((k) => k.f > 0);
+    if (hasFade || kinemeFWritten) {
+      kinemeBufF.fill(0);
+      if (hasFade)
+        kinemeTable.slice(0, 16).forEach((k, i) => {
+          if (k.f > 0) kinemeBufF[i] = k.f;
+        });
+      gl.uniform1fv(U(quadProg, 'u_kinemeF'), kinemeBufF);
+      kinemeFWritten = hasFade;
     }
     gl.uniform1f(U(quadProg, 'u_kinemeTime'), kinemeTime);
     gl.uniform2f(U(quadProg, 'u_hands'), hands.crooked || 0, hands.open || 0);
