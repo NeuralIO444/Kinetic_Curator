@@ -33,6 +33,7 @@ import {
 } from '../curator/shelfDisk.mjs';
 import { DEFAULT_SHELF_PREFS } from '../curator/shelfPrefs.mjs';
 import { markTaken, addRows } from './lootIndex.mjs';
+import { isLookFileRel } from './lootLooks.mjs';
 
 /**
  * Read the folder's keeps into disk records. Mirrors takeInImages'
@@ -58,7 +59,7 @@ export async function takeInLooks({ backend, index, isInApp, isLoaded, assetsByI
     return { index: ix, records, stubs, summary };
   }
   const entries = Object.entries(ix.items || {})
-    .filter(([, it]) => it && it.kind === 'look' && it.state === 'ok')
+    .filter(([, it]) => it && it.kind === 'look' && it.state === 'ok' && !isLookFileRel(it.rel)) // #2148: Look files are lootLooks.mjs's
     .sort((a, b) => (a[1].rel < b[1].rel ? -1 : a[1].rel > b[1].rel ? 1 : 0));
   for (const [id, it] of entries) {
     const keepId = keepIdFromLookRel(it.rel);

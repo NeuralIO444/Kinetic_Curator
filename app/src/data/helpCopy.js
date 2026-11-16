@@ -317,6 +317,12 @@ export const HELP_TOPICS = [
     text: 'How hard the invisible field culture drives the marks: where the culture is alive the marks swell, where it is dead they shrink. 0 is off — the culture may live, but nothing reads it. Double-click to reset to 0%.',
   },
   {
+    id: 'dish-life-assets',
+    group: 'Master',
+    title: 'dish life · life on the marks',
+    text: 'Lets the culture’s life and death play out on the marks themselves: a mark over a fading cell fades, over a dead cell it is gone. Its own dial, apart from coupling. 0 is off — the marks stay as dealt. Double-click to reset to 0%.',
+  },
+  {
     id: 'dish-life-seed',
     group: 'Master',
     title: 'dish life · seed from stage',

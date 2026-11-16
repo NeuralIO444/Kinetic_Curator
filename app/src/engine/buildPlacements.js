@@ -24,7 +24,7 @@ import { applyParallaxDrift } from './parallaxDrift.js'; // #1576 P3 — paralla
 import { assignColor, resolveStrategy, applyLean, ACCENT_OFFSET } from './kernel/color/index.js';
 import { hexToRgb255 } from './colorHex.mjs'; // #2018 — the plate ink rule measures distance in the palette's own RGB
 import { fillDishPoints } from './kernel/dish.js';
-import { applyCultureScale } from './dishLifeCouple.mjs'; // #1923 Phase 2 — the culture coupling's scale fold
+import { applyCultureScale, applyCultureLife } from './dishLifeCouple.mjs'; // #1923 Phase 2 — the culture coupling's scale fold
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
 import { applyRiftShear } from './riftShear.mjs'; // #1183 rift: marks shear with the tear above them
 import { applyGroundSnap } from './groundSnap.js'; // #1183 palette snap
@@ -715,6 +715,9 @@ export function buildPlacements({
   // below from the form, never from this SoA, so the poem is structurally out of the culture's
   // reach; the artist's still pins are skipped inside the applier, as every driver skips them.
   if (cultureScale) applyCultureScale(soa, cultureScale, stillMarks);
+  // #2152 slice 1 — the LIFE consumer rides the same ctx (cultureScale.life, the LIFE dial already shed-folded) and runs right
+  // after: marks over decaying cells fade, over dead cells vanish. Inert unless the LIFE dial is up.
+  if (cultureScale && cultureScale.life > 0) applyCultureLife(soa, cultureScale, stillMarks);
 
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
   // (below sorts the array, see the pool guard for why that must stay
