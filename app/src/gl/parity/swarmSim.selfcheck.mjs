@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import { ParticleSystem } from '../../engine/particles.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../../data/layout-modes.js';
 import { swarmTextureLayout, SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from '../swarmSim.mjs';
+import { hashBase, hashU01, CH } from '../../engine/kernel/rng.js';
+import { levyStep } from '../../engine/organisms/behave.js';
 import { decodeTypedInto } from '../../engine/kernel/stateCodec.mjs';
 import { createScentField } from '../../engine/kernel/field/scent.js';
 import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
@@ -239,6 +241,52 @@ try {
       `max |d| ${worst.toExponential(2)}`,
     );
     check('chemotaxis — is not a no-op', maxDiff(base.vx, withC.vx) + maxDiff(base.vy, withC.vy) > 1e-3);
+  }
+
+  // ---- Levy flights: the kernel's integer hash draws the same flights as particles.js
+  {
+    const count = 200;
+    const lp = lpFor(count);
+    const sys = new ParticleSystem();
+    sys.init(count, W, H, assets, palette, SEED);
+    const st = stateOf(sys);
+    const GAIN = 0.8;
+    const ALPHA = 1.2;
+    const run = (levy, step) =>
+      page.evaluate((r) => window.__kcSwarmRun(r), {
+        n: count,
+        state: st,
+        steps: 1,
+        params: { ...coreParams(lp, null), levy },
+      });
+    let worstRel = 0;
+    let strongest = 0;
+    for (const step of [3, 44, 45, 46, 1000, 123457]) {
+      const base = (await run(null, step)).samples[1];
+      const got = (await run({ gain: GAIN, alpha: ALPHA, step, base: hashBase(SEED, CH.dyn) }, step)).samples[1];
+      for (let i = 0; i < count; i++) {
+        const phase = hashU01(SEED, CH.dyn, 224717 + i) * 45;
+        const epoch = Math.floor((step + phase) / 45);
+        const ul = hashU01(SEED, CH.dyn, epoch * 7919 + 224737 + i);
+        const ua = hashU01(SEED, CH.dyn, epoch * 7919 + 224753 + i);
+        const stride = levyStep(ul, ALPHA) * GAIN;
+        const m = st.mass[i];
+        const ex = ((Math.cos(ua * 2 * Math.PI) * stride) / m) * SWARM_CORE_CLOUD.damping;
+        const ey = ((Math.sin(ua * 2 * Math.PI) * stride) / m) * SWARM_CORE_CLOUD.damping;
+        if (Math.hypot(got.vx[i], got.vy[i]) > 7.9 || Math.hypot(base.vx[i], base.vy[i]) > 7.5) continue; // speed clamp masks it
+        const dx = got.vx[i] - base.vx[i];
+        const dy = got.vy[i] - base.vy[i];
+        const err = Math.hypot(dx - ex, dy - ey);
+        worstRel = Math.max(worstRel, err / Math.max(1, Math.hypot(ex, ey)));
+        strongest = Math.max(strongest, Math.hypot(ex, ey));
+      }
+    }
+    check(
+      'levy — kernel flights match the JS draws (same hash, same epoch)',
+      worstRel < 1e-3,
+      `max rel err ${worstRel.toExponential(2)}, strongest force seen ${strongest.toFixed(2)}`,
+    );
+    check('levy — the walk is exercised (some flights are strong)', strongest > 0.5, `${strongest.toFixed(2)}`);
   }
 
   // ---- properties over a long run (the swarm is chaotic: trajectories are not compared, behaviour is)
