@@ -39,6 +39,13 @@ One ordered list of consumers, each a pure function of (published field state, i
 
 DISH LIFE slices 2 (born marks) and 3 (cycle-roll ease) in `dish-life-on-assets.md` are unchanged and independent.
 
+## What this does NOT overwrite in the open issues
+
+- **#2178** (ferro as a force): channel 2 (bone pull) and the GPU field-body channel shipped in #2190. Channel 1's _fragment_ grain and channel 3's finer grid stay queued and are untouched. This spec retires only the ferrofluid's **own clump consumer** of the body channel (slice 2), and only after mark drift reads as fluid.
+- **#2180 / #2181** (WebGL program): the field-body channel stays as the general capability for other field systems. Only the ferrofluid stops being a consumer that draws its own assets. Matt's earlier Option B read (thousands of small assets) is the thing this ruling replaces for the ferrofluid, so it is flagged here for his eye, not decided silently.
+- **#2186 / #2187** (K1/K2 kernels): unchanged. The seam reads published fields through the display-field path, so it works unchanged when the kernels go GPU-resident.
+- **#2152** (DISH LIFE on the assets): slices 2 and 3 are unchanged; the LIFE consumer is order 1 in this seam.
+
 ## Not in this spec
 
 No new kernel, no fluid surface, no new dials. #2178's fragment body (breaking marks into region pieces) stays queued; this spec only removes the _separate_ body, it does not add tearing.
