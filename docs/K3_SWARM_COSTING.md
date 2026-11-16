@@ -63,4 +63,4 @@ Nothing changes in the product from this document.
 1. Swarm take = **decisions only**; positions presented post-contract.
 2. **All-pairs, measure first**; cap raised only in measured steps (350, then 1,024, then 2,048). Grid only if the measurement demands it.
 3. **`dishContacts` moves to the GPU too** (not left on JS). It is therefore in scope: it needs its own slice after the swarm kernel, and a contacts readback or GPU-side consumer must be designed; the contacts feed the resolver, so this crosses the K0 R3 seam and needs the same stamp-or-post-contract decision K1 had.
-
+   Ruled (Matt, 2026-11-16): the contacts are **stamped as a recorded input** (a small list per frame, as K1), not made post-contract. The resolver stays exact; the look follows the recording device.
