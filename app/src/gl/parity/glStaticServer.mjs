@@ -7,7 +7,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const MIME = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript' };
+const MIME = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript', '.json': 'application/json' };
 
 /** @param {string} glDir absolute path of src/gl @returns {(req, res) => Promise<void>} */
 export function glStaticHandler(glDir) {

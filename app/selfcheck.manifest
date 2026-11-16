@@ -398,6 +398,8 @@ node src/engine/creatureRig.selfcheck.mjs
 node src/engine/creatureRole.selfcheck.mjs
 node src/engine/creatureBreed.selfcheck.mjs
 node src/engine/kineticBirths.selfcheck.mjs
+node src/deal/dealEngines.selfcheck.mjs
+node src/deal/creatureAdapter.selfcheck.mjs
 node src/engine/creatureKin.selfcheck.mjs
 node src/engine/creatureMoods.selfcheck.mjs
 node src/engine/beast.selfcheck.mjs
@@ -704,6 +706,8 @@ node src/gl/parity/fluidSim.selfcheck.mjs
 node src/gl/parity/cultureSim.selfcheck.mjs
 node src/gl/gpuCultureHost.selfcheck.mjs
 node src/gl/parity/swarmSim.selfcheck.mjs
+node src/gl/parity/gpuSwarmHost.selfcheck.mjs
+node src/gl/parity/dishContacts.selfcheck.mjs
 node src/gl/simBackends.selfcheck.mjs
 node src/gl/gpuFluidHost.selfcheck.mjs
 node src/engine/dishFluidCells.selfcheck.mjs

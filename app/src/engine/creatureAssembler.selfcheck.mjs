@@ -381,6 +381,11 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'engine/kineticBirths.mjs',
     'engine/kineticBirths.selfcheck.mjs',
     'state/slices/layoutSlice.js',
+    // #2232: the WetLab's deal adapter (KIN and CUR) — a backstage reader like the births core: it deals,
+    // breeds and reads creature records for the lab's hand and hands them to the host, which banks them
+    // through bankCreature; the stage reaches every banked creature through its pool TILE alone, as before
+    'deal/creatureAdapter.mjs',
+    'deal/creatureAdapter.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

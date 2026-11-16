@@ -6,7 +6,7 @@
 // wrap at a 120 px pad; organism: bounce off an 8 px margin). State is one RGBA32F texture, one texel per particle
 // (x, y, vx, vy), ping-ponged; mass rides a static texture (the per-agent uniqueness channel, uploaded once).
 //
-// Slice 1b adds the cloud swarm's POINT wind; slice 1c the CURL wind (organisms) and the windMul; slice 1d chemotaxis (reads an uploaded scent grid); slice 1e Levy flights (the kernel's own integer hash in-shader) (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
+// Slice 1b adds the cloud swarm's POINT wind; slice 1c the CURL wind (organisms) and the windMul; slice 1d chemotaxis (reads an uploaded scent grid); slice 1e Levy flights (the kernel's own integer hash in-shader); slice 1f Lorenz (per-agent xyz state, a second colour attachment); slice 1g drives + leak (energy/drive and pigment state on two more) (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
 // What is NOT here yet (later K3 slices): the curl wind (organisms), chemotaxis, Lévy, Lorenz, cling, drives, leak, breeding,
 // contacts, the heading and spine integrators. A caller that wants parity with the JS swarm runs it with wind 0 (see the
 // selfcheck, which drives the real ParticleSystem and this kernel from the same state).
@@ -63,9 +63,18 @@ uniform sampler2D u_scent;   // R32F cols x rows: the scent field's cells, uploa
 uniform vec3 u_chem;         // chemotaxis gain (0 = off), scent cols, scent rows
 uniform vec4 u_levy;         // gain (0 = off), alpha (clamped 0.05..2), sim step, unused
 uniform uint u_levyBase;     // hashBase(seed, CH.dyn): the kernel's own pre-avalanche word
+uniform sampler2D u_lorenz;  // (x, y, z) per agent
+uniform vec3 u_lz;           // rho (clamped 1..60; 0 = Lorenz off), dt (LORENZ_DT * dtFrames), steering gain (0 = advance only)
+uniform sampler2D u_drvIn;   // previous (energy, drive)
+uniform sampler2D u_leakIn;  // previous pigment (r, g, b)
+uniform vec4 u_drv;          // metabolism (0 = drives off), sim step, unused, unused
+uniform float u_leakK;       // leak * 0.004 * dtFrames (0 = leak off)
 uniform float u_windMul;     // cloud swarm: 1 (the wind knob is ignored); organism: wind * profile.wind
 uniform int u_bounce;        // 0 = wrap (cloud), 1 = bounce (organism)
 layout(location = 0) out vec4 o_state;
+layout(location = 2) out vec4 o_drv;      // (energy, drive, 0, 0) per agent
+layout(location = 3) out vec4 o_leak;     // pigment working copy (r, g, b, 0) per agent
+layout(location = 1) out vec4 o_lorenz;   // per-agent Lorenz phase state (x, y, z, 0), ping-ponged beside o_state
 
 uint hashAvalanche(uint base, uint index) {
   uint h = base ^ (index * 0x85ebca6bu);
@@ -102,6 +111,12 @@ void main() {
   ivec2 tp = ivec2(gl_FragCoord.xy);
   int i = tp.y * u_w + tp.x;
   vec4 s = texelFetch(u_state, tp, 0);
+  vec4 lz = texelFetch(u_lorenz, tp, 0);
+  o_lorenz = lz;
+  vec4 dr = texelFetch(u_drvIn, tp, 0);
+  vec4 lk = texelFetch(u_leakIn, tp, 0);
+  o_drv = dr;
+  o_leak = lk;
   if (i >= u_n) { o_state = s; return; }
   vec4 mt = texelFetch(u_mass, tp, 0);
   float m = mt.r;
@@ -126,6 +141,17 @@ void main() {
       float shape = (kcNoise3D(fx + 200.0, fy + 200.0, u_wind.w) + 1.0) * 0.4;
       f += vec2(cos(ang), sin(ang)) * shape * u_windMul / m;
     }
+  }
+
+  if (u_lz.x != 0.0) {
+    // behave.js lorenzAdvance: one RK2 (midpoint) step of the agent's own attractor state; the VELOCITY is the steering direction
+    float rho = clamp(u_lz.x, 1.0, 60.0);
+    vec3 k1 = vec3(10.0 * (lz.y - lz.x), lz.x * (rho - lz.z) - lz.y, lz.x * lz.y - (8.0 / 3.0) * lz.z);
+    vec3 h = lz.xyz + k1 * u_lz.y * 0.5;
+    vec3 k2 = vec3(10.0 * (h.y - h.x), h.x * (rho - h.z) - h.y, h.x * h.y - (8.0 / 3.0) * h.z);
+    o_lorenz = vec4(lz.xyz + k2 * u_lz.y, 0.0);
+    float mag = length(k2.xy);
+    if (u_lz.z != 0.0 && mag > 1e-9) f += (k2.xy / mag) * u_lz.z / m;
   }
 
   if (u_levy.x != 0.0) {
@@ -164,6 +190,10 @@ void main() {
   vec2 sep = vec2(0.0); float sepN = 0.0;
   vec2 ali = vec2(0.0); float aliN = 0.0;
   vec2 coh = vec2(0.0); float cohN = 0.0;
+  vec3 leakSum = vec3(0.0);
+  float meta = u_drv.x;
+  float cohW = u_weight.z;
+  if (meta > 0.0) cohW = u_weight.z * (1.0 + (1.0 - dr.x) * 1.6); // hunger seeks density
   float maxR2 = max(u_radius2.x, max(u_radius2.y, u_radius2.z));
   for (int j = 0; j < u_n; j++) {
     if (j == i) continue;
@@ -174,7 +204,10 @@ void main() {
     if (d2 >= maxR2 || d2 <= 0.0) continue;
     if (d2 < u_radius2.x) { sep -= dv / sqrt(d2); sepN += 1.0; }
     if (d2 < u_radius2.y) { ali += o.zw; aliN += 1.0; }
-    if (d2 < u_radius2.z) { coh += o.xy; cohN += 1.0; }
+    if (d2 < u_radius2.z) {
+      coh += o.xy; cohN += 1.0;
+      if (u_leakK > 0.0) leakSum += texelFetch(u_leakIn, jp, 0).rgb;
+    }
   }
   if (sepN > 0.0) {
     float mag = length(sep); if (mag == 0.0) mag = 1.0;
@@ -187,7 +220,24 @@ void main() {
   if (cohN > 0.0 && u_weight.z != 0.0) {
     vec2 steer = coh / cohN - p;
     float mag = length(steer); if (mag == 0.0) mag = 1.0;
-    f += (steer / mag) * u_weight.z / m;
+    f += (steer / mag) * cohW / m;
+  }
+  if (u_leakK > 0.0 && cohN > 0.0) o_leak = vec4(lk.rgb + (leakSum / cohN - lk.rgb) * u_leakK, 0.0);
+  if (meta > 0.0) {
+    // particles.js #287 drives: fatigue / feeding, a curiosity random walk on the drive value, and its noise detour
+    float e = dr.x - 0.0016 * meta * u_dt;
+    if (cohN > 0.0) e += 0.0012 * meta * u_dt;
+    if (u_chem.y > 1.5) e += scentSample(p / u_canvas) * 0.002 * meta * u_dt;
+    e = clamp(e, 0.0, 1.0);
+    float h = hashU01(uint(u_drv.y) * 131071u + 104729u + uint(i));
+    float dd = clamp(dr.y + (h - 0.5) * 0.06 * meta * u_dt, 0.0, 1.0);
+    o_drv = vec4(e, dd, 0.0, 0.0);
+    if (dd > 0.001) {
+      float wob = kcNoise3D(p.x * u_wind.x + 500.0, p.y * u_wind.x + 500.0, u_wind.w + mt.g * 0.0001 + 7.3);
+      float wa = wob * 6.283185307179586;
+      f += vec2(cos(wa), sin(wa)) * (dd * meta * 0.6) / m;
+    }
+    f *= 0.45 + 0.55 * e; // fatigue damps steering authority
   }
 
   v = (v + f * u_dt) * pow(u_damp, u_dt);
@@ -217,7 +267,7 @@ export function swarmTextureLayout(n, width = 128) {
  * The GPU swarm core on an existing WebGL2 context (EXT_color_buffer_float required — the renderer already demands it).
  *   seed({ x, y, vx, vy, mass, seedOffset })   upload n particles (Float32Array / number arrays)
  *   step(params)                   one substep; params: { dtFrames, sepR, aliR, cohR, sepW, aliW, cohW, damping, maxSpeed,
- *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt, curl?, mul?} | null, chemotaxis (gain; needs setScent), levy: {gain, alpha, step, base: hashBase(seed, CH.dyn)}, bounds: 'wrap'|'bounce', canvasW, canvasH }
+ *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt, curl?, mul?} | null, chemotaxis (gain; needs setScent), levy: {gain, alpha, step, base: hashBase(seed, CH.dyn)}, lorenz: {rho, gain} (seed({lorenz:{x,y,z}}); readLorenz()), drives: {meta, step, base: hashBase(seed, CH.dyn)} (needs wind.freq/nt/seed for the detour; seed({energy,drive})), leak (0..1; seed({leakRgb}); readDrives()), bounds: 'wrap'|'bounce', canvasW, canvasH }
  *   read()                         { x, y, vx, vy } as Float32Arrays (synchronous: tests / measurement)
  */
 export function createGpuSwarm(gl, n) {
@@ -247,6 +297,9 @@ export function createGpuSwarm(gl, n) {
     return t;
   };
   const tex = [mkTex(null), mkTex(null)];
+  const lzTex = [mkTex(null), mkTex(null)];
+  const drvTex = [mkTex(null), mkTex(null)];
+  const leakTex = [mkTex(null), mkTex(null)];
   const massTex = mkTex(new Float32Array(w * h * 4).fill(1));
   let scentTex = null;
   let scentDim = [1, 1];
@@ -267,10 +320,14 @@ export function createGpuSwarm(gl, n) {
     }
     return t;
   };
-  const fbo = tex.map((t) => {
+  const fbo = tex.map((t, k) => {
     const f = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, f);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, lzTex[k], 0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2, gl.TEXTURE_2D, drvTex[k], 0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT3, gl.TEXTURE_2D, leakTex[k], 0);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
       throw new Error('[swarmSim] RGBA32F target incomplete');
     return f;
@@ -283,7 +340,7 @@ export function createGpuSwarm(gl, n) {
   };
   return {
     n: count,
-    seed({ x, y, vx, vy, mass, seedOffset }) {
+    seed({ x, y, vx, vy, mass, seedOffset, lorenz, energy, drive, leakRgb }) {
       const st = new Float32Array(w * h * 4);
       const ms = new Float32Array(w * h * 4).fill(1);
       for (let i = 0; i < count; i++) {
@@ -295,6 +352,27 @@ export function createGpuSwarm(gl, n) {
         ms[i * 4 + 1] = seedOffset ? seedOffset[i] : 0;
       }
       upload(tex[cur], st);
+      const lz = new Float32Array(w * h * 4);
+      if (lorenz)
+        for (let i = 0; i < count; i++) {
+          lz[i * 4] = lorenz.x[i];
+          lz[i * 4 + 1] = lorenz.y[i];
+          lz[i * 4 + 2] = lorenz.z[i];
+        }
+      upload(lzTex[cur], lz);
+      const dv = new Float32Array(w * h * 4);
+      const lk = new Float32Array(w * h * 4);
+      for (let i = 0; i < count; i++) {
+        dv[i * 4] = energy ? energy[i] : 1;
+        dv[i * 4 + 1] = drive ? drive[i] : 0;
+        if (leakRgb) {
+          lk[i * 4] = leakRgb[i * 3];
+          lk[i * 4 + 1] = leakRgb[i * 3 + 1];
+          lk[i * 4 + 2] = leakRgb[i * 3 + 2];
+        }
+      }
+      upload(drvTex[cur], dv);
+      upload(leakTex[cur], lk);
       upload(massTex, ms);
     },
     /** Upload the scent field's cells (Float32Array cols*rows, row-major) for the chemotaxis term. */
@@ -343,7 +421,21 @@ export function createGpuSwarm(gl, n) {
       gl.uniform3f(U('u_chem'), chem, scentDim[0], scentDim[1]);
       const lv = p.levy && Number.isFinite(p.levy.gain) && p.levy.gain !== 0 ? p.levy : null;
       gl.uniform4f(U('u_levy'), lv ? lv.gain : 0, lv ? lv.alpha : 0, lv ? lv.step : 0, 0);
-      gl.uniform1ui(U('u_levyBase'), lv ? lv.base >>> 0 : 0);
+      const dp = p.drives && p.drives.meta > 0 ? p.drives : null;
+      gl.uniform1ui(U('u_levyBase'), lv ? lv.base >>> 0 : dp ? dp.base >>> 0 : 0);
+      gl.uniform4f(U('u_drv'), dp ? dp.meta : 0, dp ? dp.step : 0, 0, 0);
+      gl.uniform1f(U('u_leakK'), p.leak > 0 ? p.leak * 0.004 * dt : 0);
+      gl.uniform1i(U('u_drvIn'), 5);
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_2D, drvTex[cur]);
+      gl.uniform1i(U('u_leakIn'), 6);
+      gl.activeTexture(gl.TEXTURE6);
+      gl.bindTexture(gl.TEXTURE_2D, leakTex[cur]);
+      const lzp = p.lorenz && p.lorenz.rho > 0 ? p.lorenz : null;
+      gl.uniform3f(U('u_lz'), lzp ? lzp.rho : 0, lzp ? 0.006 * dt : 0, lzp && lzp.gain ? lzp.gain : 0);
+      gl.uniform1i(U('u_lorenz'), 4);
+      gl.activeTexture(gl.TEXTURE4);
+      gl.bindTexture(gl.TEXTURE_2D, lzTex[cur]);
       gl.uniform1i(U('u_scent'), 3);
       if (scentTex) {
         gl.activeTexture(gl.TEXTURE3);
@@ -362,6 +454,49 @@ export function createGpuSwarm(gl, n) {
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       cur = 1 - cur;
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    },
+    /** The agents' Lorenz phase state after the last step: { x, y, z } Float32Arrays. */
+    readLorenz() {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]);
+      gl.readBuffer(gl.COLOR_ATTACHMENT1);
+      const d = new Float32Array(w * h * 4);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, d);
+      gl.readBuffer(gl.COLOR_ATTACHMENT0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      const out = { x: new Float32Array(count), y: new Float32Array(count), z: new Float32Array(count) };
+      for (let i = 0; i < count; i++) {
+        out.x[i] = d[i * 4];
+        out.y[i] = d[i * 4 + 1];
+        out.z[i] = d[i * 4 + 2];
+      }
+      return out;
+    },
+    /** Drive and pigment state after the last step: { energy, drive, leakRgb (3 per agent) }. */
+    readDrives() {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]);
+      const grab = (att) => {
+        gl.readBuffer(att);
+        const d = new Float32Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, d);
+        return d;
+      };
+      const dv = grab(gl.COLOR_ATTACHMENT2);
+      const lk = grab(gl.COLOR_ATTACHMENT3);
+      gl.readBuffer(gl.COLOR_ATTACHMENT0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      const out = {
+        energy: new Float32Array(count),
+        drive: new Float32Array(count),
+        leakRgb: new Float32Array(count * 3),
+      };
+      for (let i = 0; i < count; i++) {
+        out.energy[i] = dv[i * 4];
+        out.drive[i] = dv[i * 4 + 1];
+        out.leakRgb[i * 3] = lk[i * 4];
+        out.leakRgb[i * 3 + 1] = lk[i * 4 + 1];
+        out.leakRgb[i * 3 + 2] = lk[i * 4 + 2];
+      }
+      return out;
     },
     read() {
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]);
@@ -384,7 +519,7 @@ export function createGpuSwarm(gl, n) {
     },
     dispose() {
       gl.deleteProgram(prog);
-      for (const t of [...tex, massTex, ...permTex.values()]) gl.deleteTexture(t);
+      for (const t of [...tex, ...lzTex, ...drvTex, ...leakTex, massTex, ...permTex.values()]) gl.deleteTexture(t);
       if (scentTex) gl.deleteTexture(scentTex);
       for (const f of fbo) gl.deleteFramebuffer(f);
     },
