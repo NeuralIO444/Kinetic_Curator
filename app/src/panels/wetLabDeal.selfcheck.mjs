@@ -20,6 +20,11 @@ import {
   sanitizePress,
   unkeptIds,
   bodySvgOf,
+  curPress,
+  nextCurCap,
+  sanitizeCurCap,
+  CUR_CAPS,
+  CUR_DEFAULT_CAP,
   KIN_DEFAULT_SCOPE,
   CREATURE_SCOPES,
 } from './wetLabDeal.mjs';
@@ -143,12 +148,64 @@ ok('store: a full pool refuses with a note; clearing an unkept creature takes it
 });
 
 ok(
+  'CUR: closeness steps TIGHT → NEAR → LOOSE; the funnel deals up to three neighbours within it, best first, the pick on top',
+  () => {
+    assert.deepEqual(
+      CUR_CAPS.map((c) => [c.id, c.cap]),
+      [
+        ['tight', 0.1],
+        ['near', 0.25],
+        ['loose', 0.5],
+      ],
+    );
+    assert.equal(CUR_DEFAULT_CAP, 'near');
+    assert.equal(nextCurCap('loose'), 'tight');
+    assert.equal(sanitizeCurCap('nonsense'), 'near');
+    const bank = hand().hand.slice(0, 3);
+    const subject = bank[0];
+    const run = (over = {}) =>
+      curPress({ subject, cap: 'near', seed: SEED, press: 0, library: lib, assetAttach: {}, bank, ...over });
+    const r = run();
+    assert.deepEqual(r, run(), 'pure');
+    assert.ok(r.hand.length > 0 && r.hand.length <= 3, 'a hand of at most three');
+    assert.equal(r.picked.id, r.hand[0].id, 'the pick is the top of the order');
+    for (const c of r.hand) {
+      assert.notEqual(c.id, subject.id, 'never the subject itself');
+      assert.ok(c.cultivated.outcome === 'viable', 'viable only');
+    }
+    assert.notDeepEqual(
+      run({ press: 1 }).hand.map((c) => c.id),
+      r.hand.map((c) => c.id),
+      'a new press is a new hand',
+    );
+    assert.deepEqual(curPress({ subject: null, cap: 'near', seed: SEED, press: 0, library: lib, bank }), {
+      hand: [],
+      picked: null,
+    });
+    const geneCount = subject.genome.length;
+    const differ = (a, b) =>
+      a.genome.filter((g, i) => JSON.stringify(g.value) !== JSON.stringify(b.genome[i].value)).length;
+    for (const c of run({ cap: 'tight' }).hand)
+      assert.ok(differ(subject, c) / geneCount <= 0.1 + 1e-9, 'TIGHT stays within 10%');
+  },
+);
+
+ok(
   'the lab: opens with no shape and mounts the strip; a named missing shape opens nothing; no clock or Math.random',
   () => {
     const src = readFileSync(new URL('./WetLab.jsx', import.meta.url), 'utf8');
     assert.match(src, /if \(!asset && assetId\) return null/, 'only a NAMED shape that is missing opens nothing');
     assert.match(src, /useState\(assetId \? 'assemble' : 'genome'\)/, 'the empty lab opens on the genome panel');
-    assert.match(src, /<WetLabDealStrip/, 'the strip is mounted in the lab');
+    assert.match(
+      src,
+      /<WetLabDealStrip\s+subject=\{selRecord\}/,
+      'the strip is mounted in the lab, narrowing from the stage creature',
+    );
+    assert.match(
+      readFileSync(new URL('./WetLabDealStrip.jsx', import.meta.url), 'utf8'),
+      /data-testid="cur-press"/,
+      'the CUR button is on the strip',
+    );
     const pool = readFileSync(new URL('./AssetPoolPanel.jsx', import.meta.url), 'utf8');
     assert.match(pool, /data-testid="open-wetlab-empty"/);
     assert.match(pool, /labId !== null/, 'an empty-string lab id still opens');
