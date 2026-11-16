@@ -5,8 +5,8 @@ was a read-only review of `main` at `554fa00` (2026-11-11); every claim below ab
 against the current tree (`main` at `0750d9a6`) and carries its file:line from that tree. Where this page and the
 code disagree, the code wins and this page is the bug.
 **Matt's ask (2026-11-11):** "I want the assets to be able to have new design shapes built from the simple shapes."
-**Ruled already:** §6 — one style per construct (Matt, 2026-11-11, on the issue). Everything still open is
-collected in §7, in the order it will be asked; the spec is build-ready when §7 is ruled.
+**Ruled:** §6 — one style per construct (Matt, 2026-11-11, on the issue). The six questions §7 used to carry
+were ruled by Matt on 2026-11-15; §7 is now the rulings record, and this spec is build-ready as written.
 
 ## 1. What a construct is
 
@@ -41,6 +41,12 @@ beast's body and no motion remains. A construct is the opposite pole — all bod
 (`app/src/engine/kernel/rng.js`), the pool-tile overlay pattern (`creatureTile`,
 `app/src/engine/creatureAssembler.js:770`), the atlas bake (`app/src/gl/atlas.mjs`), and the ingest cost score
 (`app/src/assets/ingest.js:277`).
+
+**A construct can be a creature's body** (Matt's ruling, 2026-11-15 — §7). A construct tile is an ordinary pool
+asset, and the creature assembler takes a basic shape as its body input — so a construct enters creature space
+whole: `assembleCreature` reads the construct tile's asset and its ATTACH points exactly as it reads any other
+body asset's (`app/src/engine/creatureAssembler.js:114-124`). Nothing in the construct record changes to allow
+this; it falls out of the tile being a pool asset like any other.
 
 ## 2. How much of the assembler is creature-specific
 
@@ -119,8 +125,9 @@ note is the asset-side reading of the style, the text `STYLE_RULES` sorts assets
 **The families slot.** These vocabularies are what would fill `assets.families` — "the asset families the style
 claims outright (the slot authored material joins by — #1854)" (`styles.js:14-15`). The state of the tree,
 exactly: `families` is `[]` for ten of the eleven styles; the one exception is marks, which claims its own
-chapter family (`styles.js:213`, `families: ['marks']`). Whether the constructs build writes the other lists is
-§7 question 6.
+chapter family (`styles.js:213`, `families: ['marks']`). This build writes the other lists (Matt's ruling,
+2026-11-15 — §7): the vocabularies above land as data in `app/src/data/canon/styles.js` as part of the
+constructs build; filling the families lists is not left to #1854.
 
 ## 4. Determinism
 
@@ -145,29 +152,34 @@ replays the shape exactly.
 
 ## 5. Where it appears
 
-The options, with their consequences. The choice itself is §7 question 1; this section does not make it.
+**Ruled (Matt, 2026-11-15 — §7): a construct lives in the project document, and its tile is derived into the
+pool** — the creature precedent. The record sits behind a door, the way creature records are kept
+(`sanitizeCreatureRecords`, `creatureAssembler.js:711`; saved and loaded at
+`state/projectDocument.js:204-205`, `state/projectDocument.js:337`, `state/projectDocument.js:402`), so the
+composition — which primitives, joined where — survives and can be re-dealt, edited and re-baked. From the
+record, the `creatureTile` pattern derives the pool overlay entry (`creatureAssembler.js:724-732`,
+`creatureAssembler.js:770`): the tile is what renders. Two representations to keep honest — the door must
+refuse a record whose tile cannot be drawn, the assembler's own rule: no tile without a drawable body
+(`creatureAssembler.js:770-772`). The rejected shapes, for the record: pool-only would lose the composition the
+moment the tile was drawn — the tile svg would be the only truth — and document-only is not placeable: a
+record alone renders nothing, so it collapses into this shape the moment the stage is involved.
 
-- **A. Pool only.** The construct exists as a pool tile and nothing else — the overlay-entry shape `creatureTile`
-  returns (`creatureAssembler.js:770-786`). Placement then needs no new machinery at all. But the composition —
-  which primitives, joined where — exists nowhere once the tile is drawn, so a construct could never be
-  re-dealt, edited or re-baked: the tile svg would be the only truth.
-- **B. Project document only.** A record behind a door, the way creature records are kept
-  (`sanitizeCreatureRecords`, `creatureAssembler.js:711`; saved and loaded at
-  `state/projectDocument.js:204-205`, `state/projectDocument.js:337`, `state/projectDocument.js:402`). The
-  composition survives and can be re-dealt. But a document record is not placeable — something must still derive
-  a tile before anything renders, so B alone is incomplete: it collapses into C the moment the stage is involved.
-- **C. Both — record in the document, tile derived into the pool.** This is what creatures actually do: the
-  record lives in the project document and `creatureTile` derives the overlay entry from it
-  (`creatureAssembler.js:724-732`, `creatureAssembler.js:770`). Two representations to keep honest — the door
-  must refuse a record whose tile cannot be drawn, the assembler's own rule: no tile without a drawable body
-  (`creatureAssembler.js:770-772`).
+**How a construct arrives: the system deal** (Matt's ruling, 2026-11-15 — §7). This build ships the deal
+alone: constructs are dealt from the seed, inside the style's §3 grammar, arriving the way creatures do. A
+WetLab hand-composition surface — the artist picking primitives and join points by hand — is a possible
+successor build, taken only if the dealt constructs earn it; it is not part of this build, and no surface for
+it is specified here.
 
-**Cap.** The creature bank caps at `MAX_CREATURE_RECORDS` = 64 records per project, the oldest dropping off
-(`creatureAssembler.js:35`, applied at `creatureAssembler.js:721`). The construct options — share that
-discipline at 64; a smaller cap of their own; or no count cap, with the cost guard below as the only limit — are
-§7 question 5.
+**On stage, a construct is dealt like any other tile** (Matt's ruling, 2026-11-15 — §7): wherever its style is
+in play, a construct may be dealt as part of that style's material — it can appear uninvited, with no artist
+placement required. This is deliberately not the creature-tile rule, under which nothing reaches the stage the
+artist did not choose.
 
-**Cost of the bake** (not an option — the declaration the bake owes under any of A/B/C). A construct's drawing
+**Cap: 64 constructs per project** (Matt's ruling, 2026-11-15 — §7) — the creature bank's discipline:
+`MAX_CREATURE_RECORDS` = 64 records per project, the oldest dropping off (`creatureAssembler.js:35`, applied
+at `creatureAssembler.js:721`). The construct bank takes the same number and the same drop-oldest behaviour.
+
+**Cost of the bake** (not an option — the declaration the bake owes). A construct's drawing
 is measurable before it is baked: `assetCostScore` counts subpaths × (1 + group depth / 8)
 (`assets/ingest.js:277-282`), and the house warning line is `COST_WARNING_THRESHOLD` = 600 (`ingest.js:284`) —
 the same line the Strand Bank holds kept warnings to (`creatureAssembler.js:24`). The bake declares its score
@@ -188,35 +200,26 @@ The mechanical consequence: a construct record carries exactly one style id; its
 outside that style's §3 vocabulary; and the record shape has no second-style field, so the ruling cannot be
 half-kept by data.
 
-## 7. Open questions for Matt
+## 7. Rulings — Matt, 2026-11-15
 
-Asked one at a time, in this order. Nothing else in this spec waits on a ruling: §§1–4 and §6 are buildable as
-written once these are answered.
+Asked one at a time, in this order; all six ruled by Matt on 2026-11-15. Nothing in this spec is left open:
+§§1–6 are buildable as written.
 
-**Q1. Where does a construct live?**
-- A. In the project document, its tile derived into the pool (the creature precedent) — the composition survives and can be re-dealt and edited; it costs a new record door and a cap.
-- B. Only as a pool tile, with no record kept — no new storage at all; the composition is lost once drawn, so a construct can never be edited or re-dealt.
-- C. Session-only, never saved — the cheapest option; every construct vanishes when the session ends.
+**Q1. Where does a construct live? — A: in the project document, its tile derived into the pool.**
+The composition survives and can be re-dealt and edited; it costs a new record door and a cap (§5).
 
-**Q2. Who composes a construct?**
-- A. The system deals it from the seed, inside the style's grammar — constructs arrive the way creatures do, and no new surface is built.
-- B. The artist builds it by hand in the WetLab, picking primitives and join points — full control; it costs a composition surface this spec does not otherwise need.
-- C. Both, dealt first — the deal ships alone, and the hand surface is a second build taken only if the dealt constructs earn it.
+**Q2. Who composes a construct? — C: both, dealt first.**
+The system deal ships alone in this build; the WetLab hand-composition surface is a second build, taken only
+if the dealt constructs earn it (§5).
 
-**Q3. May the stage deal a construct on its own, or does the artist place every one?**
-- A. Artist-placed only, never dealt (the creature-tile rule) — nothing appears on stage that the artist did not choose.
-- B. Dealt like an ordinary tile wherever its style is in play — constructs can appear uninvited, as part of a style's material.
-- C. Dealt only where the standing style matches the construct's own — variety without a construct ever standing in a foreign style's room.
+**Q3. May the stage deal a construct on its own? — B: dealt like an ordinary tile wherever its style is in play.**
+Constructs can appear uninvited, as part of a style's material (§5).
 
-**Q4. May a construct serve as a creature's body?**
-- A. Yes — a construct is an asset, and the assembler takes any basic shape — so constructs enter creature space whole.
-- B. No — constructs are stage dressing only, and the creature door refuses them as bodies, keeping the two systems separate.
+**Q4. May a construct serve as a creature's body? — A: yes.**
+A construct is an asset, and the assembler takes any basic shape — so constructs enter creature space whole (§1).
 
-**Q5. How many constructs may a project keep?** (Applies under Q1-A; under Q1-B or Q1-C it lapses.)
-- A. 64, the creature bank's cap — one discipline for everything the WetLab banks.
-- B. 16 — constructs are set pieces, not citizens, and a small bank keeps them deliberate.
-- C. No count cap; the bake's cost warning is the only guard — the simplest rule, and the document can grow without limit.
+**Q5. How many constructs may a project keep? — A: 64, the creature bank's cap.**
+One discipline for everything the WetLab banks (§5).
 
-**Q6. Does the constructs build write the styles' `assets.families` lists, or is that #1854's separate work?**
-- A. In this build — the grammar lands as data with the assembler, and the families slot stops being empty.
-- B. Separate — constructs read the styles' notes only, and the families lists stay #1854's to fill.
+**Q6. Does the constructs build write the styles' `assets.families` lists? — A: in this build.**
+The grammar lands as data with the assembler, and the families slot stops being empty (§3).
