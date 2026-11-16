@@ -205,6 +205,14 @@ export function createGpuFluid(gl, cols, rows) {
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     },
+    /** Queue an async readback of the current field (RGBA32F, u in R, v in G) into a PIXEL_PACK_BUFFER — no stall. */
+    readInto(pbo) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+      gl.readPixels(0, 0, cols, rows, gl.RGBA, gl.FLOAT, 0);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    },
     read() {
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]);
       const d = new Float32Array(cols * rows * 4);
