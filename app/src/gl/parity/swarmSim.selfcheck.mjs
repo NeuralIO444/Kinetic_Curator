@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import { ParticleSystem } from '../../engine/particles.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../../data/layout-modes.js';
 import { swarmTextureLayout, SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from '../swarmSim.mjs';
+import { decodeTypedInto } from '../../engine/kernel/stateCodec.mjs';
+import { createScentField } from '../../engine/kernel/field/scent.js';
 import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
 
 // ---- pure: texture layout
@@ -190,6 +192,53 @@ try {
     });
     const diff = Math.max(maxDiff(after.vx, g0.samples[1].vx), maxDiff(after.vy, g0.samples[1].vy));
     check('curl wind — differs from the point kernel', diff > 1e-3, `${diff.toExponential(2)}`);
+  }
+
+  // ---- chemotaxis: climb the scent gradient. The kernel reads the same cells the JS field holds.
+  {
+    const count = 120;
+    const lp = lpFor(count);
+    const sys = new ParticleSystem();
+    sys.init(count, W, H, assets, palette, SEED);
+    const scent = createScentField();
+    for (let k = 0; k < 40; k++) scent.deposit(0.3 + 0.004 * k, 0.4 + 0.002 * k, 1.5);
+    for (let k = 0; k < 6; k++) scent.step();
+    const GAIN = 40;
+    // JS reference for ONE substep: the chemotaxis force is added to the kernel's own force sum
+    const st = stateOf(sys);
+    const params = { ...coreParams(lp, null), chemotaxis: GAIN };
+    const raw = new Float64Array(scent.cols * scent.rows);
+    decodeTypedInto(scent.snapshotCells(), raw);
+    const cells = Array.from(raw);
+    const run = (chem) =>
+      page.evaluate((r) => window.__kcSwarmRun(r), {
+        n: count,
+        state: st,
+        steps: 1,
+        params: { ...params, chemotaxis: chem },
+        scent: { cells, cols: scent.cols, rows: scent.rows },
+      });
+    const base = (await run(0)).samples[1];
+    const withC = (await run(GAIN)).samples[1];
+    // expected dv = gradient * GAIN / mass, then the damping and clamp the kernel applies; compare the DIFFERENCE it makes
+    let worst = 0;
+    for (let i = 0; i < count; i++) {
+      const g = scent.gradient(st.x[i] / W, st.y[i] / H);
+      const m = st.mass[i];
+      const sp0 = Math.hypot(base.vx[i], base.vy[i]);
+      if (sp0 > 7.5) continue; // the speed clamp would mask the term
+      const ex = ((g.gx * GAIN) / m) * SWARM_CORE_CLOUD.damping;
+      const ey = ((g.gy * GAIN) / m) * SWARM_CORE_CLOUD.damping;
+      const sp1 = Math.hypot(withC.vx[i], withC.vy[i]);
+      if (sp1 > 7.9) continue;
+      worst = Math.max(worst, Math.abs(withC.vx[i] - base.vx[i] - ex), Math.abs(withC.vy[i] - base.vy[i] - ey));
+    }
+    check(
+      'chemotaxis — the kernel adds the JS scent gradient force',
+      worst < 1e-2,
+      `max |d| ${worst.toExponential(2)}`,
+    );
+    check('chemotaxis — is not a no-op', maxDiff(base.vx, withC.vx) + maxDiff(base.vy, withC.vy) > 1e-3);
   }
 
   // ---- properties over a long run (the swarm is chaotic: trajectories are not compared, behaviour is)

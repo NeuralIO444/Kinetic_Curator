@@ -12,6 +12,7 @@ window.__kcSwarmRun = (p) => {
   const g = createGpuSwarm(gl, p.n);
   const f32 = (a) => Float32Array.from(a);
   g.seed({ x: f32(p.state.x), y: f32(p.state.y), vx: f32(p.state.vx), vy: f32(p.state.vy), mass: f32(p.state.mass), seedOffset: p.state.seedOffset ? f32(p.state.seedOffset) : undefined });
+  if (p.scent) g.setScent(Float32Array.from(p.scent.cells), p.scent.cols, p.scent.rows);
   const at = new Set(p.sampleAt || [p.steps]);
   const samples = {};
   for (let s = 1; s <= p.steps; s++) {
