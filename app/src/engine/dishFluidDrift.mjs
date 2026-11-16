@@ -18,6 +18,7 @@
 
 import { FLUID_GRID_COLS, FLUID_GRID_ROWS } from './dishFluid.mjs';
 import { MATTER_DENSITY_FLOOR } from './dishFluidRender.mjs';
+import { stampWidthEm } from '../poets/placement.js';
 
 /** The density a mark's cell must reach before the field can lean it (the matter floor, the bone pull's floor). */
 export const DRIFT_DENSITY_FLOOR = MATTER_DENSITY_FLOOR;
@@ -96,4 +97,132 @@ export function applyFluidDrift(soa, field, still = null) {
       soa.y[idx[j]] = oy[j];
     }
   };
+}
+
+// ---------------------------------------------------------------- the poem: whole words (seam slice 3)
+//
+// Matt (2026-11-16): the poem (an armed FIELD form) leans by WHOLE WORDS — each word moves as one piece toward the
+// magnet, so the letters inside it stay intact; the poem is never copied and never culture-faded (a held form is
+// present, not a ghost). Placement's law is that glyph ink never overlaps (poets/placement.js); the groups keep it:
+//   · a word is never split: a break needs an ink gap wider than POEM_WORD_GAP_EM (a word's letters sit one track
+//     apart; a space leaves SPACE_ADV 0.42 em more) AND a centre step 1.5× the line's tightest (a grid's empty cell);
+//   · each group's lean is capped at POEM_LEAN_EM of its em, so two groups can close on each other by at most the sum
+//     of their caps — and any two groups whose ink is not farther apart than that are MERGED and move as one. So
+//     neighbouring words that sit tight (a dense grid, a close line pitch) lean together; ink can never close.
+
+/** A poem group's farthest lean, in its own em. */
+export const POEM_LEAN_EM = 0.2;
+/** An ink gap between neighbours on one line wider than this (em) is a word break (a track is 0.16–0.26 em). */
+export const POEM_WORD_GAP_EM = 0.35;
+/** Stamps on one line share their baseline exactly; anything within this (em) is the same line. */
+const POEM_LINE_EPS_EM = 0.25;
+
+/** A stamp's ink box in form units (placement's ruler; a rotated stamp takes its square bound). */
+function stampBox(s) {
+  const em = Number(s.em) || 0;
+  const w = Math.max(0, stampWidthEm(s.assetId, s.ch)) * em;
+  const rot = Number(s.rotation) || 0;
+  const hw = (rot !== 0 ? Math.max(w, em) : w) / 2;
+  const hh = (rot !== 0 ? Math.max(w, em) : em) / 2;
+  return { l: s.x - hw, r: s.x + hw, t: s.y - hh, b: s.y + hh, em };
+}
+
+const WORDS_CACHE = new WeakMap();
+/**
+ * Group a form's stamps (reading order) into lean groups: arrays of stamp indices. Words first (a new line, or a word
+ * gap), then any two groups whose ink is within both caps of each other are merged. Pure; cached per stamps array.
+ */
+export function poemWords(stamps) {
+  if (!Array.isArray(stamps)) return [];
+  const hit = WORDS_CACHE.get(stamps);
+  if (hit) return hit;
+  const n = stamps.length;
+  const boxes = stamps.map(stampBox);
+  const parent = new Int32Array(n);
+  for (let j = 0; j < n; j++) parent[j] = j;
+  const find = (j) => {
+    while (parent[j] !== j) j = parent[j] = parent[parent[j]];
+    return j;
+  };
+  const join = (a, b) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb);
+  };
+  // words: neighbours on one line stay together unless BOTH their ink gap is wider than a track (a proportional line's
+  // space) AND their centre step is wider than 1.5× the line's tightest step (a grid's empty cell — on a grid every
+  // letter sits a cell apart, so ink gap alone cannot tell a letter from a word)
+  const sameLine = (j) =>
+    Math.abs(stamps[j].y - stamps[j - 1].y) <= POEM_LINE_EPS_EM * Math.max(boxes[j].em, boxes[j - 1].em);
+  const minStep = new Float64Array(n).fill(Infinity); // per stamp: its line's tightest centre step
+  for (let j = 1, start = 0; j <= n; j++) {
+    if (j === n || !sameLine(j)) {
+      let m = Infinity;
+      for (let k = start + 1; k < j; k++) m = Math.min(m, Math.abs(stamps[k].x - stamps[k - 1].x));
+      for (let k = start; k < j; k++) minStep[k] = m;
+      start = j;
+    }
+  }
+  for (let j = 1; j < n; j++) {
+    if (!sameLine(j)) continue;
+    const a = boxes[j - 1];
+    const b = boxes[j];
+    const em = Math.max(a.em, b.em);
+    const gap = Math.max(b.l - a.r, a.l - b.r);
+    const step = Math.abs(stamps[j].x - stamps[j - 1].x);
+    const wordBreak = gap > POEM_WORD_GAP_EM * em && step > 1.5 * minStep[j];
+    if (!wordBreak) join(j - 1, j);
+  }
+  // merge: groups too close to lean apart safely move as one
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (find(i) === find(j)) continue;
+      const a = boxes[i];
+      const c = boxes[j];
+      const sep = Math.max(c.l - a.r, a.l - c.r, c.t - a.b, a.t - c.b);
+      if (sep <= POEM_LEAN_EM * (a.em + c.em)) join(i, j);
+    }
+  }
+  const byRoot = new Map();
+  for (let j = 0; j < n; j++) {
+    const r = find(j);
+    if (!byRoot.has(r)) byRoot.set(r, []);
+    byRoot.get(r).push(j);
+  }
+  const words = [...byRoot.values()];
+  WORDS_CACHE.set(stamps, words);
+  return words;
+}
+
+/**
+ * Lean a poem's drawn items by whole words. `items[j]` is stamp j's item (stage px); `field` the marks' lean field
+ * (markDriftDelta's); `emPx(j)` stamp j's em in stage px. Mutates the items' x/y (they are built fresh on every build,
+ * so nothing is cached past it). Returns the number of words moved.
+ */
+export function applyPoemLean(items, stamps, field, emPx) {
+  if (!field || !Array.isArray(items) || !Array.isArray(stamps) || items.length !== stamps.length) return 0;
+  let moved = 0;
+  for (const word of poemWords(stamps)) {
+    let cx = 0;
+    let cy = 0;
+    let em = Infinity;
+    for (const j of word) {
+      cx += items[j].x;
+      cy += items[j].y;
+      em = Math.min(em, Number(emPx(j)) || 0);
+    }
+    cx /= word.length;
+    cy /= word.length;
+    const lean = markDriftDelta(field, cx, cy);
+    if (!lean || !(em > 0)) continue;
+    const len = Math.hypot(lean.dx, lean.dy);
+    const cap = POEM_LEAN_EM * em;
+    const k = len > cap ? cap / len : 1;
+    for (const j of word) {
+      items[j].x += lean.dx * k;
+      items[j].y += lean.dy * k;
+    }
+    moved++;
+  }
+  return moved;
 }

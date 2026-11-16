@@ -25,7 +25,7 @@ import { assignColor, resolveStrategy, applyLean, ACCENT_OFFSET } from './kernel
 import { hexToRgb255 } from './colorHex.mjs'; // #2018 — the plate ink rule measures distance in the palette's own RGB
 import { fillDishPoints } from './kernel/dish.js';
 import { applyCultureScale, applyCultureLife } from './dishLifeCouple.mjs'; // #1923 Phase 2 — the culture coupling's scale fold
-import { applyFluidDrift } from './dishFluidDrift.mjs'; // one force seam slice 1 — the ferrofluid leans the stage's own marks
+import { applyFluidDrift, applyPoemLean } from './dishFluidDrift.mjs'; // one force seam slice 1 — the ferrofluid leans the stage's own marks
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
 import { applyRiftShear } from './riftShear.mjs'; // #1183 rift: marks shear with the tear above them
 import { applyGroundSnap } from './groundSnap.js'; // #1183 palette snap
@@ -1041,6 +1041,11 @@ export function buildPlacements({
         keys: new Set(fieldItems.map((it) => it.key)),
       };
     }
+    // One force seam slice 3 (Matt, 2026-11-16) — the ferrofluid leans the poem by WHOLE WORDS, each capped at
+    // POEM_LEAN_EM of its em so ink never closes (engine/dishFluidDrift.mjs). After the rooms are measured (a plate or
+    // quiet zone is padded wider than the cap). The items are fresh this build, so no undo. null field — every caller
+    // but the live resolver with a fluid, a magnet and the seam marker — never runs it.
+    if (fluidDrift) applyPoemLean(fieldItems, drawnForm.stamps, fluidDrift, (j) => drawnForm.stamps[j].em * canvasH);
     // On a pool hit `mapped` IS cache.itemPool — never append to it. The
     // copy costs one array of references, only while a form is armed.
     mapped = [...mapped, ...fieldItems];
