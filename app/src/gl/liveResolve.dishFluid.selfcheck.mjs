@@ -40,6 +40,7 @@ import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
 import { quietStamp } from '../engine/dishLifeQuiet.mjs';
 import { fluidStamp } from '../engine/dishFluid.mjs';
 import { packFluidCells } from '../engine/dishFluidCells.mjs';
+import { packCultureCells } from '../engine/dishCultureCells.mjs';
 import { createPerformanceRecorder, verifyPerformance, checkPerformance } from './performanceFile.mjs';
 import { createInputLog, replayInputs } from '../engine/kernel/replay/inputLog.js';
 
@@ -415,6 +416,46 @@ const N = 60;
   const js = record(false);
   assert.equal(js.simBackends.fluid, 'js.gs.v1', 'no GPU field = the all-JS stamp, as before');
   assert.equal(js.simLaw, 'js-exact');
+}
+
+// 10. K2 slice 2b — the GPU culture's grid as a recorded input: live == replay through the JSON log, and the recorded
+// grid (not the JS steps) is what the frame sees
+{
+  const NN = 96 * 54;
+  const gridAt = (f) => {
+    const g = new Uint8Array(NN);
+    for (let i = 0; i < NN; i++) g[i] = (i * 31 + f * 17) % 9 < 3 ? 1 + ((i + f) % 3) : 0;
+    return g;
+  };
+  const FR = 30;
+  const drive = (r, inputs) => inputs.map((inp) => hash(r.resolveLayers(inp)));
+  const withCulture = (f) => ({ ...inputAt(f, null), dishCultureCells: packCultureCells(gridAt(f), f) });
+  const liveInputs = Array.from({ length: FR }, (_, f) => withCulture(f));
+  const log = createInputLog();
+  for (const inp of liveInputs) log.record(inp);
+  const replayArr = [...replayInputs(JSON.parse(JSON.stringify(log.finish())))];
+  const a = createLiveResolver();
+  const liveHs = drive(a, liveInputs);
+  const b = createLiveResolver();
+  assert.deepEqual(
+    drive(b, replayArr),
+    liveHs,
+    'a JSON round-trip of the recorded culture replays the very same frames',
+  );
+  const js = createLiveResolver();
+  const jsHs = drive(
+    js,
+    Array.from({ length: FR }, (_, f) => inputAt(f, null)),
+  );
+  assert.notDeepEqual(jsHs, liveHs, 'the recorded grid, not the JS steps, is the culture');
+  // junk is inert: the JS culture runs as if the key were absent
+  const m = createLiveResolver();
+  const mHs = drive(
+    m,
+    Array.from({ length: FR }, (_, f) => ({ ...inputAt(f, null), dishCultureCells: { gen: 1, idx: [1], v: [1] } })),
+  );
+  assert.deepEqual(mHs, jsHs, 'a malformed culture-cells object is inert');
+  for (const r of [a, b, js, m]) r.dispose();
 }
 
 console.log('liveResolve.dishFluid.selfcheck: ok');

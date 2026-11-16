@@ -195,7 +195,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
    * Apply the frame's stamp to the resolved layers. Mutates the layer entries' `items` (new arrays) when a culture
    * is showing and returns true; returns false (touching nothing) when there is no stamp or nothing to seed.
    */
-  function apply(dl, layers, W, H, { specks = true } = {}) {
+  function apply(dl, layers, W, H, { specks = true, external = null } = {}) {
     if (!dl || typeof dl !== 'object' || !Number.isFinite(dl.wakeMs)) {
       st = null;
       syncPublished();
@@ -254,7 +254,11 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     const quiet = dl.mode === 'quiet';
     st.quiet = quiet ? { strength: Number(dl.strength) || 0, cycleGens: Number(dl.cycleGens) || undefined } : null;
     const target = Math.max(0, Math.floor(Number(dl.gen) || 0));
-    if (target < st.culture.gen) {
+    // K2 slice 2b — a RECORDED culture grid ({ gen, grid }, from dishCultureCells) IS this frame's culture: the host's GPU
+    // generations are not re-derived here, the stage loads what was read, so live == replay. A seek back is moot (the grid
+    // is the whole state); a malformed grid is ignored and the stage steps as ever.
+    const ext = external && Number.isFinite(external.gen) && external.grid ? external : null;
+    if (!ext && target < st.culture.gen) {
       // a replay seeking back: rebuild from the frozen seed, so generation g is always the same culture
       // #1923 Phase 4 — the rebuild is the SAME seed (possibly a press's), so its epoch is preserved:
       // the epoch names which seed of the wake this is, and seeking does not change the seed.
@@ -266,7 +270,12 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     // #1997 — the ferrofluid's birth bias lands before each generation it feeds (one frame
     // behind: fluidBias is the density published at the last applied frame). No bias handed in
     // → the loop is the pre-#1997 loop verbatim.
-    for (let n = 0; st.culture.gen < target && n < SHED_STEPS[shed]; n++) {
+    let extLoaded = false;
+    if (ext && ext.grid.length === st.culture.cur.length) {
+      st.culture.gen = Math.max(0, Math.floor(ext.gen));
+      extLoaded = restoreCultureGrid(st.culture, ext.grid);
+    }
+    for (let n = 0; !extLoaded && st.culture.gen < target && n < SHED_STEPS[shed]; n++) {
       if (birthReplay) {
         applyBirths(st.culture, birthReplay.get(st.culture.gen) || []);
         biasUsed = true;

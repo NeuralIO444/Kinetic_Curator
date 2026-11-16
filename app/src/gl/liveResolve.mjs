@@ -117,6 +117,7 @@ const POEM_ONLY_IDS = new Set(
     ...ASSETS_RISO,
   ].map((a) => a.id),
 );
+import { isCultureCells, unpackCultureCells } from '../engine/dishCultureCells.mjs';
 import { createDishLifeStage, isTerrain } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
 import { isFluidCells, unpackFluidCells } from '../engine/dishFluidCells.mjs'; // K1 slice 4b: the GPU field as a recorded input
 import { createDishFluidStage } from '../engine/dishFluidStage.mjs'; // #1997: the ferrofluid, driven by input.dishFluid (absent = no work)
@@ -470,6 +471,21 @@ export function createLiveResolver() {
     }
     cellsIn = null;
     return inp.dishFluidExternal ?? null;
+  };
+  // K2 slice 2b — input.dishCultureCells (the GPU culture's recorded grid) unpacked once per distinct object, as the fluid's.
+  let cultureCellsIn = null;
+  let cultureCellsOut = null;
+  const externalCulture = (inp) => {
+    const c = inp.dishCultureCells;
+    if (!isCultureCells(c)) {
+      cultureCellsIn = null;
+      return null;
+    }
+    if (c !== cultureCellsIn) {
+      cultureCellsOut = { gen: Math.floor(Number(c.gen)), grid: unpackCultureCells(c) };
+      cultureCellsIn = c;
+    }
+    return cultureCellsOut;
   };
   let birthReplayIn = null; // K1 slice 3c — the last input.dishBirthReplay / dishBirthRecord handed to the life stage
   let birthRecordIn = false;
@@ -1904,7 +1920,7 @@ export function createLiveResolver() {
         };
       }
     }
-    dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion }); // the tertiary specks hold still under reduced motion
+    dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion, external: externalCulture(input) }); // the tertiary specks hold still under reduced motion
     prune(aliveIds, documentIds);
     // #1412 — publish the frame's contact-density field (engine/
     // dishDensity.mjs): the shared grid's per-cell body counts from

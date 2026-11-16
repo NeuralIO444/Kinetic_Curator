@@ -702,3 +702,4 @@ node src/gl/parity/cultureSim.selfcheck.mjs
 node src/gl/simBackends.selfcheck.mjs
 node src/gl/gpuFluidHost.selfcheck.mjs
 node src/engine/dishFluidCells.selfcheck.mjs
+node src/engine/dishCultureCells.selfcheck.mjs
