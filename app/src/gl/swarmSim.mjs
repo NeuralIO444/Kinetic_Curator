@@ -6,12 +6,16 @@
 // wrap at a 120 px pad; organism: bounce off an 8 px margin). State is one RGBA32F texture, one texel per particle
 // (x, y, vx, vy), ping-ponged; mass rides a static texture (the per-agent uniqueness channel, uploaded once).
 //
-// What is NOT here yet (later K3 slices): the wind (curl / point noise), chemotaxis, Lévy, Lorenz, cling, drives, leak, breeding,
+// Slice 1b adds the cloud swarm's POINT wind (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
+// What is NOT here yet (later K3 slices): the curl wind (organisms), chemotaxis, Lévy, Lorenz, cling, drives, leak, breeding,
 // contacts, the heading and spine integrators. A caller that wants parity with the JS swarm runs it with wind 0 (see the
 // selfcheck, which drives the real ParticleSystem and this kernel from the same state).
 //
 // K0 tier: the kernel is judged against the JS swarm, not bitwise — float32 vs float64 differ at noise and a swarm is chaotic;
 // the bar is one-step agreement to float noise, then bounded speed / no NaN / ordering properties over long runs.
+
+import { FIELD_COMMON_GLSL } from './fields/fieldCommon.glsl.js';
+import { permTableFor } from '../engine/noise.js';
 
 /** The constants particles.js uses in cloud (swarm) mode and organism mode, for the forces this kernel owns. */
 export const SWARM_CORE_CLOUD = Object.freeze({
@@ -40,6 +44,8 @@ void main() {
 export const SWARM_STEP_FS = `#version 300 es
 precision highp float;
 precision highp int;
+precision highp usampler2D;
+${FIELD_COMMON_GLSL}
 uniform sampler2D u_state;   // (x, y, vx, vy)
 uniform sampler2D u_mass;    // (mass, 0, 0, 0)
 uniform int u_n;
@@ -51,6 +57,8 @@ uniform float u_damp;
 uniform float u_maxSpeed;
 uniform vec4 u_attract;      // x, y, strength (gravityWells*attractMul*GAIN*seekMul), enabled (0/1)
 uniform vec2 u_canvas;
+uniform vec4 u_wind;         // noiseFreq, domainOffsetX, domainOffsetY, nt (time * noiseSpeed * 0.001)
+uniform float u_windOn;      // 1 = point wind (cloud swarm: windMul is 1, the wind knob is ignored)
 uniform int u_bounce;        // 0 = wrap (cloud), 1 = bounce (organism)
 layout(location = 0) out vec4 o_state;
 
@@ -59,10 +67,20 @@ void main() {
   int i = tp.y * u_w + tp.x;
   vec4 s = texelFetch(u_state, tp, 0);
   if (i >= u_n) { o_state = s; return; }
-  float m = texelFetch(u_mass, tp, 0).r;
+  vec4 mt = texelFetch(u_mass, tp, 0);
+  float m = mt.r;
   vec2 p = s.xy;
   vec2 v = s.zw;
   vec2 f = vec2(0.0);
+
+  if (u_windOn > 0.5) {
+    // particles.js point wind: noise3D -> angle, a second sample (+200) -> shape; windMul is 1 for the cloud swarm.
+    float fx = p.x * u_wind.x + u_wind.y;
+    float fy = p.y * u_wind.x + u_wind.z;
+    float ang = kcNoise3D(fx, fy, u_wind.w + mt.g * 0.0001) * 6.283185307179586;
+    float shape = (kcNoise3D(fx + 200.0, fy + 200.0, u_wind.w) + 1.0) * 0.4;
+    f += vec2(cos(ang), sin(ang)) * shape / m;
+  }
 
   if (u_attract.w > 0.5) {
     vec2 d2v = u_attract.xy - p;
@@ -127,9 +145,9 @@ export function swarmTextureLayout(n, width = 128) {
 
 /**
  * The GPU swarm core on an existing WebGL2 context (EXT_color_buffer_float required — the renderer already demands it).
- *   seed({ x, y, vx, vy, mass })   upload n particles (Float32Array / number arrays)
+ *   seed({ x, y, vx, vy, mass, seedOffset })   upload n particles (Float32Array / number arrays)
  *   step(params)                   one substep; params: { dtFrames, sepR, aliR, cohR, sepW, aliW, cohW, damping, maxSpeed,
- *                                  attractor: {x, y} | null, attractStrength, bounds: 'wrap'|'bounce', canvasW, canvasH }
+ *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt} | null, bounds: 'wrap'|'bounce', canvasW, canvasH }
  *   read()                         { x, y, vx, vy } as Float32Arrays (synchronous: tests / measurement)
  */
 export function createGpuSwarm(gl, n) {
@@ -160,6 +178,23 @@ export function createGpuSwarm(gl, n) {
   };
   const tex = [mkTex(null), mkTex(null)];
   const massTex = mkTex(new Float32Array(w * h * 4).fill(1));
+  const permTex = new Map(); // noise seed -> R8UI 512x1 (the exact bytes permTableFor gives, as fieldRunner uploads them)
+  const permFor = (seed) => {
+    const key = seed >>> 0;
+    let t = permTex.get(key);
+    if (!t) {
+      t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, 512, 1, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, permTableFor(seed));
+      permTex.set(key, t);
+    }
+    return t;
+  };
   const fbo = tex.map((t) => {
     const f = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, f);
@@ -176,7 +211,7 @@ export function createGpuSwarm(gl, n) {
   };
   return {
     n: count,
-    seed({ x, y, vx, vy, mass }) {
+    seed({ x, y, vx, vy, mass, seedOffset }) {
       const st = new Float32Array(w * h * 4);
       const ms = new Float32Array(w * h * 4).fill(1);
       for (let i = 0; i < count; i++) {
@@ -185,6 +220,7 @@ export function createGpuSwarm(gl, n) {
         st[i * 4 + 2] = vx[i];
         st[i * 4 + 3] = vy[i];
         ms[i * 4] = mass ? mass[i] : 1;
+        ms[i * 4 + 1] = seedOffset ? seedOffset[i] : 0;
       }
       upload(tex[cur], st);
       upload(massTex, ms);
@@ -212,6 +248,12 @@ export function createGpuSwarm(gl, n) {
       );
       gl.uniform2f(U('u_canvas'), p.canvasW, p.canvasH);
       gl.uniform1i(U('u_bounce'), p.bounds === 'bounce' ? 1 : 0);
+      const wd = p.wind && Number.isFinite(p.wind.nt) ? p.wind : null;
+      gl.uniform4f(U('u_wind'), wd ? wd.freq : 0, wd ? wd.offX || 0 : 0, wd ? wd.offY || 0 : 0, wd ? wd.nt : 0);
+      gl.uniform1f(U('u_windOn'), wd ? 1 : 0);
+      gl.uniform1i(U('u_perm'), 2);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, permFor(wd ? wd.seed : 444));
       gl.uniform1i(U('u_state'), 0);
       gl.uniform1i(U('u_mass'), 1);
       gl.activeTexture(gl.TEXTURE1);
@@ -244,7 +286,7 @@ export function createGpuSwarm(gl, n) {
     },
     dispose() {
       gl.deleteProgram(prog);
-      for (const t of [...tex, massTex]) gl.deleteTexture(t);
+      for (const t of [...tex, massTex, ...permTex.values()]) gl.deleteTexture(t);
       for (const f of fbo) gl.deleteFramebuffer(f);
     },
   };
