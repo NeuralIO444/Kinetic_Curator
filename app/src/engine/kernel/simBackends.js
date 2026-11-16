@@ -13,17 +13,18 @@ export const SIM_KERNELS = Object.freeze(['fluid', 'culture', 'swarm']);
 /** Every backend id this build KNOWS (can validate), per kernel. */
 export const KNOWN_SIM_BACKENDS = Object.freeze({
   fluid: Object.freeze(['js.gs.v1', 'gpu.gs.v1']),
-  culture: Object.freeze(['js.life.v1']),
+  culture: Object.freeze(['js.life.v1', 'gpu.life.v1']),
   swarm: Object.freeze(['js.swarm.v1']),
 });
 
 /**
  * The backends this build can actually RUN. 'gpu.gs.v1' REPLAYS everywhere (K1 slice 4c): its field rides the take as the
- * recorded input.dishFluidCells, so replay needs no GPU; only RECORDING with it needs the GPU host.
+ * recorded input.dishFluidCells, so replay needs no GPU; only RECORDING with it needs the GPU host. 'gpu.life.v1' (K2 slice
+ * 2b) is the same: the culture's grid rides the take as the recorded input.dishCultureCells.
  */
 export const RUNNABLE_SIM_BACKENDS = Object.freeze({
   fluid: Object.freeze(['js.gs.v1', 'gpu.gs.v1']),
-  culture: Object.freeze(['js.life.v1']),
+  culture: Object.freeze(['js.life.v1', 'gpu.life.v1']),
   swarm: Object.freeze(['js.swarm.v1']),
 });
 

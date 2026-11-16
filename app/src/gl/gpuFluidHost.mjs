@@ -115,6 +115,10 @@ export function createGpuFluidHost(gl) {
       poll();
       return latest;
     },
+    /** The sim's current field texture (G = density), for the GPU culture's in-shader births (K2 slice 2b). Null before a seed. */
+    fluidTexture() {
+      return held ? sim.texture() : null;
+    },
     dispose() {
       for (const p of pending) gl.deleteSync(p.sync);
       for (const b of [...freePbos, ...pending.map((p) => p.pbo)]) gl.deleteBuffer(b);

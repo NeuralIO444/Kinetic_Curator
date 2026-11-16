@@ -34,6 +34,7 @@ import {
   getLastDishWet,
   getLastDishFluidPlan,
   getLastDishCultureField,
+  getLastDishHostSeed,
   getLastCouplingBackground,
   setLiveWetSampler,
 } from './liveResolve.mjs';
@@ -58,6 +59,9 @@ import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
 import { createGpuFluidHost } from './gpuFluidHost.mjs'; // K1 slice 4c: the GPU fluid, render-side; OFF unless window.__KC_GPU_FLUID
 import { packFluidCells } from '../engine/dishFluidCells.mjs';
+import { createGpuCultureHost } from './gpuCultureHost.mjs'; // K2 slice 2b: the GPU culture, render-side; OFF unless window.__KC_GPU_CULTURE
+import { packCultureCells } from '../engine/dishCultureCells.mjs';
+import { STAGE_COLS, STAGE_ROWS } from '../engine/dishLifeStage.mjs';
 import { fluidStamp } from '../engine/dishFluid.mjs'; // #1997: the ferrofluid's cycle stamp (the loop only stamps; since #2178 the resolver publishes the plan and the renderer seats the body)
 import { installDishFluidMagnets } from './dishFluidMagnetsDom.mjs'; // #1997: the magnet placement gesture (armed by the chip)
 import { consumeTouch, clearTouch } from '../engine/dishLifeTouch.mjs';
@@ -430,6 +434,13 @@ export function createLiveLoop(
   let gpuFluidHost = null;
   let gpuHostField = null; // the host's last handed field object, so an unchanged readback keeps its identity
   let gpuCells = null;
+  // K2 slice 2b — the GPU culture (backend gpu.life.v1). OFF by default: only while a culture stands AND window.__KC_GPU_CULTURE is
+  // set, and — because its births read the fluid in shader space — never while the fluid runs on the JS kernel (a GPU culture
+  // beside a CPU fluid would silently drop the coupling; the JS culture runs instead). The host follows the JS stage's culture
+  // on the GPU; its grid rides the resolver as the RECORDED input.dishCultureCells, so live == replay on any device.
+  let gpuCultureHost = null;
+  let gpuCultureField = null; // the host's last handed field object, so an unchanged readback keeps its identity
+  let gpuCultureCells = null;
   const disposeDishFluidMagnets = installDishFluidMagnets(canvas, getState);
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
@@ -936,6 +947,42 @@ export function createLiveLoop(
       gpuHostField = null;
       gpuCells = null;
     }
+    // K2 slice 2b — the GPU culture's grid for this frame, as the recorded input (null = the JS culture runs, as always).
+    let dishCultureCells = null;
+    const fluidTexNow = gpuFluidHost && dishFluidCells ? gpuFluidHost.fluidTexture() : null;
+    if (dishLifeStamp && typeof window !== 'undefined' && window.__KC_GPU_CULTURE && (!dishFluidStamp || fluidTexNow)) {
+      try {
+        if (!gpuCultureHost && !live.getGL().isContextLost())
+          gpuCultureHost = createGpuCultureHost(live.getGL(), STAGE_COLS, STAGE_ROWS);
+        const seedState = getLastDishHostSeed();
+        const couple = dishFluidDial ? Math.min(1, Number(dishFluidDial.couple) || 0) : 0;
+        const field = gpuCultureHost
+          ? gpuCultureHost.frame({
+              stamp: dishLifeStamp,
+              seedState,
+              fluid:
+                fluidTexNow && couple > 0
+                  ? { tex: fluidTexNow, strength: couple, seed: seedState ? seedState.biasSeed : 0 }
+                  : null,
+            })
+          : null;
+        if (field) {
+          if (field !== gpuCultureField) {
+            gpuCultureField = field;
+            gpuCultureCells = packCultureCells(field.grid, field.gen);
+          }
+          dishCultureCells = gpuCultureCells;
+        }
+      } catch (e) {
+        console.warn('[gpuCulture] disabled for this session:', e && e.message ? e.message : e);
+        window.__KC_GPU_CULTURE = false; // fail soft: the JS kernel is the reference backend (K0 R4)
+      }
+    } else if (gpuCultureHost) {
+      gpuCultureHost.dispose();
+      gpuCultureHost = null;
+      gpuCultureField = null;
+      gpuCultureCells = null;
+    }
     // #2006 slice 3 — the review morph stamp: while the standing review
     // record carries a ladder adjustment, the resolver settles the repair
     // as one planned morph (gl/liveResolve's review channel). The stamp
@@ -963,7 +1010,7 @@ export function createLiveLoop(
     const worldNow = sanitizeWorld(s.world);
     const resolved = resolver.resolveLayers({
       ...(worldNow ? { world: worldNow } : {}),
-      ...(dishLifeStamp ? { dishLife: dishLifeStamp } : {}),
+      ...(dishLifeStamp ? { dishLife: dishLifeStamp, ...(dishCultureCells ? { dishCultureCells } : {}) } : {}),
       ...(dishFieldStamp ? { dishField: dishFieldStamp, dishFieldCoupling } : {}), // #1923 Phase 2
       ...(dishFluidStamp
         ? {

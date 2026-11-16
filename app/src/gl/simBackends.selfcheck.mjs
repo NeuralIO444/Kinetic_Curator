@@ -41,6 +41,13 @@ await ok('A: the law follows the backends; stamps are validated; absent is lawfu
   // K1 4c: a gpu.gs.v1 take REPLAYS everywhere (its field is the recorded input.dishFluidCells); an id this build has never heard of cannot
   assert.deepEqual(unrunnableSimBackends(gpu.simBackends), []);
   assert.deepEqual(unrunnableSimBackends({ ...DEFAULT_SIM_BACKENDS, fluid: 'warp.9' }), ['fluid']);
+  // K2 2b: a gpu.life.v1 take replays everywhere too (its grid is the recorded input.dishCultureCells), and implies decisions-exact
+  const gl = currentSimStamp({ ...DEFAULT_SIM_BACKENDS, culture: 'gpu.life.v1' });
+  assert.equal(gl.simLaw, 'decisions-exact');
+  assert.deepEqual(checkSimStamp(gl.simLaw, gl.simBackends), gl);
+  assert.deepEqual(unrunnableSimBackends(gl.simBackends), []);
+  const both = currentSimStamp({ ...DEFAULT_SIM_BACKENDS, fluid: 'gpu.gs.v1', culture: 'gpu.life.v1' });
+  assert.deepEqual(checkSimStamp(both.simLaw, both.simBackends), both);
   assert.deepEqual([...SIM_KERNELS], ['fluid', 'culture', 'swarm']);
 });
 

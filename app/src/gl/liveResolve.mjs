@@ -392,6 +392,11 @@ export function getLastDishFluidPlan() {
  * a replay hands it back as input.dishBirthReplay. Module-level, last-resolver-wins (the getLastDishFluidPlan law).
  */
 let lastDishCultureField = null;
+let lastDishLifeStage = null;
+/** K2 slice 2b — the last resolver's DISH LIFE host seed (see dishLifeStage.hostSeed), or null. Last-resolver-wins, like its siblings. */
+export function getLastDishHostSeed() {
+  return lastDishLifeStage ? lastDishLifeStage.hostSeed() : null;
+}
 /**
  * K1 slice 4c — the culture's published field from the last resolve ({ active, cols, rows, level, gen } or null), for the
  * render-side GPU fluid's culture→fluid feed (one frame behind, like the JS stage's own). Last-resolver-wins.
@@ -873,6 +878,7 @@ export function createLiveResolver() {
     // loop stays the pre-#1997 loop, number for number).
     const fluidCoupleField = dishLife.cultureField();
     lastDishCultureField = fluidCoupleField;
+    lastDishLifeStage = dishLife;
     {
       // K1 slice 3c — births as data. A recorded list (input.dishBirthReplay) is applied in place of the bias; a
       // record request (input.dishBirthRecord) logs them. Both act only on a CHANGE of the input (the setters rebuild

@@ -205,6 +205,10 @@ export function createGpuFluid(gl, cols, rows) {
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     },
+    /** The current field texture (RG32F, u in R, v in G) — for a shader-space reader on the same context (K2 slice 2b). */
+    texture() {
+      return tex[cur];
+    },
     /** Queue an async readback of the current field (RGBA32F, u in R, v in G) into a PIXEL_PACK_BUFFER — no stall. */
     readInto(pbo) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]);
