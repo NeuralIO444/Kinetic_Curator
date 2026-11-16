@@ -49,6 +49,21 @@ import {
   FLUID_SHED_RUNGS,
 } from './dishFluid.mjs';
 
+/**
+ * K1 slice 3a (#2186) — the fluid's STEP-0 field for a stamp: both phases, as fresh Float32Arrays. This is what a
+ * GPU backend uploads as its starting state (the seed is hash-derived and exact everywhere — K0 S5), so a replay
+ * that seeks back re-seeds and re-runs on the same device from the same bytes. Pure.
+ */
+export function fluidSeedState(wakeMs, seed, magnets) {
+  const sim = createFluid({
+    cols: FLUID_GRID_COLS,
+    rows: FLUID_GRID_ROWS,
+    seedKey: fluidSeedKey(Number(seed) | 0, wakeMs),
+    magnets: sanitizeMagnets(magnets),
+  });
+  return { u: Float32Array.from(sim.u), v: Float32Array.from(sim.v) };
+}
+
 export function createDishFluidStage() {
   let st = null; // { wakeMs, seed, seedKey, sim, magnets, dial, coupleRef }
 
@@ -148,28 +163,46 @@ export function createDishFluidStage() {
 
     const rung = FLUID_SHED_RUNGS[clampFluidRung(stamp.shed)];
     const target = Math.max(0, Math.floor((Number(stamp.step) || 0) / FLUID_GRID_STEP_DIVISOR));
-    if (target < st.sim.step) {
+    if (!ctx.external && target < st.sim.step) {
       // a replay seeking back inside the cycle: rebuild from the cycle seed
       build(stamp.wakeMs, seed, magnets);
       st.magnets = magnets;
       st.dial = dial;
       st.coupleRef = cf ? { cols: cf.cols | 0, rows: cf.rows | 0, level: cf.level, gen: cf.gen | 0 } : null;
     }
-    const gridBound = rung.steps > 0 ? Math.max(1, Math.round(rung.steps / FLUID_GRID_STEP_DIVISOR)) : 0;
-    for (let n = 0; st.sim.step < target && n < gridBound; n++) stepFluid(st.sim, stepOpts(aspectHW));
+    // K1 slice 3a — an EXTERNAL field: the host (a GPU backend, K0 R1 'gpu.gs.v1') owns the sim and hands this frame's
+    // density in (ctx.external = { step, density }, one or more frames behind like every read here). The JS sim then
+    // neither steps nor seeks — it stays the seed bookkeeping — and the published density IS the host's array (the
+    // read-this-frame contract). A wrong-sized field is ignored, i.e. the JS kernel runs as always.
+    const ext =
+      ctx.external &&
+      ctx.external.density &&
+      ctx.external.density.length === FLUID_GRID_COLS * FLUID_GRID_ROWS &&
+      Number.isFinite(Number(ctx.external.step))
+        ? ctx.external
+        : null;
+    st.external = !!ext;
+    if (ext) {
+      publishedFluid.density = ext.density;
+      st.lastPublishedStep = -1; // a later return to the JS kernel republishes its own field
+    } else {
+      const gridBound = rung.steps > 0 ? Math.max(1, Math.round(rung.steps / FLUID_GRID_STEP_DIVISOR)) : 0;
+      for (let n = 0; st.sim.step < target && n < gridBound; n++) stepFluid(st.sim, stepOpts(aspectHW));
 
-    if (st.sim.step !== st.lastPublishedStep || !publishedFluid.active) {
-      publishedFluid.density = fluidDensity(st.sim);
-      st.lastPublishedStep = st.sim.step;
+      if (st.sim.step !== st.lastPublishedStep || !publishedFluid.active) {
+        publishedFluid.density = fluidDensity(st.sim);
+        st.lastPublishedStep = st.sim.step;
+      }
     }
+    const pubStep = ext ? Math.max(0, Math.floor(Number(ext.step))) : st.sim.step;
     publishedFluid.active = true;
-    publishedFluid.step = st.sim.step;
+    publishedFluid.step = pubStep;
     publishedFluid.wakeMs = st.wakeMs;
 
     plan.active = true;
     plan.seedKey = st.seedKey;
     plan.wakeMs = st.wakeMs;
-    plan.step = st.sim.step;
+    plan.step = pubStep;
     plan.density = publishedFluid.density;
     plan.magnets = magnets;
     plan.dial = dial;
@@ -201,8 +234,10 @@ export function createDishFluidStage() {
         gridStep: st.sim.step,
         magnets: st.magnets.map((m) => ({ ...m })),
         dial: { ...st.dial },
-        // the grid field itself (see the header): both phases as plain arrays
+        // the grid field itself (see the header): both phases as plain arrays. An EXTERNAL field lives on the host
+        // (K1): the JS sim here is only the seed, so it rides as the seed — the host re-seeds and re-runs on restore.
         state: { u: Array.from(st.sim.u), v: Array.from(st.sim.v) },
+        ...(st.external ? { external: true } : {}),
       };
     },
     /** Restore a snapshot(): rebuild the bookkeeping and load the recorded field verbatim. */

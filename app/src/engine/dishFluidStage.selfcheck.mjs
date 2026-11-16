@@ -12,7 +12,7 @@
 //   E coupling   the stage consumes the culture field it is handed (the field differs from
 //                the uncoupled run) and publishes density at the dish grid
 import assert from 'node:assert/strict';
-import { createDishFluidStage } from './dishFluidStage.mjs';
+import { createDishFluidStage, fluidSeedState } from './dishFluidStage.mjs';
 import { fluidStamp } from './dishFluid.mjs';
 
 const W = 1000;
@@ -154,6 +154,53 @@ const driveFrom = (stage, from, until, over = {}) => {
     [...noField.publishedFluid.density],
     'an inactive publication is not consumed as a coupling field',
   );
+}
+
+// ---- F: external field (K1 slice 3a)
+{
+  const N = 96 * 54;
+  const field = (v, step) => ({ step, density: new Float32Array(N).fill(v) });
+  const s = createDishFluidStage();
+  const ext = field(0.6, 321);
+  assert.equal(s.apply(stamp(1.5), ctx({ external: ext })), true);
+  assert.equal(s.publishedFluid.density, ext.density, 'the published density IS the host array (read-this-frame)');
+  assert.equal(s.publishedFluid.step, 321, "the host's step is the published step");
+  assert.equal(s.plan.density, ext.density);
+  assert.equal(s.plan.step, 321);
+  assert.equal(s.snapshot().gridStep, 0, 'the JS sim never stepped: it is only the seed');
+  assert.equal(s.snapshot().external, true, 'an external field is marked, not snapshotted as if it were the JS field');
+  // a seek BACK on the host's step does not rebuild or step the JS sim
+  s.apply(stamp(0.2), ctx({ external: field(0.4, 12) }));
+  assert.equal(s.publishedFluid.step, 12);
+  assert.equal(s.snapshot().gridStep, 0);
+  // a wrong-sized or step-less field is ignored: the JS kernel runs exactly as without it
+  const a = createDishFluidStage();
+  const b = createDishFluidStage();
+  for (const t of [500, 1000, 1500]) {
+    a.apply(stamp(t), ctx({ external: { step: 3, density: new Float32Array(10) } }));
+    b.apply(stamp(t), ctx());
+  }
+  assert.deepEqual(
+    Array.from(a.publishedFluid.density),
+    Array.from(b.publishedFluid.density),
+    'a bad external = no external',
+  );
+  assert.equal(a.snapshot().external, undefined);
+  // handing the field back to the JS kernel republishes its own density
+  s.apply(stamp(3000), ctx());
+  assert.notEqual(s.publishedFluid.density, ext.density);
+  assert.ok(s.publishedFluid.step > 0 && s.snapshot().external === undefined);
+  // the seed a GPU backend uploads: step-0, exact, and equal to a fresh JS stage's starting field
+  const seed = fluidSeedState(0, 7, [{ x: 0.5, y: 0.5 }]);
+  assert.equal(seed.u.length, N);
+  assert.deepEqual(
+    seed,
+    fluidSeedState(0, 7, [{ x: 0.5, y: 0.5 }]),
+    'the seed is a pure function of (wake, seed, magnets)',
+  );
+  const fresh = createDishFluidStage();
+  fresh.apply(stamp(1.5), ctx({ external: field(0.5, 9) }));
+  assert.deepEqual(fresh.snapshot().state.u, Array.from(seed.u), "the stage's seed bookkeeping is the same field");
 }
 
 console.log('dishFluidStage.selfcheck: ok');
