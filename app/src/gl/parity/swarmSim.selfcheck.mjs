@@ -106,6 +106,49 @@ try {
     );
   }
 
+  // ---- point wind: the real noise (seed SEED), cloud swarm (windMul 1), one step from live state
+  {
+    const count = 200;
+    const lp = { ...lpFor(count), noise: undefined };
+    delete lp.noise;
+    const sys = new ParticleSystem();
+    sys.init(count, W, H, assets, palette, SEED);
+    const T0 = 1_000_000;
+    for (let s = 0; s < 20; s++) sys.update(lp, assets, palette, SEED, T0 + s * (1000 / 60), null);
+    const start = { ...stateOf(sys), seedOffset: Array.from(sys.seedOffset.subarray(0, sys.n)) };
+    const tNext = T0 + 20 * (1000 / 60);
+    sys.update(lp, assets, palette, SEED, tNext, null);
+    const after = stateOf(sys);
+    const params = {
+      ...coreParams(lp, null),
+      wind: {
+        seed: SEED,
+        freq: lp.noiseFreq ?? 0.005,
+        offX: 0,
+        offY: 0,
+        nt: tNext * (lp.noiseSpeed ?? 0.5) * 0.001,
+      },
+    };
+    const g = await page.evaluate((r) => window.__kcSwarmRun(r), { n: count, state: start, steps: 1, params });
+    const got = g.samples[1];
+    const d = Math.max(
+      maxDiff(after.x, got.x),
+      maxDiff(after.y, got.y),
+      maxDiff(after.vx, got.vx),
+      maxDiff(after.vy, got.vy),
+    );
+    check('point wind — one step matches the JS swarm to float noise', d < 1e-3, `max |d| ${d.toExponential(2)}`);
+    // and the wind is really on: the same step with wind off must differ
+    const g0 = await page.evaluate((r) => window.__kcSwarmRun(r), {
+      n: count,
+      state: start,
+      steps: 1,
+      params: { ...params, wind: null },
+    });
+    const off = Math.max(maxDiff(after.vx, g0.samples[1].vx), maxDiff(after.vy, g0.samples[1].vy));
+    check('point wind — is not a no-op', off > 1e-3, `wind-off differs by ${off.toExponential(2)}`);
+  }
+
   // ---- properties over a long run (the swarm is chaotic: trajectories are not compared, behaviour is)
   {
     const count = 350;
