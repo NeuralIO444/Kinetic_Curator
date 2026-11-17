@@ -27,6 +27,10 @@ window.__kcSwarmRun = (p) => {
         const d = g.readDrives();
         samples[s].dr = { energy: Array.from(d.energy), drive: Array.from(d.drive), leakRgb: Array.from(d.leakRgb) };
       }
+      if (p.spineLen) {
+        const sp = g.readSpine(p.spineLen);
+        samples[s].spine = { x: Array.from(sp.x), y: Array.from(sp.y) };
+      }
       if (p.state.rotation) samples[s].rotation = Array.from(g.readDrives().rotation);
       if (p.state.lorenz) {
         const l = g.readLorenz();

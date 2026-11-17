@@ -380,6 +380,82 @@ try {
     }
   }
 
+  // ---- spine: the body chain follows the head, each segment easing toward the one ahead of it (already moved this step)
+  {
+    const count = 120;
+    const lp = lpFor(count);
+    const sys = new ParticleSystem();
+    sys.init(count, W, H, assets, palette, SEED);
+    for (let s = 0; s < 20; s++) sys.update(lp, assets, palette, SEED, 1_000_000 + s * (1000 / 60), null);
+    const start = stateOf(sys);
+    const STEPS = 40;
+    for (const [label, len, follow] of [
+      ['4 segments, follow 0.4', 4, 0.4],
+      ['7 segments (the cap), follow 0.15', 7, 0.15],
+      ['1 segment (head only)', 1, 0.5],
+    ]) {
+      const sampleAt = Array.from({ length: STEPS }, (_, k) => k + 1);
+      const got = (
+        await page.evaluate((r) => window.__kcSwarmRun(r), {
+          n: count,
+          state: start,
+          steps: STEPS,
+          sampleAt,
+          spineLen: len,
+          params: { ...coreParams(lp, null), bounds: 'bounce', spine: { len, follow } },
+        })
+      ).samples;
+      // reference: particles.js's own chain lines, the head from the kernel's state each step; the spine starts as [head] at the pre-step position
+      let sp = Array.from({ length: count }, (_, i) => [{ x: start.x[i], y: start.y[i] }]);
+      let worst = 0;
+      for (let st = 1; st <= STEPS; st++) {
+        const g = got[st];
+        const next = [];
+        for (let i = 0; i < count; i++) {
+          const head = { x: g.x[i], y: g.y[i] };
+          const ns = [head];
+          for (let s = 1; s < len; s++) {
+            const prev = ns[s - 1];
+            const c = sp[i][s] || sp[i][sp[i].length - 1] || head;
+            ns.push({ x: c.x + (prev.x - c.x) * follow, y: c.y + (prev.y - c.y) * follow });
+          }
+          next.push(ns);
+          for (let s = 0; s < len; s++)
+            worst = Math.max(
+              worst,
+              Math.abs(g.spine.x[i * len + s] - ns[s].x),
+              Math.abs(g.spine.y[i * len + s] - ns[s].y),
+            );
+        }
+        sp = next;
+      }
+      check(
+        `spine — ${label}: ${STEPS} steps match the JS chain`,
+        worst < 5e-3,
+        `max |d| ${worst.toExponential(2)} px`,
+      );
+    }
+    // a segment trails its head: after the run, the tail is behind the head on average (a chain that is not a no-op)
+    const tailRun = (
+      await page.evaluate((r) => window.__kcSwarmRun(r), {
+        n: count,
+        state: start,
+        steps: STEPS,
+        sampleAt: [STEPS],
+        spineLen: 5,
+        params: { ...coreParams(lp, null), bounds: 'bounce', spine: { len: 5, follow: 0.3 } },
+      })
+    ).samples[STEPS];
+    let lag = 0;
+    for (let i = 0; i < count; i++)
+      lag += Math.hypot(tailRun.spine.x[i * 5 + 4] - tailRun.x[i], tailRun.spine.y[i * 5 + 4] - tailRun.y[i]);
+    check(
+      'spine — the tail trails the head (the chain is live)',
+      lag / count > 1,
+      `mean lag ${(lag / count).toFixed(1)} px`,
+    );
+  }
+
   // ---- Lorenz: per-agent attractor state advances like behave.js lorenzAdvance, and its direction steers
   {
     const count = 150;
