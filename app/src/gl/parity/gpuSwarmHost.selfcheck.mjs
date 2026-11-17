@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { gpuSwarmWanted, gpuSwarmLiveWanted, swarmIneligibleReason, swarmCoreParams } from '../gpuSwarmHost.mjs';
 import { SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from '../swarmSim.mjs';
+import { BEHAVE_IDS, resolveBehave, resolveSeekGain } from '../../engine/organisms/behave.js';
 import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
 
 // ---- pure: the flag (OFF by default; any one of layout param / window flag / URL turns it on)
@@ -22,7 +23,27 @@ import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
   const sys = { n: 10 };
   assert.equal(swarmIneligibleReason(sys, { behave: 'cruise' }, {}), null);
   assert.equal(swarmIneligibleReason({ n: 0 }, {}, {}), 'empty');
-  assert.equal(swarmIneligibleReason(sys, { behave: 'flock' }, {}), 'behave');
+  // a cloud swarm reads its behave row for the seek gain only, so every verb is covered
+  for (const id of BEHAVE_IDS) assert.equal(swarmIneligibleReason(sys, { behave: id }, {}), null, id);
+  // ...and the wind kernel the verb rides (#392): curl for flock / mold or an explicit windMode, point otherwise
+  for (const id of BEHAVE_IDS)
+    assert.equal(
+      swarmCoreParams({ behave: id }, { canvasW: 100, canvasH: 100, loopTimeMs: 0 }, { _noiseSeed: 9 }).wind.curl,
+      id === 'flock' || id === 'mold',
+      id,
+    );
+  assert.equal(swarmCoreParams({ windMode: 'curl' }, { loopTimeMs: 0 }, { _noiseSeed: 9 }).wind.curl, true);
+  assert.equal(
+    swarmCoreParams({ behave: 'flock', windType: 'point' }, { loopTimeMs: 0 }, { _noiseSeed: 9 }).wind.curl,
+    false,
+  );
+  for (const id of BEHAVE_IDS)
+    assert.equal(
+      swarmCoreParams({ behave: id }, { attractor: { x: 1, y: 1 }, canvasW: 100, canvasH: 100 }, { _noiseSeed: 9 })
+        .attractStrength,
+      ATTRACTOR_GAIN * resolveSeekGain(resolveBehave(id)),
+      id,
+    );
   assert.equal(
     swarmIneligibleReason(sys, { contactRadius: 8 }, {}),
     null,
@@ -67,7 +88,7 @@ import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
   assert.equal(p.cohW, 1.1);
   assert.equal(p.attractStrength, 2 * ATTRACTOR_GAIN * 1.6);
   assert.equal(p.damping, SWARM_CORE_CLOUD.damping);
-  assert.deepEqual(p.wind, { seed: 9, freq: 0.01, offX: 200, offY: 200, nt: 2000 * 0.25 * 0.001 });
+  assert.deepEqual(p.wind, { seed: 9, freq: 0.01, offX: 200, offY: 200, nt: 2000 * 0.25 * 0.001, curl: false });
   // takeover: the kernel takes the step's real dt and the world noise's seed (a system on the shared world noise has none of its own)
   const r = swarmCoreParams({}, { ...ctx, dtSec: 1 / 30, noiseSeed: 77 }, { _noiseSeed: null });
   assert.ok(Math.abs(r.dtFrames - 2) < 1e-12 && r.wind.seed === 77);
@@ -151,6 +172,10 @@ try {
     ['dish layer, seeking a well', { lp: { contactRadius: 8, behave: 'seek' }, attractor: { x: 700, y: 250 } }],
     ['dish layer, fleeing a well', { lp: { contactRadius: 8, behave: 'flee' }, attractor: { x: 400, y: 350 } }],
     ['MOD-steered layer', { lp: { modSteer: { sep: 1.5, ali: 0.6, coh: 2 } } }],
+    ['flock verb on a cloud layer', { lp: { behave: 'flock' }, attractor: { x: 500, y: 300 } }],
+    ['lorenz verb on a cloud layer', { lp: { behave: 'lorenz' } }],
+    ['mold verb in the dish (curl wind as a current)', { lp: { behave: 'mold', contactRadius: 8 } }],
+    ['explicit curl wind on a cruise layer', { lp: { windMode: 'curl' } }],
   ]) {
     const r5 = await page.evaluate(
       (x) => window.__kcShadowRun({ n: 200, steps: 5, seed: 0x2188, live: true, ...x }),

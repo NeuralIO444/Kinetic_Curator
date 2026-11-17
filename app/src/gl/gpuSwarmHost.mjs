@@ -9,12 +9,13 @@
 // kernel's steering accelerations feed the CPU's accumulators (particles.js `gpuStep` seam); the contact pass, damping, thermal kick,
 // speed clamp and integration stay JS in float64, so contact impulses and everything downstream compose exactly as before.
 //
-// Eligible = a plain cloud swarm the kernel fully covers today: not an organism, no dish contacts (contacts are slice 2b+,
-// they inject impulses between forces and integration), no mod steering. (The cloud swarm's point wind ignores the `wind` knob, so the kernel always runs it.) Anything else is skipped
+// Eligible = a cloud swarm, any verb (its behave row gives the seek gain and the wind kernel, both taken from the table); dish layers and
+// MOD-steered layers are covered by the force seam. An organism layer is not (its behaviour set has to move together). Anything else is skipped
 // and counted, never half-simulated.
 import { createGpuSwarm, SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from './swarmSim.mjs';
 import { isOrganismMode } from '../data/layout-modes.js';
 import { dishCurrentsFor, ATTRACTOR_DRIFT_SPEED, attractorDriftSign } from '../engine/dishCurrents.mjs';
+import { resolveBehave, resolveSeekGain, resolveWindMode } from '../engine/organisms/behave.js';
 
 /** Is the shadow asked for? Layout param, window flag, or URL, in that order of authority (any one turns it on). */
 export function gpuSwarmWanted(layoutParams, win) {
@@ -41,7 +42,8 @@ export function gpuSwarmLiveWanted(layoutParams, win) {
 /** Why a layer can't be shadowed, or null if it can. Pure. */
 export function swarmIneligibleReason(system, lp, ctx) {
   if (!system || !(system.n > 0)) return 'empty';
-  if (lp.behave && lp.behave !== 'cruise' && lp.behave !== 'seek' && lp.behave !== 'flee') return 'behave';
+  // (A cloud swarm reads its behave row for ONE thing, the seek gain (particles.js: every other field is organism-only), so every
+  // behave id is covered: the params take the gain from the same table.)
   // (The resolver hands EVERY layer a dishSession and the shared scent field, so their presence says nothing. A layer in the dish
   // contact pass is covered since the force seam: the kernel runs its #1414 currents and the contact impulses compose on the CPU.
   // MOD steering is three weight multipliers, folded into the params.)
@@ -60,7 +62,7 @@ export function swarmCoreParams(lp, ctx, system) {
         (ctx.seedOffsets?.noise ? ctx.seedOffsets.noise * 100 : 0),
     ) || 0;
   const att = ctx.attractor || null;
-  const seekMul = lp.behave === 'seek' ? 1.6 : lp.behave === 'flee' ? -1.6 : 1;
+  const seekMul = resolveSeekGain(resolveBehave(lp.behave)); // the table's own gain (seek 1.6, flee -1.6, every other verb 1)
   // #509 MOD steering: transient per-layer multipliers on the three boids weights (identity by default), as particles.js folds them
   const st = lp.modSteer || null;
   const mul = (k) => (st && Number.isFinite(Number(st[k])) ? Number(st[k]) : 1);
@@ -93,6 +95,8 @@ export function swarmCoreParams(lp, ctx, system) {
       offX: off('X'),
       offY: off('Y'),
       nt: ctx.loopTimeMs * (lp.noiseSpeed ?? 0.5) * 0.001,
+      // #392: the flock / mold verbs (and an explicit windMode / windType) ride the divergence-free curl wind, the rest the point wind
+      curl: resolveWindMode(lp) === 'curl',
     },
   };
 }
