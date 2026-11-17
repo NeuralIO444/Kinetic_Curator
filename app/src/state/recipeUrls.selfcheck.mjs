@@ -234,4 +234,12 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
   assert.strictEqual(describePaletteFallback('mine', userPalettes), null);
 }
 
+// #2320 — an unknown link version names every version this build reads (it said "kc-r/1 only" after kc-r/2 shipped).
+{
+  const r = decodeRecipeUrl('kc-r/3.e30');
+  assert.ok(!r.ok, 'kc-r/3 is refused');
+  assert.ok(/kc-r\/1/.test(r.error) && /kc-r\/2/.test(r.error), `error names kc-r/1 and kc-r/2: ${r.error}`);
+  assert.ok(!/ only\./.test(r.error), 'no stale "only" wording');
+}
+
 console.log('recipeUrls.selfcheck: OK');
