@@ -241,7 +241,7 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
   ok('a missing style or an unjoinable vocabulary assembles nothing; a messy rule is cleaned');
 }
 
-// 7 — data only: nothing outside the assembler's own files imports it yet.
+// 7 — data only: nothing outside the assembler's own files (and the rules' own test) imports it yet.
 {
   const root = join(here, '..');
   const importers = [];
@@ -250,7 +250,11 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
       const p = join(dir, name);
       if (statSync(p).isDirectory()) {
         if (name !== 'node_modules') walk(p);
-      } else if (/\.(mjs|js|jsx)$/.test(name) && !name.startsWith('constructAssembler.')) {
+      } else if (
+        /\.(mjs|js|jsx)$/.test(name) &&
+        !name.startsWith('constructAssembler.') &&
+        name !== 'constructRules.selfcheck.mjs'
+      ) {
         if (/from\s+['"][^'"]*constructAssembler/.test(readFileSync(p, 'utf8'))) importers.push(p);
       }
     }

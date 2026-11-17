@@ -13,6 +13,13 @@
 //                lineage kept in code; the product surface shows `label` only, never `identity.figures`.
 //   assets     — `note` is the asset-side reading of the style (what STYLE_RULES sorts into it); `families` are
 //                the asset families the style claims outright (the slot authored material joins by — #1854)
+//                `primitives` (#2108) is the style's CONSTRUCT VOCABULARY: the simple shapes the note names,
+//                as pool asset ids — the closed set a construct of this style is built from
+//                (engine/constructAssembler.js; one style per construct). `turns` is how a joined piece may
+//                turn: 'quarter' (constructed styles) or 'free' (arranged ones). NOT `families`: that slot is
+//                the PACK family a chapter's deck reads (data/chapters.js matches it against an asset's
+//                family), so a shape word written there would be silently dead and a pack name would move
+//                chapter decks. The vocabulary takes its own slot instead.
 //   lookGroup  — present when the style is a Look group on the LOOKS menu; `rank` is its menu position
 //   pairing    — the asset categories its voice family wears (the old FAMILY_PAIRING row); null when the style
 //                has no voice family of its own
@@ -52,7 +59,12 @@ const style = (r) =>
     ...r,
     bus: bus(r.bus),
     identity: Object.freeze({ ...r.identity, figures: Object.freeze([...r.identity.figures]) }),
-    assets: Object.freeze({ note: r.assets.note, families: Object.freeze([...r.assets.families]) }),
+    assets: Object.freeze({
+      note: r.assets.note,
+      families: Object.freeze([...r.assets.families]),
+      primitives: Object.freeze([...(r.assets.primitives || [])]),
+      turns: r.assets.turns === 'free' ? 'free' : 'quarter',
+    }),
     lookGroup: r.lookGroup ? Object.freeze({ ...r.lookGroup }) : null,
     pairing: r.pairing ? Object.freeze([...r.pairing]) : null,
   });
@@ -69,7 +81,11 @@ export const CANON_STYLES = Object.freeze(
         figures: ['Josef Müller-Brockmann', 'Armin Hofmann', 'Emil Ruder'],
         note: 'Grid discipline, type-led, flush and objective.',
       },
-      assets: { note: 'grid discipline, type-led, solid primitives', families: [] },
+      assets: {
+        note: 'grid discipline, type-led, solid primitives',
+        families: [],
+        primitives: ['geo_square_01', 'line_solid_01', 'geo_cross_01', 'geo_diamond_01'],
+      },
       lookGroup: { rank: 2 },
       pairing: ['geometric', 'linework'],
     },
@@ -83,7 +99,11 @@ export const CANON_STYLES = Object.freeze(
         figures: ['Wassily Kandinsky', 'László Moholy-Nagy', 'Herbert Bayer', 'Anni Albers'],
         note: 'Primary geometry, constructed, weighted.',
       },
-      assets: { note: 'primary geometry: circle / square / triangle / wedge', families: [] },
+      assets: {
+        note: 'primary geometry: circle / square / triangle / wedge',
+        families: [],
+        primitives: ['geo_circle_01', 'geo_square_01', 'geo_tri_01', 'geo_quartercircle_01', 'geo_halfcircle_01'],
+      },
       lookGroup: { rank: 3 },
       pairing: ['geometric', 'radial'],
     },
@@ -97,7 +117,12 @@ export const CANON_STYLES = Object.freeze(
         figures: ['Katsushika Hokusai', 'Utagawa Hiroshige', 'Ogata Kōrin'],
         note: 'Ma (the held empty), asymmetry, a brush that stops early.',
       },
-      assets: { note: 'ma and asymmetry: sprig, branch, petal, the single ring', families: [] },
+      assets: {
+        note: 'ma and asymmetry: sprig, branch, petal, the single ring',
+        families: [],
+        primitives: ['flora_sprig_01', 'flora_branch_01', 'org_petal_03', 'geo_circle_02'],
+        turns: 'free',
+      },
       lookGroup: { rank: 0 },
       pairing: ['floral', 'organic', 'radial'],
     },
@@ -111,7 +136,12 @@ export const CANON_STYLES = Object.freeze(
         figures: ['David Carson', 'Art Chantry'],
         note: 'Photocopy contrast, distress, torn geometry.',
       },
-      assets: { note: 'distress: stamps, scribble, photocopy, torn fragments', families: [] },
+      assets: {
+        note: 'distress: stamps, scribble, photocopy, torn fragments',
+        families: [],
+        primitives: ['frg01', 'frg10', 'frg04', 'stamp_glyph_06'],
+        turns: 'free',
+      },
       lookGroup: { rank: 1 },
       pairing: ['stamps', 'fragments', 'scanlines'],
     },
@@ -125,7 +155,12 @@ export const CANON_STYLES = Object.freeze(
         figures: ['Ernst Haeckel'],
         note: "The specimen plate, the copper line, the naturalist's drawer.",
       },
-      assets: { note: 'Haeckel plates: fine-line natural history', families: [] },
+      assets: {
+        note: 'Haeckel plates: fine-line natural history',
+        families: [],
+        primitives: ['hae_kelp_01', 'hae_tendril_01', 'hae_diatom_02'],
+        turns: 'free',
+      },
       lookGroup: { rank: 6 },
       pairing: ['radial', 'linework'],
     },
@@ -139,7 +174,11 @@ export const CANON_STYLES = Object.freeze(
         figures: ['The Designers Republic'],
         note: 'The readout as ornament: HUD, circuit trace, crystal, scan.',
       },
-      assets: { note: 'HUD, circuitry, crystal, scan', families: [] },
+      assets: {
+        note: 'HUD, circuitry, crystal, scan',
+        families: [],
+        primitives: ['mic_bracket_tl', 'mic_plus', 'xsh04', 'mic_needle'],
+      },
       lookGroup: null,
       pairing: null,
     },
@@ -153,7 +192,11 @@ export const CANON_STYLES = Object.freeze(
         figures: ['Susan Kare'],
         note: 'The 8-bit grid: every mark is a count of squares.',
       },
-      assets: { note: 'the 8-bit grid', families: [] },
+      assets: {
+        note: 'the 8-bit grid',
+        families: [],
+        primitives: ['pxg_speck', 'pxg_speck_ne', 'pxg_spark', 'pxg_dust'],
+      },
       lookGroup: null,
       pairing: null,
     },
@@ -167,7 +210,12 @@ export const CANON_STYLES = Object.freeze(
         figures: ['Jean Arp', 'Joan Miró'],
         note: 'Grown, not drawn: blob, cell, root, colony.',
       },
-      assets: { note: 'blob, cell, root, colony', families: [] },
+      assets: {
+        note: 'blob, cell, root, colony',
+        families: [],
+        primitives: ['org_blob_01', 'org_drop_01', 'org_pod_01', 'org_lobe_01'],
+        turns: 'free',
+      },
       lookGroup: null,
       pairing: null,
     },
@@ -181,7 +229,11 @@ export const CANON_STYLES = Object.freeze(
         figures: ['Bridget Riley', 'Victor Vasarely', 'Jesús Rafael Soto', 'Carlos Cruz-Diez'],
         note: 'Optical vibration, repetition, figure/ground flips.',
       },
-      assets: { note: 'optical: halftone, concentric, hatch, moiré', families: [] },
+      assets: {
+        note: 'optical: halftone, concentric, hatch, moiré',
+        families: [],
+        primitives: ['rad_orbit_01', 'rad_target_01', 'rad_rings_03', 'line_hatch_02'],
+      },
       lookGroup: { rank: 4 },
       pairing: ['radial', 'dots', 'linework'],
     },
@@ -195,7 +247,12 @@ export const CANON_STYLES = Object.freeze(
         figures: ['Ettore Sottsass', 'Nathalie Du Pasquier'],
         note: 'Loud, playful, squiggles and confetti on pastel.',
       },
-      assets: { note: 'confetti, squiggle, zigzag, star', families: [] },
+      assets: {
+        note: 'confetti, squiggle, zigzag, star',
+        families: [],
+        primitives: ['dot_single_01', 'line_squiggle_01', 'line_zigzag_01', 'geo_star5_01'],
+        turns: 'free',
+      },
       lookGroup: { rank: 5 },
       pairing: ['geometric', 'dots', 'linework'],
     },
@@ -210,7 +267,12 @@ export const CANON_STYLES = Object.freeze(
         figures: [],
         note: 'Pigment on a wall, almost no motion, most of the ground left empty.',
       },
-      assets: { note: 'the primitive chapter: pigment, tally, hand', families: ['marks'] },
+      assets: {
+        note: 'the primitive chapter: pigment, tally, hand',
+        families: ['marks'],
+        primitives: ['mrk_moon_01', 'mrk_cross_01', 'mrk_hand_01', 'mrk_tally_01'],
+        turns: 'free',
+      },
       lookGroup: { rank: 7 },
       pairing: ['stamps', 'linework', 'dots'],
     },
