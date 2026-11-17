@@ -1383,7 +1383,7 @@ export class ParticleSystem {
     // divided by mass and damped by vigor). When present the force loop below does not run: the accelerations are added to the
     // accumulators (so contact impulses already there still count) and everything after is the legacy step unchanged: the
     // contact pass, damping, thermal kick, speed clamp, integration in float64. Absent = the legacy path, bit for bit.
-    const gpuStep = layoutParams.gpuStep && layoutParams.gpuStep.n === numParticles ? layoutParams.gpuStep : null;
+    let gpuStep = layoutParams.gpuStep && layoutParams.gpuStep.n === numParticles ? layoutParams.gpuStep : null;
     const { cellStart, order, cols, rows, minCx, minCy, cellSize } = this._buildSpatialHash(maxRadius);
     const cx0 = this.canvasW / 2;
     const cy0 = this.canvasH / 2;
@@ -1410,6 +1410,52 @@ export class ParticleSystem {
     const SCENT = sharedScent || this._scent;
     const seedU = seed >>> 0;
 
+    // The organism form of the seam: a function, called HERE with the step's own resolved values (the eased profile, radii, weights,
+    // wind kernel, the senses that are on, the step counter), so the kernel's params come from the one derivation above and can never
+    // drift from it. It returns the same { n, fx, fy } and writes the drive / Lorenz / pigment state it advanced straight into this
+    // system's columns (vigor below reads the new energy, as the legacy loop does).
+    if (!gpuStep && typeof layoutParams.gpuStepFn === 'function' && numParticles > 0) {
+      const r = layoutParams.gpuStepFn({
+        system: this,
+        n: numParticles,
+        organism,
+        dtFrames,
+        step: this._step,
+        seed: seedU,
+        noiseSeed: this._noiseSeed,
+        noiseFreq,
+        domainOffsetX,
+        domainOffsetY,
+        nt,
+        useCurl,
+        windMul,
+        windCurrents,
+        attractorCurrents,
+        sepRadius,
+        aliRadius,
+        cohRadius,
+        sepW,
+        aliW,
+        cohW,
+        attractor:
+          attractor &&
+          Number.isFinite(attractor.x) &&
+          Number.isFinite(attractor.y) &&
+          gravityWells > 0 &&
+          attractMul > 0
+            ? attractor
+            : null,
+        attractStrength: gravityWells * attractMul * ATTRACTOR_GAIN * seekMul,
+        attractDrift: ATTRACTOR_DRIFT_SPEED * attractorDriftSign(seekMul),
+        meta: drivesOn ? meta : 0,
+        chemotaxis: chemOn ? profile.chemotaxis : 0,
+        levy: levyOn ? { gain: levyGain, alpha: levyAlpha } : null,
+        lorenz: lorenzPhase ? { rho: lorenzRho, gain: lorenzGain } : null,
+        leak: leakOn ? leak : 0,
+        scent: SCENT,
+      });
+      if (r && r.n === numParticles) gpuStep = r;
+    }
     if (gpuStep) {
       const GFX = gpuStep.fx;
       const GFY = gpuStep.fy;
@@ -1422,6 +1468,18 @@ export class ParticleSystem {
           const tg = sampleTrailReadGradient(trails, X[i] / this.canvasW, Y[i] / this.canvasH);
           gx += (tg.gx * TRAIL_GAIN) / MASS[i];
           gy += (tg.gy * TRAIL_GAIN) / MASS[i];
+        }
+        // the organism's centre pull (orbit) is a pure function of the position: it joins the steering sum here, before vigor
+        if (organism && profile.orbit) {
+          const o = orbitForce(X[i], Y[i], cx0, cy0, profile.orbit);
+          gx += o.fx / MASS[i];
+          gy += o.fy / MASS[i];
+        }
+        if (drivesOn) {
+          // fatigue damps the whole steering sum (never the contact impulses already in AX), on the energy the kernel just advanced
+          const vigor = 0.45 + 0.55 * ENERGY[i];
+          gx *= vigor;
+          gy *= vigor;
         }
         AX[i] += gx;
         AY[i] += gy;

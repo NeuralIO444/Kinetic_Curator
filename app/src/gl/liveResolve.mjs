@@ -835,9 +835,9 @@ export function createLiveResolver() {
       }
       // K3 takeover: the loop's `swarmGpu` input marker is the switch (recorded, so the take's header says the GPU ran). The kernel's
       // steering accelerations replace the JS force loop for an eligible layer; anything else runs the JS step as always.
-      const gpuStep = ctx.swarmGpu && shadowTok ? swarmShadow.forces(shadowTok) : null;
+      const gpuSeam = ctx.swarmGpu && shadowTok ? swarmShadow.seam(shadowTok) : null;
       st.system.update(
-        gpuStep ? { ...updLp, gpuStep } : updLp,
+        gpuSeam ? { ...updLp, ...gpuSeam } : updLp,
         ctx.activeAssets,
         ctx.palette,
         ctx.seed,

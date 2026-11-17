@@ -87,4 +87,80 @@ const cols = (s) =>
   assert.deepEqual(cols(a), cols(b));
   console.log('  [ok] absent seam == legacy');
 }
+
+// 5. the organism form: `gpuStepFn` is called once per update with the step's own resolved values and returns the same { n, fx, fy }
+{
+  const olp = normalizeLayoutParams({
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'hype',
+    behave: 'flock',
+    metabolism: 1,
+    particleCount: 80,
+  });
+  const seen = [];
+  const run = (g, energy) => {
+    const sys = mk();
+    for (let i = 0; i < sys.n; i++) sys.energy[i] = energy;
+    sys.update(
+      {
+        ...olp,
+        gpuStepFn: (c) => {
+          seen.push(c);
+          return { n: c.n, fx: g.fx(c.n), fy: g.fy(c.n) };
+        },
+      },
+      assets,
+      palette,
+      SEED,
+      T(0),
+      null,
+    );
+    return sys;
+  };
+  const zero = { fx: (n) => new Float64Array(n), fy: (n) => new Float64Array(n) };
+  const push = { fx: (n) => new Float64Array(n).fill(1), fy: (n) => new Float64Array(n).fill(-2) };
+  const E = 0.3;
+  const z = run(zero, E);
+  const p1 = run(push, E);
+  assert.equal(seen.length, 2, 'called once per update');
+  const c = seen[0];
+  assert.ok(c.organism === true && c.n === 80 && c.system && c.step >= 1, 'organism context');
+  assert.ok(c.sepRadius > 0 && c.aliRadius > 0 && c.cohRadius > 0 && c.dtFrames > 0, 'radii and dt come resolved');
+  assert.equal(c.meta, 1, 'drives on at metabolism 1');
+  assert.equal(c.useCurl, true, 'flock rides the curl wind');
+  // the steering is damped by vigor (0.45 + 0.55 * energy) on the energy the callback left, then damped like any velocity
+  const vigor = 0.45 + 0.55 * E;
+  const damp = Math.max(olp.damping ?? 0.95, 0.97);
+  let worst = 0;
+  let checked = 0;
+  for (let i = 0; i < 80; i++) {
+    if (Math.max(Math.hypot(p1.vx[i], p1.vy[i]), Math.hypot(z.vx[i], z.vy[i])) > 1.6) continue; // the organism speed clamp (1.65) is the legacy one, not under test here
+    checked++;
+    worst = Math.max(
+      worst,
+      Math.abs(p1.vx[i] - z.vx[i] - 1 * vigor * damp),
+      Math.abs(p1.vy[i] - z.vy[i] + 2 * vigor * damp),
+    );
+  }
+  assert.ok(checked > 20, `enough agents under the clamp (${checked})`);
+  assert.ok(worst < 1e-9, `vigor scales the steering sum (worst ${worst})`);
+  // a wrong-size answer is ignored: the legacy loop runs
+  const a = mk();
+  const b = mk();
+  a.update(olp, assets, palette, SEED, T(0), null);
+  b.update(
+    { ...olp, gpuStepFn: () => ({ n: 3, fx: new Float64Array(3), fy: new Float64Array(3) }) },
+    assets,
+    palette,
+    SEED,
+    T(0),
+    null,
+  );
+  assert.deepEqual(cols(a), cols(b));
+  // a cloud layer reports organism false
+  seen.length = 0;
+  mk().update({ ...lp, gpuStepFn: (c2) => (seen.push(c2), null) }, assets, palette, SEED, T(0), null);
+  assert.ok(seen.length === 1 && seen[0].organism === false && seen[0].meta === 0, 'cloud context');
+  console.log('  [ok] the organism callback seam: context, vigor, wrong size ignored');
+}
 console.log('particles.gpuStep.selfcheck: ok — K3 takeover #2188');

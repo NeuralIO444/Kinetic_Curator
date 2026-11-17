@@ -128,7 +128,13 @@ export function createScentField(cols = SCENT_COLS, rows = SCENT_ROWS) {
     return decodeTypedInto(rec, cells);
   }
 
-  return { kind: 'scent', cols, rows, sample, deposit, gradient, step, clear, snapshotCells, restoreCells };
+  /** Copy the cells into `out` (a Float32Array / Float64Array of cols * rows): the GPU swarm kernel reads the same grid. */
+  function copyCells(out) {
+    out.set(cells);
+    return out;
+  }
+
+  return { kind: 'scent', cols, rows, sample, deposit, gradient, step, clear, snapshotCells, restoreCells, copyCells };
 }
 
 registerCostTier('engine/scent-field', {

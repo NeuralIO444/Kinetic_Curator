@@ -2,7 +2,13 @@
 // gate, the param mapping. GL half (skips cleanly with no Playwright browser): the shadow over a real ParticleSystem agrees with
 // the JS step to float noise, skips what the kernel doesn't cover, and never changes the JS swarm.
 import assert from 'node:assert/strict';
-import { gpuSwarmWanted, gpuSwarmLiveWanted, swarmIneligibleReason, swarmCoreParams } from '../gpuSwarmHost.mjs';
+import {
+  gpuSwarmWanted,
+  gpuSwarmLiveWanted,
+  swarmIneligibleReason,
+  swarmCoreParams,
+  organismCoreParams,
+} from '../gpuSwarmHost.mjs';
 import { SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from '../swarmSim.mjs';
 import { BEHAVE_IDS, resolveBehave, resolveSeekGain } from '../../engine/organisms/behave.js';
 import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
@@ -57,6 +63,9 @@ import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
   );
   assert.equal(swarmIneligibleReason(sys, { mode: 'hype' }, {}), 'organism', 'the organism mode is');
   assert.equal(swarmIneligibleReason(sys, { organism: true }, {}), 'organism');
+  // the takeover's callback seam covers an organism layer (the shadow, which compares a whole step, still sits it out)
+  assert.equal(swarmIneligibleReason(sys, { mode: 'hype', behave: 'mold' }, {}, { organisms: true }), null);
+  assert.equal(swarmIneligibleReason(sys, { mode: 'hype' }, { slowRender: true }, { organisms: true }), 'slowRender');
   assert.equal(swarmIneligibleReason(sys, { modSteer: {} }, {}), null, 'MOD steering folds into the weights');
   assert.equal(swarmIneligibleReason(sys, {}, { slowRender: true }), 'slowRender');
   console.log('  [ok] eligibility gate');
@@ -118,6 +127,64 @@ try {
   throw e;
 }
 const { page, close } = harness;
+// ---- pure: the organism params are a rename of what particles.js resolved for the step
+{
+  const sys = { canvasW: 1000, canvasH: 700 };
+  const base = {
+    system: sys,
+    seed: 0x2188,
+    step: 7,
+    dtFrames: 1,
+    noiseSeed: null,
+    noiseFreq: 0.01,
+    domainOffsetX: 3,
+    domainOffsetY: 4,
+    nt: 0.5,
+    useCurl: true,
+    windMul: 0.22,
+    windCurrents: { on: false, coupling: 0 },
+    attractorCurrents: { on: false, coupling: 0 },
+    sepRadius: 64,
+    aliRadius: 48,
+    cohRadius: 52,
+    sepW: 3.1,
+    aliW: 0.28,
+    cohW: 0.12,
+    attractor: { x: 1, y: 2 },
+    attractStrength: 8 * 0.45,
+    attractDrift: 0.5,
+    meta: 1,
+    chemotaxis: 0,
+    levy: null,
+    lorenz: null,
+    leak: 0.4,
+  };
+  const p = organismCoreParams(base, 999);
+  assert.equal(p.sepR, 64);
+  assert.equal(p.cohW, 0.12);
+  assert.deepEqual(
+    p.wind,
+    { seed: 999, freq: 0.01, offX: 3, offY: 4, nt: 0.5, curl: true, mul: 0.22 },
+    'world noise: the resolver seed',
+  );
+  assert.equal(organismCoreParams({ ...base, noiseSeed: 5 }, 999).wind.seed, 5, 'a system with its own noise keeps it');
+  assert.equal(p.currents, null, 'outside the dish: legacy forces');
+  assert.equal(p.attractStrength, 8 * 0.45);
+  assert.equal(organismCoreParams({ ...base, attractor: null }).attractStrength, 0);
+  assert.deepEqual(p.drives, { meta: 1, step: 7, base: p.drives.base });
+  assert.equal(organismCoreParams({ ...base, meta: 0 }).drives, null);
+  assert.equal(p.leak, 0.4);
+  assert.equal(p.levy, null);
+  assert.equal(organismCoreParams({ ...base, levy: { gain: 2, alpha: 1.5 } }).levy.step, 7);
+  assert.deepEqual(organismCoreParams({ ...base, lorenz: { rho: 28, gain: 0.5 } }).lorenz, { rho: 28, gain: 0.5 });
+  const dish = organismCoreParams({
+    ...base,
+    windCurrents: { on: true, coupling: 0.1 },
+    attractorCurrents: { on: false, coupling: 0 },
+  });
+  assert.deepEqual(dish.currents, { wind: 0.1, attract: 0, drift: 0.5 });
+}
+
 let failed = 0;
 const check = (name, cond, detail) => {
   console.log(`  [${cond ? 'ok' : 'FAIL'}] ${name}${detail ? ' — ' + detail : ''}`);
@@ -185,6 +252,49 @@ try {
       `takeover, ${label}: applied every frame and tracks the pure-JS twin`,
       r5.applied === 5 && r5.drift < 5e-2,
       `${r5.applied}/5, max |dpos| ${r5.drift.toExponential(2)} px`,
+    );
+  }
+  // an ORGANISM layer (hype): the callback seam hands the kernel the step's own resolved values; positions AND the slow state
+  // (drives, Lorenz phase, pigment) track the pure-JS twin
+  const SC = Array.from({ length: 60 }, (_, k) => ({ x: 0.3 + 0.006 * k, y: 0.4 + 0.004 * k, amount: 2 }));
+  const A = { x: 500, y: 300 };
+  for (const [label, extra] of [
+    ['cruise', { lp: { mode: 'hype' } }],
+    ['flock, drawn to a well', { lp: { mode: 'hype', behave: 'flock' }, attractor: A }],
+    ['orbit (the centre pull)', { lp: { mode: 'hype', behave: 'orbit' } }],
+    ['scatter', { lp: { mode: 'hype', behave: 'scatter' } }],
+    ['levy', { lp: { mode: 'hype', behave: 'levy' } }],
+    ['lorenz', { lp: { mode: 'hype', behave: 'lorenz' } }],
+    ['mold (chemotaxis up a laid scent)', { lp: { mode: 'hype', behave: 'mold' }, scentDeposits: SC }],
+    ['seek', { lp: { mode: 'hype', behave: 'seek' }, attractor: A }],
+    [
+      'drives on (feeding on scent, vigor)',
+      { lp: { mode: 'hype', behave: 'flock', metabolism: 1.5 }, scentDeposits: SC },
+    ],
+    ['pigment leak', { lp: { mode: 'hype', behave: 'flock' }, palette: { leak: 0.6 } }],
+    [
+      'dead slots (parked for the GPU, state not written back)',
+      { lp: { mode: 'hype', behave: 'flock', metabolism: 1 }, kill: [3, 17, 18, 150] },
+    ],
+    ['in the dish', { lp: { mode: 'hype', behave: 'flock', contactRadius: 8 } }],
+    [
+      'mold + drives + leak in the dish',
+      {
+        lp: { mode: 'hype', behave: 'mold', metabolism: 1, contactRadius: 8 },
+        palette: { leak: 0.5 },
+        scentDeposits: SC,
+      },
+    ],
+  ]) {
+    const r = await page.evaluate(
+      (x) => window.__kcShadowRun({ n: 200, steps: 5, seed: 0x2188, live: true, ...x }),
+      extra,
+    );
+    const slow = Math.max(r.slow.energy, r.slow.drive, r.slow.lorenz, r.slow.leak / 255);
+    check(
+      `organism takeover, ${label}: applied every frame, positions and slow state track the twin`,
+      r.applied === 5 && r.drift < 5e-2 && slow < 1e-3,
+      `${r.applied}/5, max |dpos| ${r.drift.toExponential(2)} px, slow state ${slow.toExponential(1)}`,
     );
   }
   // the shadow (no takeover) sits a dish layer out: the kernel has no contact impulses, so a whole-step comparison would be noise
