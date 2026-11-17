@@ -254,6 +254,28 @@ try {
       `${r5.applied}/5, max |dpos| ${r5.drift.toExponential(2)} px`,
     );
   }
+  // dense contacts (discs 30 px: every agent touches several others): the legacy contact pass, with the wet medium's cling, runs on the
+  // CPU after the kernel's steering, so the takeover composes with it. A collision amplifies any float32/float64 difference ~30x a step
+  // (1.7e-5 px after one step, 1.7e-3 after two, 5e-2 after three), so the contact cases are held to two steps; the long run is judged by properties.
+  for (const [label, lp, steps] of [
+    ['dense dish, dry', { contactRadius: 30, contactMode: 'bounce', contactRestitution: 0.7 }, 2],
+    [
+      'dense dish, wet (cling)',
+      { contactRadius: 30, contactMode: 'bounce', contactRestitution: 0.7, accumulationWetness: 0.8 },
+      2,
+    ],
+    ['dense dish, wet impulse mode', { contactRadius: 30, contactMode: 'impulse', accumulationWetness: 0.8 }, 2],
+  ]) {
+    const r = await page.evaluate((x) => window.__kcShadowRun({ n: 200, seed: 0x2188, live: true, ...x }), {
+      lp,
+      steps,
+    });
+    check(
+      `takeover, ${label}: contacts and cling compose with the kernel's steering (${steps} steps)`,
+      r.applied === steps && r.drift < 1e-2,
+      `${r.applied}/${steps}, max |dpos| ${r.drift.toExponential(2)} px`,
+    );
+  }
   // an ORGANISM layer (hype): the callback seam hands the kernel the step's own resolved values; positions AND the slow state
   // (drives, Lorenz phase, pigment) track the pure-JS twin
   const SC = Array.from({ length: 60 }, (_, k) => ({ x: 0.3 + 0.006 * k, y: 0.4 + 0.004 * k, amount: 2 }));
