@@ -22,6 +22,7 @@ import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the po
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
 import { ASSETS_CONSTRUCTS } from '../data/assets/index.js';
 import { assetStyle } from '../data/assetStyle.js';
+import { isComplexAsset } from '../state/rollPool.mjs'; // #2108: the library cut
 import { leadWithConstructs } from '../engine/constructLead.js'; // #2108: constructs lead (the CONSTRUCTS gate)
 import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
 import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
@@ -292,6 +293,8 @@ export function rollDice({
   constructLead = false, // #2108: the CONSTRUCTS gate — on, each cast's lead slots are the lead asset's style's constructs
 }) {
   if (!assets || !assets.length) throw new Error('[dice] no assets to deal from');
+  // #2108 — the library cut: with the CONSTRUCTS gate on, casts are dealt from the simple shapes only.
+  const dealFrom = constructLead ? assets.filter((a) => !isComplexAsset(a.id)) : assets;
   if (!scorer || typeof scorer.score !== 'function') throw new Error('[dice] scorer missing');
   const wildness = wildnessForDavis(davisCode);
   const n = DICE_CANDIDATES_BASE + Math.round(wildness * DICE_CANDIDATES_WILD);
@@ -308,13 +311,13 @@ export function rollDice({
     let anchorFamily = null;
     if (i >= n - stratCount) {
       const fam = stratifiedFamilyFor(layout.id, size, i);
-      const pool = assets.filter((a) => a.category === fam);
+      const pool = dealFrom.filter((a) => a.category === fam);
       if (pool.length) {
         anchorPool = pool;
         anchorFamily = fam;
       }
     }
-    const dealt = dealCast(assets, size, rng, wildness, crowns, anchorPool);
+    const dealt = dealCast(dealFrom, size, rng, wildness, crowns, anchorPool);
     // #2108 — off, the cast is exactly as dealt. On, the cast's leading slots become house constructs of the style
     // of the cast's own lead asset (so the cast stays coherent); no rng is drawn, so every other candidate is unmoved.
     const assetIds = constructLead

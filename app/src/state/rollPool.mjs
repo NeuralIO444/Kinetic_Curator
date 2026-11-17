@@ -19,7 +19,7 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
-import { ASSETS_CONSTRUCTS } from '../data/assets/index.js';
+import { ASSETS, ASSETS_CONSTRUCTS } from '../data/assets/index.js';
 import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
 import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
 import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
@@ -77,6 +77,32 @@ export function dealableRecords(assets, customAssets = []) {
   // never dealt by a pool. Judged by what the record IS (category + source), never by its id.
   const imports = (customAssets || []).filter((a) => !isCreatureTile(a));
   return assetRecords([...(assets || []), ...imports]).filter((r) => !NEVER_DEALT.includes(r.id));
+}
+
+/** #2108 (the library cut): a library asset with this many drawn shapes or more is COMPLEX — the constructs build those. */
+export const COMPLEX_SHAPES = 4;
+const SHAPE_TAGS = /<(path|circle|rect|ellipse|line|polygon|polyline)\b/g;
+let complexIds = null;
+const complexIdSet = () => {
+  if (!complexIds) {
+    complexIds = new Set();
+    const built = new Set(ASSETS_CONSTRUCTS.map((a) => a.id)); // the constructs ARE the answer to complexity: never cut
+    for (const a of ASSETS)
+      if (!built.has(a.id) && (String(a.svg).match(SHAPE_TAGS) || []).length >= COMPLEX_SHAPES) complexIds.add(a.id);
+  }
+  return complexIds;
+};
+/**
+ * The library cut — with the CONSTRUCTS gate on, the deal draws only simple shapes (1–3 drawn shapes) and the
+ * constructs, which assemble the complex ones. A complex library asset stays in the catalogue, so a project or take
+ * that names one still renders; it is simply never dealt. The artist's own imports are never cut (their ids are not
+ * the library's). Off, nothing calls this, and the deal is exactly as it was.
+ */
+/** True for a complex library asset (the library cut leaves it undealt). */
+export const isComplexAsset = (id) => complexIdSet().has(id);
+export function reducedRecords(records) {
+  const complex = complexIdSet();
+  return (records || []).filter((r) => !complex.has(r.id));
 }
 
 /**

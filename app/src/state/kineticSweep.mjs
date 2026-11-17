@@ -22,7 +22,7 @@ import { validateLayoutParams } from '../data/layout-modes.js';
 import { RANDOMIZABLE_KEYS } from './paramUtils.js';
 import { REFINE_RANGES, mutateKey } from '../curator/refineMutate.js';
 import { MOTION_KEYS, pinRollScope } from './rollScope.mjs';
-import { dealPoolFor, poolToEnabled } from './rollPool.mjs';
+import { dealPoolFor, poolToEnabled, isComplexAsset } from './rollPool.mjs';
 import { leadWithConstructs } from '../engine/constructLead.js'; // #2108: constructs lead (the CONSTRUCTS gate)
 
 /** The curator pass's cap: at most this many params move, each by at most NUDGE_SPREAD of its dice range. */
@@ -90,9 +90,15 @@ export function lookPass(
           kitContext,
         });
   // #2108 — the CONSTRUCTS gate: on, the style in play's house constructs lead the pool (engine/constructLead.js).
-  // Off, this line is skipped and the deal is exactly as it was. The curated 4-shape sets are never touched.
-  const poolIds =
-    state.constructLead && poolKind !== 'sets' ? leadWithConstructs(pool.ids, look?.styles?.[0] ?? null) : pool.ids;
+  // Off, this is skipped and the deal is exactly as it was.
+  // The library cut applies to a curated set too: complex assets are never dealt with the gate on.
+  const poolIds = state.constructLead
+    ? leadWithConstructs(
+        pool.ids.filter((id) => !isComplexAsset(id)),
+        look?.styles?.[0] ?? null,
+        look?.id || 'standing',
+      )
+    : pool.ids;
   return {
     layoutParams: validateLayoutParams(merged).params, // #1550: rolled values land through the validating door
     enabledAssets: poolToEnabled(poolIds),
