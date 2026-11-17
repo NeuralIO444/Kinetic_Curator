@@ -96,6 +96,8 @@ test('a fresh artist climbs SHAPE → CONSTRUCT → CREATURE, and it all survive
   await page.getByRole('tab', { name: /assets/i }).click();
   await openLab(page);
   await expect(page.getByTestId('rung-creature')).toBeEnabled();
+  // #2318 — one creature kept on the ladder does not open RIG, even after a reload
+  await expect(page.getByTestId('rung-rig')).toBeDisabled();
   await expect(pips(page, 'shape')).toHaveAttribute('data-filled', '3');
   await expect(pips(page, 'construct')).toHaveAttribute('data-filled', '3');
   await expect(pips(page, 'creature')).toHaveAttribute('data-filled', '1');

@@ -115,6 +115,23 @@ export function openForExisting(ladder, { creatures = 0, beasts = 0 } = {}) {
   return { v: 1, kept: { ...cur.kept }, open };
 }
 
+/**
+ * The ladder to show when the WetLab opens (#2318's quirk, Matt 2026-11-17). An artist who already holds creatures or
+ * beasts the FIRST time they meet the ladder — nothing stored yet — starts with every rung open (§12.3): those were
+ * banked before the ladder shipped. Once a ladder is stored, it is the record: creatures kept on the ladder since then
+ * do not re-open rungs on the next load, so RIG is earned, not granted by a reload. Never throws.
+ */
+export function restoreLadder(storage, counts = {}) {
+  let stored = false;
+  try {
+    stored = !!(storage && storage.getItem(LADDER_KEY));
+  } catch {
+    stored = false;
+  }
+  const loaded = loadLadder(storage);
+  return stored ? loaded : openForExisting(loaded, counts);
+}
+
 /** The rung a new artist would work on next: the highest open rung. */
 export function topOpenRung(ladder) {
   let top = FIRST;

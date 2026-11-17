@@ -4,13 +4,13 @@
 // `keepOn` from the creature and beast strips). Storage is the per-viewer preference (wetLabLadder.mjs LADDER_KEY),
 // wrapped as FerroFluidChip wraps it: a blocked store reads as a new artist and a failed write just loses the nicety.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { emptyLadder, keep, loadLadder, openForExisting, saveLadder } from './wetLabLadder.mjs';
+import { emptyLadder, keep, restoreLadder, saveLadder } from './wetLabLadder.mjs';
 
 const storage = () => (typeof localStorage !== 'undefined' ? localStorage : null);
 
 /**
  * @param {{ creatures: number, beasts: number }} counts  what the project already holds; either > 0 opens every rung
- *   for an existing artist (§12.3). Read once, at the first mount.
+ *   for an existing artist (§12.3), only the first time they meet the ladder (restoreLadder). Read once, at mount.
  * @returns {{ ladder, keepOn(rung) → opened rung id | null }}
  */
 export function useWetLabLadder({ creatures = 0, beasts = 0 } = {}) {
@@ -22,7 +22,7 @@ export function useWetLabLadder({ creatures = 0, beasts = 0 } = {}) {
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
-    const next = openForExisting(loadLadder(storage()), { creatures, beasts });
+    const next = restoreLadder(storage(), { creatures, beasts });
     latest.current = next;
     setLadder(next);
     saveLadder(storage(), next);
