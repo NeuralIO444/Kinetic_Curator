@@ -106,7 +106,7 @@ When TASTE finds a principle failing, it **hands it to that principle's owner**,
 ### Order (each one PR, Matt merges)
 
 1. Retire the clumps, and record this design (this PR).
-2. Field-driven break-up: pieces of assets and creatures flow with the fluid and reassemble when it leaves (#2178 channel 1). The fluid's copies retire.
+2. Field-driven break-up: pieces of assets and creatures flow with the fluid and reassemble when it leaves (#2178 channel 1). The fluid's copies retire. Re-ordered 2026-11-16: waits for the constructs build and the library cut (`docs/design/constructs-spec.md` §8), so pieces come from constructs.
 3. Life births as copies of real marks inside placement; cap 256; share rule; copies shed first (#2152 slice 2, re-cut).
 4. Retire Life's own cell drawing (visual mode) and specks.
 5. TASTE scores the four principles.
