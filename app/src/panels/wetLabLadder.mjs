@@ -100,6 +100,21 @@ export function keep(ladder, rung) {
   return { ladder: next, opened: null };
 }
 
+/**
+ * An artist who already has kept creatures or beasts starts with every rung open (spec §12.3): they have been
+ * working the top of the ladder before it existed, and locking it would take away what they had. A brand-new artist
+ * (no creatures, no beasts) keeps the ladder as it is. Never closes a rung and never changes the keeps. Pure.
+ * `creatures` and `beasts` are counts; anything that is not a positive number reads as zero.
+ */
+export function openForExisting(ladder, { creatures = 0, beasts = 0 } = {}) {
+  const cur = sanitizeLadder(ladder);
+  const n = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+  if (!n(creatures) && !n(beasts)) return cur;
+  const open = {};
+  for (const id of RUNG_IDS) open[id] = true;
+  return { v: 1, kept: { ...cur.kept }, open };
+}
+
 /** The rung a new artist would work on next: the highest open rung. */
 export function topOpenRung(ladder) {
   let top = FIRST;

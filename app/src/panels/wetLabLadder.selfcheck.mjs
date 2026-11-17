@@ -20,6 +20,7 @@ import {
   lockLabel,
   keep,
   topOpenRung,
+  openForExisting,
   loadLadder,
   saveLadder,
 } from './wetLabLadder.mjs';
@@ -178,6 +179,34 @@ ok('a blocked or missing store never throws and reads as a new artist', () => {
   assert.equal(saveLadder(blocked, emptyLadder()), false);
   assert.deepEqual(loadLadder(null), emptyLadder());
   assert.equal(saveLadder(null, emptyLadder()), false);
+});
+
+ok('an artist with kept creatures or beasts starts with every rung open; a new artist does not', () => {
+  const fresh = emptyLadder();
+  for (const counts of [{ creatures: 1 }, { beasts: 2 }, { creatures: 5, beasts: 1 }]) {
+    const l = openForExisting(fresh, counts);
+    assert.deepEqual(
+      RUNG_IDS.map((id) => isOpen(l, id)),
+      RUNG_IDS.map(() => true),
+      JSON.stringify(counts),
+    );
+    assert.deepEqual(l.kept, fresh.kept, 'the keeps are not touched');
+    assert.equal(topOpenRung(l), 'rig');
+  }
+  assert.deepEqual(openForExisting(fresh, { creatures: 0, beasts: 0 }), fresh);
+  assert.deepEqual(openForExisting(fresh), fresh);
+});
+
+ok('openForExisting never closes a rung, reads junk counts as zero, and does not change its input', () => {
+  const half = keepN(emptyLadder(), 'shape', 3).ladder;
+  const frozen = JSON.stringify(half);
+  for (const junk of [NaN, -3, '4', null, undefined, Infinity]) {
+    const l = openForExisting(half, { creatures: junk, beasts: junk });
+    assert.equal(isOpen(l, 'construct'), true, 'an earned rung stays open');
+    assert.equal(isOpen(l, 'creature'), false, `junk count ${String(junk)} opens nothing`);
+  }
+  openForExisting(half, { creatures: 3 });
+  assert.equal(JSON.stringify(half), frozen);
 });
 
 ok('the model is pure: no clock, no Math.random, no store, no React, no DOM', () => {
