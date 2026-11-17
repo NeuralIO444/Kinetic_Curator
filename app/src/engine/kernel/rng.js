@@ -214,6 +214,11 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // #1997 — the fluid's bias on the culture's births (engine/dishFluidCouple.mjs) is a spatial
   // decision dealt per cell per generation, like the seed fill above.
   'dish-fluid-birth': 'spatial',
+  // #2108 — the construct assembler's deal (engine/constructAssembler.js): which of a style's primitives
+  // join, where, at what turn and scale. A construct is a shape, so the deal is an ASSET decision. The
+  // assembler passes no offsets, so the group offset is the identity for its draws; its own channel keeps
+  // a construct deal from re-keying a creature deal that shares the seed.
+  construct: 'asset',
 });
 
 const OFFSET_GROUP_OF = new Map([
