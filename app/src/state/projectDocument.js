@@ -212,6 +212,7 @@ export function serializeProject(state) {
   // when there are some: a project with none exports as before.
   const constructs = sanitizeConstructRecords(state.constructRecords);
   if (constructs.length) doc.constructRecords = constructs;
+  if (state.constructLead === true) doc.constructLead = true; // #2108 — only when on: an off project serializes as before
   // #1694 S3 — the creature count has no top-level field any more: it is the BUILD layout
   // param `creatures`, written above inside layoutParams like every other param (the
   // pre-fold-in top-level `creatureCount` field is read back only by parseProject's
@@ -346,6 +347,7 @@ export function parseProject(raw) {
       creatureRecords: sanitizeCreatureRecords(raw.creatureRecords), // #1849
       shapeShelf: sanitizeShapeShelf(raw.shapeShelf), // #2280
       constructRecords: sanitizeConstructRecords(raw.constructRecords), // #2108
+      constructLead: raw.constructLead === true, // #2108 — the CONSTRUCTS gate
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
       ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
       mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
@@ -413,6 +415,7 @@ export function parseProject(raw) {
     creatureRecords: sanitizeCreatureRecords(raw.creatureRecords), // #1849
     shapeShelf: sanitizeShapeShelf(raw.shapeShelf), // #2280
     constructRecords: sanitizeConstructRecords(raw.constructRecords), // #2108
+    constructLead: raw.constructLead === true, // #2108 — the CONSTRUCTS gate
     audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
     ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
     mathMacros: sanitizeMathMacros(raw.mathMacros), // #724

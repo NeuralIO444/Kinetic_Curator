@@ -119,9 +119,12 @@ const POEM_ONLY_IDS = new Set(
     ...ASSETS_PLATE,
     ...ASSETS_WEAR,
     ...ASSETS_RISO,
-    ...ASSETS_CONSTRUCTS, // #2108
   ].map((a) => a.id),
 );
+// #2108 — the house constructs are placeable ONLY when a pool names them (an explicit enabledAssets entry, which only
+// the CONSTRUCTS gate's deal writes). An 'all'-era project (enabledAssets null) never places them, and with the gate
+// off no pool names one, so every frame is as it was.
+const CONSTRUCT_IDS = new Set(ASSETS_CONSTRUCTS.map((a) => a.id));
 import { isCultureCells, unpackCultureCells } from '../engine/dishCultureCells.mjs';
 import { createDishLifeStage, isTerrain } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
 import { isContactStamps } from '../engine/dishContactStamps.mjs'; // K3 slice 2c: the GPU contact list as a recorded input (consumed by the dish pass)
@@ -1284,7 +1287,11 @@ export function createLiveResolver() {
       let activeAssets = pool
         .filter(
           (a) =>
-            a.id !== CREATURE_ASSET_ID && !POEM_ONLY_IDS.has(a.id) && (!src.enabledAssets || src.enabledAssets[a.id]),
+            a.id !== CREATURE_ASSET_ID &&
+            !POEM_ONLY_IDS.has(a.id) &&
+            (CONSTRUCT_IDS.has(a.id)
+              ? !!(src.enabledAssets && src.enabledAssets[a.id])
+              : !src.enabledAssets || src.enabledAssets[a.id]),
         )
         .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a))
         .map((a) => (mixW && mixW[a.id] ? { ...a, mixWeight: mixW[a.id] } : a));

@@ -472,6 +472,8 @@ export const createGlobalSlice = (set) => ({
   assetOptions: {},
   assetAttach: {}, // #1355 — { assetId: [{x, y}] } attach points set in the wet lab
   creatureRecords: [], // #1849 — creature records assembled in the wet lab; #1850: each one's pool tile lives in customAssets
+  constructLead: false, // #2108 — the CONSTRUCTS gate: on, KIN/CHAOS pools are led by the house constructs (default off = every roll as before)
+  setConstructLead: (on) => set({ constructLead: !!on }),
   constructRecords: [], // #2108 — construct records (recipes); their tiles are drawn from them, never saved
   creatureBreedNote: null, // #1852 — what the last BREED did (the same statuses, plus need-three). Session-only.
   creatureBirthNote: null, // #2037 — what the last kept-take banking did: { id: null, status: 'banked', count }. Session-only.
@@ -1616,6 +1618,7 @@ export const createGlobalSlice = (set) => ({
       next.creatureRecords = sanitizeCreatureRecords(doc.creatureRecords); // #1849 — a doc without records has none
       next.shapeShelf = sanitizeShapeShelf(doc.shapeShelf); // #2280 — a doc without a shelf has an empty one
       next.constructRecords = sanitizeConstructRecords(doc.constructRecords); // #2108 — a doc without constructs has none
+      next.constructLead = doc.constructLead === true; // #2108 — the gate rides the project; absent = off
       next.stageBirths = []; // #2037 — a loaded document starts its own performance: the old one's unbanked children leave with it
       // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
       // rest of the params; parseProject lands a pre-fold-in document's top-level creatureCount
