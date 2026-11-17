@@ -157,3 +157,23 @@ test('phone width: the empty lab and its strip never scroll sideways', async ({ 
   await shot(page, '5-phone');
   expect(errors).toEqual([]);
 });
+
+test('a KIN hand tile draws the whole creature, body and parts, not just the body shape', async ({ page }) => {
+  const errors = await boot(page, { width: 1280, height: 900 });
+  await openEmptyLab(page);
+  await page.getByTestId('kin-press').click();
+  await expect(page.getByTestId('kin-tile')).toHaveCount(6);
+  const figures = await page.getByTestId('kin-tile').evaluateAll((els) =>
+    els.map((e) => {
+      const svg = e.querySelector('svg');
+      return {
+        kind: svg && svg.getAttribute('data-figure'),
+        pieces: svg ? svg.querySelectorAll(':scope > g[transform]').length : 0,
+      };
+    }),
+  );
+  expect(figures.every((f) => f.kind === 'full' && f.pieces >= 1)).toBe(true);
+  expect(figures.some((f) => f.pieces > 1)).toBe(true); // at least one tile carries parts beyond its body
+  await shot(page, 'c1-full-creature-tiles');
+  expect(errors).toEqual([]);
+});

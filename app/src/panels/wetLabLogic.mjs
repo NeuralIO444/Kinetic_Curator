@@ -121,14 +121,9 @@ export function topBodies(ids, fit) {
  * @param {{ seed: number, overlay?: Array, pileOnly?: Set<string>|null, davis?: string|null }} opts
  * @returns {Array<{ bone: string, role: string, asset: string }>}
  */
-export function previewDeal(
-  record,
-  bodyAsset,
-  stageIds,
-  { seed = 0, overlay = [], pileOnly = null, davis = null } = {},
-) {
+function placedPreview(record, bodyAsset, stageIds, { seed = 0, overlay = [], pileOnly = null, davis = null } = {}) {
   const [tile] = sanitizeOverlay([creatureTile(record, bodyAsset)]);
-  if (!tile || !tile.rig) return [];
+  if (!tile || !tile.rig) return { tile: null, out: [] };
   const inst = (asset, key) => ({
     asset,
     key,
@@ -150,6 +145,11 @@ export function previewDeal(
     fitOf: davisFitOf(overlayById),
     pileOnly,
   });
+  return { tile, out };
+}
+
+export function previewDeal(record, bodyAsset, stageIds, opts = {}) {
+  const { out } = placedPreview(record, bodyAsset, stageIds, opts);
   return out
     .filter((i) => i.key.startsWith('preview#'))
     .map((i) => ({
@@ -157,4 +157,28 @@ export function previewDeal(
       role: i.key.endsWith('#h') ? 'head' : 'limb',
       asset: i.asset,
     }));
+}
+
+/**
+ * The whole creature at rest as one drawing, for a hand tile: the body and every part Davis would deal onto its
+ * bones, placed exactly as the stage places them (limbs under the body, the head over it). `library` is the dealable
+ * pool (id, svg) and `overlay` the artist's own assets; a part whose drawing is unknown is skipped. Returns the inner
+ * markup of a 0 0 100 100 box — parts may overhang it, so a tile widens its viewBox — or null for a creature that
+ * cannot be drawn.
+ */
+export function creatureFigureSvg(record, bodyAsset, stageIds, { library = [], ...opts } = {}) {
+  const { tile, out } = placedPreview(record, bodyAsset, stageIds, opts);
+  if (!tile) return null;
+  const svgOf = new Map([...library, ...(opts.overlay || []), tile].map((a) => [a.id, a.svg]));
+  const f = (n) => Math.round(n * 100) / 100;
+  const pieces = out
+    .filter((i) => i.key === 'preview' || i.key.startsWith('preview#'))
+    .map((i) => {
+      const body = i.key === 'preview' ? tile.svg : svgOf.get(i.asset);
+      if (typeof body !== 'string' || !body) return '';
+      const t = `translate(${f(50 + i.x)} ${f(50 + i.y)}) rotate(${f(i.rotation)}) scale(${f(i.scaleX)} ${f(i.scaleY)}) translate(-50 -50)`;
+      return `<g transform="${t}" opacity="${f(i.opacity)}">${body}</g>`;
+    })
+    .filter(Boolean);
+  return pieces.length ? pieces.join('') : null;
 }

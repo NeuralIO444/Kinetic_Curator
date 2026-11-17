@@ -28,6 +28,7 @@ import {
   KIN_DEFAULT_SCOPE,
   CREATURE_SCOPES,
 } from './wetLabDeal.mjs';
+import { creatureFigureSvg } from './wetLabLogic.mjs';
 
 let n = 0;
 const ok = (name, fn) => {
@@ -219,5 +220,19 @@ ok(
     }
   },
 );
+
+ok('a hand tile draws the whole creature: the body plus the parts dealt from the stage, deterministically', () => {
+  const c = hand().hand[0];
+  const body = lib.find((a) => a.id === c.body);
+  const stage = lib.slice(0, 6).map((a) => a.id);
+  const opts = { seed: SEED, library: lib };
+  const whole = creatureFigureSvg(c, body, stage, opts);
+  assert.ok(whole && whole.includes('<g transform="translate('), 'markup with placed pieces');
+  assert.ok((whole.match(/<g transform=/g) || []).length > 1, 'more than the body: the parts ride on its bones');
+  assert.equal(whole, creatureFigureSvg(c, body, stage, opts), 'pure: same creature, stage and seed, same drawing');
+  const bare = creatureFigureSvg(c, body, [], opts);
+  assert.ok(bare && (bare.match(/<g transform=/g) || []).length >= 1, 'a bare stage still draws the body');
+  assert.equal(creatureFigureSvg({ ...c, body: 'nope' }, null, stage, opts), null, 'no body, no drawing');
+});
 
 console.log(`wetLabDeal selfcheck: ${n} ok`);
