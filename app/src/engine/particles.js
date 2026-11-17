@@ -1378,11 +1378,11 @@ export class ParticleSystem {
     const aliRadius2 = aliRadius * aliRadius;
     const cohRadius2 = cohRadius * cohRadius;
     const numParticles = this.n;
-    // K3 swarm takeover (#2188) — a spread-only seam on the params, like dishSession: { n, vx, vy } = the GPU kernel's post-step
-    // velocities for this system's n agents (damped, speed-clamped; the kernel ran the same forces from this system's own state).
-    // When present the force loop below does not run and the integration takes these velocities; position, wrap, heading, scale,
-    // alpha and every other derived column stay JS (float64, unchanged). Absent = the legacy path, bit for bit. The host only
-    // offers it to a plain cloud swarm (no contacts, no organism, nobody dead), where the JS force loop adds nothing else to AX.
+    // K3 swarm takeover (#2188) — a spread-only seam on the params, like dishSession: { n, fx, fy } = the GPU kernel's steering
+    // acceleration for this system's n agents (the same force sum the loop below computes, from this system's own state, already
+    // divided by mass and damped by vigor). When present the force loop below does not run: the accelerations are added to the
+    // accumulators (so contact impulses already there still count) and everything after is the legacy step unchanged: the
+    // contact pass, damping, thermal kick, speed clamp, integration in float64. Absent = the legacy path, bit for bit.
     const gpuStep = layoutParams.gpuStep && layoutParams.gpuStep.n === numParticles ? layoutParams.gpuStep : null;
     const { cellStart, order, cols, rows, minCx, minCy, cellSize } = this._buildSpatialHash(maxRadius);
     const cx0 = this.canvasW / 2;
@@ -1410,6 +1410,23 @@ export class ParticleSystem {
     const SCENT = sharedScent || this._scent;
     const seedU = seed >>> 0;
 
+    if (gpuStep) {
+      const GFX = gpuStep.fx;
+      const GFY = gpuStep.fy;
+      for (let i = 0; i < numParticles; i++) {
+        if (!ALIVE[i]) continue;
+        let gx = GFX[i];
+        let gy = GFY[i];
+        // #1415 — the trail read is a per-body field sample, not a neighbour term: it stays here (the same line as the loop below).
+        if (trails.on) {
+          const tg = sampleTrailReadGradient(trails, X[i] / this.canvasW, Y[i] / this.canvasH);
+          gx += (tg.gx * TRAIL_GAIN) / MASS[i];
+          gy += (tg.gy * TRAIL_GAIN) / MASS[i];
+        }
+        AX[i] += gx;
+        AY[i] += gy;
+      }
+    }
     for (let i = 0; i < (gpuStep ? 0 : numParticles); i++) {
       // Dead slots integrate nothing and their forces are never consumed
       // (integration skips them; _breed zeroes ax/ay on recycle) — skip the
@@ -1838,8 +1855,8 @@ export class ParticleSystem {
       const dampI = wetDrag
         ? Math.pow(damp, dtFrames) * Math.pow(mediumDampRetentionAt(wetDrag(X[i], Y[i])), dtFrames)
         : dampDt;
-      let vxi = gpuStep ? gpuStep.vx[i] : (VX[i] + AX[i] * dtFrames) * dampI;
-      let vyi = gpuStep ? gpuStep.vy[i] : (VY[i] + AY[i] * dtFrames) * dampI;
+      let vxi = (VX[i] + AX[i] * dtFrames) * dampI;
+      let vyi = (VY[i] + AY[i] * dtFrames) * dampI;
       // #1538 — TEMPO: the thermal kick (law in dishThermal.mjs).
       // A Brownian velocity impulse, one draw per axis per body per
       // step from the dyn channel — step-mixed keys in the curiosity
@@ -1855,7 +1872,7 @@ export class ParticleSystem {
         vyi += (hashU01(seedU, CH.dyn, tk + 1048583) * 2 - 1) * thermal.amp * dtSqrt;
       }
       const speed = Math.sqrt(vxi * vxi + vyi * vyi);
-      if (speed > maxSpeed && !gpuStep) {
+      if (speed > maxSpeed) {
         vxi = (vxi / speed) * maxSpeed;
         vyi = (vyi / speed) * maxSpeed;
       }

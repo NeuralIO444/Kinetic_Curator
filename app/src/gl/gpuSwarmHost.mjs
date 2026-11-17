@@ -6,13 +6,15 @@
 // hardware (#2183) before any kernel takes over. Scent deposits and breeding stay on the CPU (Matt, 2026-11-16: CPU mirror).
 //
 // TAKEOVER (the same host, one more step): with the loop's `swarmGpu` input marker up, the layer's JS force loop is skipped and the
-// kernel's velocities drive the integration (particles.js `gpuStep` seam; position, wrap, heading and every derived column stay JS).
+// kernel's steering accelerations feed the CPU's accumulators (particles.js `gpuStep` seam); the contact pass, damping, thermal kick,
+// speed clamp and integration stay JS in float64, so contact impulses and everything downstream compose exactly as before.
 //
 // Eligible = a plain cloud swarm the kernel fully covers today: not an organism, no dish contacts (contacts are slice 2b+,
 // they inject impulses between forces and integration), no mod steering. (The cloud swarm's point wind ignores the `wind` knob, so the kernel always runs it.) Anything else is skipped
 // and counted, never half-simulated.
 import { createGpuSwarm, SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from './swarmSim.mjs';
 import { isOrganismMode } from '../data/layout-modes.js';
+import { dishCurrentsFor, ATTRACTOR_DRIFT_SPEED, attractorDriftSign } from '../engine/dishCurrents.mjs';
 
 /** Is the shadow asked for? Layout param, window flag, or URL, in that order of authority (any one turns it on). */
 export function gpuSwarmWanted(layoutParams, win) {
@@ -40,27 +42,12 @@ export function gpuSwarmLiveWanted(layoutParams, win) {
 export function swarmIneligibleReason(system, lp, ctx) {
   if (!system || !(system.n > 0)) return 'empty';
   if (lp.behave && lp.behave !== 'cruise' && lp.behave !== 'seek' && lp.behave !== 'flee') return 'behave';
-  // The resolver hands EVERY layer a dishSession (spread-only), so its presence says nothing: a layer is in the dish contact pass
-  // only when it has a contact radius (particles.js and dishEnrolRadius gate on that, not on the session).
-  if (lp.contactRadius > 0) return 'contacts';
-  if (lp.modSteer) return 'modSteer';
+  // (The resolver hands EVERY layer a dishSession and the shared scent field, so their presence says nothing. A layer in the dish
+  // contact pass is covered since the force seam: the kernel runs its #1414 currents and the contact impulses compose on the CPU.
+  // MOD steering is three weight multipliers, folded into the params.)
   // Likewise every layer gets the shared scent field handed in; what makes it an organism is its mode.
   if (isOrganismMode(lp.mode) || lp.organism) return 'organism';
   if (ctx && ctx.slowRender) return 'slowRender';
-  return null;
-}
-
-/**
- * Why a layer the kernel CAN step still cannot take over this frame's velocities, or null. The takeover skips the JS force loop, so
- * everything that loop would have added must be provably absent:
- * nothing already pushed into the force accumulators this frame (contact impulses; none for an eligible swarm, so any nonzero
- * means something else is steering and the JS step must run). Pure; O(n).
- */
-export function takeoverBlocker(system) {
-  const n = system.n;
-  for (let i = 0; i < n; i++) {
-    if (system.alive[i] && (system.ax[i] !== 0 || system.ay[i] !== 0)) return 'preforce';
-  }
   return null;
 }
 
@@ -74,11 +61,25 @@ export function swarmCoreParams(lp, ctx, system) {
     ) || 0;
   const att = ctx.attractor || null;
   const seekMul = lp.behave === 'seek' ? 1.6 : lp.behave === 'flee' ? -1.6 : 1;
+  // #509 MOD steering: transient per-layer multipliers on the three boids weights (identity by default), as particles.js folds them
+  const st = lp.modSteer || null;
+  const mul = (k) => (st && Number.isFinite(Number(st[k])) ? Number(st[k]) : 1);
+  // #1414 dish currents: inside the dish (contactRadius > 0) the wind and the well are velocities the body relaxes toward
+  const inDish = lp.contactRadius > 0;
+  const windCur = inDish ? dishCurrentsFor(1) : null; // the cloud swarm's windMul is 1
+  const attCur = inDish ? dishCurrentsFor((lp.gravityWells ?? 1) * Math.abs(seekMul)) : null;
   return {
     ...SWARM_CORE_CLOUD,
-    sepW: 1.8,
-    aliW: 1.0,
-    cohW: lp.swarmCohesion ?? 1.5,
+    sepW: 1.8 * mul('sep'),
+    aliW: 1.0 * mul('ali'),
+    cohW: (lp.swarmCohesion ?? 1.5) * mul('coh'),
+    currents: inDish
+      ? {
+          wind: windCur.on ? windCur.coupling : 0,
+          attract: attCur.on ? attCur.coupling : 0,
+          drift: ATTRACTOR_DRIFT_SPEED * attractorDriftSign(seekMul),
+        }
+      : null,
     damping: lp.damping ?? SWARM_CORE_CLOUD.damping,
     dtFrames: Number.isFinite(ctx.dtSec) && ctx.dtSec > 0 ? ctx.dtSec * 60 : 1, // particles.js: dtFrames = dtSec * 60
     attractor: att,
@@ -113,8 +114,7 @@ export function createGpuSwarmHost(gl) {
     driftPosMax: 0,
     driftVelMax: 0,
     dead: 0, // dead slots parked in the last stepped layer
-    applied: 0, // takeover: frames a layer's velocities came from the GPU
-    takeoverSkipped: {},
+    applied: 0, // takeover: frames a layer's steering came from the GPU
   };
   const gpuFor = (id, n) => {
     let L = layers.get(id);
@@ -128,8 +128,10 @@ export function createGpuSwarmHost(gl) {
   return {
     stats,
     /** Before the JS step: returns a token for post(), or null when the layer is skipped. */
-    pre(layerId, system, lp, ctx) {
-      const why = swarmIneligibleReason(system, lp, ctx);
+    pre(layerId, system, lp, ctx, { force = false } = {}) {
+      // The SHADOW compares a whole GPU step with the JS step, and the kernel has no contact impulses: a dish layer would only
+      // report its contacts as drift, so the shadow sits it out. The takeover (force) covers it: the contacts stay on the CPU.
+      const why = swarmIneligibleReason(system, lp, ctx) || (!force && lp.contactRadius > 0 ? 'contacts' : null);
       if (why) {
         stats.skipped[why] = (stats.skipped[why] || 0) + 1;
         return null;
@@ -162,32 +164,28 @@ export function createGpuSwarmHost(gl) {
         mass: system.mass.subarray(0, n),
         seedOffset: system.seedOffset.subarray(0, n),
       });
-      gpu.step(swarmCoreParams(lp, ctx, system));
+      // force = the takeover: the kernel emits its steering acceleration (read().vx/vy) and the CPU integrates; else the shadow's full step
+      gpu.step(force ? { ...swarmCoreParams(lp, ctx, system), emit: 'force' } : swarmCoreParams(lp, ctx, system));
       const got = gpu.read();
       const ms = now() - t0;
       stats.frames++;
       stats.agents = n;
       stats.gpuMsAvg += (ms - stats.gpuMsAvg) / stats.frames;
       stats.gpuMsMax = Math.max(stats.gpuMsMax, ms);
-      return { got, n };
+      return { got, n, force };
     },
     /**
-     * Takeover: the GPU's post-step velocities for this layer as the particles.js seam ({ n, vx, vy }), or null when the JS step must
-     * run (no token, or a blocker). Call after pre(); the token's step already ran from this system's own state.
+     * Takeover: the kernel's steering accelerations for this layer as the particles.js seam ({ n, fx, fy }), or null without a
+     * force token. The CPU adds them to its accumulators and runs the rest of the legacy step (contacts, damping, clamp, integration).
      */
-    velocities(token, system) {
-      if (!token) return null;
-      const why = takeoverBlocker(system);
-      if (why) {
-        stats.takeoverSkipped[why] = (stats.takeoverSkipped[why] || 0) + 1;
-        return null;
-      }
+    forces(token) {
+      if (!token || !token.force) return null;
       stats.applied++;
-      return { n: token.n, vx: token.got.vx, vy: token.got.vy };
+      return { n: token.n, fx: token.got.vx, fy: token.got.vy };
     },
     /** After the JS step: compare the GPU's one step against what the JS swarm just did (alive agents only). */
     post(token, system) {
-      if (!token) return;
+      if (!token || token.force) return; // a force token carries accelerations, not a state to compare
       const { got, n } = token;
       if (system.n !== n) return; // the population changed under the step (breeding / death): nothing to compare
       for (let i = 0; i < n; i++) {

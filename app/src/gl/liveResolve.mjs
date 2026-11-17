@@ -812,24 +812,30 @@ export function createLiveResolver() {
       ) {
         try {
           if (!swarmShadow) swarmShadow = createGpuSwarmHost(liveSwarmGl());
-          shadowTok = swarmShadow.pre(layerId, st.system, updLp, {
-            attractor: ctx.attractor,
-            canvasW: W,
-            canvasH: H,
-            loopTimeMs: ctx.loopTimeMs,
-            seedOffsets: ctx.seedOffsets,
-            slowRender: ctx.slowRender,
-            noiseSeed: worldNoise ? worldNoiseSeed || 444 : null,
-            dtSec: ctx.dtSec,
-          });
+          shadowTok = swarmShadow.pre(
+            layerId,
+            st.system,
+            updLp,
+            {
+              attractor: ctx.attractor,
+              canvasW: W,
+              canvasH: H,
+              loopTimeMs: ctx.loopTimeMs,
+              seedOffsets: ctx.seedOffsets,
+              slowRender: ctx.slowRender,
+              noiseSeed: worldNoise ? worldNoiseSeed || 444 : null,
+              dtSec: ctx.dtSec,
+            },
+            { force: !!ctx.swarmGpu },
+          );
         } catch (e) {
           swarmShadowDead = true; // fail soft: the JS swarm is the reference and never waits on the shadow
           console.warn('[gpuSwarm] shadow disabled for this session:', e && e.message ? e.message : e);
         }
       }
       // K3 takeover: the loop's `swarmGpu` input marker is the switch (recorded, so the take's header says the GPU ran). The kernel's
-      // velocities replace the JS force loop for an eligible layer; anything else (or a blocker this frame) runs the JS step as always.
-      const gpuStep = ctx.swarmGpu && shadowTok ? swarmShadow.velocities(shadowTok, st.system) : null;
+      // steering accelerations replace the JS force loop for an eligible layer; anything else runs the JS step as always.
+      const gpuStep = ctx.swarmGpu && shadowTok ? swarmShadow.forces(shadowTok) : null;
       st.system.update(
         gpuStep ? { ...updLp, gpuStep } : updLp,
         ctx.activeAssets,
