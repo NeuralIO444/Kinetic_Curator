@@ -182,8 +182,8 @@ export function WetLabShapeStrip({ onKeep } = {}) {
               >
                 <svg
                   viewBox="0 0 100 100"
-                  width="20"
-                  height="20"
+                  width="28"
+                  height="28"
                   aria-hidden="true"
                   dangerouslySetInnerHTML={{ __html: svg || '' }}
                 />
@@ -253,11 +253,11 @@ const pickMark = {
   letterSpacing: '0.08em',
   color: 'var(--accent)',
 };
-const shelfRow = { display: 'flex', gap: 3, flexWrap: 'wrap', maxWidth: 200 };
+const shelfRow = { display: 'flex', gap: 4, flexWrap: 'wrap', maxWidth: 240 };
 const shelfTile = {
-  width: 28,
-  height: 28,
-  padding: 3,
+  width: 44,
+  height: 44,
+  padding: 7,
   background: 'transparent',
   border: '1px solid var(--line)',
   color: 'var(--ink)',
