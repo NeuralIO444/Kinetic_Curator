@@ -404,6 +404,7 @@ node src/engine/creatureAssembler.selfcheck.mjs
 node src/engine/constructAssembler.selfcheck.mjs
 node src/engine/constructRules.selfcheck.mjs
 node src/engine/constructBank.selfcheck.mjs
+node src/engine/constructPool.selfcheck.mjs
 node src/engine/constructHouse.selfcheck.mjs
 node src/data/constructCatalogue.selfcheck.mjs
 node src/engine/creatureInjection.selfcheck.mjs
@@ -423,6 +424,7 @@ node src/panels/wetLabLadder.selfcheck.mjs
 node src/panels/shapeDeal.selfcheck.mjs
 node src/panels/constructSettle.selfcheck.mjs
 node src/panels/constructDeal.selfcheck.mjs
+node src/panels/ladderPools.selfcheck.mjs
 node src/engine/creatureKin.selfcheck.mjs
 node src/engine/creatureMoods.selfcheck.mjs
 node src/engine/beast.selfcheck.mjs
@@ -625,6 +627,7 @@ node src/curator/fieldDirector.selfcheck.mjs
 node src/curator/fieldEval.selfcheck.mjs
 node src/curator/fieldBattery.selfcheck.mjs
 node src/poets/placement.selfcheck.mjs
+node src/poets/poemRegister.selfcheck.mjs
 node src/poets/poemRow.selfcheck.mjs
 node src/poets/fieldStampPath.selfcheck.mjs
 node src/poets/fieldKana.selfcheck.mjs
