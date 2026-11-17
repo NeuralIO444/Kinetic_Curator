@@ -1046,6 +1046,9 @@ export function createLiveLoop(
         ? {
             dishField: dishFieldStamp,
             dishFieldCoupling,
+            // #2152 slice 3 — dishFieldEase marks that the field's consumers ease across a cycle roll. A take recorded
+            // before the slice lacks it and replays with the roll as recorded.
+            dishFieldEase: 1,
             // #2152 slice 2 — dishFieldBorn marks that Life births copies of the marks. A take recorded before the slice
             // lacks it and replays exactly as recorded (fade and die only).
             ...(dishFieldLife > 0 ? { dishFieldLife, dishFieldBorn: 1 } : {}),

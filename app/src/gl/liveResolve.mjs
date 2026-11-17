@@ -997,7 +997,11 @@ export function createLiveResolver() {
     // #2152 slice 1 — the LIFE dial (input.dishFieldLife) is its own dial, shed-folded the same way; it reads the same field
     // publication, so either dial alone opens the one sampler and rides the one ctx ({ coupling, life, sampler }).
     const lifeNow = effectiveCoupling(input.dishFieldLife, input.dishField?.shed);
-    const fieldSamplerNow = couplingNow > 0 || lifeNow > 0 ? fieldSampler(dishFieldStage.publishedField, W, H) : null;
+    // #2152 slice 3 — the cycle-roll ease rides the loop's recorded marker (dishFieldEase): a take from before it lacks the
+    // key and replays with the roll as it was recorded.
+    const fieldEase = input.dishFieldEase === 1;
+    const fieldSamplerNow =
+      couplingNow > 0 || lifeNow > 0 ? fieldSampler(dishFieldStage.publishedField, W, H, { ease: fieldEase }) : null;
     const cultureScale = fieldSamplerNow
       ? { coupling: couplingNow, sampler: fieldSamplerNow, ...(lifeNow > 0 ? { life: lifeNow } : {}) }
       : null;
@@ -1983,6 +1987,7 @@ export function createLiveResolver() {
           H,
           life: lifeNow,
           lean: fluidDrift,
+          ease: fieldEase,
         });
     }
     dishFieldStage.apply(input.dishField?.mode === 'field' ? input.dishField : null, out, W, H);

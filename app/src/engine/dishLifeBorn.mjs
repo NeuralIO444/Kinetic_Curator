@@ -21,7 +21,7 @@
 // No parents → no copies (never a shape of Life's own). Nothing is edited in place: the result is extra items.
 
 import { coverageField } from './dishLifeSeed.mjs';
-import { LIFE_GONE_BELOW, LIFE_SHRINK } from './dishLifeCouple.mjs';
+import { LIFE_GONE_BELOW, LIFE_SHRINK, easedLevel } from './dishLifeCouple.mjs';
 import { markDriftDelta } from './dishFluidDrift.mjs';
 import { isFluidDuplicate } from './dishFluidDuplicates.mjs';
 
@@ -55,10 +55,14 @@ const inkOf = (scale, scaleY, alpha) => Math.abs(scale * scaleY) * Math.max(0, a
 /**
  * The born copies for one frame. `published`: the field stage's holder ({ active, cols, rows, level }). `layers`: the
  * frame's content layers in stack order, each { items }. `opts`: { W, H, life (the LIFE dial, already shed-folded),
- * lean (the fluid's drift field or null), share (the ink share; BORN_SHARE unless a suite isolates another rule) }. Returns one array per layer (same order): the copies whose parent lives in
+ * lean (the fluid's drift field or null), ease (slice 3: read the level eased across a cycle roll), share (the ink share; BORN_SHARE unless a suite isolates another rule) }. Returns one array per layer (same order): the copies whose parent lives in
  * that layer. Every array is empty when the gate is closed.
  */
-export function lifeBornItems(published, layers, { W, H, life = 0, lean = null, share = BORN_SHARE } = {}) {
+export function lifeBornItems(
+  published,
+  layers,
+  { W, H, life = 0, lean = null, share = BORN_SHARE, ease = false } = {},
+) {
   const list = Array.isArray(layers) ? layers : [];
   const out = list.map(() => []);
   const dial = Math.min(1, Math.max(0, fin(life, 0)));
@@ -69,7 +73,7 @@ export function lifeBornItems(published, layers, { W, H, life = 0, lean = null, 
   const w = fin(W, 0);
   const h = fin(H, 0);
   if (!(n > 0) || published.level.length < n || !(w > 0) || !(h > 0)) return out;
-  const level = published.level;
+  const levelAt = (i) => easedLevel(published, i, ease); // slice 3: across a roll, copies fade like the marks
 
   // parents claim the cell under their centre (first in layer/item order); every mark's body marks its cells occupied
   const owner = new Int32Array(n).fill(-1);
@@ -133,7 +137,7 @@ export function lifeBornItems(published, layers, { W, H, life = 0, lean = null, 
   const cands = [];
   for (let i = 0; i < n; i++) {
     if (cov[i] > 0 || dist[i] <= 0) continue;
-    if (!(level[i] > LIFE_GONE_BELOW)) continue;
+    if (!(levelAt(i) > LIFE_GONE_BELOW)) continue;
     cands.push(i);
   }
   if (!cands.length) return out;
@@ -146,7 +150,7 @@ export function lifeBornItems(published, layers, { W, H, life = 0, lean = null, 
   for (const i of cands) {
     if (count >= maxCount) break;
     const p = parents[owner[i]];
-    const f = Math.min(1, level[i]);
+    const f = Math.min(1, levelAt(i));
     const grow = BORN_SCALE * (1 - LIFE_SHRINK * (1 - f));
     const scale = p.scale * grow;
     const scaleY = p.scaleY * grow;
