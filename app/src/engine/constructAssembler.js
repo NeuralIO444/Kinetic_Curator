@@ -1,0 +1,204 @@
+// engine/constructAssembler.js — #2108 (constructs, slice 1; spec docs/design/constructs-spec.md): the construct assembler.
+//
+// A CONSTRUCT is a new static design shape built from a style's simple shapes (docs/design/constructs-spec.md).
+// Matt's rulings (2026-11-16, §8): a construct is 12–16 primitives from ONE style's small vocabulary, joined at
+// their ATTACH points and reused with scale and rotation. Its pieces are its recipe, so the same list that
+// builds it is the list the field later breaks it into.
+//
+// This slice is data only: the assembler deals a RECORD. Nothing draws it, nothing saves it, nothing on stage
+// reads it (the tile composer, the record door and the deal are their own slices).
+//
+// Pure and deterministic (spec §4): no clock, no Math.random. Every draw rides the registered 'construct'
+// string channel — its own stream, so a construct deal never re-keys a creature deal sharing the seed — keyed
+// by the style, the vocabulary and its points. Same seed + style + vocabulary ⇒ the identical record, byte
+// for byte.
+//
+// A sibling of the creature assembler, never a branch in it: no head, no limbs, no genome, no rig. The
+// H / L roles a point may carry are creature grammar; here a point is only where shapes join.
+
+import { hashU01 } from './kernel/rng.js';
+import { sanitizeAttachPoints, ATTACH_BOX, MAX_ATTACH } from './assetAttach.js';
+
+export const CONSTRUCT_KIND = 'kc-construct/1';
+/** The string channel every construct draw rides (registered in kernel/rng.js STRING_CHANNEL_GROUPS). */
+export const CONSTRUCT_CHANNEL = 'construct';
+/** A construct is built from this many primitives (Matt, 2026-11-16: 12–16 pieces per construct). */
+export const CONSTRUCT_MIN_PARTS = 12;
+export const CONSTRUCT_MAX_PARTS = 16;
+/** A style's vocabulary is small and reused: at most this many primitives are read from a rule. */
+export const MAX_VOCABULARY = 32;
+/** The scale range a joined piece is dealt in, relative to the first piece (1). */
+export const PART_SCALE = Object.freeze({ min: 0.35, max: 0.8 });
+/** The turns a piece may take when its style names none: quarter turns. */
+export const DEFAULT_ROTATIONS = Object.freeze([0, 90, 180, 270]);
+/** The margin the finished composition keeps inside the box, in box units. */
+export const CONSTRUCT_MARGIN = 4;
+
+/** The pool id a construct's tile takes: the overlay's `user:` namespace + the record id. */
+export const constructTileId = (recordId) => `user:${recordId}`;
+/** True for a construct tile's pool id. Its own shape, so no consumer mistakes it for a creature tile. */
+export const isConstructTileId = (id) => typeof id === 'string' && /^user:cn-[0-9a-f]{8}$/.test(id);
+
+/** FNV-1a of a string: a stable 32-bit key. */
+function hash32(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 0x01000193);
+  return h >>> 0;
+}
+
+const r2 = (n) => Math.round(n * 100) / 100;
+const r4 = (n) => Math.round(n * 10000) / 10000;
+const validId = (id) => typeof id === 'string' && !!id && id.length <= 120;
+
+/** The rule's vocabulary, made honest: unique ids, sanitized points, in the order given, at most MAX_VOCABULARY. */
+function readVocabulary(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const v of raw) {
+    if (!v || !validId(v.id) || seen.has(v.id) || out.length >= MAX_VOCABULARY) continue;
+    seen.add(v.id);
+    // Roles are creature grammar: a construct reads plain points only.
+    out.push({ id: v.id, points: sanitizeAttachPoints(v.points).map((p) => ({ x: p.x, y: p.y })) });
+  }
+  return out;
+}
+
+function readRotations(raw) {
+  if (!Array.isArray(raw)) return [...DEFAULT_ROTATIONS];
+  const out = [];
+  for (const r of raw) {
+    if (typeof r !== 'number' || !Number.isFinite(r)) continue;
+    const d = r2(((r % 360) + 360) % 360);
+    if (!out.includes(d) && out.length < 24) out.push(d);
+  }
+  return out.length ? out : [...DEFAULT_ROTATIONS];
+}
+
+function readScale(raw) {
+  const min = Number(raw?.min);
+  const max = Number(raw?.max);
+  if (!(min > 0) || !(max >= min) || max > 1) return { ...PART_SCALE };
+  return { min, max };
+}
+
+/** The construct key: what the record is a pure function of (besides the seed). */
+const constructKey = (style, vocab, rotations, scale) =>
+  `${style}|${vocab.map((v) => `${v.id}:${v.points.map((p) => `${p.x},${p.y}`).join(';')}`).join('|')}|${rotations.join(',')}|${scale.min},${scale.max}`;
+
+/** Where a piece's own box point lands: T + R(r)·s·p. */
+function place(part, p) {
+  const a = (part.r * Math.PI) / 180;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return { x: part.x + part.s * (c * p.x - s * p.y), y: part.y + part.s * (s * p.x + c * p.y) };
+}
+
+const BOX_CORNERS = Object.freeze([
+  { x: 0, y: 0 },
+  { x: ATTACH_BOX, y: 0 },
+  { x: 0, y: ATTACH_BOX },
+  { x: ATTACH_BOX, y: ATTACH_BOX },
+]);
+
+/**
+ * Assemble a construct record from one style's rule.
+ * @param {object} p
+ *   style:      the Canon style id (required). One style per construct (spec §6).
+ *   vocabulary: the style's primitives, [{ id, points }] — each an asset id and its ATTACH points (the artist's
+ *               own, or the shape's AUTO points). Closed: nothing outside it enters the construct.
+ *   seed:       the deal seed (uint32).
+ *   rotations:  the turns (degrees) a piece may take; quarter turns when absent.
+ *   scale:      { min, max } for joined pieces, relative to the first piece; PART_SCALE when absent.
+ * @returns the record, or null when the style is missing or the vocabulary has no primitive that carries a point
+ *   (nothing to join at — a construct is never a pile).
+ */
+export function assembleConstruct({ style, vocabulary = [], seed = 0, rotations = null, scale = null } = {}) {
+  if (!validId(style)) return null;
+  const vocab = readVocabulary(vocabulary);
+  const jointed = vocab.filter((v) => v.points.length > 0);
+  if (!jointed.length) return null;
+  const turns = readRotations(rotations);
+  const range = readScale(scale);
+  const s0 = seed >>> 0;
+  const key = constructKey(style, vocab, turns, range);
+  const k = hash32(key);
+  let n = 0;
+  const draw = () => hashU01(s0, CONSTRUCT_CHANNEL, (k + n++) >>> 0);
+  const pick = (list) => list[Math.floor(draw() * list.length) % list.length];
+
+  const countSpan = CONSTRUCT_MAX_PARTS - CONSTRUCT_MIN_PARTS + 1;
+  const count = CONSTRUCT_MIN_PARTS + (Math.floor(draw() * countSpan) % countSpan);
+  // Pieces that carry two or more points keep the shape growing; a one-point piece is a leaf.
+  const growers = jointed.filter((v) => v.points.length > 1);
+
+  const parts = [];
+  /** Join points still free: { x, y } in the working frame. */
+  const open = [];
+  /** Every join ever made, so a shape that runs out of free points still joins at a real one. */
+  const used = [];
+
+  for (let i = 0; i < count; i++) {
+    const remaining = count - i - 1;
+    // While the shape must keep growing and is nearly out of free points, prefer a piece that adds some.
+    const needGrower = growers.length > 0 && remaining > 0 && open.length <= 1;
+    const prim = pick(needGrower ? growers : jointed);
+    const own = Math.floor(draw() * prim.points.length) % prim.points.length;
+    const r = pick(turns);
+    const sc = i === 0 ? 1 : range.min + draw() * (range.max - range.min);
+    let join;
+    if (i === 0) {
+      join = { x: ATTACH_BOX / 2, y: ATTACH_BOX / 2 };
+    } else if (open.length) {
+      join = open.splice(Math.floor(draw() * open.length) % open.length, 1)[0];
+    } else {
+      join = pick(used);
+    }
+    // Place the piece so its own point sits on the join: T = join − R·s·own.
+    const part = { asset: prim.id, own, x: 0, y: 0, s: sc, r };
+    const off = place(part, prim.points[own]);
+    part.x = join.x - off.x;
+    part.y = join.y - off.y;
+    parts.push(part);
+    used.push(join);
+    prim.points.forEach((p, j) => {
+      if (j !== own) open.push(place(part, p));
+    });
+  }
+
+  // Fit the whole composition into the box: uniform scale, centred, a margin kept. The bound is every piece's
+  // own box (its drawing lives inside it), so nothing can be clipped by the tile.
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const part of parts) {
+    for (const c of BOX_CORNERS) {
+      const q = place(part, c);
+      x0 = Math.min(x0, q.x);
+      y0 = Math.min(y0, q.y);
+      x1 = Math.max(x1, q.x);
+      y1 = Math.max(y1, q.y);
+    }
+  }
+  const span = Math.max(x1 - x0, y1 - y0);
+  const f = (ATTACH_BOX - 2 * CONSTRUCT_MARGIN) / span;
+  const ox = (ATTACH_BOX - f * (x1 - x0)) / 2 - f * x0;
+  const oy = (ATTACH_BOX - f * (y1 - y0)) / 2 - f * y0;
+  const fit = (q) => ({ x: f * q.x + ox, y: f * q.y + oy });
+
+  const outParts = parts.map((part) => {
+    const t = fit(part);
+    return { asset: part.asset, own: part.own, x: r2(t.x), y: r2(t.y), s: r4(part.s * f), r: part.r };
+  });
+  // The construct's own ATTACH points: the joins it left free, so it can join again (or serve as a creature
+  // body — spec §1). At most MAX_ATTACH, in the order they were opened.
+  const points = sanitizeAttachPoints(open.slice(0, MAX_ATTACH).map(fit));
+
+  const body = { kind: CONSTRUCT_KIND, style, seed: s0, parts: outParts, points };
+  const id = `cn-${hash32(`${key}#${s0}`).toString(16).padStart(8, '0')}`;
+  return { id, ...body };
+}
+
+/** Where a record's piece puts a point of its own box, in the construct's box. For the composer and the tests. */
+export const constructPartPoint = (part, p) => place(part, p);
