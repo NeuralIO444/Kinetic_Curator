@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { settledSvg, ease, SETTLE_SPREAD } from './constructSettle.mjs';
 import { constructTileSvg } from '../engine/constructAssembler.js';
-import { houseConstructs } from '../engine/constructHouse.js';
+import { assembleConstruct } from '../engine/constructAssembler.js';
+import { constructRule, CONSTRUCT_STYLE_IDS } from '../engine/constructRules.js';
 import { ASSETS } from '../data/assets/index.js';
 
 let n = 0;
@@ -15,16 +16,20 @@ const ok = (name, fn) => {
 
 const byId = new Map(ASSETS.map((a) => [a.id, a]));
 const svgOf = (id) => (byId.get(id) || {}).svg;
-const records = houseConstructs((id) => byId.get(id) || null);
+// real constructs, built by the assembler from every style's rule (not the house set: only the catalogue reads that)
+const records = CONSTRUCT_STYLE_IDS.flatMap((style) => {
+  const rule = constructRule(style, (id) => byId.get(id) || null, null);
+  return rule ? [1, 2, 3].map((k) => assembleConstruct({ ...rule, seed: 0x5e771e00 + k })).filter(Boolean) : [];
+});
 const rec = records[0];
 const translates = (svg) => [...svg.matchAll(/translate\(([-\d.]+) ([-\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
 
 ok('there are real constructs to draw', () => {
-  assert.ok(records.length > 10, `${records.length} house constructs`);
+  assert.ok(records.length > 10, `${records.length} constructs`);
   assert.ok(constructTileSvg(rec, svgOf));
 });
 
-ok('settled (t >= 1) is constructTileSvg byte for byte, for every house construct', () => {
+ok('settled (t >= 1) is constructTileSvg byte for byte, for every construct', () => {
   for (const r of records) {
     const tile = constructTileSvg(r, svgOf);
     assert.equal(settledSvg(r, svgOf, 1), tile, r.id);
