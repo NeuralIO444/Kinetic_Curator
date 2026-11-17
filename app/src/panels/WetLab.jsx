@@ -43,6 +43,7 @@ import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './
 import { WetLabDealStrip } from './WetLabDealStrip.jsx'; // #2232 — KIN: the auto-generate strip
 import { WetLabBeastStrip } from './WetLabBeastStrip.jsx'; // #2232 — KIN / CUR for beasts, under the bank rail
 import { WetLabShapeStrip } from './WetLabShapeStrip.jsx'; // #2282 — the SHAPE rung: KIN / CUR over style primitives
+import { WetLabConstructStrip } from './WetLabConstructStrip.jsx'; // #2301 — the CONSTRUCT rung: constructs from kept shapes
 import { WetLabRungRail } from './WetLabRungRail.jsx'; // #2281 — the ladder's rung rail
 import { useWetLabLadder } from './useWetLabLadder.js'; // #2281
 import { topOpenRung, isOpen } from './wetLabLadder.mjs'; // #2281
@@ -1165,11 +1166,7 @@ export function WetLab({ assetId, onClose }) {
         </div>
         <WetLabRungRail ladder={ladder} selected={rungOnScreen} onSelect={setRungPick} />
         {rungOnScreen === 'shape' && <WetLabShapeStrip onKeep={() => keepRung('shape')} />}
-        {rungOnScreen === 'construct' && (
-          <div style={rungEmpty} data-testid={`rung-empty-${rungOnScreen}`}>
-            nothing here yet
-          </div>
-        )}
+        {rungOnScreen === 'construct' && <WetLabConstructStrip onKeep={() => keepRung('construct')} />}
         {rungOnScreen === 'creature' && (
           <WetLabDealStrip
             subject={selRecord}
@@ -1255,16 +1252,6 @@ export function WetLab({ assetId, onClose }) {
     </div>
   );
 }
-
-const rungEmpty = {
-  padding: '14px 10px',
-  borderTop: '1px solid var(--line)',
-  fontSize: 10,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-  color: 'var(--dim)',
-  flex: '0 0 auto',
-};
 
 const veil = {
   position: 'fixed',
