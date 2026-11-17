@@ -409,6 +409,7 @@ node src/deal/creatureAdapter.selfcheck.mjs
 node src/deal/beastAdapter.selfcheck.mjs
 node src/panels/wetLabDeal.selfcheck.mjs
 node src/panels/wetLabBeast.selfcheck.mjs
+node src/panels/wetLabLadder.selfcheck.mjs
 node src/engine/creatureKin.selfcheck.mjs
 node src/engine/creatureMoods.selfcheck.mjs
 node src/engine/beast.selfcheck.mjs
