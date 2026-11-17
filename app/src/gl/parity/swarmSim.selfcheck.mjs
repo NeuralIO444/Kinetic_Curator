@@ -290,6 +290,96 @@ try {
     check('levy — the walk is exercised (some flights are strong)', strongest > 0.5, `${strongest.toFixed(2)}`);
   }
 
+  // ---- heading: the facing follows the clamped velocity (cloud: snap; organism: shortest turn, damped, capped per step)
+  {
+    const count = 150;
+    const lp = lpFor(count);
+    const sys = new ParticleSystem();
+    sys.init(count, W, H, assets, palette, SEED);
+    for (let s = 0; s < 20; s++) sys.update(lp, assets, palette, SEED, 1_000_000 + s * (1000 / 60), null);
+    const start = { ...stateOf(sys), rotation: Array.from(sys.rotation.subarray(0, sys.n)) };
+    sys.update(lp, assets, palette, SEED, 1_000_000 + 20 * (1000 / 60), null);
+    const want = Array.from(sys.rotation.subarray(0, sys.n));
+    const angDiff = (a, b) => {
+      let d = (a - b) % 360;
+      if (d > 180) d -= 360;
+      if (d < -180) d += 360;
+      return Math.abs(d);
+    };
+    const cloud = (
+      await page.evaluate((r) => window.__kcSwarmRun(r), {
+        n: count,
+        state: start,
+        steps: 1,
+        params: { ...coreParams(lp, null), heading: { mode: 1 } },
+      })
+    ).samples[1];
+    let worst = 0;
+    for (let i = 0; i < count; i++) worst = Math.max(worst, angDiff(cloud.rotation[i], want[i]));
+    check(
+      'heading (cloud) — the facing after one step matches the JS swarm',
+      worst < 1e-2,
+      `max |d| ${worst.toExponential(2)} deg`,
+    );
+    const off = (
+      await page.evaluate((r) => window.__kcSwarmRun(r), {
+        n: count,
+        state: start,
+        steps: 1,
+        params: coreParams(lp, null),
+      })
+    ).samples[1];
+    check(
+      'heading — off (no p.heading) leaves the facing exactly as seeded',
+      maxDiff(off.rotation, start.rotation.map(Math.fround)) === 0,
+    );
+
+    // organism turn: shortest-arc, damped by 1 - exp(-lambda dt), capped at 600 deg/s * dt. The reference is particles.js's own lines,
+    // fed the velocity the kernel just produced (so the comparison isolates the heading maths, in every wrap / cap regime).
+    const rot0 = Array.from({ length: count }, (_, i) => (i % 5) * 200 - 400 + (i % 7) * 13.7); // spans below -360 and above 360
+    const st2 = { ...start, rotation: rot0 };
+    for (const [label, lambda, dtSec] of [
+      ['damped (lambda 10)', 10, 1 / 60],
+      ['stiff (lambda 400, so the 10 deg/step cap binds)', 400, 1 / 60],
+    ]) {
+      const turn = 1 - Math.exp(-lambda * dtSec);
+      const maxTurn = 600 * dtSec;
+      const got = (
+        await page.evaluate((r) => window.__kcSwarmRun(r), {
+          n: count,
+          state: st2,
+          steps: 1,
+          params: { ...coreParams(lp, null), heading: { mode: 2, turn, maxTurn } },
+        })
+      ).samples[1];
+      let w = 0;
+      let moved = 0;
+      let capped = 0;
+      for (let i = 0; i < count; i++) {
+        const speed = Math.hypot(start.vx[i], start.vy[i]);
+        if (!(speed > 0.04)) continue; // (the kernel judges the pre-clamp speed of the damped velocity; the stats below use the output)
+        const next = (Math.atan2(got.vy[i], got.vx[i]) * 180) / Math.PI;
+        let dlt = next - rot0[i];
+        while (dlt > 180) dlt -= 360;
+        while (dlt < -180) dlt += 360;
+        let step = dlt * turn;
+        if (step > maxTurn) step = maxTurn;
+        if (step < -maxTurn) step = -maxTurn;
+        if (Math.abs(step) >= maxTurn - 1e-6) capped++;
+        const wantR = rot0[i] + step;
+        w = Math.max(w, Math.abs(got.rotation[i] - wantR));
+        moved += Math.abs(got.rotation[i] - rot0[i]) > 1e-6 ? 1 : 0;
+      }
+      check(
+        `heading (organism) ${label} — matches particles.js's turn`,
+        w < 0.05,
+        `max |d| ${w.toExponential(2)} deg; ${moved} moved`,
+      );
+      if (lambda > 100)
+        check('heading (organism) — the per-step cap binds for some agents', capped > 0, `${capped} capped`);
+    }
+  }
+
   // ---- Lorenz: per-agent attractor state advances like behave.js lorenzAdvance, and its direction steers
   {
     const count = 150;
