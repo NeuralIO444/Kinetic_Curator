@@ -60,6 +60,7 @@ import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
 import { createGpuFluidHost } from './gpuFluidHost.mjs'; // K1 slice 4c: the GPU fluid, render-side; OFF unless window.__KC_GPU_FLUID
+import { gpuSwarmLiveWanted } from './gpuSwarmHost.mjs'; // K3 swarm takeover marker (OFF unless asked for)
 import { createGpuContactsHost, gpuContactsWanted } from './gpuContactsHost.mjs'; // K3 contacts producer (OFF unless asked for)
 import { packFluidCells } from '../engine/dishFluidCells.mjs';
 import { createGpuCultureHost } from './gpuCultureHost.mjs'; // K2 slice 2b: the GPU culture, render-side; OFF unless window.__KC_GPU_CULTURE
@@ -1056,6 +1057,7 @@ export function createLiveLoop(
           }
         : {}), // #1997 (+ K1 4c: the GPU field, when that backend runs) — stamp + magnets + dials, only while the mode is on
       ...(dishContactStamps ? { dishContactStamps } : {}),
+      ...(gpuSwarmLiveWanted(layoutParams, typeof window !== 'undefined' ? window : null) ? { swarmGpu: 1 } : {}), // K3 takeover: the recorded switch
       ...(reviewMorphStamp ? { reviewMorph: reviewMorphStamp } : {}),
       canvasW,
       canvasH,

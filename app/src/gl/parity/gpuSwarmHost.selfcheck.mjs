@@ -2,7 +2,13 @@
 // gate, the param mapping. GL half (skips cleanly with no Playwright browser): the shadow over a real ParticleSystem agrees with
 // the JS step to float noise, skips what the kernel doesn't cover, and never changes the JS swarm.
 import assert from 'node:assert/strict';
-import { gpuSwarmWanted, swarmIneligibleReason, swarmCoreParams } from '../gpuSwarmHost.mjs';
+import {
+  gpuSwarmWanted,
+  gpuSwarmLiveWanted,
+  swarmIneligibleReason,
+  swarmCoreParams,
+  takeoverBlocker,
+} from '../gpuSwarmHost.mjs';
 import { SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from '../swarmSim.mjs';
 import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
 
@@ -24,11 +30,36 @@ import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
   assert.equal(swarmIneligibleReason({ n: 0 }, {}, {}), 'empty');
   assert.equal(swarmIneligibleReason(sys, { behave: 'flock' }, {}), 'behave');
   assert.equal(swarmIneligibleReason(sys, { contactRadius: 8 }, {}), 'contacts');
-  assert.equal(swarmIneligibleReason(sys, { dishSession: {} }, {}), 'contacts');
+  // the resolver hands EVERY layer a dishSession and the shared scent field: neither says anything about the layer
+  assert.equal(
+    swarmIneligibleReason(sys, { dishSession: {}, scentField: {}, mode: 'swarm' }, {}),
+    null,
+    'a session / scent field alone is not a blocker',
+  );
+  assert.equal(swarmIneligibleReason(sys, { mode: 'hype' }, {}), 'organism', 'the organism mode is');
+  assert.equal(swarmIneligibleReason(sys, { organism: true }, {}), 'organism');
   assert.equal(swarmIneligibleReason(sys, { modSteer: {} }, {}), 'modSteer');
-  assert.equal(swarmIneligibleReason(sys, { scentField: {} }, {}), 'organism');
   assert.equal(swarmIneligibleReason(sys, {}, { slowRender: true }), 'slowRender');
   console.log('  [ok] eligibility gate');
+}
+
+// ---- pure: the takeover flag, the takeover blockers
+{
+  assert.equal(gpuSwarmLiveWanted({}, null), false);
+  assert.equal(
+    gpuSwarmLiveWanted({ gpuSwarm: true }, { __KC_GPU_SWARM: true }),
+    false,
+    'the shadow flag is NOT the takeover',
+  );
+  assert.equal(gpuSwarmLiveWanted({ gpuSwarmLive: true }, null), true);
+  assert.equal(gpuSwarmLiveWanted({}, { __KC_GPU_SWARM_LIVE: true }), true);
+  assert.equal(gpuSwarmLiveWanted({}, { location: { search: '?gpuSwarmLive=1' } }), true);
+  assert.equal(gpuSwarmLiveWanted({}, { location: { search: '?gpuSwarmLive=2' } }), false);
+  const live = (extra = {}) => ({ n: 3, alive: [1, 1, 1], ax: [0, 0, 0], ay: [0, 0, 0], ...extra });
+  assert.equal(takeoverBlocker(live()), null);
+  assert.equal(takeoverBlocker(live({ alive: [1, 0, 1] })), 'dead');
+  assert.equal(takeoverBlocker(live({ ay: [0, 0.5, 0] })), 'preforce');
+  console.log('  [ok] takeover flag and blockers');
 }
 
 // ---- pure: the param mapping
@@ -43,6 +74,10 @@ import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
   assert.equal(p.attractStrength, 2 * ATTRACTOR_GAIN * 1.6);
   assert.equal(p.damping, SWARM_CORE_CLOUD.damping);
   assert.deepEqual(p.wind, { seed: 9, freq: 0.01, offX: 200, offY: 200, nt: 2000 * 0.25 * 0.001 });
+  // takeover: the kernel takes the step's real dt and the world noise's seed (a system on the shared world noise has none of its own)
+  const r = swarmCoreParams({}, { ...ctx, dtSec: 1 / 30, noiseSeed: 77 }, { _noiseSeed: null });
+  assert.ok(Math.abs(r.dtFrames - 2) < 1e-12 && r.wind.seed === 77);
+  assert.equal(swarmCoreParams({}, ctx, { _noiseSeed: 9 }).dtFrames, 1, 'no dtSec = one frame');
   const q = swarmCoreParams({ behave: 'flee' }, { ...ctx, attractor: null }, { _noiseSeed: 9 });
   assert.equal(q.attractStrength, 0);
   assert.equal(swarmCoreParams({ behave: 'flee' }, ctx, { _noiseSeed: 9 }).attractStrength, 1 * ATTRACTOR_GAIN * -1.6);
@@ -77,6 +112,22 @@ try {
     'it measures its own cost',
     Number.isFinite(r.gpuMsAvg) && r.gpuMsAvg > 0,
     `${r.gpuMsAvg.toFixed(2)} ms avg (software GL: not device truth)`,
+  );
+  // takeover: the GPU's velocities drive the system. Early on it tracks a pure-JS twin to float noise; later the two diverge as any
+  // pair of float32/float64 swarms does (a neighbour crossing a force radius flips a whole force term), so the long run is judged
+  // by properties, as K0 rules for sim outcomes.
+  const t5 = await page.evaluate(() => window.__kcShadowRun({ n: 200, steps: 5, seed: 0x2188, live: true }));
+  check('takeover applied the GPU velocities every frame', t5.applied === 5, `${t5.applied}/5`);
+  check(
+    'takeover tracks the pure-JS twin to float noise over 5 steps',
+    t5.drift < 5e-2,
+    `max |dpos| ${t5.drift.toExponential(2)} px`,
+  );
+  const t90 = await page.evaluate(() => window.__kcShadowRun({ n: 200, steps: 90, seed: 0x2188, live: true }));
+  check(
+    'takeover, 90 steps: applied every frame, finite, speed within the clamp',
+    t90.applied === 90 && t90.finite && t90.speedMax <= 8 + 1e-6,
+    `${t90.applied}/90, max speed ${t90.speedMax.toFixed(3)}`,
   );
   const c = await page.evaluate(() => window.__kcShadowRun({ n: 100, steps: 5, seed: 7, lp: { contactRadius: 8 } }));
   check('a layer with dish contacts is skipped, not half-simulated', c.frames === 0 && c.skipped.contacts === 5);

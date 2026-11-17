@@ -47,16 +47,34 @@ window.__kcShadowRun = (p) => {
   const sys = new ParticleSystem();
   sys.init(p.n, W, H, assets, palette, p.seed);
   const host = createGpuSwarmHost(gl);
+  // takeover: a pure-JS twin from the same seed, stepped beside the system the GPU's velocities drive
+  let twin = null;
+  let drift = 0;
+  if (p.live) {
+    twin = new ParticleSystem();
+    twin.init(p.n, W, H, assets, palette, p.seed);
+  }
   const T0 = 1_000_000;
   let toks = 0;
   for (let s = 0; s < p.steps; s++) {
     const t = T0 + s * (1000 / 60);
     const tok = host.pre('L', sys, lp, { attractor: null, canvasW: W, canvasH: H, loopTimeMs: t, seedOffsets: null, slowRender: false });
     if (tok) toks++;
-    sys.update(lp, assets, palette, p.seed, t, null);
+    const gs = p.live ? host.velocities(tok, sys) : null;
+    sys.update(gs ? { ...lp, gpuStep: gs } : lp, assets, palette, p.seed, t, null);
+    if (twin) {
+      twin.update(lp, assets, palette, p.seed, t, null);
+      for (let i = 0; i < p.n; i++) drift = Math.max(drift, Math.abs(sys.x[i] - twin.x[i]), Math.abs(sys.y[i] - twin.y[i]));
+    }
     host.post(tok, sys);
   }
-  const out = { ...host.stats, toks };
+  let speedMax = 0;
+  let finite = true;
+  for (let i = 0; i < p.n; i++) {
+    if (![sys.x[i], sys.y[i], sys.vx[i], sys.vy[i]].every(Number.isFinite)) finite = false;
+    speedMax = Math.max(speedMax, Math.hypot(sys.vx[i], sys.vy[i]));
+  }
+  const out = { ...host.stats, toks, drift, speedMax, finite };
   host.dispose();
   return out;
 };

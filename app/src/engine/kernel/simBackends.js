@@ -15,6 +15,8 @@ export const SIM_KERNELS = Object.freeze(['fluid', 'culture', 'swarm']);
  * the contacts producer, and every take that never recorded GPU contact stamps), so the header of such a take is byte-for-byte what it
  * was. 'gpu.contacts.v1' is the GPU dish-contact DETECTION: its pair list rides the take as the recorded input.dishContactStamps and
  * the CPU resolves exactly that list, so it replays anywhere.
+ * K3 swarm takeover (#2188): swarm 'gpu.swarm.v1' = the GPU kernel's velocities drove eligible cloud swarms (flag gpuSwarmLive, recorded as
+ * the input marker swarmGpu). Swarm outcomes are tier S (the recording device's own), so it implies decisions-exact; a replay runs the JS swarm.
  */
 export const OPTIONAL_SIM_KERNELS = Object.freeze(['contacts']);
 
@@ -22,7 +24,7 @@ export const OPTIONAL_SIM_KERNELS = Object.freeze(['contacts']);
 export const KNOWN_SIM_BACKENDS = Object.freeze({
   fluid: Object.freeze(['js.gs.v1', 'gpu.gs.v1']),
   culture: Object.freeze(['js.life.v1', 'gpu.life.v1']),
-  swarm: Object.freeze(['js.swarm.v1']),
+  swarm: Object.freeze(['js.swarm.v1', 'gpu.swarm.v1']),
   contacts: Object.freeze(['js.contacts.v1', 'gpu.contacts.v1']),
 });
 
@@ -34,7 +36,7 @@ export const KNOWN_SIM_BACKENDS = Object.freeze({
 export const RUNNABLE_SIM_BACKENDS = Object.freeze({
   fluid: Object.freeze(['js.gs.v1', 'gpu.gs.v1']),
   culture: Object.freeze(['js.life.v1', 'gpu.life.v1']),
-  swarm: Object.freeze(['js.swarm.v1']),
+  swarm: Object.freeze(['js.swarm.v1', 'gpu.swarm.v1']),
   contacts: Object.freeze(['js.contacts.v1', 'gpu.contacts.v1']),
 });
 

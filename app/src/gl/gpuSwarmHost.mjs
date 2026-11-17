@@ -5,10 +5,14 @@
 // screen or the take. What this buys: real-input parity numbers and per-frame GPU cost + readback cost on the stage
 // hardware (#2183) before any kernel takes over. Scent deposits and breeding stay on the CPU (Matt, 2026-11-16: CPU mirror).
 //
+// TAKEOVER (the same host, one more step): with the loop's `swarmGpu` input marker up, the layer's JS force loop is skipped and the
+// kernel's velocities drive the integration (particles.js `gpuStep` seam; position, wrap, heading and every derived column stay JS).
+//
 // Eligible = a plain cloud swarm the kernel fully covers today: not an organism, no dish contacts (contacts are slice 2b+,
 // they inject impulses between forces and integration), no mod steering. (The cloud swarm's point wind ignores the `wind` knob, so the kernel always runs it.) Anything else is skipped
 // and counted, never half-simulated.
 import { createGpuSwarm, SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from './swarmSim.mjs';
+import { isOrganismMode } from '../data/layout-modes.js';
 
 /** Is the shadow asked for? Layout param, window flag, or URL, in that order of authority (any one turns it on). */
 export function gpuSwarmWanted(layoutParams, win) {
@@ -19,14 +23,45 @@ export function gpuSwarmWanted(layoutParams, win) {
   return /(?:^|[?&])gpuSwarm=1(?:&|$)/.test(search);
 }
 
+/**
+ * Is the TAKEOVER asked for? A separate flag from the shadow's: the per-Look layout param `gpuSwarmLive`, `window.__KC_GPU_SWARM_LIVE`,
+ * or `?gpuSwarmLive=1`. It rides the resolve input as `swarmGpu: 1` (recorded: the take's header then says the GPU swarm ran), and it
+ * implies the host runs (the resolver starts it when the marker is up).
+ */
+export function gpuSwarmLiveWanted(layoutParams, win) {
+  if (layoutParams && layoutParams.gpuSwarmLive) return true;
+  if (!win) return false;
+  if (win.__KC_GPU_SWARM_LIVE) return true;
+  const search = win.location && typeof win.location.search === 'string' ? win.location.search : '';
+  return /(?:^|[?&])gpuSwarmLive=1(?:&|$)/.test(search);
+}
+
 /** Why a layer can't be shadowed, or null if it can. Pure. */
 export function swarmIneligibleReason(system, lp, ctx) {
   if (!system || !(system.n > 0)) return 'empty';
   if (lp.behave && lp.behave !== 'cruise' && lp.behave !== 'seek' && lp.behave !== 'flee') return 'behave';
-  if (lp.contactRadius > 0 || lp.dishSession) return 'contacts';
+  // The resolver hands EVERY layer a dishSession (spread-only), so its presence says nothing: a layer is in the dish contact pass
+  // only when it has a contact radius (particles.js and dishEnrolRadius gate on that, not on the session).
+  if (lp.contactRadius > 0) return 'contacts';
   if (lp.modSteer) return 'modSteer';
-  if (lp.scentField || lp.organism) return 'organism';
+  // Likewise every layer gets the shared scent field handed in; what makes it an organism is its mode.
+  if (isOrganismMode(lp.mode) || lp.organism) return 'organism';
   if (ctx && ctx.slowRender) return 'slowRender';
+  return null;
+}
+
+/**
+ * Why a layer the kernel CAN step still cannot take over this frame's velocities, or null. The takeover skips the JS force loop, so
+ * everything that loop would have added must be provably absent: nobody dead (the kernel's all-pairs treats every slot as live) and
+ * nothing already pushed into the force accumulators this frame (contact impulses; none for an eligible swarm, so any nonzero
+ * means something else is steering and the JS step must run). Pure; O(n).
+ */
+export function takeoverBlocker(system) {
+  const n = system.n;
+  for (let i = 0; i < n; i++) {
+    if (!system.alive[i]) return 'dead';
+    if (system.ax[i] !== 0 || system.ay[i] !== 0) return 'preforce';
+  }
   return null;
 }
 
@@ -46,13 +81,14 @@ export function swarmCoreParams(lp, ctx, system) {
     aliW: 1.0,
     cohW: lp.swarmCohesion ?? 1.5,
     damping: lp.damping ?? SWARM_CORE_CLOUD.damping,
-    dtFrames: 1,
+    dtFrames: Number.isFinite(ctx.dtSec) && ctx.dtSec > 0 ? ctx.dtSec * 60 : 1, // particles.js: dtFrames = dtSec * 60
     attractor: att,
     attractStrength: att ? (lp.gravityWells ?? 1) * ATTRACTOR_GAIN * seekMul : 0,
     canvasW: ctx.canvasW,
     canvasH: ctx.canvasH,
     wind: {
-      seed: system._noiseSeed,
+      // a system on the shared world noise has no seed of its own (particles.js nulls it): the resolver says which seed the world noise is
+      seed: ctx.noiseSeed ?? system._noiseSeed,
       freq: lp.noiseFreq ?? 0.005,
       offX: off('X'),
       offY: off('Y'),
@@ -73,6 +109,8 @@ export function createGpuSwarmHost(gl) {
     gpuMsMax: 0,
     driftPosMax: 0,
     driftVelMax: 0,
+    applied: 0, // takeover: frames a layer's velocities came from the GPU
+    takeoverSkipped: {},
   };
   const gpuFor = (id, n) => {
     let L = layers.get(id);
@@ -111,6 +149,20 @@ export function createGpuSwarmHost(gl) {
       stats.gpuMsAvg += (ms - stats.gpuMsAvg) / stats.frames;
       stats.gpuMsMax = Math.max(stats.gpuMsMax, ms);
       return { got, n };
+    },
+    /**
+     * Takeover: the GPU's post-step velocities for this layer as the particles.js seam ({ n, vx, vy }), or null when the JS step must
+     * run (no token, or a blocker). Call after pre(); the token's step already ran from this system's own state.
+     */
+    velocities(token, system) {
+      if (!token) return null;
+      const why = takeoverBlocker(system);
+      if (why) {
+        stats.takeoverSkipped[why] = (stats.takeoverSkipped[why] || 0) + 1;
+        return null;
+      }
+      stats.applied++;
+      return { n: token.n, vx: token.got.vx, vy: token.got.vy };
     },
     /** After the JS step: compare the GPU's one step against what the JS swarm just did (alive agents only). */
     post(token, system) {
