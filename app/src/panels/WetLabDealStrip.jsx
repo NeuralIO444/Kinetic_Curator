@@ -27,6 +27,7 @@ import {
   bodySvgOf,
 } from './wetLabDeal.mjs';
 import { creatureFigureSvg } from './wetLabLogic.mjs';
+import { ladderBodyPool, ladderOverlay, ladderPartIds } from './ladderPools.mjs'; // #2304
 
 const label = (scope) => (CREATURE_SCOPES.find((s) => s.id === scope) || CREATURE_SCOPES[0]).label;
 
@@ -47,21 +48,36 @@ export function WetLabDealStrip({ subject = null, onTap, onKeep }) {
   const [cap, setCap] = useState(CUR_DEFAULT_CAP);
   const [curN, setCurN] = useState(0); // CUR's own press counter
   const [dealtIds, setDealtIds] = useState([]); // what this strip banked this session (the "unkept" pool)
+  const constructRecords = useStore((s) => s.constructRecords);
+  const shapeShelf = useStore((s) => s.shapeShelf);
   const library = useMemo(() => dealLibrary(ASSETS, customAssets), [customAssets]);
+  // #2304 — the ladder (spec §14): bodies come only from banked constructs once there are three; parts come from the
+  // stage plus every banked construct and every kept shape. The construct tiles are drawn from their records.
+  const ladderTiles = useMemo(() => {
+    const byId = new Map(library.map((a) => [a.id, a]));
+    return ladderOverlay({ constructRecords, svgOf: (id) => (byId.get(id) || {}).svg }).filter((t) => !byId.has(t.id));
+  }, [library, constructRecords]);
+  const bodyPool = useMemo(
+    () => ladderBodyPool({ library, constructRecords, svgOf: (id) => (library.find((a) => a.id === id) || {}).svg }),
+    [library, constructRecords],
+  );
+  const drawable = useMemo(() => [...library, ...ladderTiles], [library, ladderTiles]);
+  const labOverlay = useMemo(() => [...(customAssets || []), ...ladderTiles], [customAssets, ladderTiles]);
   const banked = new Set((bank || []).map((r) => r.id));
   const unkept = unkeptIds(dealtIds, bank, enabledAssets);
   // the whole creature at rest on each tile — its body and the parts Davis would deal from the stage as it stands
   const stageIds = Object.keys(enabledAssets || {}).filter(
     (id) => enabledAssets[id] && id !== 'creature' && library.some((a) => a.id === id),
   );
-  const stageKey = stageIds.join('|');
+  const partIds = ladderPartIds({ stageIds, constructTileIds: ladderTiles.map((t) => t.id), shelf: shapeShelf });
+  const stageKey = partIds.join('|');
   const figures = useMemo(() => {
     const m = new Map();
     for (const rec of hand || []) {
-      const body = library.find((a) => a.id === rec.body);
+      const body = drawable.find((a) => a.id === rec.body);
       let svg;
       try {
-        svg = body ? creatureFigureSvg(rec, body, stageIds, { seed, library, overlay: customAssets }) : null;
+        svg = body ? creatureFigureSvg(rec, body, partIds, { seed, library: drawable, overlay: labOverlay }) : null;
       } catch {
         svg = null; // a tile that cannot be composed falls back to its body drawing
       }
@@ -69,10 +85,10 @@ export function WetLabDealStrip({ subject = null, onTap, onKeep }) {
     }
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hand, library, seed, customAssets, stageKey]);
+  }, [hand, drawable, seed, labOverlay, stageKey]);
 
   const press = () => {
-    const r = kinPress({ scope, seed, press: pressN, library, assetAttach, bank });
+    const r = kinPress({ scope, seed, press: pressN, library: bodyPool, assetAttach, bank });
     setHand(r.hand);
     setHandKind('kin');
     setPicked(null);
@@ -81,7 +97,7 @@ export function WetLabDealStrip({ subject = null, onTap, onKeep }) {
     if (r.hand.length) tap(r.hand[0]);
   };
   const narrowPress = () => {
-    const r = curPress({ subject, cap, seed, press: curN, library, assetAttach, bank });
+    const r = curPress({ subject, cap, seed, press: curN, library: bodyPool, assetAttach, bank });
     setHand(r.hand);
     setHandKind('cur');
     setPicked(r.picked ? r.picked.id : null);
@@ -168,7 +184,7 @@ export function WetLabDealStrip({ subject = null, onTap, onKeep }) {
           )}
           {(hand || []).map((rec) => {
             const figure = figures.get(rec.id);
-            const svg = figure || bodySvgOf(rec, library);
+            const svg = figure || bodySvgOf(rec, drawable);
             const on = banked.has(rec.id);
             return (
               <button

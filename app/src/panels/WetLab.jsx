@@ -47,6 +47,7 @@ import { WetLabConstructStrip } from './WetLabConstructStrip.jsx'; // #2301 — 
 import { WetLabRungRail } from './WetLabRungRail.jsx'; // #2281 — the ladder's rung rail
 import { useWetLabLadder } from './useWetLabLadder.js'; // #2281
 import { topOpenRung, isOpen } from './wetLabLadder.mjs'; // #2281
+import { ladderOverlay, ladderPartIds } from './ladderPools.mjs'; // #2304 — creatures built from the ladder
 import { poolBeasts } from './beastDeal.mjs'; // #2281 — the beast count that opens the ladder for an existing artist
 
 /** #2150 — a glyph is never a creature body: the caps/digits pack, the solo
@@ -125,7 +126,16 @@ function RailIcon({ kind }) {
 }
 
 export function WetLab({ assetId, onClose }) {
-  const { assets } = useApp();
+  const { assets: appAssets } = useApp();
+  // #2304 — the lab's pool: the app's assets plus the constructs the artist banked, drawn from their records (never
+  // saved as tiles). Every body and part lookup below reads this one list, so a construct body draws everywhere.
+  const constructRecords = useStore((s) => s.constructRecords);
+  const shapeShelf = useStore((s) => s.shapeShelf);
+  const ladderTiles = useMemo(() => {
+    const byId = new Map((appAssets || []).map((a) => [a && a.id, a]));
+    return ladderOverlay({ constructRecords, svgOf: (id) => (byId.get(id) || {}).svg }).filter((t) => !byId.has(t.id));
+  }, [appAssets, constructRecords]);
+  const assets = useMemo(() => [...(appAssets || []), ...ladderTiles], [appAssets, ladderTiles]);
   const asset = assets.find((a) => a.id === assetId) || null;
   const own = useStore((s) => s.assetAttach?.[assetId]);
   const isOwn = Array.isArray(own); // the artist edited this asset by hand; otherwise the points come from its shape
@@ -159,6 +169,8 @@ export function WetLab({ assetId, onClose }) {
   const assetTags = useStore((s) => s.assetTags);
   const customAssets = useStore((s) => s.customAssets);
   const enabledAssets = useStore((s) => s.enabledAssets);
+  // #2304 — the overlay the lab's drawers read: the imports plus the banked constructs' tiles
+  const labOverlay = useMemo(() => [...(customAssets || []), ...ladderTiles], [customAssets, ladderTiles]);
   const assetAttach = useStore((s) => s.assetAttach);
   const seed = useStore((s) => s.seed);
   const [tagFilter, setTagFilter] = useState(''); // 'subject:plant' — a breed-parent filter on the body's tags
@@ -288,6 +300,8 @@ export function WetLab({ assetId, onClose }) {
   const stageIds = Object.keys(enabledAssets || {}).filter(
     (id) => enabledAssets[id] && id !== 'creature' && assets.some((a) => a.id === id && a.category !== 'creature'),
   );
+  // #2304 — in the lab, Davis deals parts from the stage plus every banked construct and every kept shape (spec §14.3)
+  const partIds = ladderPartIds({ stageIds, constructTileIds: ladderTiles.map((t) => t.id), shelf: shapeShelf });
   // #1946 — the parent pickers, filtered by the body's tags and/or a kit (assetsWhere's own answer over the bodies)
   const bodyRecs = new Map(
     (allRecords || []).filter((r) => descById.has(r.body)).map((r) => [r.body, descById.get(r.body)]),
@@ -524,8 +538,8 @@ export function WetLab({ assetId, onClose }) {
                     bodyAsset: selBodyAsset,
                   }}
                   assets={assets}
-                  stageIds={stageIds}
-                  overlay={customAssets}
+                  stageIds={partIds}
+                  overlay={labOverlay}
                   seed={seed}
                 />
               ) : selRecord ? (
@@ -533,8 +547,8 @@ export function WetLab({ assetId, onClose }) {
                   <div style={{ display: 'flex', justifyContent: 'center' }}>
                     <CreatureMiniature
                       subject={{ kind: 'record', record: selRecord, bodyAsset: selBodyAsset }}
-                      stageIds={stageIds}
-                      overlay={customAssets}
+                      stageIds={partIds}
+                      overlay={labOverlay}
                       seed={seed}
                       svgOf={stageSvgOf}
                       size={232}
@@ -602,9 +616,9 @@ export function WetLab({ assetId, onClose }) {
                       previewKits.flatMap((id) => resolveKit(kitsById([id], kits)[0] || { where: {} }, descs).ids),
                     )
                   : null;
-                const parts = previewDeal(selRecord, selBodyAsset, stageIds, {
+                const parts = previewDeal(selRecord, selBodyAsset, partIds, {
                   seed,
-                  overlay: customAssets,
+                  overlay: labOverlay,
                   pileOnly,
                 });
                 return (
