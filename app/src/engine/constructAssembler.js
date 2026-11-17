@@ -284,7 +284,8 @@ export function constructTile(record, svgOf) {
     id: constructTileId(record.id),
     category: CONSTRUCT_CATEGORY,
     weight: 'medium',
-    tags: ['construct', record.style],
+    tags: ['construct'], // the style is its own field: a tag must have a canonical home (data/assetStyle.js)
+    style: record.style,
     compound: true,
     source: CONSTRUCT_SOURCE,
     svg,

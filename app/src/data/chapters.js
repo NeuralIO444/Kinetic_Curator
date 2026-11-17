@@ -39,6 +39,7 @@ import { ASSETS_ORNAMENTS } from './assets/assets-ornaments.js';
 import { ASSETS_PLATE } from './assets/assets-plate.js';
 import { ASSETS_WEAR } from './assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from './assets/assets-riso.js';
+import { ASSETS_CONSTRUCTS } from './assets/index.js';
 import { ASSETS_LETTERS } from './assets/assets-letterforms.js'; // #2150: the caps/digits pack
 import { SOLO_TEXT_STAMP_IDS } from './assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
 import { PIXEL_LETTER_ANATOMY_IDS } from './assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
@@ -71,6 +72,8 @@ export const CHAPTER_UNDEALT = Object.freeze([
   ...ASSETS_WEAR.map((a) => a.id),
   // #2008: the riso icons join the same class — catalogue members dealt only by the riso field dealer.
   ...ASSETS_RISO.map((a) => a.id),
+  // #2108: the house constructs join the same class — no chapter deck deals them until the gate.
+  ...ASSETS_CONSTRUCTS.map((a) => a.id),
   // #2150: the glyphs join the same class.
   ...ASSETS_LETTERS.map((a) => a.id),
   ...SOLO_TEXT_STAMP_IDS,

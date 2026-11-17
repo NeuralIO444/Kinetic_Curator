@@ -148,7 +148,7 @@ export const TAG_SYNONYMS = Object.freeze({
   ],
   dash: ['dash', 'dashed', 'dot-dash', 'dotted', 'tally', 'marks', 'mark', 'ticks', 'ruler', 'gauge'],
   hatch: ['hatch', 'hatched', 'crosshatch', 'texture'],
-  grid: ['grid', 'modular', 'cluster', 'scatter', 'mixed'],
+  grid: ['grid', 'modular', 'cluster', 'scatter', 'mixed', 'construct'], // #2108: a construct is a mixed assembly
   dot: ['dot', 'dots', 'speck', 'speckle', 'confetti', 'halftone'],
   glyph: [
     'glyph',
@@ -224,6 +224,8 @@ export const FAMILIES = Object.freeze([
   'creature',
   'imported',
 ]);
+/** #2108: catalogue-only families — never dealt as a family (not in FAMILIES, which the deals and pairings walk). */
+export const CATALOGUE_ONLY_FAMILIES = Object.freeze(['construct']);
 export const FAMILY_BY_PREFIX = Object.freeze({
   org: 'organic-geo',
   geo: 'organic-geo',
@@ -243,6 +245,7 @@ export const FAMILY_BY_PREFIX = Object.freeze({
   mrk: 'marks',
   riso: 'riso',
   creature: 'creature',
+  cn: 'construct', // #2108: `cn-xxxxxxxx` construct ids
 });
 
 /** The family an asset comes from. */
@@ -322,6 +325,8 @@ function ruleMatches(rule, family, category, tags) {
 /** An asset's style (always one of STYLES). */
 export function assetStyle(asset) {
   const family = assetFamily(asset);
+  // #2108: a construct is assembled from ONE style's vocabulary and carries that style on its own field.
+  if (family === 'construct' && asset && STYLES.includes(asset.style)) return asset.style;
   const category = asset && asset.category;
   const tags = normalizeTags(asset);
   for (const rule of STYLE_RULES) if (ruleMatches(rule, family, category, tags)) return rule.style;

@@ -450,7 +450,7 @@ assert.ok(
 );
 assert.strictEqual(
   ASSETS.length,
-  602 + (26 + 17 + 52 + 4) + 52 + 24 + 208,
+  602 + (26 + 17 + 52 + 4) + 52 + 24 + 208 + 66, // #2108 RE-PIN: +66 house constructs, same road
   'the catalogue arithmetic: 602 + (26 lowercase + 17 punct + 52 serif + 4 ornaments) + 52 plate stamps (#2005) + 24 riso icons (#2008) + 208 worn letters (#2010)',
 );
 for (const a of [...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS]) {

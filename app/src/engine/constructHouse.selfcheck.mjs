@@ -4,7 +4,7 @@
 //   2. a pure function: the same set, byte for byte, every time; ids unique
 //   3. every record draws a tile; the tile is an ordinary pool asset with its own id shape
 //   4. the set moves when its recipe moves: another vocabulary is another id, never the same id for a new shape
-//   5. nothing reads the house set yet (data only; 5b puts it in the catalogue)
+//   5. only the catalogue reads the house set (5b); every dealing surface excludes it
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -99,7 +99,7 @@ const find = (id) => byId.get(id);
   ok('an edited vocabulary changes the ids of its style alone: the same name never means a new shape');
 }
 
-// 5 — data only.
+// 5 — only the catalogue reads it.
 {
   const root = join(here, '..');
   const importers = [];
@@ -114,8 +114,8 @@ const find = (id) => byId.get(id);
     }
   };
   walk(root);
-  assert.deepEqual(importers, [], 'nothing reads the house set in this slice');
-  ok('nothing reads the house set yet');
+  assert.deepEqual(importers, ['data/assets/index.js'], 'only the catalogue reads the house set');
+  ok('only the catalogue (data/assets/index.js) reads the house set');
 }
 
 console.log(`constructHouse.selfcheck: OK (${checks} checks)`);

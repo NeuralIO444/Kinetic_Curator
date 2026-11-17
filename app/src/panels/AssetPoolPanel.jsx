@@ -252,7 +252,7 @@ export function AssetPoolPanel() {
             >
               USER <span className="cat-chip-count">{overlayCount}</span>
             </button>
-            {ALL_CATEGORIES.map((c) => (
+            {ALL_CATEGORIES.filter((c) => c !== 'construct' || catCounts[c]).map((c) => (
               <button
                 key={c}
                 className={`cat-chip ${catFilter === c ? 'active' : ''}`}

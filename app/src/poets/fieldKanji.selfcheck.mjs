@@ -191,7 +191,7 @@ assert.ok(!ASSETS_AUTHORED.some((a) => KANJI_STAMP_IDS.has(a.id)), 'no kanji in 
 // the set; the riso suites own their containment pins.
 assert.strictEqual(
   ASSETS.length,
-  312 + 1 + 163 + 126 + 43 + 52 + 4 + 52 + 24 + 208,
+  312 + 1 + 163 + 126 + 43 + 52 + 4 + 52 + 24 + 208 + 66, // #2108 RE-PIN: +66 house constructs, same road
   'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments + plate + riso + wear',
 );
 assert.ok(ASSETS_KANJI.every((a) => ASSETS.some((x) => x.id === a.id)), 'every kanji stamp resolves in the catalogue');

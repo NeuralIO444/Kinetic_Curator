@@ -16,6 +16,7 @@ import { ASSETS_WEAR } from './assets-wear.js';
 import { ASSETS_RISO } from './assets-riso.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
+import { houseConstructTiles } from '../../engine/constructHouse.js'; // #2108: the construct house set
 import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes (#725) baked for the library
 
 /** The catalogue as authored, before the baked mattes are attached (what the bake reads). */
@@ -55,6 +56,13 @@ const CREATURE_CITIZEN = {
   svg: `<ellipse cx="50" cy="50" rx="20" ry="42" fill="var(--ink)"/><line x1="50" y1="10" x2="50" y2="90" stroke="var(--accent)" stroke-width="2"/><circle cx="50" cy="35" r="3" fill="var(--accent)"/><circle cx="50" cy="50" r="3" fill="var(--accent)"/><circle cx="50" cy="65" r="3" fill="var(--accent)"/>`,
   options: [{ key: 'family', choices: ['both', 'moth', 'dish'], default: 'both' }],
 };
+
+// #2108 (constructs slice 5b) — the 66 house constructs ride the same road in, on the same terms: derived at load
+// from the authored library and the fixed house seeds (engine/constructHouse.js) — catalogue members, never
+// authored content, excluded by id on every dealing surface. Nothing deals them yet; the gate that lifts that
+// exclusion is the next slice, so every existing roll, deal and take stays as it was.
+const authoredById = new Map(ASSETS_AUTHORED.map((a) => [a.id, a]));
+export const ASSETS_CONSTRUCTS = houseConstructTiles((id) => authoredById.get(id));
 
 export const ASSETS = [
   ...ASSETS_AUTHORED.map((a) => (BAKED_REGIONS[a.id] ? { ...a, ...BAKED_REGIONS[a.id] } : a)),
@@ -96,5 +104,6 @@ export const ASSETS = [
   // catalogue members, never authored content, excluded by id on every dealing
   // surface, dealt only by the riso field dealer (engine/risoField.mjs).
   ...ASSETS_RISO,
+  ...ASSETS_CONSTRUCTS,
   CREATURE_CITIZEN,
 ];

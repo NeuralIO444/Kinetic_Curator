@@ -219,10 +219,11 @@ assert.ok(!ASSETS_AUTHORED.some((a) => KANA_STAMP_IDS.has(a.id)), 'no kana in th
 // the set.
 // #2010 RE-PIN (cause: RAY GUN P1 · TORN & XEROXED): the worn letters (208)
 // join the catalogue on the same road — the sum grows by exactly the pack.
+// #2108 RE-PIN (cause: constructs slice 5b): the 66 house constructs join the catalogue on the same road.
 assert.strictEqual(
   ASSETS.length,
-  312 + 1 + 163 + 126 + 43 + 52 + 4 + 52 + 24 + 208,
-  'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments + plate + riso + wear',
+  312 + 1 + 163 + 126 + 43 + 52 + 4 + 52 + 24 + 208 + 66,
+  'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments + plate + riso + wear + constructs',
 );
 assert.ok(ASSETS_KANA.every((a) => ASSETS.some((x) => x.id === a.id)), 'every kana stamp resolves in the catalogue');
 const recs = poolDescriptors(ASSETS);

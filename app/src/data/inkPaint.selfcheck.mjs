@@ -41,9 +41,11 @@ assert.strictEqual(
 );
 
 // ── the census, pinned (measured on this head) ───────────────────────────
+// #2108 RE-PIN: the 66 house constructs are catalogue members, so the census grows by exactly them
+// (985 → 1051: +7 stroke, +12 fill, +41 mixed, +6 no ink slot; the original 985 are unchanged).
 assert.deepStrictEqual(
   INK_PAINT_CENSUS,
-  { total: 985, stroke: 107, fill: 813, mixed: 46, none: 19 },
+  { total: 1051, stroke: 114, fill: 825, mixed: 87, none: 25 },
   'the library census: 107 stroke-only / 813 fill-only / 46 mixed / 19 no ink slot',
 );
 

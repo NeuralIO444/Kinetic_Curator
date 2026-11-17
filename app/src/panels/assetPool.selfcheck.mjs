@@ -120,6 +120,7 @@ const kanaIds = new Set([
     ...ASSETS_RISO,
     ...ASSETS_WEAR,
     ...ASSETS_LETTERS,
+    ...(await import('../data/assets/index.js')).ASSETS_CONSTRUCTS, // #2108
   ].map((k) => k.id),
   ...SOLO_TEXT_STAMP_IDS,
   ...PIXEL_LETTER_ANATOMY_IDS,

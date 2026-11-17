@@ -609,7 +609,7 @@ assert.ok(!ASSETS_PLATE.some((a) => ASSETS_AUTHORED.includes(a)), 'no plate stam
 // #2010 RE-PIN (cause: RAY GUN P1 · TORN & XEROXED): the worn letters (208) join on the same road.
 assert.strictEqual(
   ASSETS.length,
-  701 + 52 + 24 + 208,
+  701 + 52 + 24 + 208 + 66, // #2108 RE-PIN: +66 house constructs, same road
   'the catalogue arithmetic: 701 + 52 plate stamps + 24 riso icons (#2008) + 208 worn letters (#2010)',
 );
 for (const a of ASSETS_PLATE) {
