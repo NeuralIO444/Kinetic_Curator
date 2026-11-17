@@ -6,7 +6,7 @@
 //   4. the whole composition stays inside the box, and the record's own points are honest ATTACH points
 //   5. the deal rides its own registered channel and no other
 //   6. nothing to join at is refused: no style, or no primitive carrying a point, assembles nothing
-//   7. data only: no stage path reads the assembler in this slice
+//   7. not on stage yet: only the project document and the store's bank read the assembler
 //   8. (slice 2) the tile is a pure function of the record: one group per piece, each drawn where it was joined
 //   9. (slice 2) no tile without every piece; the tile passes the pool's own door; the bake declares its cost
 import assert from 'node:assert/strict';
@@ -241,27 +241,27 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
   ok('a missing style or an unjoinable vocabulary assembles nothing; a messy rule is cleaned');
 }
 
-// 7 — data only: nothing outside the assembler's own files (and the rules' own test) imports it yet.
+// 7 — not on stage yet: only the document and the store's bank read the assembler (records are saved and
+// loaded); no render, curator or deal path does.
 {
   const root = join(here, '..');
+  const allowed = new Set(['state/projectDocument.js', 'state/slices/globalSlice.js']);
   const importers = [];
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
       const p = join(dir, name);
       if (statSync(p).isDirectory()) {
         if (name !== 'node_modules') walk(p);
-      } else if (
-        /\.(mjs|js|jsx)$/.test(name) &&
-        !name.startsWith('constructAssembler.') &&
-        name !== 'constructRules.selfcheck.mjs'
-      ) {
-        if (/from\s+['"][^'"]*constructAssembler/.test(readFileSync(p, 'utf8'))) importers.push(p);
+      } else if (/\.(mjs|js|jsx)$/.test(name) && !/^construct\w+\.(selfcheck\.mjs|js)$/.test(name)) {
+        const rel = p.slice(root.length + 1);
+        if (allowed.has(rel)) continue;
+        if (/from\s+['"][^'"]*constructAssembler/.test(readFileSync(p, 'utf8'))) importers.push(rel);
       }
     }
   };
   walk(root);
   assert.deepEqual(importers, [], 'no stage path reads the construct assembler in this slice');
-  ok('nothing on stage reads the assembler yet (data only)');
+  ok('only the project document and the bank read the assembler (nothing on stage yet)');
 }
 
 // 8 — the tile: a pure function of the record; one group per piece; each piece drawn where it was joined.
