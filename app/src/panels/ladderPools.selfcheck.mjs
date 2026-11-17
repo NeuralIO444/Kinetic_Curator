@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { ladderBodyPool, ladderPartIds, ladderOverlay, LADDER_BODY_FLOOR } from './ladderPools.mjs';
-import { houseConstructs } from '../engine/constructHouse.js';
+import { assembleConstruct } from '../engine/constructAssembler.js';
+import { constructRule, CONSTRUCT_STYLE_IDS } from '../engine/constructRules.js';
 import { attachPointsFor } from '../engine/autoAttach.js';
 import { founderRoles, creatureAdapter } from '../deal/creatureAdapter.mjs';
 import { press } from '../deal/kineticEngine.mjs';
@@ -17,7 +18,11 @@ const ok = (name, fn) => {
 
 const byId = new Map(ASSETS.map((a) => [a.id, a]));
 const svgOf = (id) => (byId.get(id) || {}).svg;
-const records = houseConstructs((id) => byId.get(id) || null);
+// real constructs, built by the assembler from every style's rule (not the house set: only the catalogue reads that)
+const records = CONSTRUCT_STYLE_IDS.flatMap((style) => {
+  const rule = constructRule(style, (id) => byId.get(id) || null, null);
+  return rule ? [1, 2, 3].map((k) => assembleConstruct({ ...rule, seed: 0x5e771e00 + k })).filter(Boolean) : [];
+});
 const library = ASSETS.slice(0, 40);
 const shelf = [
   { style: records[0].style, asset: records[0].parts[0].asset },
@@ -59,7 +64,7 @@ ok('checked: a construct tile reads as a body, and KIN deals construct-bodied cr
     const pts = founderRoles(attachPointsFor(t, null));
     return pts.some((p) => p.role === 'H') && pts.some((p) => p.role === 'L');
   });
-  assert.equal(skeletal.length, tiles.length, 'every house construct has a head and limbs');
+  assert.equal(skeletal.length, tiles.length, 'every construct has a head and limbs');
   const pool = ladderBodyPool({ library, constructRecords: records.slice(0, 6), svgOf });
   const hand = press(creatureAdapter, { scope: 'weak', seed: 0x2303, press: 0, ctx: { library: pool, bank: [] } }).hand;
   assert.ok(hand.length > 0);
