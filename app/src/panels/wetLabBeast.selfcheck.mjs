@@ -151,7 +151,12 @@ ok('unkept: banked from the strip and not turned on for the stage', () => {
 
 ok('lab: the beast strip is mounted under the bank rail; no clock or Math.random in the glue or the store door', () => {
   const lab = readFileSync(new URL('./WetLab.jsx', import.meta.url), 'utf8');
-  assert.match(lab, /<\/footer>\s*<WetLabBeastStrip \/>/, 'the strip sits right under the bank rail');
+  // the rung rail shows one rung at a time: the strip belongs to the RIG rung, and still sits right under the bank rail
+  assert.match(
+    lab,
+    /<\/footer>\s*\{rungOnScreen === 'rig' && <WetLabBeastStrip \/>\}/,
+    'the strip sits right under the bank rail, on the rig rung',
+  );
   const strip = readFileSync(new URL('./WetLabBeastStrip.jsx', import.meta.url), 'utf8');
   assert.match(strip, /data-testid="beast-cur"/);
   assert.match(strip, /prefers-reduced-motion/, 'the walk stands still for reduced motion');
