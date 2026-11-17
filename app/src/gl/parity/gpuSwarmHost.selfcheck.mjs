@@ -57,7 +57,12 @@ import { openHarnessPage, closeGlDriver } from './glDriver.mjs';
   assert.equal(gpuSwarmLiveWanted({}, { location: { search: '?gpuSwarmLive=2' } }), false);
   const live = (extra = {}) => ({ n: 3, alive: [1, 1, 1], ax: [0, 0, 0], ay: [0, 0, 0], ...extra });
   assert.equal(takeoverBlocker(live()), null);
-  assert.equal(takeoverBlocker(live({ alive: [1, 0, 1] })), 'dead');
+  assert.equal(takeoverBlocker(live({ alive: [1, 0, 1] })), null, 'the dead are parked for the GPU, not a blocker');
+  assert.equal(
+    takeoverBlocker(live({ alive: [1, 0, 1], ay: [0, 0.5, 0] })),
+    null,
+    "a dead slot's stale force is nobody's",
+  );
   assert.equal(takeoverBlocker(live({ ay: [0, 0.5, 0] })), 'preforce');
   console.log('  [ok] takeover flag and blockers');
 }
@@ -128,6 +133,20 @@ try {
     'takeover, 90 steps: applied every frame, finite, speed within the clamp',
     t90.applied === 90 && t90.finite && t90.speedMax <= 8 + 1e-6,
     `${t90.applied}/90, max speed ${t90.speedMax.toFixed(3)}`,
+  );
+  // a population with dead slots (breeding / culling stays on the CPU): the dead are parked for the GPU and the living still match
+  const d5 = await page.evaluate(() =>
+    window.__kcShadowRun({ n: 200, steps: 5, seed: 0x2188, live: true, kill: [3, 17, 18, 64, 120, 199] }),
+  );
+  check(
+    'takeover with dead slots: applied every frame, 6 parked',
+    d5.applied === 5 && d5.dead === 6,
+    `${d5.applied}/5, ${d5.dead} dead`,
+  );
+  check(
+    'takeover with dead slots: the living track the pure-JS twin',
+    d5.drift < 5e-2,
+    `max |dpos| ${d5.drift.toExponential(2)} px`,
   );
   const c = await page.evaluate(() => window.__kcShadowRun({ n: 100, steps: 5, seed: 7, lp: { contactRadius: 8 } }));
   check('a layer with dish contacts is skipped, not half-simulated', c.frames === 0 && c.skipped.contacts === 5);
