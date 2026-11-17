@@ -162,3 +162,24 @@ one-writer files `liveLoop.mjs`, `liveResolve.mjs`, `particles.js`.
 
 No code, config or behaviour changes. It does not change the KIN/CUR engines, the creature record format, the
 breeding law, the stage, or the take.
+
+## 12. Phase 2 rulings (Matt, 2026-11-16 late — all taken as recommended)
+
+These amend the sections above where they differ.
+
+1. **Scope of phase 2:** the rung rail and the SHAPE rung (build steps 2 and 3).
+2. **Four rungs, not five.** ASSET and RECIPE become one **CONSTRUCT** rung, matching `constructs-spec.md` §8
+   (a complex shape is a recipe built from primitives). The ladder is SHAPE → CONSTRUCT → CREATURE → RIG. §2's table
+   rows 2 and 3 and build steps 4 and 5 collapse into "CONSTRUCT adapter" (`engine/constructAssembler.js` exists).
+3. **Existing artists start open.** A project that already holds kept creatures or beasts opens every rung. A
+   brand-new artist starts at SHAPE only.
+4. **SHAPE deals primitives only:** the Canon styles' construct vocabularies
+   (`constructVocabularyIds`, `CONSTRUCT_STYLE_IDS` in `engine/constructRules.js`), not the whole library.
+5. **One style per hand.** The scope pill picks a style, or ANY (the press picks the style). Kept shapes then fit
+   the one-style-per-construct ruling.
+6. **Keep goes to the rung's shelf, saved in the project.** The CONSTRUCT rung will deal from the SHAPE shelf. The
+   lead shape of a KIN hand also lands on the stage, as KIN creatures do (#2250).
+7. **The rail shows one rung at a time.** Tapping a rung shows only that rung's strip; the creature strip sits under
+   CREATURE and the beast strip under RIG.
+
+Phase 2 is cut into issues, one fix per PR; each issue names its files, its selfcheck, and what it must not touch.
