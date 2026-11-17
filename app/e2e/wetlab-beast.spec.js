@@ -18,6 +18,10 @@ async function boot(page, size) {
       if (!sessionStorage.getItem('kc:e2e-booted')) localStorage.clear();
       sessionStorage.setItem('kc:e2e-booted', '1');
       localStorage.setItem('kc:first-run-seen', '1');
+      localStorage.setItem(
+        'kc.wetLabLadder.v1',
+        JSON.stringify({ v: 1, kept: {}, open: { shape: true, construct: true, creature: true, rig: true } }),
+      ); // #2281 — this suite works the creature and rig rungs: open them
     } catch {
       /* ignore */
     }
@@ -35,6 +39,7 @@ async function openEmptyLab(page) {
   await expect(open).toBeVisible();
   await open.click();
   await expect(page.getByTestId('wet-lab')).toBeVisible();
+  await page.getByTestId('rung-rig').click(); // #2281 — the rail shows one rung's strip at a time
 }
 
 const beastsInPool = (page) =>
