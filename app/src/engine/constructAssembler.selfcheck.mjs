@@ -7,6 +7,8 @@
 //   5. the deal rides its own registered channel and no other
 //   6. nothing to join at is refused: no style, or no primitive carrying a point, assembles nothing
 //   7. data only: no stage path reads the assembler in this slice
+//   8. (slice 2) the tile is a pure function of the record: one group per piece, each drawn where it was joined
+//   9. (slice 2) no tile without every piece; the tile passes the pool's own door; the bake declares its cost
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -20,7 +22,14 @@ import {
   CONSTRUCT_CHANNEL,
   CONSTRUCT_MIN_PARTS,
   CONSTRUCT_MAX_PARTS,
+  constructTileSvg,
+  constructTile,
+  constructCost,
+  isConstructTile,
 } from './constructAssembler.js';
+import { sanitizeOverlay } from '../assets/overlay.js';
+import { assetCostScore, COST_WARNING_THRESHOLD } from '../assets/ingest.js';
+import { isCreatureTile } from './creatureTileId.js';
 import { sanitizeAttachPoints, ATTACH_BOX, MAX_ATTACH } from './assetAttach.js';
 import { autoAttachPoints } from './autoAttach.js';
 import { isCreatureTileId } from './creatureTileId.js';
@@ -249,6 +258,79 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
   walk(root);
   assert.deepEqual(importers, [], 'no stage path reads the construct assembler in this slice');
   ok('nothing on stage reads the assembler yet (data only)');
+}
+
+// 8 — the tile: a pure function of the record; one group per piece; each piece drawn where it was joined.
+{
+  const svgOf = (id) => byId.get(id)?.svg;
+  const pts = new Map(vocabulary.map((v) => [v.id, sanitizeAttachPoints(v.points)]));
+  const GROUP = /<g transform="translate\((\S+) (\S+)\) rotate\((\S+)\) scale\((\S+)\)">/g;
+  for (const seed of SEEDS.slice(0, 60)) {
+    const rec = assembleConstruct({ ...rule, seed });
+    const svg = constructTileSvg(rec, svgOf);
+    assert.equal(svg, constructTileSvg(JSON.parse(JSON.stringify(rec)), svgOf), 'the same record is the same tile');
+    const groups = [...svg.matchAll(GROUP)];
+    assert.equal(groups.length, rec.parts.length, 'one group per piece');
+    // Read each transform back out of the markup and apply it the way SVG does (right to left: size, turn, move):
+    // the piece's own point must land on a point of an earlier piece — the join, as drawn.
+    const drawn = groups.map((g) => ({ x: Number(g[1]), y: Number(g[2]), r: Number(g[3]), s: Number(g[4]) }));
+    const apply = (t, p) => {
+      const a = (t.r * Math.PI) / 180;
+      const sx = t.s * p.x;
+      const sy = t.s * p.y;
+      return { x: t.x + sx * Math.cos(a) - sy * Math.sin(a), y: t.y + sx * Math.sin(a) + sy * Math.cos(a) };
+    };
+    rec.parts.forEach((part, i) => {
+      if (i === 0) return;
+      const mine = apply(drawn[i], pts.get(part.asset)[part.own]);
+      let best = Infinity;
+      for (let j = 0; j < i; j++) {
+        for (const p of pts.get(rec.parts[j].asset)) {
+          const q = apply(drawn[j], p);
+          best = Math.min(best, Math.hypot(q.x - mine.x, q.y - mine.y));
+        }
+      }
+      assert.ok(best < 0.1, `seed ${seed} piece ${i} is drawn on its join (gap ${best.toFixed(4)})`);
+    });
+    // Every piece's own markup is inside its group, untouched.
+    rec.parts.forEach((part) => assert.ok(svg.includes(`">${svgOf(part.asset)}</g>`)));
+  }
+  ok('the tile draws one group per piece, each on its join, and the same record bakes the same tile');
+}
+
+// 9 — the pool entry: refused without every piece; passes the pool's door; declares its cost.
+{
+  const svgOf = (id) => byId.get(id)?.svg;
+  const rec = assembleConstruct({ ...rule, seed: 2108 });
+  const tile = constructTile(rec, svgOf);
+  assert.ok(tile);
+  assert.ok(isConstructTileId(tile.id) && isConstructTile(tile) && !isCreatureTile(tile));
+  assert.deepEqual(tile.tags, ['construct', 'bauhaus']);
+  assert.deepEqual(tile.points, rec.points);
+  // The pool's own trust boundary keeps the tile's drawing byte for byte (nothing hostile, no disallowed tag).
+  const [kept] = sanitizeOverlay([tile]);
+  assert.ok(kept && kept.svg === tile.svg && kept.id === tile.id && kept.category === 'construct');
+  // The cost is the house score of the composed drawing, with the house warning line.
+  assert.equal(tile.cost.score, assetCostScore(tile.svg));
+  assert.equal(tile.cost.over, tile.cost.score > COST_WARNING_THRESHOLD);
+  assert.ok(tile.cost.score >= rec.parts.length, 'at least one subpath per piece');
+  assert.equal(constructCost(tile.svg).score, tile.cost.score);
+  // No tile without every piece: a primitive the pool no longer carries refuses the whole tile.
+  const gone = rec.parts[3].asset;
+  assert.equal(
+    constructTile(rec, (id) => (id === gone ? undefined : svgOf(id))),
+    null,
+  );
+  assert.equal(
+    constructTileSvg(rec, () => ''),
+    null,
+  );
+  assert.equal(constructTileSvg({ ...rec, parts: [] }, svgOf), null);
+  assert.equal(constructTileSvg({ ...rec, parts: [{ ...rec.parts[0], s: 0 }] }, svgOf), null);
+  assert.equal(constructTileSvg({ ...rec, parts: [{ ...rec.parts[0], x: NaN }] }, svgOf), null);
+  assert.equal(constructTileSvg(rec, null), null);
+  assert.equal(constructTile({ ...rec, id: 'cr-0123abcd' }, svgOf), null, 'a creature id is not a construct');
+  ok(`the tile is an ordinary pool asset (cost ${tile.cost.score}); a missing piece refuses the whole tile`);
 }
 
 console.log(`constructAssembler.selfcheck: OK (${checks} checks)`);
