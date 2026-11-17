@@ -223,3 +223,31 @@ One discipline for everything the WetLab banks (§5).
 
 **Q6. Does the constructs build write the styles' `assets.families` lists? — A: in this build.**
 The grammar lands as data with the assembler, and the families slot stops being empty (§3).
+
+## 8. The library and the break-up cycle — Matt, 2026-11-16
+
+Asked after seeing the ferrofluid on stage (build bef708a). Matt: "I wanted to have a system that builds complex shapes from simple" ... "Reduce library of assets. But, keep a library of complex shapes that can be made from."
+
+**The library ruling.**
+
+- **What is dealt is primitives.** The pool the stage deals from becomes a small set of simple primitives: each Canon style's named simple shapes (§3's vocabularies, written for all eleven styles), roughly 40–60 in all.
+- **Complex shapes are recipes.** A complex shape on stage is a construct, assembled from those primitives by its style's grammar (§§1–6 as written: 2–4 primitives, one style, banked in the document, cap 64).
+- **Today's complex assets stay, but are not dealt.** The ~985 assets remain in the library for browsing and as references that constructs imitate. Nothing is deleted.
+
+**The cycle (with `docs/design/one-force-seam.md`).** Simple ↔ complex is one loop, two directions:
+
+- **Complex → simple:** where the ferrofluid is strong, a construct breaks into its primitives (its pieces are its recipe, by the shape itself), and the pieces flow with the field.
+- **Simple → complex:** when the field leaves, pieces reassemble: into the construct they came from, or into a new construct by the style's grammar.
+
+### Build order
+
+1. This section (docs).
+2. Constructs, per §§1–6: the assembler, the tile composer, the record door and bank, the styles' `assets.families` data, and the system deal.
+3. The library cut: the deal draws primitives + constructs; the complex assets become reference-only.
+4. The field break-up and reassembly (one-force-seam order step 2), on constructs.
+
+### Open (to ask Matt one at a time at build time, not decided here)
+
+- A construct has 2–4 primitives, so it breaks into 2–4 pieces; Matt asked for 12–16 pieces per asset. Do primitives also break further (by outline), or does a construct grow to more primitives, or is 2–4 right once everything is a construct?
+- What the cut does to systems that deal from the full library today: KINETIC's full-library pools (#1778), Loot pools, kits (#1955), creature parts dealt from the stage (#1937), the poem's stamps (not pool assets; unaffected).
+- Which styles' vocabularies need new primitives drawn, versus picked from existing simple assets.
