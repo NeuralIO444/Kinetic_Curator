@@ -8,7 +8,7 @@
 //
 // Slice 1b adds the cloud swarm's POINT wind; slice 1c the CURL wind (organisms) and the windMul; slice 1d chemotaxis (reads an uploaded scent grid); slice 1e Levy flights (the kernel's own integer hash in-shader); slice 1f Lorenz (per-agent xyz state, a second colour attachment); slice 1g drives + leak (energy/drive and pigment state on two more) (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
 // What is NOT here yet (later K3 slices): the curl wind (organisms), chemotaxis, Lévy, Lorenz, cling, drives, leak, breeding,
-// contacts, the spine integrator (slice 1h adds the HEADING: p.heading { mode 1 cloud snap | 2 organism damped turn, turn, maxTurn }, the facing in degrees riding o_drv.z). A caller that wants parity with the JS swarm runs it with wind 0 (see the
+// contacts, swarm takeover (slice 1i adds the SPINE chain: p.spine { len, follow }, its own pass, readSpine(len); slice 1h adds the HEADING: p.heading { mode 1 cloud snap | 2 organism damped turn, turn, maxTurn }, the facing in degrees riding o_drv.z). A caller that wants parity with the JS swarm runs it with wind 0 (see the
 // selfcheck, which drives the real ParticleSystem and this kernel from the same state).
 //
 // K0 tier: the kernel is judged against the JS swarm, not bitwise — float32 vs float64 differ at noise and a swarm is chaotic;
@@ -269,6 +269,46 @@ void main() {
   o_state = vec4(p, v);
 }`;
 
+export const SPINE_MAX = 7; // particles.js caps an organism's body at 7 segments (bodyLen = clamp(round(body), 1, 7))
+
+/**
+ * The spine pass. An organism's body is a chain of bodyLen points: segment 0 is the head (the post-bounce position this step), and
+ * every later segment eases toward the one in front of it, which has ALREADY moved this step: new[s] = cur[s] + (new[s-1] - cur[s]) * f
+ * (f = 1 - pow(1 - follow, dtFrames), computed by the caller). That recurrence is sequential along the chain, so each fragment (agent,
+ * segment s) unrolls it from the head: s <= 6 iterations, no cross-fragment dependency. Spine texture = the state texture's layout
+ * stacked SPINE_MAX times: row (s * h + ty). Mode 1 (init) sets every segment to the head, as particles.js's [head] seed does.
+ */
+export const SPINE_FS = `#version 300 es
+precision highp float;
+precision highp int;
+uniform sampler2D u_state;   // the state texture holding the heads (x, y, vx, vy)
+uniform sampler2D u_spineIn; // previous (x, y) per segment
+uniform int u_n;
+uniform int u_w;
+uniform int u_h;
+uniform int u_len;           // bodyLen (1..7)
+uniform float u_follow;      // dt-corrected follow fraction
+uniform int u_init;          // 1 = every segment starts at the head
+layout(location = 0) out vec4 o_spine;
+void main() {
+  ivec2 tp = ivec2(gl_FragCoord.xy);
+  int s = tp.y / u_h;
+  ivec2 ap = ivec2(tp.x, tp.y - s * u_h);
+  int i = ap.y * u_w + ap.x;
+  vec4 prev = texelFetch(u_spineIn, tp, 0);
+  if (i >= u_n) { o_spine = prev; return; }
+  vec2 head = texelFetch(u_state, ap, 0).xy;
+  if (u_init == 1) { o_spine = vec4(head, 0.0, 0.0); return; }
+  if (s >= u_len) { o_spine = prev; return; }
+  vec2 acc = head;
+  for (int k = 1; k <= 6; k++) {
+    if (k > s) break;
+    vec2 cur = texelFetch(u_spineIn, ivec2(ap.x, k * u_h + ap.y), 0).xy;
+    acc = cur + (acc - cur) * u_follow;
+  }
+  o_spine = vec4(acc, 0.0, 0.0);
+}`;
+
 /** Pure: texture layout for n particles — a fixed width keeps the all-pairs index math cheap and the texture within limits. */
 export function swarmTextureLayout(n, width = 128) {
   const count = Math.max(1, Math.floor(n));
@@ -282,6 +322,7 @@ export function swarmTextureLayout(n, width = 128) {
  *   step(params)                   one substep; params: { dtFrames, sepR, aliR, cohR, sepW, aliW, cohW, damping, maxSpeed,
  *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt, curl?, mul?} | null, chemotaxis (gain; needs setScent), levy: {gain, alpha, step, base: hashBase(seed, CH.dyn)}, lorenz: {rho, gain} (seed({lorenz:{x,y,z}}); readLorenz()), drives: {meta, step, base: hashBase(seed, CH.dyn)} (needs wind.freq/nt/seed for the detour; seed({energy,drive})), leak (0..1; seed({leakRgb}); readDrives()), bounds: 'wrap'|'bounce', canvasW, canvasH }
  *                                  heading: { mode: 1 (cloud: snap to the velocity) | 2 (organism: shortest turn x turn, capped at maxTurn deg), turn: 1 - exp(-lambda*dtSec) or 1, maxTurn: 600*dtSec } (seed({rotation}) degrees; readDrives().rotation)
+ *                                  spine: { len (body segments, 1..7), follow (0.05..0.95, particles.js `tight`) } runs the spine pass after the step: readSpine(len) -> { x, y } indexed i*len+s
  *   read()                         { x, y, vx, vy } as Float32Arrays (synchronous: tests / measurement)
  */
 export function createGpuSwarm(gl, n) {
@@ -348,6 +389,64 @@ export function createGpuSwarm(gl, n) {
   });
   let cur = 0;
   const vao = gl.createVertexArray();
+  // the spine pass: its own program + ping-pong texture (w x h*SPINE_MAX), allocated on first use
+  let spine = null;
+  const ensureSpine = () => {
+    if (spine) return spine;
+    const sp = gl.createProgram();
+    gl.attachShader(sp, compile(gl.VERTEX_SHADER, FULL_VS));
+    gl.attachShader(sp, compile(gl.FRAGMENT_SHADER, SPINE_FS));
+    gl.linkProgram(sp);
+    if (!gl.getProgramParameter(sp, gl.LINK_STATUS)) throw new Error(`[swarmSim] ${gl.getProgramInfoLog(sp)}`);
+    const SH = h * SPINE_MAX;
+    const mk = () => {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, SH, 0, gl.RGBA, gl.FLOAT, null);
+      return t;
+    };
+    const tx = [mk(), mk()];
+    const fb = tx.map((t) => {
+      const f = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+        throw new Error('[swarmSim] spine target incomplete');
+      return f;
+    });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    spine = { prog: sp, tx, fb, cur: 0, ready: false, SH };
+    return spine;
+  };
+  const runSpine = (init, len, follow) => {
+    const S = ensureSpine();
+    const U2 = (nme) => gl.getUniformLocation(S.prog, nme);
+    gl.useProgram(S.prog);
+    gl.bindVertexArray(vao);
+    gl.disable(gl.BLEND);
+    gl.viewport(0, 0, w, S.SH);
+    gl.uniform1i(U2('u_n'), count);
+    gl.uniform1i(U2('u_w'), w);
+    gl.uniform1i(U2('u_h'), h);
+    gl.uniform1i(U2('u_len'), len);
+    gl.uniform1f(U2('u_follow'), follow);
+    gl.uniform1i(U2('u_init'), init ? 1 : 0);
+    gl.uniform1i(U2('u_state'), 0);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex[cur]);
+    gl.uniform1i(U2('u_spineIn'), 1);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, S.tx[S.cur]);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.fb[1 - S.cur]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    S.cur = 1 - S.cur;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.activeTexture(gl.TEXTURE0);
+  };
   const upload = (t, data) => {
     gl.bindTexture(gl.TEXTURE_2D, t);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.FLOAT, data);
@@ -408,6 +507,13 @@ export function createGpuSwarm(gl, n) {
     step(p) {
       const dt = Number.isFinite(p.dtFrames) ? p.dtFrames : 1;
       const a = p.attractor && Number.isFinite(p.attractor.x) && Number.isFinite(p.attractor.y) ? p.attractor : null;
+      const sg = p.spine && p.spine.len >= 1 ? p.spine : null;
+      const sgLen = sg ? Math.max(1, Math.min(SPINE_MAX, Math.round(sg.len))) : 0;
+      // the first stepped substep seeds every segment at the pre-step head (particles.js starts a spine as [head])
+      if (sg && !(spine && spine.ready)) {
+        runSpine(true, sgLen, 0);
+        spine.ready = true;
+      }
       gl.useProgram(prog);
       gl.bindVertexArray(vao);
       gl.disable(gl.BLEND);
@@ -477,6 +583,26 @@ export function createGpuSwarm(gl, n) {
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       cur = 1 - cur;
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      if (sg) runSpine(false, sgLen, 1 - Math.pow(1 - Math.max(0.05, Math.min(0.95, sg.follow)), dt));
+    },
+    /** The spine chain after the last step: { len, x, y } with x[i * len + s] = segment s of agent i (s = 0 is the head). Needs p.spine. */
+    readSpine(len) {
+      const out = { len, x: new Float32Array(count * len), y: new Float32Array(count * len) };
+      if (!spine) return out;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, spine.fb[spine.cur]);
+      const d = new Float32Array(w * spine.SH * 4);
+      gl.readPixels(0, 0, w, spine.SH, gl.RGBA, gl.FLOAT, d);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      for (let i = 0; i < count; i++) {
+        const tx = i % w;
+        const ty = Math.floor(i / w);
+        for (let s = 0; s < len; s++) {
+          const o = ((s * h + ty) * w + tx) * 4;
+          out.x[i * len + s] = d[o];
+          out.y[i * len + s] = d[o + 1];
+        }
+      }
+      return out;
     },
     /** The agents' Lorenz phase state after the last step: { x, y, z } Float32Arrays. */
     readLorenz() {
@@ -547,6 +673,11 @@ export function createGpuSwarm(gl, n) {
       for (const t of [...tex, ...lzTex, ...drvTex, ...leakTex, massTex, ...permTex.values()]) gl.deleteTexture(t);
       if (scentTex) gl.deleteTexture(scentTex);
       for (const f of fbo) gl.deleteFramebuffer(f);
+      if (spine) {
+        gl.deleteProgram(spine.prog);
+        for (const t of spine.tx) gl.deleteTexture(t);
+        for (const f of spine.fb) gl.deleteFramebuffer(f);
+      }
     },
   };
 }
