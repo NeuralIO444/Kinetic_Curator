@@ -24,10 +24,18 @@ async function boot(page, size) {
 }
 
 async function openLab(page) {
+  // #2298 — ASSEMBLE A BEAST lives under the RIG rung: open the ladder for this artist, then go to RIG
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'kc.wetLabLadder.v1',
+      JSON.stringify({ v: 1, kept: {}, open: { shape: true, construct: true, creature: true, rig: true } }),
+    ),
+  );
   await page.getByPlaceholder(/filter/i).fill('org_petal_01');
   await page.getByRole('button', { name: 'Inspect org_petal_01' }).click();
   await page.getByRole('button', { name: 'wet lab' }).click();
   await expect(page.getByTestId('wet-lab')).toBeVisible();
+  await page.getByTestId('rung-rig').click();
 }
 
 test('ASSEMBLE A BEAST banks a linkage tile, a second press banks a different one, and it stands on the stage', async ({
