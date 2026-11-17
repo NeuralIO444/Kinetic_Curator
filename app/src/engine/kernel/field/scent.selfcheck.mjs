@@ -6,6 +6,7 @@
  */
 import { strict as assert } from 'node:assert';
 import { createScentField, SCENT_COLS, SCENT_ROWS } from './scent.js';
+import { decodeTypedInto } from '../stateCodec.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -107,6 +108,21 @@ ok('deterministic: same deposit sequence → same samples', () => {
     return [f.sample(0.25, 0.75), f.sample(0.85, 0.15), f.sample(0.5, 0.5)];
   };
   assert.deepEqual(run(), run());
+});
+
+ok('copyCells hands the GPU swarm the same grid the field holds', () => {
+  const f = createScentField();
+  f.deposit(0.4, 0.5, 3);
+  f.step();
+  const out = new Float32Array(f.cols * f.rows);
+  assert.equal(f.copyCells(out), out);
+  const raw = new Float64Array(f.cols * f.rows);
+  decodeTypedInto(f.snapshotCells(), raw);
+  for (let i = 0; i < out.length; i++) assert.equal(out[i], Math.fround(raw[i]));
+  assert.ok(
+    out.some((v) => v > 0),
+    'the deposit is in the copy',
+  );
 });
 
 console.log(`[selfcheck] scent field: ${passed} passed, ${failed} failed`);

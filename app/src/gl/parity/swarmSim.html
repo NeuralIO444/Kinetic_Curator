@@ -8,6 +8,7 @@ import { createGpuSwarm } from '../swarmSim.mjs';
 import { createGpuSwarmHost } from '../gpuSwarmHost.mjs';
 import { ParticleSystem } from '../../engine/particles.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../../data/layout-modes.js';
+import { createScentField } from '../../engine/kernel/field/scent.js';
 // window.__kcSwarmRun({ n, state: { x, y, vx, vy, mass }, steps, params, sampleAt: [steps...] }) -> { samples: { step: {x,y,vx,vy} } }
 // Seeds the GPU swarm, runs `steps` substeps under `params`; returns the state after each step listed in sampleAt (and the last).
 const gl = document.getElementById('c').getContext('webgl2', { alpha: false, antialias: false });
@@ -46,7 +47,7 @@ window.__kcShadowRun = (p) => {
   const W = 1000;
   const H = 700;
   const assets = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
-  const palette = { swatches: ['#ff0000', '#00ff00', '#0000ff', '#ffff00'] };
+  const palette = { swatches: ['#ff0000', '#00ff00', '#0000ff', '#ffff00'], ...(p.palette || {}) };
   const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', behave: 'cruise', particleCount: p.n, ...(p.lp || {}) });
   const sys = new ParticleSystem();
   sys.init(p.n, W, H, assets, palette, p.seed);
@@ -62,28 +63,51 @@ window.__kcShadowRun = (p) => {
     sys.alive[k] = 0;
     if (twin) twin.alive[k] = 0;
   }
+  // p.scentDeposits: each system gets its OWN shared field, pre-laid identically (the resolver hands every layer the one field; here two
+  // systems must not deposit into the same ground, or the twin would read the other's marks)
+  const mkField = () => {
+    if (!p.scentDeposits) return null;
+    const f = createScentField();
+    for (const d of p.scentDeposits) f.deposit(d.x, d.y, d.amount);
+    for (let k = 0; k < 6; k++) f.step();
+    return f;
+  };
+  const fieldSys = mkField();
+  const fieldTwin = mkField();
+  const lpSys = fieldSys ? { ...lp, scentField: fieldSys } : lp;
+  const lpTwin = fieldTwin ? { ...lp, scentField: fieldTwin } : lp;
   const T0 = 1_000_000;
   let toks = 0;
   for (let s = 0; s < p.steps; s++) {
     const t = T0 + s * (1000 / 60);
     const att = p.attractor || null;
-    const tok = host.pre('L', sys, lp, { attractor: att, canvasW: W, canvasH: H, loopTimeMs: t, seedOffsets: null, slowRender: false }, { force: !!p.live });
+    const tok = host.pre('L', sys, lpSys, { attractor: att, canvasW: W, canvasH: H, loopTimeMs: t, seedOffsets: null, slowRender: false }, { force: !!p.live });
     if (tok) toks++;
-    const gs = p.live ? host.forces(tok) : null;
-    sys.update(gs ? { ...lp, gpuStep: gs } : lp, assets, palette, p.seed, t, att);
+    const seam = p.live ? host.seam(tok) : null;
+    sys.update(seam ? { ...lpSys, ...seam } : lpSys, assets, palette, p.seed, t, att);
     if (twin) {
-      twin.update(lp, assets, palette, p.seed, t, att);
+      twin.update(lpTwin, assets, palette, p.seed, t, att);
       for (let i = 0; i < p.n; i++) if (sys.alive[i]) drift = Math.max(drift, Math.abs(sys.x[i] - twin.x[i]), Math.abs(sys.y[i] - twin.y[i]));
     }
     host.post(tok, sys);
   }
+  // the slow state (drives, Lorenz phase, pigment) against the twin's, for the takeover
+  const slow = { energy: 0, drive: 0, lorenz: 0, leak: 0 };
+  if (twin)
+    for (let i = 0; i < p.n; i++) {
+      if (!sys.alive[i]) continue;
+      slow.energy = Math.max(slow.energy, Math.abs(sys.energy[i] - twin.energy[i]));
+      slow.drive = Math.max(slow.drive, Math.abs(sys.drive[i] - twin.drive[i]));
+      slow.lorenz = Math.max(slow.lorenz, Math.abs(sys.lorenzX[i] - twin.lorenzX[i]), Math.abs(sys.lorenzY[i] - twin.lorenzY[i]), Math.abs(sys.lorenzZ[i] - twin.lorenzZ[i]));
+      for (let k = 0; k < 3; k++) slow.leak = Math.max(slow.leak, Math.abs(sys.leakRgb[i * 3 + k] - twin.leakRgb[i * 3 + k]));
+    }
   let speedMax = 0;
   let finite = true;
   for (let i = 0; i < p.n; i++) {
     if (![sys.x[i], sys.y[i], sys.vx[i], sys.vy[i]].every(Number.isFinite)) finite = false;
     speedMax = Math.max(speedMax, Math.hypot(sys.vx[i], sys.vy[i]));
   }
-  const out = { ...host.stats, toks, drift, speedMax, finite };
+  const out = { ...host.stats, toks, drift, speedMax, finite, slow };
   host.dispose();
   return out;
 };

@@ -9,12 +9,14 @@
 // kernel's steering accelerations feed the CPU's accumulators (particles.js `gpuStep` seam); the contact pass, damping, thermal kick,
 // speed clamp and integration stay JS in float64, so contact impulses and everything downstream compose exactly as before.
 //
-// Eligible = a plain cloud swarm the kernel fully covers today: not an organism, no dish contacts (contacts are slice 2b+,
-// they inject impulses between forces and integration), no mod steering. (The cloud swarm's point wind ignores the `wind` knob, so the kernel always runs it.) Anything else is skipped
+// Eligible = a cloud swarm, any verb (its behave row gives the seek gain and the wind kernel, both taken from the table); dish layers and
+// MOD-steered layers are covered by the force seam. An organism layer is not (its behaviour set has to move together). Anything else is skipped
 // and counted, never half-simulated.
 import { createGpuSwarm, SWARM_CORE_CLOUD, ATTRACTOR_GAIN } from './swarmSim.mjs';
+import { hashBase, CH } from '../engine/kernel/rng.js';
 import { isOrganismMode } from '../data/layout-modes.js';
 import { dishCurrentsFor, ATTRACTOR_DRIFT_SPEED, attractorDriftSign } from '../engine/dishCurrents.mjs';
+import { resolveBehave, resolveSeekGain, resolveWindMode } from '../engine/organisms/behave.js';
 
 /** Is the shadow asked for? Layout param, window flag, or URL, in that order of authority (any one turns it on). */
 export function gpuSwarmWanted(layoutParams, win) {
@@ -39,14 +41,16 @@ export function gpuSwarmLiveWanted(layoutParams, win) {
 }
 
 /** Why a layer can't be shadowed, or null if it can. Pure. */
-export function swarmIneligibleReason(system, lp, ctx) {
+export function swarmIneligibleReason(system, lp, ctx, { organisms = false } = {}) {
   if (!system || !(system.n > 0)) return 'empty';
-  if (lp.behave && lp.behave !== 'cruise' && lp.behave !== 'seek' && lp.behave !== 'flee') return 'behave';
+  // (A cloud swarm reads its behave row for ONE thing, the seek gain (particles.js: every other field is organism-only), so every
+  // behave id is covered: the params take the gain from the same table.)
   // (The resolver hands EVERY layer a dishSession and the shared scent field, so their presence says nothing. A layer in the dish
   // contact pass is covered since the force seam: the kernel runs its #1414 currents and the contact impulses compose on the CPU.
   // MOD steering is three weight multipliers, folded into the params.)
   // Likewise every layer gets the shared scent field handed in; what makes it an organism is its mode.
-  if (isOrganismMode(lp.mode) || lp.organism) return 'organism';
+  // An organism layer is covered only by the takeover's callback seam (the kernel has the whole behaviour set); the shadow still sits it out.
+  if (!organisms && (isOrganismMode(lp.mode) || lp.organism)) return 'organism';
   if (ctx && ctx.slowRender) return 'slowRender';
   return null;
 }
@@ -60,7 +64,7 @@ export function swarmCoreParams(lp, ctx, system) {
         (ctx.seedOffsets?.noise ? ctx.seedOffsets.noise * 100 : 0),
     ) || 0;
   const att = ctx.attractor || null;
-  const seekMul = lp.behave === 'seek' ? 1.6 : lp.behave === 'flee' ? -1.6 : 1;
+  const seekMul = resolveSeekGain(resolveBehave(lp.behave)); // the table's own gain (seek 1.6, flee -1.6, every other verb 1)
   // #509 MOD steering: transient per-layer multipliers on the three boids weights (identity by default), as particles.js folds them
   const st = lp.modSteer || null;
   const mul = (k) => (st && Number.isFinite(Number(st[k])) ? Number(st[k]) : 1);
@@ -93,7 +97,55 @@ export function swarmCoreParams(lp, ctx, system) {
       offX: off('X'),
       offY: off('Y'),
       nt: ctx.loopTimeMs * (lp.noiseSpeed ?? 0.5) * 0.001,
+      // #392: the flock / mold verbs (and an explicit windMode / windType) ride the divergence-free curl wind, the rest the point wind
+      curl: resolveWindMode(lp) === 'curl',
     },
+  };
+}
+
+/**
+ * The kernel's params for an ORGANISM layer's step, from the values particles.js itself resolved for the step (the callback seam's
+ * context `c`): the eased behave profile, radii, weights, wind kernel, and which senses are on all arrive already derived, so this is
+ * a rename, not a second derivation. `fallbackNoiseSeed` is the resolver's world-noise seed (a system on the shared noise has none).
+ */
+export function organismCoreParams(c, fallbackNoiseSeed) {
+  const sys = c.system;
+  const inDish = !!(c.windCurrents.on || c.attractorCurrents.on);
+  const base = hashBase(c.seed >>> 0, CH.dyn);
+  return {
+    ...SWARM_CORE_CLOUD,
+    sepR: c.sepRadius,
+    aliR: c.aliRadius,
+    cohR: c.cohRadius,
+    sepW: c.sepW,
+    aliW: c.aliW,
+    cohW: c.cohW,
+    currents: inDish
+      ? {
+          wind: c.windCurrents.on ? c.windCurrents.coupling : 0,
+          attract: c.attractorCurrents.on ? c.attractorCurrents.coupling : 0,
+          drift: c.attractDrift,
+        }
+      : null,
+    dtFrames: c.dtFrames,
+    attractor: c.attractor,
+    attractStrength: c.attractor ? c.attractStrength : 0,
+    canvasW: sys.canvasW,
+    canvasH: sys.canvasH,
+    wind: {
+      seed: c.noiseSeed ?? fallbackNoiseSeed ?? 444,
+      freq: c.noiseFreq,
+      offX: c.domainOffsetX,
+      offY: c.domainOffsetY,
+      nt: c.nt,
+      curl: c.useCurl,
+      mul: c.windMul,
+    },
+    chemotaxis: c.chemotaxis,
+    levy: c.levy ? { gain: c.levy.gain, alpha: c.levy.alpha, step: c.step, base } : null,
+    lorenz: c.lorenz ? { rho: c.lorenz.rho, gain: c.lorenz.gain } : null,
+    drives: c.meta > 0 ? { meta: c.meta, step: c.step, base } : null,
+    leak: c.leak,
   };
 }
 
@@ -105,6 +157,7 @@ const now = () => (typeof performance !== 'undefined' ? performance.now() : 0);
 
 export function createGpuSwarmHost(gl) {
   const layers = new Map(); // layerId -> { gpu, n }
+  const scratch = new Map(); // layerId -> Float32Array: the scent grid's upload copy
   const stats = {
     frames: 0,
     skipped: {},
@@ -131,7 +184,9 @@ export function createGpuSwarmHost(gl) {
     pre(layerId, system, lp, ctx, { force = false } = {}) {
       // The SHADOW compares a whole GPU step with the JS step, and the kernel has no contact impulses: a dish layer would only
       // report its contacts as drift, so the shadow sits it out. The takeover (force) covers it: the contacts stay on the CPU.
-      const why = swarmIneligibleReason(system, lp, ctx) || (!force && lp.contactRadius > 0 ? 'contacts' : null);
+      const why =
+        swarmIneligibleReason(system, lp, ctx, { organisms: force }) ||
+        (!force && lp.contactRadius > 0 ? 'contacts' : null);
       if (why) {
         stats.skipped[why] = (stats.skipped[why] || 0) + 1;
         return null;
@@ -156,6 +211,7 @@ export function createGpuSwarmHost(gl) {
         }
       }
       stats.dead = dead;
+      const organism = !!(isOrganismMode(lp.mode) || lp.organism);
       gpu.seed({
         x: sx,
         y: sy,
@@ -163,7 +219,35 @@ export function createGpuSwarmHost(gl) {
         vy: system.vy.subarray(0, n),
         mass: system.mass.subarray(0, n),
         seedOffset: system.seedOffset.subarray(0, n),
+        // an organism's slow state lives in the system's columns; the kernel advances it and the seam writes it back
+        ...(organism
+          ? {
+              energy: system.energy.subarray(0, n),
+              drive: system.drive.subarray(0, n),
+              lorenz: {
+                x: system.lorenzX.subarray(0, n),
+                y: system.lorenzY.subarray(0, n),
+                z: system.lorenzZ.subarray(0, n),
+              },
+              leakRgb: system.leakRgb.subarray(0, n * 3),
+            }
+          : {}),
       });
+      if (organism) {
+        // The step itself runs inside particles.js (the callback seam, after it has resolved the eased profile): hand over the grid
+        // the kernel's chemotaxis and feeding read, and a token the seam turns into the callback.
+        const scent = lp.scentField || system._scent;
+        if (scent && scent.copyCells) {
+          let cells = scratch.get(layerId);
+          if (!cells || cells.length !== scent.cols * scent.rows) {
+            cells = new Float32Array(scent.cols * scent.rows);
+            scratch.set(layerId, cells);
+          }
+          scent.copyCells(cells);
+          gpu.setScent(cells, scent.cols, scent.rows);
+        }
+        return { gpu, n, force, organism: true, system, noiseSeed: ctx.noiseSeed, t0 };
+      }
       // force = the takeover: the kernel emits its steering acceleration (read().vx/vy) and the CPU integrates; else the shadow's full step
       gpu.step(force ? { ...swarmCoreParams(lp, ctx, system), emit: 'force' } : swarmCoreParams(lp, ctx, system));
       const got = gpu.read();
@@ -182,6 +266,53 @@ export function createGpuSwarmHost(gl) {
       if (!token || !token.force) return null;
       stats.applied++;
       return { n: token.n, fx: token.got.vx, fy: token.got.vy };
+    },
+    /**
+     * Takeover: what to spread into the layer's update params. A cloud layer gets { gpuStep } (the steering accelerations, already
+     * computed); an organism layer gets { gpuStepFn }, which particles.js calls once it has resolved the step: the kernel steps
+     * with those values, the advanced drive / Lorenz / pigment state is written back into the system, and the accelerations return.
+     */
+    seam(token) {
+      if (!token || !token.force) return null;
+      if (!token.organism) return { gpuStep: this.forces(token) };
+      return {
+        gpuStepFn: (c) => {
+          const { gpu, n, system } = token;
+          gpu.step({ ...organismCoreParams(c, token.noiseSeed), emit: 'force' });
+          const got = gpu.read();
+          if (c.meta > 0 || c.leak > 0) {
+            const d = gpu.readDrives();
+            for (let i = 0; i < n; i++) {
+              if (!system.alive[i]) continue;
+              if (c.meta > 0) {
+                system.energy[i] = d.energy[i];
+                system.drive[i] = d.drive[i];
+              }
+              if (c.leak > 0) {
+                system.leakRgb[i * 3] = d.leakRgb[i * 3];
+                system.leakRgb[i * 3 + 1] = d.leakRgb[i * 3 + 1];
+                system.leakRgb[i * 3 + 2] = d.leakRgb[i * 3 + 2];
+              }
+            }
+          }
+          if (c.lorenz) {
+            const z = gpu.readLorenz();
+            for (let i = 0; i < n; i++) {
+              if (!system.alive[i]) continue;
+              system.lorenzX[i] = z.x[i];
+              system.lorenzY[i] = z.y[i];
+              system.lorenzZ[i] = z.z[i];
+            }
+          }
+          const ms = now() - token.t0;
+          stats.frames++;
+          stats.agents = n;
+          stats.applied++;
+          stats.gpuMsAvg += (ms - stats.gpuMsAvg) / stats.frames;
+          stats.gpuMsMax = Math.max(stats.gpuMsMax, ms);
+          return { n, fx: got.vx, fy: got.vy };
+        },
+      };
     },
     /** After the JS step: compare the GPU's one step against what the JS swarm just did (alive agents only). */
     post(token, system) {
