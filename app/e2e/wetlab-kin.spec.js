@@ -18,6 +18,10 @@ async function boot(page, size) {
       if (!sessionStorage.getItem('kc:e2e-booted')) localStorage.clear();
       sessionStorage.setItem('kc:e2e-booted', '1');
       localStorage.setItem('kc:first-run-seen', '1');
+      localStorage.setItem(
+        'kc.wetLabLadder.v1',
+        JSON.stringify({ v: 1, kept: {}, open: { shape: true, construct: true, creature: true, rig: true } }),
+      ); // #2281 — this suite works the creature and rig rungs: open them
     } catch {
       /* ignore */
     }
@@ -35,6 +39,7 @@ async function openEmptyLab(page) {
   await expect(open).toBeVisible();
   await open.click();
   await expect(page.getByTestId('wet-lab')).toBeVisible();
+  await page.getByTestId('rung-creature').click(); // #2281 — the rail shows one rung's strip at a time
 }
 
 test('the empty lab opens from the USER section; KIN lands a creature on the stage and deals six; a tap banks another; clear unkept takes them back', async ({
@@ -136,6 +141,7 @@ test('a lab opened on a shape keeps hand-picking and gains the strip', async ({ 
   await expect(page.getByTestId('wet-lab')).toBeVisible({ timeout: 20_000 }); // the lab is a lazy import
   await expect(page.getByTestId('lab-mode-assemble')).toBeVisible();
   await expect(page.getByTestId('wet-lab-stage')).toBeVisible();
+  await page.getByTestId('rung-creature').click(); // #2281
   await expect(page.getByTestId('kin-strip')).toBeVisible();
   expect(errors).toEqual([]);
 });
