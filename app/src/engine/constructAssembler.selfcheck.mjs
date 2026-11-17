@@ -242,10 +242,18 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
 }
 
 // 7 — not on stage yet: only the document and the store's bank read the assembler (records are saved and
-// loaded); no render, curator or deal path does.
+// loaded); no render, curator or stage deal path does. The WetLab ladder's CONSTRUCT and CREATURE rungs read it
+// (wetlab-ladder-spec §13, §14): the WetLab is not the stage, and each file is named here, so anything else still trips.
 {
   const root = join(here, '..');
-  const allowed = new Set(['state/projectDocument.js', 'state/slices/globalSlice.js']);
+  const allowed = new Set([
+    'state/projectDocument.js',
+    'state/slices/globalSlice.js',
+    'deal/constructAdapter.mjs', // the WetLab CONSTRUCT rung's deal adapter (#2299)
+    'panels/constructSettle.mjs', // the WetLab construct tile's settle drawing (#2300)
+    'panels/ladderPools.mjs', // the WetLab CREATURE rung's body pool and parts pile (#2303)
+    'panels/ladderPools.selfcheck.mjs', // its suite builds real constructs to test against
+  ]);
   const importers = [];
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
