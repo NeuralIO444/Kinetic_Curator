@@ -23,6 +23,7 @@ import {
   openForExisting,
   loadLadder,
   saveLadder,
+  restoreLadder,
 } from './wetLabLadder.mjs';
 
 let n = 0;
@@ -216,6 +217,32 @@ ok('the model is pure: no clock, no Math.random, no store, no React, no DOM', ()
     .join('\n');
   for (const bad of ['Date.now', 'Math.random', 'performance.now', 'zustand', "from 'react'", 'document.', 'window.'])
     assert.ok(!src.includes(bad), `wetLabLadder.mjs has no ${bad}`);
+});
+
+ok('restoreLadder: holdings open every rung only the first time; a stored ladder is the record (#2318)', () => {
+  const mem = new Map();
+  const storage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => void mem.set(k, v) };
+  // an artist with creatures, meeting the ladder for the first time: every rung open
+  const first = restoreLadder(storage, { creatures: 2 });
+  assert.ok(RUNG_IDS.every((id) => isOpen(first, id)));
+  // a new artist who earns creatures on the ladder: stored ladder has RIG locked; a reload keeps it locked
+  mem.clear();
+  const fresh = restoreLadder(storage, { creatures: 0 });
+  saveLadder(storage, fresh);
+  const reload = restoreLadder(storage, { creatures: 2 });
+  assert.equal(isOpen(reload, 'rig'), false, 'creatures kept on the ladder do not open RIG on reload');
+  assert.equal(isOpen(reload, 'shape'), true);
+  // a blocked store reads as a first meeting and never throws
+  const blocked = {
+    getItem() {
+      throw new Error('x');
+    },
+    setItem() {
+      throw new Error('x');
+    },
+  };
+  assert.ok(RUNG_IDS.every((id) => isOpen(restoreLadder(blocked, { beasts: 1 }), id)));
+  assert.deepEqual(restoreLadder(blocked, {}), emptyLadder());
 });
 
 console.log(`wetLabLadder selfcheck: ${n} ok`);
