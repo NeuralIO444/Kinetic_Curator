@@ -17,12 +17,12 @@ assert.deepEqual(
   [350, 200, 100, 400],
   'the JS-swarm caps are untouched',
 );
-// under the GPU swarm: step 1 of the ladder at the top tier, each lower tier keeping its share
+// under the GPU swarm: step 2 of the ladder at the top tier, each lower tier keeping its share
 const hi = particleCapsFor(QUALITY_PRESETS.high, true);
-assert.equal(hi.maxParticles, 1024);
-assert.equal(particleCapsFor(QUALITY_PRESETS.balanced, true).maxParticles, 585);
-assert.equal(particleCapsFor(QUALITY_PRESETS.performance, true).maxParticles, 293);
-assert.equal(particleCapsFor(FINAL_CAPS, true).maxParticles, 1024);
+assert.equal(hi.maxParticles, 2048);
+assert.equal(particleCapsFor(QUALITY_PRESETS.balanced, true).maxParticles, 1170);
+assert.equal(particleCapsFor(QUALITY_PRESETS.performance, true).maxParticles, 585);
+assert.equal(particleCapsFor(FINAL_CAPS, true).maxParticles, 2048);
 // only the particle cap moves; the raised caps are cached per tier (stable identity frame to frame) and the tier is not mutated
 assert.equal(hi.maxCount, QUALITY_PRESETS.high.maxCount);
 assert.equal(hi.id, 'high');

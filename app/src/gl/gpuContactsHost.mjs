@@ -15,7 +15,7 @@
 import { createGpuContacts } from './dishContactsGpu.mjs';
 import { packContactStamps } from '../engine/dishContactStamps.mjs';
 
-export const CONTACTS_CAP_BODIES = 1024; // ladder step 1 (was 350)
+export const CONTACTS_CAP_BODIES = 2048; // ladder step 2 (was 350, then 1,024)
 
 /** Is the producer asked for? Layout param, window flag, or URL (any one turns it on). */
 export function gpuContactsWanted(layoutParams, win) {
