@@ -33,6 +33,7 @@ export const QUALITY_PRESETS = {
     maxCount: 800,
     maxCountMirrored: 650,
     maxParticles: 350,
+    maxParticlesGpu: 1024, // K3 cap ladder step 1 (#2188): only while the GPU swarm carries the forces (see particleCapFor)
     allowMirror: true,
     allowGloss: true,
     maxFxLayers: Infinity, // #192: retired as a budget — GPU composites all FX wraps
@@ -48,6 +49,7 @@ export const QUALITY_PRESETS = {
     maxCount: 420,
     maxCountMirrored: 360,
     maxParticles: 200,
+    maxParticlesGpu: 585,
     allowMirror: true,
     allowGloss: true,
     maxFxLayers: Infinity, // #192: retired as a budget — GPU composites all FX wraps
@@ -63,6 +65,7 @@ export const QUALITY_PRESETS = {
     maxCount: 180,
     maxCountMirrored: 140,
     maxParticles: 100,
+    maxParticlesGpu: 293,
     allowMirror: false,
     allowGloss: false,
     maxFxLayers: Infinity, // #192: retired as a budget — GPU composites all FX wraps
@@ -186,6 +189,23 @@ export function travelBudgetForDevice(ipadClass) {
   return ipadClass ? TRAVEL_BUDGETS.ipad : TRAVEL_BUDGETS.desktop;
 }
 
+/**
+ * K3 cap ladder (#2188; Matt's ruling: 350 -> 1,024 -> 2,048 in measured steps, he merges each raise). The particle cap a swarm
+ * layer runs under: the tier's `maxParticlesGpu` only while the GPU swarm carries the layer's forces (`gpuSwarm` = the resolve
+ * input's recorded `swarmGpu` marker AND a layer the kernel covers), else the tier's `maxParticles`, exactly as before. Each tier's GPU
+ * cap keeps the tier's share of the top one (x 1024/350). Pure. Returns the same caps object when nothing changes.
+ */
+export function particleCapsFor(caps, gpuSwarm) {
+  if (!caps || !gpuSwarm || !(caps.maxParticlesGpu > caps.maxParticles)) return caps;
+  let raised = RAISED_CAPS.get(caps);
+  if (!raised) {
+    raised = Object.freeze({ ...caps, maxParticles: caps.maxParticlesGpu });
+    RAISED_CAPS.set(caps, raised);
+  }
+  return raised;
+}
+const RAISED_CAPS = new WeakMap();
+
 /** Caps used when RENDER · UNCAPPED is on — no interactivity to protect. */
 export const FINAL_CAPS = {
   id: 'final',
@@ -193,6 +213,7 @@ export const FINAL_CAPS = {
   maxCount: 800,
   maxCountMirrored: 800,
   maxParticles: 400,
+  maxParticlesGpu: 1024,
   allowMirror: true,
   allowGloss: true,
   maxFxLayers: Infinity,
