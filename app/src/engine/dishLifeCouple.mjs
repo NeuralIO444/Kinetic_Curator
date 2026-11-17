@@ -121,6 +121,29 @@ export function cultureBreathFactor(activity, coupling) {
 }
 
 /**
+ * #2152 slice 3 — the cycle-roll ease (Matt, 2026-11-17: "ease back in"). When the field culture re-seeds (a cycle roll or
+ * a "seed from stage" press) the stage publishes the grid it rolled from (`rollFrom`). For the first ROLL_EASE_GENS
+ * generations of the new seed, a consumer that asks for the ease reads a straight blend from that grid to the live one:
+ * generation 0 reads exactly the old grid (no pop), generation ROLL_EASE_GENS reads the new one. Dead marks fade back up,
+ * marks the new seed leaves dead fade out, and copies fade the same way. About half a second at 8 generations a second.
+ */
+export const ROLL_EASE_GENS = 4;
+
+/**
+ * The level at cell `i` of a published field, eased across a roll when `ease` is set and the field carries a `rollFrom`
+ * grid inside the window; otherwise exactly `published.level[i]`. Pure.
+ */
+export function easedLevel(published, i, ease) {
+  const lv = published.level[i];
+  if (!ease) return lv;
+  const from = published.rollFrom;
+  const g = published.gen | 0;
+  if (!from || !(g >= 0) || g >= ROLL_EASE_GENS || from.length !== published.level.length) return lv;
+  const t = g / ROLL_EASE_GENS;
+  return from[i] + (lv - from[i]) * t;
+}
+
+/**
  * The sampler over a stage's published field — the one read every coupling consumer shares.
  * `published` is the stage's stable holder ({ active, cols, rows, gen, level, activity }); the sampler
  * closes over the holder's LIVE arrays (no copy — the holder's read-this-frame contract: sample the
@@ -129,12 +152,19 @@ export function cultureBreathFactor(activity, coupling) {
  *   sample(x, y, out) — nearest cell for the canvas point; writes { level, activity } into `out` and
  *   returns true, or false outside the canvas (the consumer leaves such a mark alone).
  */
-export function fieldSampler(published, canvasW, canvasH) {
+export function fieldSampler(published, canvasW, canvasH, { ease = false } = {}) {
   if (!published || published.active !== true || !published.level || !published.activity) return null;
   const { cols, rows, gen, level, activity } = published;
   if (!(cols > 0 && rows > 0)) return null;
   const W = Number(canvasW) || 1;
   const H = Number(canvasH) || 1;
+  // #2152 slice 3 — the roll ease is decided once per sampler: only inside the window, only when asked, only with a grid
+  const easing =
+    !!ease &&
+    !!published.rollFrom &&
+    (gen | 0) >= 0 &&
+    (gen | 0) < ROLL_EASE_GENS &&
+    published.rollFrom.length === level.length;
   return {
     cols,
     rows,
@@ -144,7 +174,7 @@ export function fieldSampler(published, canvasW, canvasH) {
       const cy = Math.floor((y / H) * rows);
       if (!(cx >= 0 && cx < cols && cy >= 0 && cy < rows)) return false;
       const i = cy * cols + cx;
-      out.level = level[i];
+      out.level = easing ? easedLevel(published, i, true) : level[i];
       out.activity = activity[i];
       return true;
     },

@@ -187,6 +187,7 @@ node src/engine/dishLifeField.selfcheck.mjs
 node src/engine/dishLifeCoupling.selfcheck.mjs
 node src/engine/dishLifeAssets.selfcheck.mjs
 node src/engine/dishLifeBorn.selfcheck.mjs
+node src/engine/dishLifeRollEase.selfcheck.mjs
 node src/engine/dishLifeBreathing.selfcheck.mjs
 node src/engine/dishLifePatterns.selfcheck.mjs
 node src/engine/dishLifeBackgrounds.selfcheck.mjs

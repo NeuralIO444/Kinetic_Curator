@@ -34,6 +34,7 @@
 
 import { createCulture, stepCulture, setBedrock, restoreCultureGrid, CULTURE_RULE } from './dishLife.mjs';
 import { seedFromMarks, coverageField } from './dishLifeSeed.mjs';
+import { ROLL_EASE_GENS } from './dishLifeCouple.mjs'; // #2152 slice 3 — the roll ease window (the snapshot rider's bound)
 import { nearestMarks, cultureFrame, speckItems } from './dishLifeRender.mjs';
 import { cultureSampler, envelope } from './dishLifeQuiet.mjs';
 import { injectFluidBirths, fluidBirthSet, applyBirths } from './dishFluidCouple.mjs'; // #1997 — the ferrofluid's bias on this culture's births
@@ -128,6 +129,11 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     seedEpoch: 0,
     level: null,
     activity: null,
+    // #2152 slice 3 — the cycle-roll ease: the level grid the culture stood at just before this wake's seed replaced it
+    // (a cycle roll or a "seed from stage" press), or null (the first wake, or no field culture before it). Consumers
+    // that ask for the ease blend from it to the live level over the first ROLL_EASE_GENS generations
+    // (dishLifeCouple.easedLevel), so the stage fades back instead of popping. A copy owned by the stage, never re-pointed.
+    rollFrom: null,
   };
   function syncPublished() {
     if (st && st.fieldOn) {
@@ -143,6 +149,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       publishedField.seedEpoch = st.seedEpoch | 0;
       publishedField.level = f.level;
       publishedField.activity = f.activity;
+      publishedField.rollFrom = st.rollFrom || null;
     } else {
       publishedField.active = false;
       publishedField.cols = 0;
@@ -152,6 +159,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       publishedField.seedEpoch = 0;
       publishedField.level = null;
       publishedField.activity = null;
+      publishedField.rollFrom = null;
     }
   }
 
@@ -246,8 +254,15 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
         }
         return false;
       }
+      // #2152 slice 3 — a field culture replaced by a new seed at the same canvas (a cycle roll or a press) leaves its
+      // last level grid behind, so the consumers can ease from it. The first wake (no field culture before) leaves none.
+      const rollFrom =
+        fieldMode && st && st.fieldOn && st.culture && st.W === W && st.H === H
+          ? Float32Array.from(st.culture.field.level)
+          : null;
       build(dl.wakeMs, marks, W, H, bedrock, needNearest, terrain);
       if (seedPress) st.seedEpoch = prevEpoch + 1; // the press's build supersedes the wake's seed
+      st.rollFrom = rollFrom;
     } else {
       setBedrock(st.culture, bedrock);
       st.terrain = terrain.map(freeze); // the snapshot records the terrain the culture currently lives under
@@ -264,8 +279,10 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       // #1923 Phase 4 — the rebuild is the SAME seed (possibly a press's), so its epoch is preserved:
       // the epoch names which seed of the wake this is, and seeking does not change the seed.
       const epoch = st.seedEpoch | 0;
+      const rollFrom = st.rollFrom || null; // #2152 slice 3 — the same seed, so the same grid it rolled from
       build(dl.wakeMs, st.marks, W, H, bedrock, needNearest, terrain);
       st.seedEpoch = epoch;
+      st.rollFrom = rollFrom;
     }
     const shed = Math.max(0, Math.min(SHED_STEPS.length - 1, Number(dl.shed) | 0));
     // #1997 — the ferrofluid's birth bias lands before each generation it feeds (one frame
@@ -429,6 +446,9 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
             // restore exactly as they always did.
             ...(st.seedEpoch ? { seedEpoch: st.seedEpoch } : {}),
             gen: st.culture.gen,
+            // #2152 slice 3 — OPTIONAL rider, present only inside a roll's ease window: the grid the culture rolled from,
+            // so a take that begins mid-ease eases exactly as live. Outside the window the grid is never read; no key.
+            ...(st.rollFrom && st.culture.gen < ROLL_EASE_GENS ? { rollFrom: Array.from(st.rollFrom) } : {}),
             ...(st.quiet ? { quiet: { ...st.quiet } } : {}), // #1923 — the secondary read's dial rides the snapshot
             ...(st.fieldOn ? { field: { ...st.fieldOn } } : {}), // #1994 — so does field mode's cycle
             // #1997 — OPTIONAL riders, present only while this wake's steps consumed a
@@ -481,6 +501,9 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       // #1923 Phase 4 — the seed epoch rides the snapshot (absent = a pre-Phase-4 snapshot: epoch 0,
       // the wake's own seed — exactly the historical restore).
       st.seedEpoch = Number.isInteger(snap.seedEpoch) && snap.seedEpoch > 0 ? snap.seedEpoch : 0;
+      // #2152 slice 3 — the roll's grid, when the snapshot was taken inside the ease window (absent = no ease, as before)
+      st.rollFrom =
+        Array.isArray(snap.rollFrom) && snap.rollFrom.length === cols * rows ? Float32Array.from(snap.rollFrom) : null;
       if (snap.quiet && typeof snap.quiet === 'object') {
         st.quiet = { strength: Number(snap.quiet.strength) || 0, cycleGens: Number(snap.quiet.cycleGens) || undefined };
       }
