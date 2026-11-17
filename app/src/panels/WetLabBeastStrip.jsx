@@ -51,7 +51,7 @@ function useWalkClock(active) {
   return t;
 }
 
-export function WetLabBeastStrip() {
+export function WetLabBeastStrip({ onKeep } = {}) {
   const seed = useStore((s) => s.seed);
   const customAssets = useStore((s) => s.customAssets);
   const enabledAssets = useStore((s) => s.enabledAssets);
@@ -72,9 +72,12 @@ export function WetLabBeastStrip() {
   const unkept = unkeptBeastIds(dealtIds, customAssets, enabledAssets);
   const t = useWalkClock(!!hand && hand.length > 0);
 
-  const tap = (m) => {
+  // `chosen`: the artist tapped this tile. The lead a KIN press lands by itself is not a keep (#2283): only a choice
+  // fills the ladder's pips.
+  const tap = (m, chosen = false) => {
     bankBeast(m);
     const st = useStore.getState().beastDealNote;
+    if (chosen && st && st.status === 'banked' && onKeep) onKeep();
     if (st && (st.status === 'banked' || st.status === 'already')) {
       if (st.status === 'banked') setDealtIds((ids) => (ids.includes(st.id) ? ids : [...ids, st.id]));
       setLastId(st.id);
@@ -177,7 +180,7 @@ export function WetLabBeastStrip() {
                 data-testid="beast-tile"
                 aria-pressed={on}
                 title={`${key} · ${m.legCount} legs${key === picked ? ' · CUR’s pick' : ''} · tap to ${on ? 'select' : 'bank'} it`}
-                onClick={() => tap(m)}
+                onClick={() => tap(m, true)}
               >
                 <svg viewBox="4 34 80 28" width="68" height="24" style={{ display: 'block', margin: '6px auto' }}>
                   {d && <path d={d} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />}

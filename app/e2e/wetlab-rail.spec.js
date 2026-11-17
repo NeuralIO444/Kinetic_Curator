@@ -124,3 +124,43 @@ test('phone width: the rail wraps and the lab never scrolls sideways', async ({ 
   await shot(page, 'r4-phone');
   expect(errors).toEqual([]);
 });
+
+test('keeps fill the pips: three creatures the artist taps open RIG; the lead a KIN press lands does not count', async ({
+  page,
+}) => {
+  const errors = await boot(page, { width: 1280, height: 900 });
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'kc.wetLabLadder.v1',
+      JSON.stringify({ v: 1, kept: {}, open: { shape: true, construct: true, creature: true, rig: false } }),
+    ),
+  );
+  await openEmptyLab(page);
+  await page.getByTestId('rung-creature').click();
+  await expect(page.getByTestId('rung-rig')).toBeDisabled();
+
+  await page.getByTestId('kin-press').click();
+  await expect(page.getByTestId('kin-tile')).toHaveCount(6);
+  await expect(page.getByTestId('bank-tile')).toHaveCount(1); // the lead landed by itself
+  await expect(page.getByTestId('rung-pips-creature')).toHaveAttribute('data-filled', '0'); // …and is not a keep
+
+  for (const [i, filled] of [
+    [1, '1'],
+    [2, '2'],
+  ]) {
+    await page.getByTestId('kin-tile').nth(i).click();
+    await expect(page.getByTestId('rung-pips-creature')).toHaveAttribute('data-filled', filled);
+    await expect(page.getByTestId('rung-rig')).toBeDisabled();
+  }
+  await page.getByTestId('kin-tile').nth(1).click(); // the same creature again is 'already': not a second keep
+  await expect(page.getByTestId('rung-pips-creature')).toHaveAttribute('data-filled', '2');
+
+  await page.getByTestId('kin-tile').nth(3).click();
+  await expect(page.getByTestId('rung-pips-creature')).toHaveAttribute('data-filled', '3');
+  await expect(page.getByTestId('rung-rig')).toBeEnabled();
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('kc.wetLabLadder.v1')));
+  expect(stored.kept.creature).toBe(3);
+  expect(stored.open.rig).toBe(true);
+  await shot(page, 'r5-keeps-open-rig');
+  expect(errors).toEqual([]);
+});

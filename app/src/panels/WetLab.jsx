@@ -170,7 +170,7 @@ export function WetLab({ assetId, onClose }) {
   const beasts = useMemo(() => beastRows(customAssets), [customAssets]); // #1868
   // #2281 — the ladder: an artist with creatures or beasts starts with every rung open (§12.3); the rail shows one
   // rung's strip at a time (§12.7). Until the artist picks, the highest open rung is the one on screen.
-  const { ladder } = useWetLabLadder({
+  const { ladder, keepOn } = useWetLabLadder({
     creatures: (allRecords || []).length,
     beasts: poolBeasts(customAssets).length,
   });
@@ -1165,6 +1165,7 @@ export function WetLab({ assetId, onClose }) {
         {rungOnScreen === 'creature' && (
           <WetLabDealStrip
             subject={selRecord}
+            onKeep={() => keepOn('creature')} // #2283 — a creature the artist kept fills CREATURE's pips
             onTap={(id) => {
               setSelectedId(id);
               setCultivateOpen(false);
@@ -1233,7 +1234,7 @@ export function WetLab({ assetId, onClose }) {
             </div>
           </div>
         </footer>
-        {rungOnScreen === 'rig' && <WetLabBeastStrip />}
+        {rungOnScreen === 'rig' && <WetLabBeastStrip onKeep={() => keepOn('rig')} />}
       </div>
     </div>
   );
