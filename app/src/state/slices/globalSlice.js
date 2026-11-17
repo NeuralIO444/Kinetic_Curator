@@ -863,9 +863,11 @@ export const createGlobalSlice = (set) => ({
     set((state) => {
       const next = { ...state.enabledAssets };
       const userOnly = state.catFilter === 'user';
+      // On the USER chip, ALL ON lights only what the artist made (it must not switch the whole library on), but ALL OFF
+      // clears the stage of everything — the library too — so the artist can then turn on just their own and view them.
       ASSETS.forEach((a) => {
-        if (userOnly) return;
-        if (state.catFilter === 'all' || a.category === state.catFilter) next[a.id] = enabled;
+        if (userOnly && enabled) return;
+        if (userOnly || state.catFilter === 'all' || a.category === state.catFilter) next[a.id] = enabled;
       });
       sanitizeOverlay(state.customAssets).forEach((a) => {
         if (state.catFilter === 'all' || state.catFilter === 'user' || a.category === state.catFilter)

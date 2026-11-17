@@ -73,6 +73,29 @@ ok('toggle / solo / toggle-all speak for the citizen like any asset', () => {
   assert.equal(S().enabledAssets.creature, false, 'all-off includes the citizen');
 });
 
+ok('on the USER chip, all-off clears the library too; all-on lights only what the artist made', () => {
+  S().assembleBeast(); // a user tile in the overlay
+  const mine = S().customAssets.map((a) => a.id);
+  assert.ok(mine.length > 0, 'a user tile exists');
+  S().setCatFilter('user');
+  S().toggleAllAssets(true);
+  assert.ok(
+    mine.every((id) => S().enabledAssets[id] === true),
+    'all-on lights the user tiles',
+  );
+  S().soloAsset('org_blob_01'); // a library mark on
+  S().toggleAllAssets(false);
+  assert.equal(S().enabledAssets.org_blob_01, false, 'all-off on USER switches the library off too');
+  assert.ok(
+    mine.every((id) => S().enabledAssets[id] === false),
+    'and the user tiles',
+  );
+  S().toggleAllAssets(true);
+  assert.equal(S().enabledAssets.org_blob_01, false, 'then all-on shows only the user tiles');
+  assert.ok(mine.every((id) => S().enabledAssets[id] === true));
+  S().setCatFilter('all');
+});
+
 ok('absence reads enabled; only an explicit false disables (the pre-citizenship world)', () => {
   assert.equal(creatureEnabled({}), true);
   assert.equal(creatureEnabled({ enabledAssets: null }), true);
