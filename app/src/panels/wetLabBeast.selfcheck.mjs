@@ -154,7 +154,7 @@ ok('lab: the beast strip is mounted under the bank rail; no clock or Math.random
   // the rung rail shows one rung at a time: the strip belongs to the RIG rung, and still sits right under the bank rail
   assert.match(
     lab,
-    /<\/footer>\s*\{rungOnScreen === 'rig' && <WetLabBeastStrip \/>\}/,
+    /<\/footer>\s*\{rungOnScreen === 'rig' && <WetLabBeastStrip\b[\s\S]*?\/>\}/,
     'the strip sits right under the bank rail, on the rig rung',
   );
   const strip = readFileSync(new URL('./WetLabBeastStrip.jsx', import.meta.url), 'utf8');
