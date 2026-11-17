@@ -21,6 +21,8 @@ import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
 import { ASSETS_CONSTRUCTS } from '../data/assets/index.js';
+import { assetStyle } from '../data/assetStyle.js';
+import { leadWithConstructs } from '../engine/constructLead.js'; // #2108: constructs lead (the CONSTRUCTS gate)
 import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
 import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
 import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
@@ -287,6 +289,7 @@ export function rollDice({
   crowns = [],
   orderScorer = null,
   orderMeta = null,
+  constructLead = false, // #2108: the CONSTRUCTS gate — on, each cast's lead slots are the lead asset's style's constructs
 }) {
   if (!assets || !assets.length) throw new Error('[dice] no assets to deal from');
   if (!scorer || typeof scorer.score !== 'function') throw new Error('[dice] scorer missing');
@@ -311,7 +314,12 @@ export function rollDice({
         anchorFamily = fam;
       }
     }
-    const assetIds = dealCast(assets, size, rng, wildness, crowns, anchorPool);
+    const dealt = dealCast(assets, size, rng, wildness, crowns, anchorPool);
+    // #2108 — off, the cast is exactly as dealt. On, the cast's leading slots become house constructs of the style
+    // of the cast's own lead asset (so the cast stays coherent); no rng is drawn, so every other candidate is unmoved.
+    const assetIds = constructLead
+      ? leadWithConstructs(dealt, assetStyle(assets.find((a) => a.id === dealt[0])) || null)
+      : dealt;
     const candidate = { layoutId: layout.id, assetIds };
     candidates.push({ ...candidate, score: scorer.score(candidate) });
     anchorOf.push(anchorFamily);

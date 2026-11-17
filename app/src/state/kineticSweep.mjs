@@ -23,6 +23,7 @@ import { RANDOMIZABLE_KEYS } from './paramUtils.js';
 import { REFINE_RANGES, mutateKey } from '../curator/refineMutate.js';
 import { MOTION_KEYS, pinRollScope } from './rollScope.mjs';
 import { dealPoolFor, poolToEnabled } from './rollPool.mjs';
+import { leadWithConstructs } from '../engine/constructLead.js'; // #2108: constructs lead (the CONSTRUCTS gate)
 
 /** The curator pass's cap: at most this many params move, each by at most NUDGE_SPREAD of its dice range. */
 export const NUDGE_MAX_KEYS = 3;
@@ -88,9 +89,13 @@ export function lookPass(
           kits: Array.isArray(state.kitTriad) && state.kitTriad.length ? state.kitTriad : look && look.kits,
           kitContext,
         });
+  // #2108 — the CONSTRUCTS gate: on, the style in play's house constructs lead the pool (engine/constructLead.js).
+  // Off, this line is skipped and the deal is exactly as it was. The curated 4-shape sets are never touched.
+  const poolIds =
+    state.constructLead && poolKind !== 'sets' ? leadWithConstructs(pool.ids, look?.styles?.[0] ?? null) : pool.ids;
   return {
     layoutParams: validateLayoutParams(merged).params, // #1550: rolled values land through the validating door
-    enabledAssets: poolToEnabled(pool.ids),
+    enabledAssets: poolToEnabled(poolIds),
     lookId: look ? look.id : null,
     coherent: pool.coherent,
     ...(pool.notes && pool.notes.length ? { kitNotes: pool.notes } : {}), // #1944: a kit that dealt nothing is named

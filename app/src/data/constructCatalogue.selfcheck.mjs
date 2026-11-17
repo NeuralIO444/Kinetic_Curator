@@ -43,9 +43,13 @@ const ids = new Set(ASSETS_CONSTRUCTS.map((a) => a.id));
   }
   assert.equal(poolDescriptors(ASSETS).filter((d) => ids.has(d.id)).length, 0, 'pool panel shows none');
   const read = (rel) => readFileSync(join(here, rel), 'utf8');
-  for (const rel of ['../curator/dice.js', '../gl/liveResolve.mjs']) {
-    assert.match(read(rel), /\.\.\.ASSETS_CONSTRUCTS/, `${rel} excludes the house set`);
-  }
+  assert.match(read('../curator/dice.js'), /\.\.\.ASSETS_CONSTRUCTS/, 'dice excludes the house set');
+  // The placeable pool places a construct only when a pool names it (the CONSTRUCTS gate's deal writes that).
+  assert.match(
+    read('../gl/liveResolve.mjs'),
+    /CONSTRUCT_IDS\.has\(a\.id\)/,
+    'the resolver places a construct only when named',
+  );
   ok('KINETIC roll, chapter decks, pool panel, dice and placeable pool all exclude the house set');
 }
 

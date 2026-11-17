@@ -36,7 +36,17 @@ export function useDiceRoll() {
     const taste = getTaste();
     const orderScorer = makeXgbScorer(taste, { experimental: experimentalOn() });
     const orderMeta = orderScorer ? { tasteVersion: taste.version, headKind: taste.head.kind } : null;
-    setTray(rollDice({ assets: ASSETS, davisCode, scorer, crowns: readCrowns(), orderScorer, orderMeta }));
+    setTray(
+      rollDice({
+        assets: ASSETS,
+        davisCode,
+        scorer,
+        crowns: readCrowns(),
+        orderScorer,
+        orderMeta,
+        constructLead: useStore.getState().constructLead === true, // #2108: the CONSTRUCTS gate
+      }),
+    );
   };
 
   const crown = (finalist) => {

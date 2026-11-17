@@ -56,6 +56,7 @@ import {
   shapeMixIds,
 } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
+import { leadWithConstructs } from '../../engine/constructLead.js'; // #2108
 import { dealableRecords, dealMixedPool, dealKitTriad, kitDescriptors, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal; #1944: kits
 import { kitsById } from '../../data/kits.js';
 import { lookPass, voicePass, curatorPass, ACCUM_KEYS } from '../kineticSweep.mjs'; // #1772: look → voice → curator
@@ -1878,7 +1879,9 @@ export const createLayoutSlice = (set) => ({
         if (deal.ids.length) chaosIds = deal.ids;
         kitNote = deal.notes.length ? kitNoteText(deal.notes, triad) : null;
       }
-      const enabledAssets = poolToEnabled(chaosIds || dealMixedPool(chaosRecords, dieRng).ids);
+      const chaosPool = chaosIds || dealMixedPool(chaosRecords, dieRng).ids;
+      // #2108 — the CONSTRUCTS gate: on, a pool dealt from the whole library is led by a style's house constructs.
+      const enabledAssets = poolToEnabled(state.constructLead ? leadWithConstructs(chaosPool) : chaosPool);
 
       // 5. FX + blend — one FX layer, 0–3 random menu effects with default
       // params; content layers get a random blend mode. Never strands the
