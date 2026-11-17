@@ -58,6 +58,10 @@ window.__kcShadowRun = (p) => {
     twin = new ParticleSystem();
     twin.init(p.n, W, H, assets, palette, p.seed);
   }
+  for (const k of p.kill || []) {
+    sys.alive[k] = 0;
+    if (twin) twin.alive[k] = 0;
+  }
   const T0 = 1_000_000;
   let toks = 0;
   for (let s = 0; s < p.steps; s++) {
@@ -68,7 +72,7 @@ window.__kcShadowRun = (p) => {
     sys.update(gs ? { ...lp, gpuStep: gs } : lp, assets, palette, p.seed, t, null);
     if (twin) {
       twin.update(lp, assets, palette, p.seed, t, null);
-      for (let i = 0; i < p.n; i++) drift = Math.max(drift, Math.abs(sys.x[i] - twin.x[i]), Math.abs(sys.y[i] - twin.y[i]));
+      for (let i = 0; i < p.n; i++) if (sys.alive[i]) drift = Math.max(drift, Math.abs(sys.x[i] - twin.x[i]), Math.abs(sys.y[i] - twin.y[i]));
     }
     host.post(tok, sys);
   }

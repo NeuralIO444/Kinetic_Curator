@@ -52,15 +52,14 @@ export function swarmIneligibleReason(system, lp, ctx) {
 
 /**
  * Why a layer the kernel CAN step still cannot take over this frame's velocities, or null. The takeover skips the JS force loop, so
- * everything that loop would have added must be provably absent: nobody dead (the kernel's all-pairs treats every slot as live) and
+ * everything that loop would have added must be provably absent:
  * nothing already pushed into the force accumulators this frame (contact impulses; none for an eligible swarm, so any nonzero
  * means something else is steering and the JS step must run). Pure; O(n).
  */
 export function takeoverBlocker(system) {
   const n = system.n;
   for (let i = 0; i < n; i++) {
-    if (!system.alive[i]) return 'dead';
-    if (system.ax[i] !== 0 || system.ay[i] !== 0) return 'preforce';
+    if (system.alive[i] && (system.ax[i] !== 0 || system.ay[i] !== 0)) return 'preforce';
   }
   return null;
 }
@@ -97,6 +96,10 @@ export function swarmCoreParams(lp, ctx, system) {
   };
 }
 
+/** Where a dead slot sits in the GPU's copy: far beyond the canvas and every force radius, each slot on its own spot. */
+export const DEAD_PARK = 1e7;
+export const DEAD_PARK_STEP = 1e3;
+
 const now = () => (typeof performance !== 'undefined' ? performance.now() : 0);
 
 export function createGpuSwarmHost(gl) {
@@ -109,6 +112,7 @@ export function createGpuSwarmHost(gl) {
     gpuMsMax: 0,
     driftPosMax: 0,
     driftVelMax: 0,
+    dead: 0, // dead slots parked in the last stepped layer
     applied: 0, // takeover: frames a layer's velocities came from the GPU
     takeoverSkipped: {},
   };
@@ -133,9 +137,26 @@ export function createGpuSwarmHost(gl) {
       const n = system.n;
       const t0 = now();
       const gpu = gpuFor(layerId, n);
+      // Dead slots (a bred / culled population): the JS neighbour grid leaves them out, so the kernel must not see them either. They
+      // are parked far outside every force radius for the GPU's copy only (distinct spots, so they never meet each other); their own
+      // output is garbage nobody reads (the JS integration and the comparison both skip the dead).
+      let sx = system.x.subarray(0, n);
+      let sy = system.y.subarray(0, n);
+      let dead = 0;
+      for (let i = 0; i < n; i++) if (!system.alive[i]) dead++;
+      if (dead) {
+        sx = Float32Array.from(sx);
+        sy = Float32Array.from(sy);
+        for (let i = 0; i < n; i++) {
+          if (system.alive[i]) continue;
+          sx[i] = DEAD_PARK + i * DEAD_PARK_STEP;
+          sy[i] = DEAD_PARK;
+        }
+      }
+      stats.dead = dead;
       gpu.seed({
-        x: system.x.subarray(0, n),
-        y: system.y.subarray(0, n),
+        x: sx,
+        y: sy,
         vx: system.vx.subarray(0, n),
         vy: system.vy.subarray(0, n),
         mass: system.mass.subarray(0, n),
