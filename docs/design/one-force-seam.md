@@ -65,3 +65,49 @@ No new kernel, no fluid surface, no new dials. #2178's fragment body (breaking m
 - Dial 0 and field-absent stages are byte-identical to today.
 - With FERROFLUID on and a magnet placed, the stage's own marks visibly gather toward it; no second set of shapes appears.
 - Culture fade and fluid drift act on the same mark in the fixed order, and a take replays bit-for-bit.
+
+## Unification: one kind of thing on stage (Matt, 2026-11-16 evening)
+
+Seen live on build bef708a, Matt ruled: "I don't want those clumps. I want the clumps, game of life and assets dealt to stage to all have same intrinsic properties." Then, pointing at a clean phyllotaxis stage: "the second image should be the start point. Then the kineme breaks up the assets, creatures. And then the small pieces start to be affected by ferrofluid, using graphic design principles."
+
+### The arc: clean → broken up → flowing → whole again
+
+1. **Clean start.** The dealt stage, whole: assets, creatures, type as dealt.
+2. **The field breaks things up.** Assets stay whole until the fluid reaches them. Where the field is strong, the kineme's region break-up (Phase 4: a part's regions scatter while its bone carries it) tears the asset or creature into its own pieces.
+3. **The pieces flow.** The ferrofluid leans and gathers the pieces, not copies. **Pieces replace the fluid's copies** (#2247's fluid copies retire when pieces land).
+4. **Whole again.** When the field leaves, the pieces drift back and reassemble, so the stage can always return to the clean start.
+
+The field drives it: a calm field is a clean stage.
+
+### Same intrinsic properties
+
+- **Same look, same motion, same forces, same record.** Anything on stage is a dealt asset, a piece of one, or a copy of one: same assets, palette, Look, size law and finish; same kineme motion; same LIFE fade, fluid lean and governor; an ordinary stage item (recorded in takes, mirrored, counted in the budget).
+- **The clumps are retired.** The ferrofluid publishes no field-body descriptor; the renderer seats nothing of its own. The channel (`engine/dishFluidChannel.mjs`) stays as the #2180 capability for other field systems.
+- **Life's own cells are retired.** Life's idle visual mode and its specks go; Life shows only by fading, killing and birthing copies of dealt marks. Idle does nothing special: the culture keeps running underneath.
+- **Copies (Life births only) are real marks.** They are spawned inside placement, so kineme motion, mirror, materials, LIFE, lean and the budget apply exactly as to dealt marks. One copy rule (the nearest dealt mark), cap **256**.
+
+### Hierarchy and balance
+
+- **Dealt > pieces and copies > forces.** Whole dealt assets lead (biggest, brightest); pieces and copies are always smaller and quieter; forces are seen only through them.
+- **Share rule.** Copies' total ink never exceeds **half** the dealt marks' ink, whatever the fields do.
+- **Copies shed first.** Under load the governor thins copies before it touches dealt marks or effects.
+
+### Graphic design principles, judged and played (all four)
+
+| Principle                      | Played by | What it moves                                                                        |
+| ------------------------------ | --------- | ------------------------------------------------------------------------------------ |
+| Rhythm and repetition          | **QUEEN** | Pieces pulse and flow on the beat in readable patterns (spirals, streams), not noise |
+| Contrast                       | **DAVIS** | Breaks more and pulls harder when the frame reads plain                              |
+| Negative space and balance     | **LOIS**  | Pulls back when the frame is crowded or lopsided; keeps breathing room               |
+| Hierarchy, and the whole frame | **TASTE** | Judges: scores each principle and names the one that fails                           |
+
+When TASTE finds a principle failing, it **hands it to that principle's owner**, who takes **one small, capped step** on its dial next phrase: at most once per phrase (8 bars, or ~8 s without a beat).
+
+### Order (each one PR, Matt merges)
+
+1. Retire the clumps, and record this design (this PR).
+2. Field-driven break-up: pieces of assets and creatures flow with the fluid and reassemble when it leaves (#2178 channel 1). The fluid's copies retire.
+3. Life births as copies of real marks inside placement; cap 256; share rule; copies shed first (#2152 slice 2, re-cut).
+4. Retire Life's own cell drawing (visual mode) and specks.
+5. TASTE scores the four principles.
+6. QUEEN, DAVIS and LOIS take their small steps on TASTE's hand-off.

@@ -7,7 +7,9 @@
 // is now the plan ANNOTATION (the bedrock mask + the channel descriptor), which lives on the
 // published plan, never in the resolved layers. Pinned here:
 //   off parity      no fluid keys → frames byte-identical between independent resolvers, no
-//                   dishFluid key in the snapshot, no descriptor published. With the fluid
+//                   dishFluid key in the snapshot, no descriptor published. [The clump body — the field-body
+//                   descriptor — is RETIRED (Matt, 2026-11-16); the pins below that said it publishes now say it never
+//                   does.] With the fluid
 //                   present at COUPLE 0, frames are byte-identical to the no-fluid run WHOLE
 //                   (nothing to strip — there are no body items), while the descriptor
 //                   publishes from the first frame: the body is presentation now, and the
@@ -34,9 +36,6 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createLiveResolver, checkResolverSnapshot, getLastDishFluidPlan, getLastDishBirths } from './liveResolve.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
-import { ASSETS } from '../data/assets/index.js';
-import { ASSETS_KANA } from '../data/assets/assets-kana.js';
-import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
 import { quietStamp } from '../engine/dishLifeQuiet.mjs';
 import { fluidStamp } from '../engine/dishFluid.mjs';
 import { packFluidCells } from '../engine/dishFluidCells.mjs';
@@ -150,8 +149,11 @@ const N = 60;
     plainHs.map((f) => f.full),
     'fluid present at COUPLE 0: every frame is the no-fluid frame, whole — the body is not in the output',
   );
-  assert.ok(uncoupledHs[0].descriptor, 'the descriptor publishes from the first frame (the seeded field)');
-  assert.ok(uncoupledHs[N - 1].descriptor, 'and the descriptor is still published at the last frame');
+  // the clumps are retired (Matt, 2026-11-16): the fluid runs, yet no field-body descriptor ever publishes
+  assert.ok(
+    uncoupledHs.every((f) => f.planActive && !f.descriptor),
+    'the fluid runs on every frame and seats no clump body',
+  );
   assert.ok(uncoupled.snapshotState().dishFluid, 'the fluid itself ran (its own key rides)');
   assert.equal(uncoupled.snapshotState().dishLife.fluidGrid, undefined, 'an uncoupled culture carries no state rider');
   plain.dispose();
@@ -188,7 +190,10 @@ const N = 60;
   const late = createLiveResolver();
   const lateHs = run(late, N, { from: 1, couple: 0.8 });
   assert.equal(lateHs[0].descriptor, false, 'the late run’s frame 0 has no fluid at all — no descriptor');
-  assert.ok(onTimeHs[0].descriptor, 'the on-time run’s frame 0 already publishes the descriptor');
+  assert.ok(
+    onTimeHs[0].planActive && !onTimeHs[0].descriptor,
+    'the on-time run’s frame 0 runs the fluid, with no clump body',
+  );
   assert.equal(lateHs[0].full, onTimeHs[0].full, 'frame 0 identical in both runs');
   assert.equal(lateHs[1].full, onTimeHs[1].full, 'frame 1 still precedes any biased generation in both runs');
   onTime.dispose();
@@ -222,8 +227,8 @@ const N = 60;
     'restored mid-run, the pair continues bit-identically',
   );
   assert.ok(
-    tailA.every((f) => f.descriptor),
-    'the descriptor keeps publishing through the continuation',
+    tailA.every((f) => !f.descriptor),
+    'no clump body publishes through the continuation (retired)',
   );
   const fluidShape = {
     wakeMs: 0,
@@ -258,7 +263,9 @@ const N = 60;
   b.dispose();
 }
 
-// 5. vocabulary: nothing dealt → the descriptor's vocabulary is the stage's own pool
+// 5. (retired with the clumps, Matt 2026-11-16 — the body's vocabulary pin went with the body: the fluid's copies wear
+//    the stage's own dealt marks, pinned in engine/dishFluidDuplicates.selfcheck.mjs.) An empty stage runs the fluid and
+//    publishes no descriptor.
 {
   const r = createLiveResolver();
   for (let f = 0; f < 30; f++) {
@@ -275,20 +282,7 @@ const N = 60;
     );
   }
   const plan = getLastDishFluidPlan();
-  assert.ok(plan && plan.fieldBody, 'the descriptor publishes on an empty stage');
-  const vocab = plan.fieldBody.poolIds;
-  assert.ok(Array.isArray(vocab) && vocab.length > 20, `the vocabulary is the stage pool (${vocab?.length} shapes)`);
-  const poolIds = new Set(ASSETS.map((a) => a.id));
-  for (const id of vocab) assert.ok(poolIds.has(id), `vocabulary shape ${id} is a pool asset`);
-  assert.ok(
-    vocab.some((id) => !String(id).startsWith('mrk_')),
-    'the vocabulary is wider than the marks chapter — letters and stamps ride the pool',
-  );
-  const poemOnly = new Set([...ASSETS_KANA, ...ASSETS_KANJI].map((a) => a.id));
-  assert.ok(
-    vocab.every((id) => !poemOnly.has(id)),
-    'poem-only stamps never appear — they are not pool assets',
-  );
+  assert.ok(plan && plan.active && !plan.fieldBody, 'an empty stage runs the fluid and seats no clump body');
   r.dispose();
 }
 
