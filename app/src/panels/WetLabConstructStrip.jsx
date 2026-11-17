@@ -22,6 +22,7 @@ import {
   assembleCandidate,
   constructKey,
   TOO_FEW_LINE,
+  CONSTRUCT_FLOOR,
   CONSTRUCT_SCOPES,
   CONSTRUCT_DEFAULT_SCOPE,
 } from './constructDeal.mjs';
@@ -196,7 +197,9 @@ export function WetLabConstructStrip({ onKeep } = {}) {
         <div style={row} data-testid="construct-hand">
           {hand === null && (
             <span style={hint}>
-              {inPlay.length ? 'press KIN — your kept shapes join up into constructs' : TOO_FEW_LINE.toLowerCase()}
+              {inPlay.length
+                ? 'press KIN — your kept shapes join up into constructs'
+                : `keep ${CONSTRUCT_FLOOR} shapes of one style on the SHAPE rung`}
             </span>
           )}
           {hand !== null && records.length === 0 && (
