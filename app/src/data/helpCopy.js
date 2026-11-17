@@ -320,7 +320,7 @@ export const HELP_TOPICS = [
     id: 'dish-life-assets',
     group: 'Master',
     title: 'dish life · life on the marks',
-    text: 'Lets the culture’s life and death play out on the marks themselves: a mark over a fading cell fades, over a dead cell it is gone. Its own dial, apart from coupling. 0 is off — the marks stay as dealt. Double-click to reset to 0%.',
+    text: 'Lets the culture’s life and death play out on the marks themselves: a mark over a fading cell fades, over a dead cell it is gone, and where the culture is alive on empty ground, smaller, quieter copies of the nearest mark are born beside it. Its own dial, apart from coupling. 0 is off — the marks stay as dealt. Double-click to reset to 0%.',
   },
   {
     id: 'dish-life-seed',

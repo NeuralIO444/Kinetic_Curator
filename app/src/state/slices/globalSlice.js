@@ -62,6 +62,7 @@ import {
   skeletonFounder,
   withCultivation,
 } from '../../engine/creatureAssembler.js'; // #1849 / #1850, cultivation notes #1872
+import { sanitizeConstructRecords, bankConstructRecord } from '../../engine/constructAssembler.js'; // #2108
 import { dealBeastMeasures, beastTile } from '../../engine/beastTile.js'; // #1962
 import { sanitizeShapeShelf, keepShape, dropShape } from '../../panels/shapeShelf.mjs'; // #2280
 import { sourceRecord, breedCreature, handEditRecord, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852, hand edits #1870
@@ -471,6 +472,7 @@ export const createGlobalSlice = (set) => ({
   assetOptions: {},
   assetAttach: {}, // #1355 — { assetId: [{x, y}] } attach points set in the wet lab
   creatureRecords: [], // #1849 — creature records assembled in the wet lab; #1850: each one's pool tile lives in customAssets
+  constructRecords: [], // #2108 — construct records (recipes); their tiles are drawn from them, never saved
   creatureBreedNote: null, // #1852 — what the last BREED did (the same statuses, plus need-three). Session-only.
   creatureBirthNote: null, // #2037 — what the last kept-take banking did: { id: null, status: 'banked', count }. Session-only.
   beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.
@@ -1135,6 +1137,15 @@ export const createGlobalSlice = (set) => ({
       return rec ? bankCreature(state, rec) : {};
     }),
   /**
+   * #2108 — bank one construct record through its door. A dishonest record or one already banked changes
+   * nothing (no write); at the cap the oldest drops off.
+   */
+  bankConstruct: (record) =>
+    set((state) => {
+      const next = bankConstructRecord(state.constructRecords, record);
+      return next === state.constructRecords ? {} : { constructRecords: next };
+    }),
+  /**
    * #2232 — a creature dealt by the wet lab's KIN strip, banked on tap. The record comes from the deal engines, so it
    * goes back through the door (sanitizeCreatureRecord) and must read viable; then it banks exactly as an assembled
    * one does (bankCreature: the pool tile, the cap, the same statuses). A dishonest or stillborn record is 'nobody'.
@@ -1604,6 +1615,7 @@ export const createGlobalSlice = (set) => ({
       next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
       next.creatureRecords = sanitizeCreatureRecords(doc.creatureRecords); // #1849 — a doc without records has none
       next.shapeShelf = sanitizeShapeShelf(doc.shapeShelf); // #2280 — a doc without a shelf has an empty one
+      next.constructRecords = sanitizeConstructRecords(doc.constructRecords); // #2108 — a doc without constructs has none
       next.stageBirths = []; // #2037 — a loaded document starts its own performance: the old one's unbanked children leave with it
       // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
       // rest of the params; parseProject lands a pre-fold-in document's top-level creatureCount
