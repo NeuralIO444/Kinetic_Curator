@@ -223,3 +223,32 @@ One discipline for everything the WetLab banks (§5).
 
 **Q6. Does the constructs build write the styles' `assets.families` lists? — A: in this build.**
 The grammar lands as data with the assembler, and the families slot stops being empty (§3).
+
+## 8. The library and the break-up cycle — Matt, 2026-11-16
+
+Asked after seeing the ferrofluid on stage (build bef708a). Matt: "I wanted to have a system that builds complex shapes from simple" ... "Reduce library of assets. But, keep a library of complex shapes that can be made from."
+
+**The library ruling.**
+
+- **What is dealt is primitives.** The pool the stage deals from becomes a small set of simple primitives: each Canon style's named simple shapes (§3's vocabularies, written for all eleven styles), roughly 40–60 in all.
+- **Complex shapes are recipes.** A complex shape on stage is a construct, assembled from those primitives by its style's grammar (§§1–6 as written: 2–4 primitives, one style, banked in the document, cap 64).
+- **Today's complex assets stay, but are not dealt.** The ~985 assets remain in the library for browsing and as references that constructs imitate. Nothing is deleted.
+
+**The cycle (with `docs/design/one-force-seam.md`).** Simple ↔ complex is one loop, two directions:
+
+- **Complex → simple:** where the ferrofluid is strong, a construct breaks into its primitives (its pieces are its recipe, by the shape itself), and the pieces flow with the field.
+- **Simple → complex:** when the field leaves, pieces reassemble: into the construct they came from, or into a new construct by the style's grammar.
+
+### Build order
+
+1. This section (docs).
+2. Constructs, per §§1–6: the assembler, the tile composer, the record door and bank, the styles' `assets.families` data, and the system deal.
+3. The library cut: the deal draws primitives + constructs; the complex assets become reference-only.
+4. The field break-up and reassembly (one-force-seam order step 2), on constructs.
+
+### Rulings on the open questions — Matt, 2026-11-16
+
+- **Pieces: 12–16 primitives per construct.** This replaces §1's "2–4 primitives". A construct is many small pieces, so the break-up has plenty to flow with the ferrofluid. §§1–6 are read with this number wherever they say 2–4.
+- **Budget: a small primitive set, heavily reused.** About 20–30 simple primitives (bars, arcs, dots, wedges, rings) per the styles' vocabularies. Constructs reuse them with scale and rotation, so the atlas and the cap of 64 stay small.
+- **The cut re-points every pool.** KINETIC's full-library pools (#1778), Loot pools, kits (#1955) and creature parts dealt from the stage (#1937) draw from primitives and constructs. The ~985 assets stay as read-only references and are never dealt. The poem's stamps are unaffected.
+- **Primitives: extract first, draw the gaps.** Pull the simplest shapes from the baked region data (`BAKED_REGIONS`), list which styles are still missing a vocabulary entry, and draw only those.
