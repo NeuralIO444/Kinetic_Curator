@@ -20,6 +20,7 @@ import {
   lockLabel,
   keep,
   topOpenRung,
+  openForExisting,
   loadLadder,
   saveLadder,
 } from './wetLabLadder.mjs';
@@ -42,10 +43,10 @@ const keepN = (ladder, rung, times) => {
   return { ladder: cur, opened };
 };
 
-ok('the rungs are the five of the spec, bottom to top, and keeping three opens the next', () => {
-  assert.deepEqual(RUNG_IDS, ['shape', 'asset', 'recipe', 'creature', 'rig']);
+ok('the rungs are the four of the spec (§12.2), bottom to top, and keeping three opens the next', () => {
+  assert.deepEqual(RUNG_IDS, ['shape', 'construct', 'creature', 'rig']);
   assert.equal(OPEN_AT, 3);
-  assert.equal(RUNGS.length, 5);
+  assert.equal(RUNGS.length, 4);
 });
 
 ok('a new artist has only SHAPE open and nothing kept', () => {
@@ -58,9 +59,8 @@ ok('a new artist has only SHAPE open and nothing kept', () => {
 
 ok('a locked rung says what opens it in four words or fewer; the bottom rung is never locked', () => {
   assert.equal(lockLabel('shape'), null);
-  assert.equal(lockLabel('asset'), 'KEEP 3 SHAPES');
-  assert.equal(lockLabel('recipe'), 'KEEP 3 ASSETS');
-  assert.equal(lockLabel('creature'), 'KEEP 3 RECIPES');
+  assert.equal(lockLabel('construct'), 'KEEP 3 SHAPES');
+  assert.equal(lockLabel('creature'), 'KEEP 3 CONSTRUCTS');
   assert.equal(lockLabel('rig'), 'KEEP 3 CREATURES');
   for (const id of RUNG_IDS.slice(1)) assert.ok(lockLabel(id).split(' ').length <= 4, `${id} lock line`);
   assert.equal(lockLabel('nope'), null);
@@ -69,13 +69,13 @@ ok('a locked rung says what opens it in four words or fewer; the bottom rung is 
 ok('the third keep opens the next rung exactly once, and says which', () => {
   const two = keepN(emptyLadder(), 'shape', 2);
   assert.deepEqual(two.opened, []);
-  assert.equal(isOpen(two.ladder, 'asset'), false);
+  assert.equal(isOpen(two.ladder, 'construct'), false);
   assert.equal(pips(two.ladder, 'shape'), 2);
   const three = keep(two.ladder, 'shape');
-  assert.equal(three.opened, 'asset');
-  assert.equal(isOpen(three.ladder, 'asset'), true);
+  assert.equal(three.opened, 'construct');
+  assert.equal(isOpen(three.ladder, 'construct'), true);
   assert.equal(pips(three.ladder, 'shape'), 3);
-  assert.equal(topOpenRung(three.ladder), 'asset');
+  assert.equal(topOpenRung(three.ladder), 'construct');
   const more = keepN(three.ladder, 'shape', 5);
   assert.deepEqual(more.opened, [], 'keeping more opens nothing a second time');
   assert.equal(pips(more.ladder, 'shape'), OPEN_AT, 'pips cap at the opening number');
@@ -90,7 +90,7 @@ ok('the whole ladder opens one rung at a time, in order', () => {
     l = r.ladder;
     order.push(...r.opened);
   }
-  assert.deepEqual(order, ['asset', 'recipe', 'creature', 'rig']);
+  assert.deepEqual(order, ['construct', 'creature', 'rig']);
   assert.equal(topOpenRung(l), 'rig');
   const top = keepN(l, 'rig', 10);
   assert.deepEqual(top.opened, [], 'the top rung has nothing above it to open');
@@ -103,8 +103,26 @@ ok('a keep on a locked rung is refused and changes nothing', () => {
   assert.deepEqual(r.ladder, l);
   assert.equal(keep(l, 'nope').opened, null);
   assert.deepEqual(keep(l, 'nope').ladder, l);
-  const skipped = keepN(l, 'recipe', 9);
+  const skipped = keepN(l, 'creature', 9);
   assert.deepEqual(skipped.ladder, l, 'keeping on a rung that is not open cannot open the one above it');
+});
+
+ok('an old five-rung record (ASSET, RECIPE) carries into CONSTRUCT; unknown rungs are dropped', () => {
+  const old = {
+    v: 1,
+    kept: { shape: 3, asset: 2, recipe: 4, creature: 1 },
+    open: { shape: true, asset: true, recipe: true, creature: false, rig: false },
+  };
+  const l = sanitizeLadder(old);
+  assert.deepEqual(Object.keys(l.kept), RUNG_IDS);
+  assert.deepEqual(Object.keys(l.open), RUNG_IDS);
+  assert.equal(l.kept.construct, 4, 'the larger of the old two counts');
+  assert.equal(isOpen(l, 'construct'), true, 'an open ASSET means an open CONSTRUCT');
+  assert.equal(isOpen(l, 'creature'), true, 'four construct keeps have opened CREATURE');
+  assert.equal(isOpen(l, 'rig'), false);
+  const closed = sanitizeLadder({ kept: { shape: 1, asset: 2 }, open: { shape: true, asset: false, recipe: true } });
+  assert.equal(isOpen(closed, 'construct'), false, 'a closed ASSET stays closed even if RECIPE claimed open');
+  assert.equal(closed.kept.construct, 2);
 });
 
 ok('keep is pure: the ladder it was given is not changed', () => {
@@ -118,22 +136,22 @@ ok('sanitize reads garbage as a new artist, field by field', () => {
   for (const junk of [null, undefined, 7, 'x', [], {}, { kept: 'no', open: 3 }]) {
     assert.deepEqual(sanitizeLadder(junk), emptyLadder());
   }
-  const l = sanitizeLadder({ kept: { shape: '2', asset: -4, recipe: NaN, rig: 1e3 }, open: { shape: false } });
+  const l = sanitizeLadder({ kept: { shape: '2', construct: -4, creature: NaN, rig: 1e3 }, open: { shape: false } });
   assert.equal(l.kept.shape, 2);
-  assert.equal(l.kept.asset, 0);
-  assert.equal(l.kept.recipe, 0);
+  assert.equal(l.kept.construct, 0);
+  assert.equal(l.kept.creature, 0);
   assert.equal(isOpen(l, 'shape'), true, 'the bottom rung can never be locked');
 });
 
 ok('sanitize cannot leave a rung open above a locked one, and finishes an opening the keeps earned', () => {
-  const skip = sanitizeLadder({ open: { shape: true, asset: false, recipe: true, creature: true, rig: true } });
+  const skip = sanitizeLadder({ open: { shape: true, construct: false, creature: true, rig: true } });
   assert.deepEqual(
     RUNG_IDS.map((id) => isOpen(skip, id)),
-    [true, false, false, false, false],
+    [true, false, false, false],
   );
   const earned = sanitizeLadder({ kept: { shape: 3 }, open: { shape: true } });
-  assert.equal(isOpen(earned, 'asset'), true, 'three keeps on a rung have opened the next');
-  assert.equal(isOpen(earned, 'recipe'), false);
+  assert.equal(isOpen(earned, 'construct'), true, 'three keeps on a rung have opened the next');
+  assert.equal(isOpen(earned, 'creature'), false);
 });
 
 ok('the store round-trips through an injected storage under one key', () => {
@@ -161,6 +179,34 @@ ok('a blocked or missing store never throws and reads as a new artist', () => {
   assert.equal(saveLadder(blocked, emptyLadder()), false);
   assert.deepEqual(loadLadder(null), emptyLadder());
   assert.equal(saveLadder(null, emptyLadder()), false);
+});
+
+ok('an artist with kept creatures or beasts starts with every rung open; a new artist does not', () => {
+  const fresh = emptyLadder();
+  for (const counts of [{ creatures: 1 }, { beasts: 2 }, { creatures: 5, beasts: 1 }]) {
+    const l = openForExisting(fresh, counts);
+    assert.deepEqual(
+      RUNG_IDS.map((id) => isOpen(l, id)),
+      RUNG_IDS.map(() => true),
+      JSON.stringify(counts),
+    );
+    assert.deepEqual(l.kept, fresh.kept, 'the keeps are not touched');
+    assert.equal(topOpenRung(l), 'rig');
+  }
+  assert.deepEqual(openForExisting(fresh, { creatures: 0, beasts: 0 }), fresh);
+  assert.deepEqual(openForExisting(fresh), fresh);
+});
+
+ok('openForExisting never closes a rung, reads junk counts as zero, and does not change its input', () => {
+  const half = keepN(emptyLadder(), 'shape', 3).ladder;
+  const frozen = JSON.stringify(half);
+  for (const junk of [NaN, -3, '4', null, undefined, Infinity]) {
+    const l = openForExisting(half, { creatures: junk, beasts: junk });
+    assert.equal(isOpen(l, 'construct'), true, 'an earned rung stays open');
+    assert.equal(isOpen(l, 'creature'), false, `junk count ${String(junk)} opens nothing`);
+  }
+  openForExisting(half, { creatures: 3 });
+  assert.equal(JSON.stringify(half), frozen);
 });
 
 ok('the model is pure: no clock, no Math.random, no store, no React, no DOM', () => {

@@ -1,6 +1,6 @@
 // wetLabLadder.mjs — the WetLab ladder's rung model (docs/design/wetlab-ladder-spec.md §2, §4, §9; step 1).
 //
-// Five rungs, SHAPE → ASSET → RECIPE → CREATURE → RIG. On every rung the artist keeps things; keeping the third
+// Four rungs, SHAPE → CONSTRUCT → CREATURE → RIG (spec §12.2: ASSET and RECIPE became one CONSTRUCT rung). On every rung the artist keeps things; keeping the third
 // item on a rung opens the next one, and an opened rung stays open for that artist in every project (rulings 4, 5,
 // 8). Pure and headless: no UI, no clock, no random. The preference store follows the per-viewer pattern of
 // dishFluidChip.model.mjs — an injected storage, never throws, never part of a saved project.
@@ -11,8 +11,7 @@
 /** The rungs, bottom to top. `noun` is what a rung's keeps are called, for the lock line of the rung above. */
 export const RUNGS = Object.freeze([
   Object.freeze({ id: 'shape', label: 'SHAPE', noun: 'SHAPES' }),
-  Object.freeze({ id: 'asset', label: 'ASSET', noun: 'ASSETS' }),
-  Object.freeze({ id: 'recipe', label: 'RECIPE', noun: 'RECIPES' }),
+  Object.freeze({ id: 'construct', label: 'CONSTRUCT', noun: 'CONSTRUCTS' }),
   Object.freeze({ id: 'creature', label: 'CREATURE', noun: 'CREATURES' }),
   Object.freeze({ id: 'rig', label: 'RIG', noun: 'RIGS' }),
 ]);
@@ -47,14 +46,19 @@ export function emptyLadder() {
 export function sanitizeLadder(raw) {
   const out = emptyLadder();
   if (!raw || typeof raw !== 'object') return out;
-  for (const id of RUNG_IDS) {
+  const count = (id) => {
     const k = Number(raw.kept && raw.kept[id]);
-    out.kept[id] = Number.isFinite(k) && k > 0 ? Math.floor(k) : 0;
-  }
+    return Number.isFinite(k) && k > 0 ? Math.floor(k) : 0;
+  };
+  const wasOpenRaw = (id) => !!(raw.open && raw.open[id] === true);
+  for (const id of RUNG_IDS) out.kept[id] = count(id);
+  // a record written before §12.2 had ASSET and RECIPE where CONSTRUCT now stands: it carries over, nothing lost
+  out.kept.construct = Math.max(out.kept.construct, count('asset'), count('recipe'));
+  const openIn = (id) => wasOpenRaw(id) || (id === 'construct' && wasOpenRaw('asset'));
   for (let i = 1; i < RUNG_IDS.length; i += 1) {
     const id = RUNG_IDS[i];
     const below = RUNG_IDS[i - 1];
-    const wasOpen = !!(raw.open && raw.open[id] === true);
+    const wasOpen = openIn(id);
     out.open[id] = out.open[below] && (wasOpen || out.kept[below] >= OPEN_AT);
   }
   return out;
@@ -94,6 +98,21 @@ export function keep(ladder, rung) {
     return { ladder: next, opened: above };
   }
   return { ladder: next, opened: null };
+}
+
+/**
+ * An artist who already has kept creatures or beasts starts with every rung open (spec §12.3): they have been
+ * working the top of the ladder before it existed, and locking it would take away what they had. A brand-new artist
+ * (no creatures, no beasts) keeps the ladder as it is. Never closes a rung and never changes the keeps. Pure.
+ * `creatures` and `beasts` are counts; anything that is not a positive number reads as zero.
+ */
+export function openForExisting(ladder, { creatures = 0, beasts = 0 } = {}) {
+  const cur = sanitizeLadder(ladder);
+  const n = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+  if (!n(creatures) && !n(beasts)) return cur;
+  const open = {};
+  for (const id of RUNG_IDS) open[id] = true;
+  return { v: 1, kept: { ...cur.kept }, open };
 }
 
 /** The rung a new artist would work on next: the highest open rung. */

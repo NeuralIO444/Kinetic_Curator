@@ -42,6 +42,11 @@ import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature 
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
 import { WetLabDealStrip } from './WetLabDealStrip.jsx'; // #2232 — KIN: the auto-generate strip
 import { WetLabBeastStrip } from './WetLabBeastStrip.jsx'; // #2232 — KIN / CUR for beasts, under the bank rail
+import { WetLabShapeStrip } from './WetLabShapeStrip.jsx'; // #2282 — the SHAPE rung: KIN / CUR over style primitives
+import { WetLabRungRail } from './WetLabRungRail.jsx'; // #2281 — the ladder's rung rail
+import { useWetLabLadder } from './useWetLabLadder.js'; // #2281
+import { topOpenRung, isOpen } from './wetLabLadder.mjs'; // #2281
+import { poolBeasts } from './beastDeal.mjs'; // #2281 — the beast count that opens the ladder for an existing artist
 
 /** #2150 — a glyph is never a creature body: the caps/digits pack, the solo
  * text stamps and the pixel letter-anatomy emblems (Q4) are not legal bodies
@@ -164,6 +169,20 @@ export function WetLab({ assetId, onClose }) {
     [customAssets, assetTags],
   );
   const beasts = useMemo(() => beastRows(customAssets), [customAssets]); // #1868
+  // #2281 — the ladder: an artist with creatures or beasts starts with every rung open (§12.3); the rail shows one
+  // rung's strip at a time (§12.7). Until the artist picks, the highest open rung is the one on screen.
+  const { ladder, keepOn } = useWetLabLadder({
+    creatures: (allRecords || []).length,
+    beasts: poolBeasts(customAssets).length,
+  });
+  const [rungPick, setRungPick] = useState(null);
+  const rungOnScreen = rungPick && isOpen(ladder, rungPick) ? rungPick : topOpenRung(ladder);
+  // a keep pins the rung it was made on: the third keep opens the next rung on the rail, but the screen stays where the
+  // artist is working (spec §4: the rail lights the new rung, and nothing else happens)
+  const keepRung = (rung) => {
+    setRungPick(rung);
+    keepOn(rung);
+  };
   const descById = useMemo(() => new Map(descs.map((r) => [r.id, r])), [descs]);
   const allKits = [...SEED_KITS, ...(kits || [])];
 
@@ -1144,13 +1163,23 @@ export function WetLab({ assetId, onClose }) {
               ))}
           </aside>
         </div>
-        <WetLabDealStrip
-          subject={selRecord}
-          onTap={(id) => {
-            setSelectedId(id);
-            setCultivateOpen(false);
-          }}
-        />
+        <WetLabRungRail ladder={ladder} selected={rungOnScreen} onSelect={setRungPick} />
+        {rungOnScreen === 'shape' && <WetLabShapeStrip onKeep={() => keepRung('shape')} />}
+        {rungOnScreen === 'construct' && (
+          <div style={rungEmpty} data-testid={`rung-empty-${rungOnScreen}`}>
+            nothing here yet
+          </div>
+        )}
+        {rungOnScreen === 'creature' && (
+          <WetLabDealStrip
+            subject={selRecord}
+            onKeep={() => keepRung('creature')} // #2283 — a creature the artist kept fills CREATURE's pips
+            onTap={(id) => {
+              setSelectedId(id);
+              setCultivateOpen(false);
+            }}
+          />
+        )}
         <footer style={bankRail} data-testid="bank-rail">
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '0 0 auto' }}>
             <span className="ttl" style={{ fontSize: 10 }}>
@@ -1213,11 +1242,21 @@ export function WetLab({ assetId, onClose }) {
             </div>
           </div>
         </footer>
-        <WetLabBeastStrip />
+        {rungOnScreen === 'rig' && <WetLabBeastStrip onKeep={() => keepRung('rig')} />}
       </div>
     </div>
   );
 }
+
+const rungEmpty = {
+  padding: '14px 10px',
+  borderTop: '1px solid var(--line)',
+  fontSize: 10,
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
+  color: 'var(--dim)',
+  flex: '0 0 auto',
+};
 
 const veil = {
   position: 'fixed',
