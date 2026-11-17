@@ -183,3 +183,26 @@ These amend the sections above where they differ.
    CREATURE and the beast strip under RIG.
 
 Phase 2 is cut into issues, one fix per PR; each issue names its files, its selfcheck, and what it must not touch.
+
+## 13. Phase 3 rulings: the CONSTRUCT rung (Matt, 2026-11-17 — all taken as recommended)
+
+**Correction first.** The question put to Matt said a construct is "2 to 4 primitives". The code says otherwise:
+`assembleConstruct` (`engine/constructAssembler.js`) builds a record of `CONSTRUCT_MIN_PARTS`–`CONSTRUCT_MAX_PARTS`
+= **12–16 parts**, drawn with repeats from one style's vocabulary, and needs only one vocabulary piece that carries an
+ATTACH point. The rulings below read with that in mind.
+
+1. **KIN builds from the artist's kept shapes only.** The vocabulary of a construct is the SHAPE shelf's shapes of one
+   style — never the rest of that style's vocabulary.
+2. **Too few: say so.** If no style has at least 2 kept shapes, KIN is disabled with one line: "KEEP 2 SHAPES OF ONE
+   STYLE". (The assembler would run on 1; 2 is the design floor, so a construct is never one shape repeated.)
+3. **Alive: pieces settle into place.** Each part starts a little apart from its join and slides home, then rests;
+   hover replays it. Under reduced motion the tile shows the settled construct.
+4. **Keep goes to the construct bank** (`bankConstruct`, #2284) and fills a CONSTRUCT pip. The lead of a KIN hand
+   lands on the stage, as on the other rungs — *if* a banked construct tile can be turned on for the stage today.
+   Not checked: `constructRecords` says tiles "are drawn from them, never saved". The strip's issue checks first.
+5. **CUR changes one thing.** Three neighbours of the last kept construct, each with one primitive of its vocabulary
+   swapped for another kept shape of the same style. ("One join" changes need a record-level edit the assembler does
+   not offer; not in this phase.)
+6. **SHAPE shelf tiles grow to 44 px** (the touch target).
+7. **The "BANK · + BEAST" footer shows only under RIG**, with the beast strip.
+
