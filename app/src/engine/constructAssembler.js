@@ -6,8 +6,8 @@
 // builds it is the list the field later breaks it into.
 //
 // Data only: the assembler deals a RECORD, and the composer (slice 2, below) turns a record into ONE pool
-// tile's drawing. Nothing saves a record and nothing on stage reads one yet (the record door, the bank and
-// the deal are their own slices).
+// tile's drawing; the door and the bank (slice 4, below) keep records in the project document. Nothing on
+// stage reads one yet (the deal is its own slice).
 //
 // Pure and deterministic (spec §4): no clock, no Math.random. Every draw rides the registered 'construct'
 // string channel — its own stream, so a construct deal never re-keys a creature deal sharing the seed — keyed
@@ -19,6 +19,7 @@
 
 import { hashU01 } from './kernel/rng.js';
 import { sanitizeAttachPoints, ATTACH_BOX, MAX_ATTACH } from './assetAttach.js';
+import { constructVocabularyIds } from './constructRules.js'; // the style's closed vocabulary, as data
 import { assetCostScore, COST_WARNING_THRESHOLD } from '../assets/ingest.js'; // the price of a drawing, whoever drew it
 
 export const CONSTRUCT_KIND = 'kc-construct/1';
@@ -290,4 +291,78 @@ export function constructTile(record, svgOf) {
     points: sanitizeAttachPoints(record.points).map((p) => ({ x: p.x, y: p.y })),
     cost: constructCost(svg),
   };
+}
+
+// ── Slice 4: the record door and the bank ─────────────────────────────────────────────────────────────────────
+//
+// Matt's ruling (2026-11-16): a project saves construct RECORDS only — the recipes. A tile is never saved: it is
+// drawn into the pool from its record (constructTile, above), so constructs never use the import overlay's slots.
+//
+// The door is the trust boundary (records live in the project document, which can be hand-edited or arrive from
+// an older build). The creature door's rule, kept: a record dishonest in any particular is refused WHOLE, never
+// half-loaded. One style per construct is mechanical here (spec §6): a piece outside its style's vocabulary
+// refuses the record, and the record shape has no second-style field.
+
+/** A project keeps at most this many construct records; the oldest drop off (Matt, 2026-11-15: the creature cap). */
+export const MAX_CONSTRUCT_RECORDS = 64;
+/** A piece's position is a box coordinate; a fitted piece's origin can sit outside the box, but never far. */
+const PART_POS_LIMIT = 2 * ATTACH_BOX;
+
+const finite = (n) => typeof n === 'number' && Number.isFinite(n);
+
+/**
+ * Validate one record. Returns a normalized copy carrying only the known fields, or null.
+ * @param vocabularyOf (styleId) => that style's primitive ids; the Canon data by default. A style with no
+ *   vocabulary is not a construct style, so its records are refused.
+ */
+export function sanitizeConstructRecord(raw, vocabularyOf = constructVocabularyIds) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (raw.kind !== CONSTRUCT_KIND) return null;
+  if (typeof raw.id !== 'string' || !/^cn-[0-9a-f]{8}$/.test(raw.id)) return null;
+  if (!Number.isInteger(raw.seed) || raw.seed < 0 || raw.seed > 0xffffffff) return null;
+  if (!validId(raw.style)) return null;
+  const vocab = new Set(vocabularyOf(raw.style) || []);
+  if (!vocab.size) return null;
+  if (!Array.isArray(raw.parts)) return null;
+  if (raw.parts.length < CONSTRUCT_MIN_PARTS || raw.parts.length > CONSTRUCT_MAX_PARTS) return null;
+  const parts = [];
+  for (const p of raw.parts) {
+    if (!p || typeof p !== 'object' || !vocab.has(p.asset)) return null;
+    if (!Number.isInteger(p.own) || p.own < 0 || p.own >= MAX_ATTACH) return null;
+    if (![p.x, p.y, p.s, p.r].every(finite)) return null;
+    if (Math.abs(p.x) > PART_POS_LIMIT || Math.abs(p.y) > PART_POS_LIMIT) return null;
+    if (!(p.s > 0) || p.s > 1 || p.r < 0 || p.r >= 360) return null;
+    parts.push({ asset: p.asset, own: p.own, x: r2(p.x), y: r2(p.y), s: r4(p.s), r: r2(p.r) });
+  }
+  // The construct's own points: honest ATTACH points, plain (a role is creature grammar and a lie here).
+  if (!Array.isArray(raw.points) || raw.points.length > MAX_ATTACH) return null;
+  if (raw.points.some((p) => p && p.role !== undefined)) return null;
+  const points = sanitizeAttachPoints(raw.points);
+  if (points.length !== raw.points.length) return null;
+  return { id: raw.id, kind: CONSTRUCT_KIND, style: raw.style, seed: raw.seed, parts, points };
+}
+
+/** The project's record list: every entry re-validated, de-duplicated by id (first wins), capped (newest kept). */
+export function sanitizeConstructRecords(raw, vocabularyOf = constructVocabularyIds) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const r of raw) {
+    const rec = sanitizeConstructRecord(r, vocabularyOf);
+    if (!rec || seen.has(rec.id)) continue;
+    seen.add(rec.id);
+    out.push(rec);
+  }
+  return out.slice(-MAX_CONSTRUCT_RECORDS);
+}
+
+/**
+ * Bank one record: the new list, or the SAME list when nothing changes (a dishonest record, or one already
+ * banked). At the cap the oldest drops off — a construct is dealt, not hand-made, so the bank rolls forward.
+ */
+export function bankConstructRecord(bank, record, vocabularyOf = constructVocabularyIds) {
+  const cur = Array.isArray(bank) ? bank : [];
+  const rec = sanitizeConstructRecord(record, vocabularyOf);
+  if (!rec || cur.some((r) => r && r.id === rec.id)) return cur;
+  return [...cur, rec].slice(-MAX_CONSTRUCT_RECORDS);
 }
