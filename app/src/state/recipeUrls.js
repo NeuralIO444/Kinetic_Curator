@@ -197,7 +197,7 @@ export function decodeRecipeUrl(str) {
   if (!t.startsWith(RECIPE_URL_PREFIX) && !t.startsWith(RECIPE_URL_PREFIX_2)) {
     const m = /^kc-r\/([^.]+)\./.exec(t);
     const ver = m ? m[1] : '?';
-    return fail(`Unknown recipe link version "kc-r/${ver}" — this build reads ${RECIPE_URL_VERSION} only.`);
+    return fail(`Unknown recipe link version "kc-r/${ver}" — this build reads kc-r/1 and kc-r/2.`);
   }
   const b64 = t.slice(RECIPE_URL_PREFIX.length); // both prefixes are 7 characters
   let json;
