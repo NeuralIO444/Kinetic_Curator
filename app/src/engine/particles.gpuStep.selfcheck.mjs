@@ -163,4 +163,45 @@ const cols = (s) =>
   assert.ok(seen.length === 1 && seen[0].organism === false && seen[0].meta === 0, 'cloud context');
   console.log('  [ok] the organism callback seam: context, vigor, wrong size ignored');
 }
+
+// 6. the contact pass and its wet-medium cling still run inside the seam (the force seam keeps the legacy step; cling needs no GPU port)
+{
+  const sep = (over) => {
+    const clp = normalizeLayoutParams({
+      ...DEFAULT_LAYOUT_PARAMS,
+      mode: 'swarm',
+      behave: 'cruise',
+      particleCount: 2,
+      ...over,
+    });
+    const s = new ParticleSystem();
+    s.init(2, W, H, assets, palette, 7);
+    // two overlapping discs already moving apart: the dry bounce keeps them separating, the wet medium's surface tension captures them
+    s.x[0] = 500;
+    s.y[0] = 350;
+    s.x[1] = 512;
+    s.y[1] = 350;
+    s.vx[0] = -0.6;
+    s.vx[1] = 0.6;
+    s.vy[0] = 0;
+    s.vy[1] = 0;
+    const z = { n: 2, fx: new Float64Array(2), fy: new Float64Array(2) };
+    s.update({ ...clp, gpuStep: z }, assets, palette, 7, T(0), null);
+    return s.vx[1] - s.vx[0];
+  };
+  const dish = { contactRadius: 12, contactMode: 'bounce', contactRestitution: 0.8 };
+  const none = sep({});
+  const dry = sep(dish);
+  const wet = sep({ ...dish, accumulationWetness: 1 });
+  assert.ok(
+    Math.abs(dry - none) > 0.05,
+    `the dry contact pass acts under the seam (${none.toFixed(3)} -> ${dry.toFixed(3)})`,
+  );
+  assert.ok(
+    wet < dry - 0.2,
+    `wet cling captures the separating velocity under the seam (dry ${dry.toFixed(3)}, wet ${wet.toFixed(3)})`,
+  );
+  console.log('  [ok] contacts and cling run inside the seam: dry bounce acts, wet cling holds the pair');
+}
+
 console.log('particles.gpuStep.selfcheck: ok — K3 takeover #2188');
