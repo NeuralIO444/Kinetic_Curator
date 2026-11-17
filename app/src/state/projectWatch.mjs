@@ -31,6 +31,7 @@ export const PROJECT_STATE_KEYS = Object.freeze([
   'assetAttach',
   'creatureRecords', // #1849
   'shapeShelf', // #2280
+  'constructRecords', // #2108
   'audioRoutes',
   'canvasW',
   'canvasH',
