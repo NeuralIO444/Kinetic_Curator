@@ -62,7 +62,8 @@ import {
   skeletonFounder,
   withCultivation,
 } from '../../engine/creatureAssembler.js'; // #1849 / #1850, cultivation notes #1872
-import { sanitizeConstructRecords, bankConstructRecord } from '../../engine/constructAssembler.js'; // #2108
+import { sanitizeConstructRecords, bankConstructRecord, constructTileId } from '../../engine/constructAssembler.js'; // #2108
+import { findBodyAsset } from '../../engine/constructPool.js'; // spec §14 — a banked construct can be a creature body
 import { dealBeastMeasures, beastTile } from '../../engine/beastTile.js'; // #1962
 import { sanitizeShapeShelf, keepShape, dropShape } from '../../panels/shapeShelf.mjs'; // #2280
 import { sourceRecord, breedCreature, handEditRecord, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852, hand edits #1870
@@ -274,7 +275,13 @@ function bankCreature(state, rec, noteKey = 'creatureAssembleNote') {
   // every load re-runs): a body the door refuses — the one library stamp drawn with a character entity — cannot
   // become a tile, so it is refused here rather than lost on reload.
   // #1947 — the tile knows its family (the founder its skeleton descends from), so kin resemble and shimmer together
-  const tile = creatureTile(rec, findAsset(rec.body, sanitizeOverlay(overlay)), skeletonFounder(rec, cur));
+  // a body may be a construct the artist banked: drawn from its record (constructPool.js), never saved as a tile
+  const body = findBodyAsset(rec.body, {
+    overlay: sanitizeOverlay(overlay),
+    catalogue: ASSETS,
+    constructRecords: state.constructRecords,
+  });
+  const tile = creatureTile(rec, body, skeletonFounder(rec, cur));
   if (!tile || sanitizeOverlay([tile]).length !== 1) return note('nobody');
   if (cur.some((r) => r.id === rec.id)) {
     // already banked: heal a missing tile (an older document, or a one-file bundle from before #1850)
@@ -1244,10 +1251,16 @@ export const createGlobalSlice = (set) => ({
       const rec = bank[at];
       const overlay = state.customAssets || [];
       const cleanOverlay = sanitizeOverlay(overlay);
-      const bodyAsset = findAsset(rec.body, cleanOverlay);
-      const legalBodies = [...ASSETS, ...cleanOverlay]
-        .filter((a) => a && a.category !== 'creature' && typeof a.id === 'string')
-        .map((a) => a.id);
+      const bodyOf = (id) =>
+        findBodyAsset(id, { overlay: cleanOverlay, catalogue: ASSETS, constructRecords: state.constructRecords });
+      const bodyAsset = bodyOf(rec.body);
+      const legalBodies = [
+        ...[...ASSETS, ...cleanOverlay]
+          .filter((a) => a && a.category !== 'creature' && typeof a.id === 'string')
+          .map((a) => a.id),
+        // a construct the artist banked is a lawful body too (spec §14)
+        ...(state.constructRecords || []).map((r) => r && constructTileId(r.id)).filter(Boolean),
+      ];
       const own = state.assetAttach?.[rec.body];
       const bodyAttachPoints = Array.isArray(own) ? own : bodyAsset ? autoAttachPoints(bodyAsset.svg) : undefined;
       const { record: edited, refusal } = handEditRecord(rec, edit, {
@@ -1261,7 +1274,7 @@ export const createGlobalSlice = (set) => ({
       const standing = overlay.find((a) => a && a.id === tileId);
       if (standing && !isCreatureTile(standing)) return refuse('id-taken');
       if (!standing && overlay.length >= OVERLAY_CAP) return refuse('pool-full');
-      const tile = creatureTile(edited, findAsset(edited.body, cleanOverlay), skeletonFounder(edited, bank));
+      const tile = creatureTile(edited, bodyOf(edited.body), skeletonFounder(edited, bank));
       if (!tile || sanitizeOverlay([tile]).length !== 1) return refuse('nobody');
       return {
         creatureRecords: bank.map((r, i) => (i === at ? edited : r)),
