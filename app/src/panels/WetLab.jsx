@@ -41,6 +41,7 @@ import { assemblyWarnings, keptFromWarnings, roleSetStrands } from '../component
 import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature readout
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
 import { WetLabDealStrip } from './WetLabDealStrip.jsx'; // #2232 — KIN: the auto-generate strip
+import { WetLabBeastStrip } from './WetLabBeastStrip.jsx'; // #2232 — KIN / CUR for beasts, under the bank rail
 
 /** #2150 — a glyph is never a creature body: the caps/digits pack, the solo
  * text stamps and the pixel letter-anatomy emblems (Q4) are not legal bodies
@@ -1212,6 +1213,7 @@ export function WetLab({ assetId, onClose }) {
             </div>
           </div>
         </footer>
+        <WetLabBeastStrip />
       </div>
     </div>
   );
