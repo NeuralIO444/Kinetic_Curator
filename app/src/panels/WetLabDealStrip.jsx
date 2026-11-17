@@ -26,6 +26,7 @@ import {
   unkeptIds,
   bodySvgOf,
 } from './wetLabDeal.mjs';
+import { creatureFigureSvg } from './wetLabLogic.mjs';
 
 const label = (scope) => (CREATURE_SCOPES.find((s) => s.id === scope) || CREATURE_SCOPES[0]).label;
 
@@ -49,6 +50,26 @@ export function WetLabDealStrip({ subject = null, onTap }) {
   const library = useMemo(() => dealLibrary(ASSETS, customAssets), [customAssets]);
   const banked = new Set((bank || []).map((r) => r.id));
   const unkept = unkeptIds(dealtIds, bank, enabledAssets);
+  // the whole creature at rest on each tile — its body and the parts Davis would deal from the stage as it stands
+  const stageIds = Object.keys(enabledAssets || {}).filter(
+    (id) => enabledAssets[id] && id !== 'creature' && library.some((a) => a.id === id),
+  );
+  const stageKey = stageIds.join('|');
+  const figures = useMemo(() => {
+    const m = new Map();
+    for (const rec of hand || []) {
+      const body = library.find((a) => a.id === rec.body);
+      let svg;
+      try {
+        svg = body ? creatureFigureSvg(rec, body, stageIds, { seed, library, overlay: customAssets }) : null;
+      } catch {
+        svg = null; // a tile that cannot be composed falls back to its body drawing
+      }
+      m.set(rec.id, svg);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hand, library, seed, customAssets, stageKey]);
 
   const press = () => {
     const r = kinPress({ scope, seed, press: pressN, library, assetAttach, bank });
@@ -143,7 +164,8 @@ export function WetLabDealStrip({ subject = null, onTap }) {
             </span>
           )}
           {(hand || []).map((rec) => {
-            const svg = bodySvgOf(rec, library);
+            const figure = figures.get(rec.id);
+            const svg = figure || bodySvgOf(rec, library);
             const on = banked.has(rec.id);
             return (
               <button
@@ -157,14 +179,15 @@ export function WetLabDealStrip({ subject = null, onTap }) {
               >
                 {svg ? (
                   <svg
-                    viewBox="0 0 100 100"
-                    width="44"
-                    height="44"
+                    viewBox={figure ? '-20 -20 140 140' : '0 0 100 100'}
+                    width="52"
+                    height="52"
+                    data-figure={figure ? 'full' : 'body'}
                     style={{ display: 'block', margin: '0 auto' }}
                     dangerouslySetInnerHTML={{ __html: svg }}
                   />
                 ) : (
-                  <span style={{ display: 'block', height: 44, lineHeight: '44px', color: 'var(--dim)' }}>—</span>
+                  <span style={{ display: 'block', height: 52, lineHeight: '52px', color: 'var(--dim)' }}>—</span>
                 )}
                 {rec.id === picked && (
                   <span style={pickMark} data-testid="cur-pick">
