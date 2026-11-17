@@ -1180,68 +1180,76 @@ export function WetLab({ assetId, onClose }) {
             }}
           />
         )}
-        <footer style={bankRail} data-testid="bank-rail">
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '0 0 auto' }}>
-            <span className="ttl" style={{ fontSize: 10 }}>
-              bank
+        {/* #2298 — the bank rail is the creature bank: it shows under CREATURE and RIG, not under SHAPE or CONSTRUCT */}
+        {(rungOnScreen === 'creature' || rungOnScreen === 'rig') && (
+          <footer style={bankRail} data-testid="bank-rail">
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '0 0 auto' }}>
+              <span className="ttl" style={{ fontSize: 10 }}>
+                bank
+              </span>
+              <span style={{ fontSize: 9, color: 'var(--dim)' }}>
+                {(allRecords || []).length} / {MAX_CREATURE_RECORDS}
+              </span>
             </span>
-            <span style={{ fontSize: 9, color: 'var(--dim)' }}>
-              {(allRecords || []).length} / {MAX_CREATURE_RECORDS}
-            </span>
-          </span>
-          <div style={bankScroll}>
-            <div style={bankRow}>
-              {(allRecords || []).map((r) => {
-                const bodyA = assets.find((a) => a.id === r.body) || null;
-                const gen = lineageTree(r).self.gen;
-                const sel = selRecord && selRecord.id === r.id;
-                return (
+            <div style={bankScroll}>
+              <div style={bankRow}>
+                {(allRecords || []).map((r) => {
+                  const bodyA = assets.find((a) => a.id === r.body) || null;
+                  const gen = lineageTree(r).self.gen;
+                  const sel = selRecord && selRecord.id === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      style={{ ...bankTile, ...(sel ? bankTileSel : null) }}
+                      aria-pressed={!!sel}
+                      data-testid="bank-tile"
+                      title={`${r.id} · ${genText(gen)} · ${lookName(r.look)} · ${voiceName(r.voice)}`}
+                      onClick={() => {
+                        setSelectedId(r.id);
+                        setCultivateOpen(false);
+                      }}
+                    >
+                      <span style={genChip}>{gen === null ? '—' : String(gen).padStart(2, '0')}</span>
+                      {r.kept && r.kept.length > 0 && (
+                        <span
+                          style={keptGlyph}
+                          title={`kept ${r.kept.length} warning${r.kept.length === 1 ? '' : 's'}`}
+                        >
+                          ⚠{r.kept.length}
+                        </span>
+                      )}
+                      {bodyA ? (
+                        <svg
+                          viewBox="0 0 100 100"
+                          width="44"
+                          height="44"
+                          style={{ display: 'block', margin: '0 auto' }}
+                          dangerouslySetInnerHTML={{ __html: bodyA.svg }}
+                        />
+                      ) : (
+                        <span style={{ display: 'block', height: 44, lineHeight: '44px', color: 'var(--dim)' }}>—</span>
+                      )}
+                      <span style={bankTileId}>{r.id}</span>
+                    </button>
+                  );
+                })}
+                {rungOnScreen === 'rig' && ( // #2298 — ASSEMBLE A BEAST belongs to the RIG rung
                   <button
-                    key={r.id}
                     type="button"
-                    style={{ ...bankTile, ...(sel ? bankTileSel : null) }}
-                    aria-pressed={!!sel}
-                    data-testid="bank-tile"
-                    title={`${r.id} · ${genText(gen)} · ${lookName(r.look)} · ${voiceName(r.voice)}`}
-                    onClick={() => {
-                      setSelectedId(r.id);
-                      setCultivateOpen(false);
-                    }}
+                    style={{ ...bankTile, borderStyle: 'dashed' }}
+                    data-testid="assemble-beast"
+                    title="Deal the next Strandbeest off the project seed and add its tile to the asset pool"
+                    onClick={() => assembleBeast()}
                   >
-                    <span style={genChip}>{gen === null ? '—' : String(gen).padStart(2, '0')}</span>
-                    {r.kept && r.kept.length > 0 && (
-                      <span style={keptGlyph} title={`kept ${r.kept.length} warning${r.kept.length === 1 ? '' : 's'}`}>
-                        ⚠{r.kept.length}
-                      </span>
-                    )}
-                    {bodyA ? (
-                      <svg
-                        viewBox="0 0 100 100"
-                        width="44"
-                        height="44"
-                        style={{ display: 'block', margin: '0 auto' }}
-                        dangerouslySetInnerHTML={{ __html: bodyA.svg }}
-                      />
-                    ) : (
-                      <span style={{ display: 'block', height: 44, lineHeight: '44px', color: 'var(--dim)' }}>—</span>
-                    )}
-                    <span style={bankTileId}>{r.id}</span>
+                    <span style={{ display: 'block', fontSize: 22, lineHeight: '44px', color: 'var(--ink)' }}>+</span>
+                    <span style={{ ...bankTileId, ...caps }}>beast</span>
                   </button>
-                );
-              })}
-              <button
-                type="button"
-                style={{ ...bankTile, borderStyle: 'dashed' }}
-                data-testid="assemble-beast"
-                title="Deal the next Strandbeest off the project seed and add its tile to the asset pool"
-                onClick={() => assembleBeast()}
-              >
-                <span style={{ display: 'block', fontSize: 22, lineHeight: '44px', color: 'var(--ink)' }}>+</span>
-                <span style={{ ...bankTileId, ...caps }}>beast</span>
-              </button>
+                )}
+              </div>
             </div>
-          </div>
-        </footer>
+          </footer>
+        )}
         {rungOnScreen === 'rig' && <WetLabBeastStrip onKeep={() => keepRung('rig')} />}
       </div>
     </div>
