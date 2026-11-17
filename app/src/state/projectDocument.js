@@ -14,6 +14,7 @@ import { sanitizeAssetTagsDoc } from '../data/assetFacets.js';
 import { sanitizeKitsDoc, sanitizeKitTriad, SEED_KITS } from '../data/kits.js';
 import { sanitizeAssetAttach } from '../engine/assetAttach.js';
 import { sanitizeCreatureRecords } from '../engine/creatureAssembler.js'; // #1849
+import { sanitizeShapeShelf } from '../panels/shapeShelf.mjs'; // #2280
 import { sanitizeConstructRecords } from '../engine/constructAssembler.js'; // #2108
 import { sanitizeCount } from '../curator/spawn.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
@@ -204,6 +205,9 @@ export function serializeProject(state) {
   // #1849 — wet-lab creature records. Written only when there are some: a project with none exports as before.
   const records = sanitizeCreatureRecords(state.creatureRecords);
   if (records.length) doc.creatureRecords = records;
+  // #2280 — the WetLab SHAPE rung's shelf. Written only when there is something on it: a project without one exports as before.
+  const shelf = sanitizeShapeShelf(state.shapeShelf);
+  if (shelf.length) doc.shapeShelf = shelf;
   // #2108 — construct records (the recipes; a tile is never saved, it is drawn from its record). Written only
   // when there are some: a project with none exports as before.
   const constructs = sanitizeConstructRecords(state.constructRecords);
@@ -340,6 +344,7 @@ export function parseProject(raw) {
       assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
       assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
       creatureRecords: sanitizeCreatureRecords(raw.creatureRecords), // #1849
+      shapeShelf: sanitizeShapeShelf(raw.shapeShelf), // #2280
       constructRecords: sanitizeConstructRecords(raw.constructRecords), // #2108
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
       ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
@@ -406,6 +411,7 @@ export function parseProject(raw) {
     assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
     assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
     creatureRecords: sanitizeCreatureRecords(raw.creatureRecords), // #1849
+    shapeShelf: sanitizeShapeShelf(raw.shapeShelf), // #2280
     constructRecords: sanitizeConstructRecords(raw.constructRecords), // #2108
     audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
     ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map

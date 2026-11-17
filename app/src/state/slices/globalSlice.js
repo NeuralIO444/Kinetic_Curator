@@ -64,6 +64,7 @@ import {
 } from '../../engine/creatureAssembler.js'; // #1849 / #1850, cultivation notes #1872
 import { sanitizeConstructRecords, bankConstructRecord } from '../../engine/constructAssembler.js'; // #2108
 import { dealBeastMeasures, beastTile } from '../../engine/beastTile.js'; // #1962
+import { sanitizeShapeShelf, keepShape, dropShape } from '../../panels/shapeShelf.mjs'; // #2280
 import { sourceRecord, breedCreature, handEditRecord, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852, hand edits #1870
 import { autoAttachPoints } from '../../engine/autoAttach.js'; // #1870 — a skeleton replace reads the body shape's points
 import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
@@ -476,6 +477,8 @@ export const createGlobalSlice = (set) => ({
   creatureBirthNote: null, // #2037 — what the last kept-take banking did: { id: null, status: 'banked', count }. Session-only.
   beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.
   creatureDealNote: null, // #2232 — what the last KIN tap did: { id, status: banked | already | full | … }. Session-only.
+  shapeShelf: [], // #2280 — the WetLab SHAPE rung's kept shapes, [{ style, asset }]; saved with the project
+  shapeShelfNote: null, // #2280 — what the last SHAPE keep did: { key, status: kept | already | shelf-full | nobody }. Session-only.
   beastDealNote: null, // #2232 — what the last beast KIN / CUR tap did: { id, status: banked | already | pool-full | nobody }. Session-only.
   creatureAssembleNote: null, // #1849 — what the last ASSEMBLE did: { id, status: banked | already | full }. Session-only.
   creatureGeneNote: null, // #1870 — what the last hand edit did: { id, status: mutated | replaced | refused, why? }. Session-only.
@@ -1169,6 +1172,22 @@ export const createGlobalSlice = (set) => ({
       return { customAssets: [...overlay, tile], beastDealNote: { id: tile.id, status: 'banked' } };
     }),
   /**
+   * #2280 — keep one shape on the WetLab SHAPE rung's shelf (spec §12.6). The same shape twice is 'already'; a full
+   * shelf refuses rather than evicting; anything that is not a shape of a known style is 'nobody'. The shelf only —
+   * keeping never turns the shape on for the stage.
+   */
+  keepDealtShape: (shape) =>
+    set((state) => {
+      const { shelf, note } = keepShape(state.shapeShelf, shape);
+      return shelf === state.shapeShelf ? { shapeShelfNote: note } : { shapeShelf: shelf, shapeShelfNote: note };
+    }),
+  /** #2280 — take one shape off the SHAPE shelf by its key (`shape:<style>:<asset>`). */
+  dropShelfShape: (key) =>
+    set((state) => {
+      const next = dropShape(state.shapeShelf, key);
+      return next === state.shapeShelf ? {} : { shapeShelf: next };
+    }),
+  /**
    * #1962 — ASSEMBLE A BEAST: deal the next Strandbeest off the project seed (inside the S2 gate — never a stillbirth)
    * and bank it as a pool tile carrying its linkage. The nth press on a seed is the nth animal, so it is never banked
    * twice; a full pool refuses rather than evicting. It reaches the stage like every tile: turn it on, place it.
@@ -1595,6 +1614,7 @@ export const createGlobalSlice = (set) => ({
       next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
       next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
       next.creatureRecords = sanitizeCreatureRecords(doc.creatureRecords); // #1849 — a doc without records has none
+      next.shapeShelf = sanitizeShapeShelf(doc.shapeShelf); // #2280 — a doc without a shelf has an empty one
       next.constructRecords = sanitizeConstructRecords(doc.constructRecords); // #2108 — a doc without constructs has none
       next.stageBirths = []; // #2037 — a loaded document starts its own performance: the old one's unbanked children leave with it
       // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
