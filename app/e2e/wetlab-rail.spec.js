@@ -98,7 +98,7 @@ test('an artist with a creature banked starts with every rung open; one strip sh
   await shot(page, 'r3-creature');
 
   await page.getByTestId('rung-construct').click();
-  await expect(page.getByTestId('rung-empty-construct')).toBeVisible();
+  await expect(page.getByTestId('construct-strip')).toBeVisible(); // #2301
   await expect(page.getByTestId('kin-strip')).toHaveCount(0);
   await expect(page.getByTestId('beast-strip')).toHaveCount(0);
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('kc.wetLabLadder.v1')));
