@@ -424,7 +424,6 @@ node src/panels/wetLabLadder.selfcheck.mjs
 node src/panels/shapeDeal.selfcheck.mjs
 node src/panels/constructSettle.selfcheck.mjs
 node src/panels/ladderPools.selfcheck.mjs
-node src/panels/constructSettle.selfcheck.mjs
 node src/panels/constructDeal.selfcheck.mjs
 node src/engine/creatureKin.selfcheck.mjs
 node src/engine/creatureMoods.selfcheck.mjs
