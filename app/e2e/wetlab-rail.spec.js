@@ -98,7 +98,7 @@ test('an artist with a creature banked starts with every rung open; one strip sh
   await shot(page, 'r3-creature');
 
   await page.getByTestId('rung-construct').click();
-  await expect(page.getByTestId('rung-empty-construct')).toBeVisible();
+  await expect(page.getByTestId('construct-strip')).toBeVisible(); // #2301
   await expect(page.getByTestId('kin-strip')).toHaveCount(0);
   await expect(page.getByTestId('beast-strip')).toHaveCount(0);
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('kc.wetLabLadder.v1')));
@@ -162,5 +162,27 @@ test('keeps fill the pips: three creatures the artist taps open RIG; the lead a 
   expect(stored.kept.creature).toBe(3);
   expect(stored.open.rig).toBe(true);
   await shot(page, 'r5-keeps-open-rig');
+  expect(errors).toEqual([]);
+});
+
+test('#2298: the bank rail shows under CREATURE and RIG only; ASSEMBLE A BEAST only under RIG', async ({ page }) => {
+  const errors = await boot(page, { width: 1280, height: 900 });
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'kc.wetLabLadder.v1',
+      JSON.stringify({ v: 1, kept: {}, open: { shape: true, construct: true, creature: true, rig: true } }),
+    ),
+  );
+  await openEmptyLab(page);
+  for (const [rung, rail, beast] of [
+    ['shape', 0, 0],
+    ['construct', 0, 0],
+    ['creature', 1, 0],
+    ['rig', 1, 1],
+  ]) {
+    await page.getByTestId(`rung-${rung}`).click();
+    await expect(page.getByTestId('bank-rail')).toHaveCount(rail);
+    await expect(page.getByTestId('assemble-beast')).toHaveCount(beast);
+  }
   expect(errors).toEqual([]);
 });

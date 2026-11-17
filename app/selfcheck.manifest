@@ -416,12 +416,15 @@ node src/deal/dealEngines.selfcheck.mjs
 node src/deal/creatureAdapter.selfcheck.mjs
 node src/deal/beastAdapter.selfcheck.mjs
 node src/deal/shapeAdapter.selfcheck.mjs
+node src/deal/constructAdapter.selfcheck.mjs
 node src/panels/shapeShelf.selfcheck.mjs
 node src/panels/wetLabDeal.selfcheck.mjs
 node src/panels/wetLabBeast.selfcheck.mjs
 node src/panels/wetLabLadder.selfcheck.mjs
 node src/panels/shapeDeal.selfcheck.mjs
 node src/panels/ladderPools.selfcheck.mjs
+node src/panels/constructSettle.selfcheck.mjs
+node src/panels/constructDeal.selfcheck.mjs
 node src/engine/creatureKin.selfcheck.mjs
 node src/engine/creatureMoods.selfcheck.mjs
 node src/engine/beast.selfcheck.mjs
