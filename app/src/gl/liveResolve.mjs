@@ -41,7 +41,7 @@ import { packContactBodies } from './dishContactsGpu.mjs'; // K3 contacts produc
 import { createGpuSwarmHost, gpuSwarmWanted } from './gpuSwarmHost.mjs'; // K3 wiring: the GPU swarm in SHADOW (JS stays authoritative); OFF unless asked for
 import { isLiveSwarmMode, isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
-import { getQualityCaps } from '../data/quality.js';
+import { getQualityCaps, particleCapsFor } from '../data/quality.js';
 import { shapeMixWeights, liveShapeLevels } from '../data/voices.js';
 import { getAssetCost } from '../assets/cost.js';
 import { isFxLayer } from '../fx/fxFilters.js';
@@ -812,24 +812,30 @@ export function createLiveResolver() {
       ) {
         try {
           if (!swarmShadow) swarmShadow = createGpuSwarmHost(liveSwarmGl());
-          shadowTok = swarmShadow.pre(layerId, st.system, updLp, {
-            attractor: ctx.attractor,
-            canvasW: W,
-            canvasH: H,
-            loopTimeMs: ctx.loopTimeMs,
-            seedOffsets: ctx.seedOffsets,
-            slowRender: ctx.slowRender,
-            noiseSeed: worldNoise ? worldNoiseSeed || 444 : null,
-            dtSec: ctx.dtSec,
-          });
+          shadowTok = swarmShadow.pre(
+            layerId,
+            st.system,
+            updLp,
+            {
+              attractor: ctx.attractor,
+              canvasW: W,
+              canvasH: H,
+              loopTimeMs: ctx.loopTimeMs,
+              seedOffsets: ctx.seedOffsets,
+              slowRender: ctx.slowRender,
+              noiseSeed: worldNoise ? worldNoiseSeed || 444 : null,
+              dtSec: ctx.dtSec,
+            },
+            { force: !!ctx.swarmGpu },
+          );
         } catch (e) {
           swarmShadowDead = true; // fail soft: the JS swarm is the reference and never waits on the shadow
           console.warn('[gpuSwarm] shadow disabled for this session:', e && e.message ? e.message : e);
         }
       }
       // K3 takeover: the loop's `swarmGpu` input marker is the switch (recorded, so the take's header says the GPU ran). The kernel's
-      // velocities replace the JS force loop for an eligible layer; anything else (or a blocker this frame) runs the JS step as always.
-      const gpuStep = ctx.swarmGpu && shadowTok ? swarmShadow.velocities(shadowTok, st.system) : null;
+      // steering accelerations replace the JS force loop for an eligible layer; anything else runs the JS step as always.
+      const gpuStep = ctx.swarmGpu && shadowTok ? swarmShadow.forces(shadowTok) : null;
       st.system.update(
         gpuStep ? { ...updLp, gpuStep } : updLp,
         ctx.activeAssets,
@@ -1289,7 +1295,9 @@ export function createLiveResolver() {
         activeAssets = activeAssets.filter((a) => !dropped.has(a.id));
       }
       const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
-      const safeParticles = Math.min(Math.max(0, layoutParams.particleCount || 150), caps.maxParticles);
+      // K3 cap ladder: a cloud swarm whose forces the GPU carries (the recorded swarmGpu marker) runs under the tier's GPU cap.
+      const pCaps = particleCapsFor(caps, !!input.swarmGpu && !isOrganismMode(layoutParams.mode));
+      const safeParticles = Math.min(Math.max(0, layoutParams.particleCount || 150), pCaps.maxParticles);
       const seed = (src.seed ?? 0) >>> 0;
       const seedOffsets = src.seedOffsets ?? input.seedOffsets ?? null;
 
@@ -1303,7 +1311,7 @@ export function createLiveResolver() {
           seed,
           seedOffsets,
           layoutParams,
-          caps,
+          caps: pCaps,
           scaleMul: input.scaleMul ?? 1,
           alphaBoost: input.alphaBoost ?? 0,
           slowRender: !!input.slowRender,
