@@ -8,7 +8,7 @@
 //
 // Slice 1b adds the cloud swarm's POINT wind; slice 1c the CURL wind (organisms) and the windMul; slice 1d chemotaxis (reads an uploaded scent grid); slice 1e Levy flights (the kernel's own integer hash in-shader); slice 1f Lorenz (per-agent xyz state, a second colour attachment); slice 1g drives + leak (energy/drive and pigment state on two more) (the noise3D -> angle/shape pair, via the field twin's GLSL + the exact perm bytes).
 // What is NOT here yet (later K3 slices): the curl wind (organisms), chemotaxis, Lévy, Lorenz, cling, drives, leak, breeding,
-// contacts, the heading and spine integrators. A caller that wants parity with the JS swarm runs it with wind 0 (see the
+// contacts, the spine integrator (slice 1h adds the HEADING: p.heading { mode 1 cloud snap | 2 organism damped turn, turn, maxTurn }, the facing in degrees riding o_drv.z). A caller that wants parity with the JS swarm runs it with wind 0 (see the
 // selfcheck, which drives the real ParticleSystem and this kernel from the same state).
 //
 // K0 tier: the kernel is judged against the JS swarm, not bitwise — float32 vs float64 differ at noise and a swarm is chaotic;
@@ -71,8 +71,9 @@ uniform vec4 u_drv;          // metabolism (0 = drives off), sim step, unused, u
 uniform float u_leakK;       // leak * 0.004 * dtFrames (0 = leak off)
 uniform float u_windMul;     // cloud swarm: 1 (the wind knob is ignored); organism: wind * profile.wind
 uniform int u_bounce;        // 0 = wrap (cloud), 1 = bounce (organism)
+uniform vec4 u_head;         // heading: mode (0 off, 1 cloud snap, 2 organism turn), turn fraction per step (1 = no smoothing), max turn degrees per step, unused
 layout(location = 0) out vec4 o_state;
-layout(location = 2) out vec4 o_drv;      // (energy, drive, 0, 0) per agent
+layout(location = 2) out vec4 o_drv;      // (energy, drive, heading degrees, 0) per agent
 layout(location = 3) out vec4 o_leak;     // pigment working copy (r, g, b, 0) per agent
 layout(location = 1) out vec4 o_lorenz;   // per-agent Lorenz phase state (x, y, z, 0), ping-ponged beside o_state
 
@@ -231,7 +232,7 @@ void main() {
     e = clamp(e, 0.0, 1.0);
     float h = hashU01(uint(u_drv.y) * 131071u + 104729u + uint(i));
     float dd = clamp(dr.y + (h - 0.5) * 0.06 * meta * u_dt, 0.0, 1.0);
-    o_drv = vec4(e, dd, 0.0, 0.0);
+    o_drv = vec4(e, dd, dr.z, dr.w);
     if (dd > 0.001) {
       float wob = kcNoise3D(p.x * u_wind.x + 500.0, p.y * u_wind.x + 500.0, u_wind.w + mt.g * 0.0001 + 7.3);
       float wa = wob * 6.283185307179586;
@@ -243,6 +244,18 @@ void main() {
   v = (v + f * u_dt) * pow(u_damp, u_dt);
   float speed = length(v);
   if (speed > u_maxSpeed) v = v / speed * u_maxSpeed;
+  if (u_head.x > 0.5 && speed > 0.04) {
+    // particles.js heading: the facing follows the (clamped) velocity. Cloud: snap. Organism: the shortest turn, damped, then capped per step.
+    float next = atan(v.y, v.x) * 57.29577951308232;
+    if (u_head.x < 1.5) {
+      o_drv.z = next;
+    } else {
+      float dlt = next - dr.z;
+      if (abs(dlt) > 180.0) dlt -= 360.0 * sign(dlt) * ceil((abs(dlt) - 180.0) / 360.0);
+      float stp = clamp(dlt * u_head.y, -u_head.z, u_head.z);
+      o_drv.z = dr.z + stp;
+    }
+  }
   p += v * u_dt;
   if (u_bounce == 1) {
     if (p.x < 8.0) { p.x = 8.0; v.x = abs(v.x) * 0.62; }
@@ -268,6 +281,7 @@ export function swarmTextureLayout(n, width = 128) {
  *   seed({ x, y, vx, vy, mass, seedOffset })   upload n particles (Float32Array / number arrays)
  *   step(params)                   one substep; params: { dtFrames, sepR, aliR, cohR, sepW, aliW, cohW, damping, maxSpeed,
  *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt, curl?, mul?} | null, chemotaxis (gain; needs setScent), levy: {gain, alpha, step, base: hashBase(seed, CH.dyn)}, lorenz: {rho, gain} (seed({lorenz:{x,y,z}}); readLorenz()), drives: {meta, step, base: hashBase(seed, CH.dyn)} (needs wind.freq/nt/seed for the detour; seed({energy,drive})), leak (0..1; seed({leakRgb}); readDrives()), bounds: 'wrap'|'bounce', canvasW, canvasH }
+ *                                  heading: { mode: 1 (cloud: snap to the velocity) | 2 (organism: shortest turn x turn, capped at maxTurn deg), turn: 1 - exp(-lambda*dtSec) or 1, maxTurn: 600*dtSec } (seed({rotation}) degrees; readDrives().rotation)
  *   read()                         { x, y, vx, vy } as Float32Arrays (synchronous: tests / measurement)
  */
 export function createGpuSwarm(gl, n) {
@@ -340,7 +354,7 @@ export function createGpuSwarm(gl, n) {
   };
   return {
     n: count,
-    seed({ x, y, vx, vy, mass, seedOffset, lorenz, energy, drive, leakRgb }) {
+    seed({ x, y, vx, vy, mass, seedOffset, lorenz, energy, drive, leakRgb, rotation }) {
       const st = new Float32Array(w * h * 4);
       const ms = new Float32Array(w * h * 4).fill(1);
       for (let i = 0; i < count; i++) {
@@ -365,6 +379,7 @@ export function createGpuSwarm(gl, n) {
       for (let i = 0; i < count; i++) {
         dv[i * 4] = energy ? energy[i] : 1;
         dv[i * 4 + 1] = drive ? drive[i] : 0;
+        dv[i * 4 + 2] = rotation ? rotation[i] : 0;
         if (leakRgb) {
           lk[i * 4] = leakRgb[i * 3];
           lk[i * 4 + 1] = leakRgb[i * 3 + 1];
@@ -413,6 +428,14 @@ export function createGpuSwarm(gl, n) {
       );
       gl.uniform2f(U('u_canvas'), p.canvasW, p.canvasH);
       gl.uniform1i(U('u_bounce'), p.bounds === 'bounce' ? 1 : 0);
+      const hd = p.heading && p.heading.mode ? p.heading : null;
+      gl.uniform4f(
+        U('u_head'),
+        hd ? hd.mode : 0,
+        hd && Number.isFinite(hd.turn) ? hd.turn : 1,
+        hd && Number.isFinite(hd.maxTurn) ? hd.maxTurn : 1e9,
+        0,
+      );
       const wd = p.wind && Number.isFinite(p.wind.nt) ? p.wind : null;
       gl.uniform4f(U('u_wind'), wd ? wd.freq : 0, wd ? wd.offX || 0 : 0, wd ? wd.offY || 0 : 0, wd ? wd.nt : 0);
       gl.uniform1f(U('u_windOn'), wd ? (wd.curl ? 2 : 1) : 0);
@@ -471,7 +494,7 @@ export function createGpuSwarm(gl, n) {
       }
       return out;
     },
-    /** Drive and pigment state after the last step: { energy, drive, leakRgb (3 per agent) }. */
+    /** Drive, heading and pigment state after the last step: { energy, drive, rotation (degrees), leakRgb (3 per agent) }. */
     readDrives() {
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]);
       const grab = (att) => {
@@ -487,11 +510,13 @@ export function createGpuSwarm(gl, n) {
       const out = {
         energy: new Float32Array(count),
         drive: new Float32Array(count),
+        rotation: new Float32Array(count),
         leakRgb: new Float32Array(count * 3),
       };
       for (let i = 0; i < count; i++) {
         out.energy[i] = dv[i * 4];
         out.drive[i] = dv[i * 4 + 1];
+        out.rotation[i] = dv[i * 4 + 2];
         out.leakRgb[i * 3] = lk[i * 4];
         out.leakRgb[i * 3 + 1] = lk[i * 4 + 1];
         out.leakRgb[i * 3 + 2] = lk[i * 4 + 2];
