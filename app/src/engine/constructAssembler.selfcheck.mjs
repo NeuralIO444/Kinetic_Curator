@@ -252,6 +252,7 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
     'deal/constructAdapter.mjs', // the WetLab CONSTRUCT rung's deal adapter (#2299)
     'panels/constructSettle.mjs', // the WetLab construct tile's settle drawing (#2300)
     'panels/ladderPools.mjs', // the WetLab CREATURE rung's body pool and parts pile (#2303)
+    'panels/ladderPools.selfcheck.mjs', // its suite builds real constructs to test against
   ]);
   const importers = [];
   const walk = (dir) => {
