@@ -42,6 +42,7 @@ import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature 
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
 import { WetLabDealStrip } from './WetLabDealStrip.jsx'; // #2232 — KIN: the auto-generate strip
 import { WetLabBeastStrip } from './WetLabBeastStrip.jsx'; // #2232 — KIN / CUR for beasts, under the bank rail
+import { WetLabShapeStrip } from './WetLabShapeStrip.jsx'; // #2282 — the SHAPE rung: KIN / CUR over style primitives
 import { WetLabRungRail } from './WetLabRungRail.jsx'; // #2281 — the ladder's rung rail
 import { useWetLabLadder } from './useWetLabLadder.js'; // #2281
 import { topOpenRung, isOpen } from './wetLabLadder.mjs'; // #2281
@@ -176,6 +177,12 @@ export function WetLab({ assetId, onClose }) {
   });
   const [rungPick, setRungPick] = useState(null);
   const rungOnScreen = rungPick && isOpen(ladder, rungPick) ? rungPick : topOpenRung(ladder);
+  // a keep pins the rung it was made on: the third keep opens the next rung on the rail, but the screen stays where the
+  // artist is working (spec §4: the rail lights the new rung, and nothing else happens)
+  const keepRung = (rung) => {
+    setRungPick(rung);
+    keepOn(rung);
+  };
   const descById = useMemo(() => new Map(descs.map((r) => [r.id, r])), [descs]);
   const allKits = [...SEED_KITS, ...(kits || [])];
 
@@ -1157,7 +1164,8 @@ export function WetLab({ assetId, onClose }) {
           </aside>
         </div>
         <WetLabRungRail ladder={ladder} selected={rungOnScreen} onSelect={setRungPick} />
-        {(rungOnScreen === 'shape' || rungOnScreen === 'construct') && (
+        {rungOnScreen === 'shape' && <WetLabShapeStrip onKeep={() => keepRung('shape')} />}
+        {rungOnScreen === 'construct' && (
           <div style={rungEmpty} data-testid={`rung-empty-${rungOnScreen}`}>
             nothing here yet
           </div>
@@ -1165,7 +1173,7 @@ export function WetLab({ assetId, onClose }) {
         {rungOnScreen === 'creature' && (
           <WetLabDealStrip
             subject={selRecord}
-            onKeep={() => keepOn('creature')} // #2283 — a creature the artist kept fills CREATURE's pips
+            onKeep={() => keepRung('creature')} // #2283 — a creature the artist kept fills CREATURE's pips
             onTap={(id) => {
               setSelectedId(id);
               setCultivateOpen(false);
@@ -1234,7 +1242,7 @@ export function WetLab({ assetId, onClose }) {
             </div>
           </div>
         </footer>
-        {rungOnScreen === 'rig' && <WetLabBeastStrip onKeep={() => keepOn('rig')} />}
+        {rungOnScreen === 'rig' && <WetLabBeastStrip onKeep={() => keepRung('rig')} />}
       </div>
     </div>
   );

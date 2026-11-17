@@ -59,8 +59,8 @@ test('a brand-new artist: only SHAPE is open, the rest are locked and say what o
     await expect(page.getByTestId(`rung-${id}`)).toBeDisabled();
     await expect(page.getByTestId(`rung-lock-${id}`)).toHaveText(line);
   }
-  // SHAPE has no strip yet: an honest empty state, and neither old strip on screen
-  await expect(page.getByTestId('rung-empty-shape')).toBeVisible();
+  // SHAPE shows its own strip (#2282), and neither old strip is on screen
+  await expect(page.getByTestId('shape-strip')).toBeVisible();
   await expect(page.getByTestId('kin-strip')).toHaveCount(0);
   await expect(page.getByTestId('beast-strip')).toHaveCount(0);
   await shot(page, 'r1-new-artist');
