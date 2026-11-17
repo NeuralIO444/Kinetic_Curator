@@ -13,6 +13,7 @@ import {
   assetRecords,
   assetRecord,
   assetsWhere,
+  CATALOGUE_ONLY_FAMILIES,
   countBy,
 } from './assetStyle.js';
 
@@ -23,7 +24,10 @@ assert.equal(records.length, ASSETS.length);
 const catIds = new Set(ALL_CATEGORIES);
 for (const r of records) {
   assert.ok(catIds.has(r.category), `${r.id}: category ${r.category} is in data/categories.js`);
-  assert.ok(FAMILIES.includes(r.family) && r.family !== 'imported', `${r.id}: a library family (${r.family})`);
+  assert.ok(
+    (FAMILIES.includes(r.family) || CATALOGUE_ONLY_FAMILIES.includes(r.family)) && r.family !== 'imported',
+    `${r.id}: a library family (${r.family})`,
+  );
   assert.ok(STYLES.includes(r.style), `${r.id}: style ${r.style} is in the controlled list`);
   assert.ok(r.tags.length > 0, `${r.id}: at least one canonical tag`);
   for (const t of r.tags) assert.ok(TAG_VOCAB.includes(t), `${r.id}: tag ${t} is in the vocabulary`);

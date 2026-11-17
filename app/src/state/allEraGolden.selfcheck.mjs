@@ -12,7 +12,7 @@ import { renderSvg } from '../../../studio/render.mjs';
 import { ASSETS } from '../data/assets/index.js';
 
 /** First-render SVG SHA-256 of the all-era fixture — bump only on intentional render changes. */
-export const EXPECTED_ALL_ERA_FIRST_RENDER_HASH = '60466dade95df7cbb7156f7c802b4348d224cce720fb5a8edc9b6e883fd63bbd'; // re-pinned: #2008 added the composed riso icon set (24 records) to the catalog —
+export const EXPECTED_ALL_ERA_FIRST_RENDER_HASH = 'b44e2c35983637e44fa679d3cb26b74831ff2ba9c8f0e235a60dc994d0719851'; // re-pinned: #2108 added the 66 house constructs to the catalog (the 'all' pool is the full catalog, so its first render gains them); proven on the #2008 pattern — with the construct spread removed, this suite reproduces 60466dad… exactly (985 assets, 24296 svg bytes). Earlier: #2008 added the composed riso icon set (24 records) to the catalog —
 // the 'all' pool is the full catalog, so its first render gains the new icons. Proven before re-pinning,
 // on the #1854 pattern: with only the ASSETS_RISO spread removed from the assets index (scratch tree),
 // this suite reproduces 48f77588… exactly (753 assets, 25619 svg bytes) — the delta is the catalog

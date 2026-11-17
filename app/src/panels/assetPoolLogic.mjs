@@ -11,6 +11,7 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
+import { ASSETS_CONSTRUCTS } from '../data/assets/index.js';
 import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
 import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
 import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
@@ -38,6 +39,7 @@ const POEM_ONLY_IDS = new Set([
     ...ASSETS_PLATE,
     ...ASSETS_WEAR,
     ...ASSETS_RISO,
+    ...ASSETS_CONSTRUCTS, // #2108
     ...ASSETS_LETTERS,
   ].map((a) => a.id),
   ...SOLO_TEXT_STAMP_IDS,

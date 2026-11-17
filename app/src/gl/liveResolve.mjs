@@ -99,6 +99,7 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js'; // #2002:
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js'; // #2005: the poem-only plate stamps
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js'; // #2008: the grammar-composed riso icons
+import { ASSETS_CONSTRUCTS } from '../data/assets/index.js'; // #2108: the house constructs (catalogue-only until the gate)
 
 // #1982 — the kana stamps are catalogue members for the census and the stage
 // atlas, but they are dealt by the FIELD director alone (Teijo's native
@@ -118,6 +119,7 @@ const POEM_ONLY_IDS = new Set(
     ...ASSETS_PLATE,
     ...ASSETS_WEAR,
     ...ASSETS_RISO,
+    ...ASSETS_CONSTRUCTS, // #2108
   ].map((a) => a.id),
 );
 import { isCultureCells, unpackCultureCells } from '../engine/dishCultureCells.mjs';

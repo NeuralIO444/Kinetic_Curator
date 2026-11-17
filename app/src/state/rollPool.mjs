@@ -19,6 +19,7 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
+import { ASSETS_CONSTRUCTS } from '../data/assets/index.js';
 import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
 import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
 import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
@@ -53,6 +54,8 @@ export const NEVER_DEALT = Object.freeze([
   ...ASSETS_WEAR.map((a) => a.id),
   // #2008: the riso icons ride too — dealt only by the riso field dealer.
   ...ASSETS_RISO.map((a) => a.id),
+  // #2108: the house constructs ride too — dealt by no one until the gate (next slice).
+  ...ASSETS_CONSTRUCTS.map((a) => a.id),
   // #2150: the glyphs — never dealt as solo assets.
   ...ASSETS_LETTERS.map((a) => a.id),
   ...SOLO_TEXT_STAMP_IDS,

@@ -309,7 +309,8 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
   const tile = constructTile(rec, svgOf);
   assert.ok(tile);
   assert.ok(isConstructTileId(tile.id) && isConstructTile(tile) && !isCreatureTile(tile));
-  assert.deepEqual(tile.tags, ['construct', 'bauhaus']);
+  assert.deepEqual(tile.tags, ['construct']);
+  assert.equal(tile.style, 'bauhaus');
   assert.deepEqual(tile.points, rec.points);
   // The pool's own trust boundary keeps the tile's drawing byte for byte (nothing hostile, no disallowed tag).
   const [kept] = sanitizeOverlay([tile]);
