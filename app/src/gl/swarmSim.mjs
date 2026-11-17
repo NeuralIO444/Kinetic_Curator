@@ -71,6 +71,7 @@ uniform vec4 u_drv;          // metabolism (0 = drives off), sim step, unused, u
 uniform float u_leakK;       // leak * 0.004 * dtFrames (0 = leak off)
 uniform float u_windMul;     // cloud swarm: 1 (the wind knob is ignored); organism: wind * profile.wind
 uniform int u_bounce;        // 0 = wrap (cloud), 1 = bounce (organism)
+uniform vec4 u_cur;          // dish currents + emit: wind coupling (0 = legacy wind force), attractor coupling (0 = legacy), signed drift speed, emit force (1 = o_state.zw carries the steering acceleration instead of the velocity)
 uniform vec4 u_head;         // heading: mode (0 off, 1 cloud snap, 2 organism turn), turn fraction per step (1 = no smoothing), max turn degrees per step, unused
 layout(location = 0) out vec4 o_state;
 layout(location = 2) out vec4 o_drv;      // (energy, drive, heading degrees, 0) per agent
@@ -135,12 +136,16 @@ void main() {
       float n2 = kcFbm3D(fx, fy - 0.5, tz, 3, 2.0, 0.5);
       float n3 = kcFbm3D(fx + 0.5, fy, tz, 3, 2.0, 0.5);
       float n4 = kcFbm3D(fx - 0.5, fy, tz, 3, 2.0, 0.5);
-      f += vec2(n1 - n2, n4 - n3) * (0.8 * u_windMul) / m;
+      vec2 cw = vec2(n1 - n2, n4 - n3);
+      // #1414 dish currents: the body relaxes toward the field's velocity (CURRENT_SPEED 1.2), coupled by inverse mass
+      if (u_cur.x > 0.0) f += (cw * 1.2 - v) * u_cur.x / m;
+      else f += cw * (0.8 * u_windMul) / m;
     } else {
       // noise3D -> angle, a second sample (+200) -> shape
       float ang = kcNoise3D(fx, fy, tz) * 6.283185307179586;
       float shape = (kcNoise3D(fx + 200.0, fy + 200.0, u_wind.w) + 1.0) * 0.4;
-      f += vec2(cos(ang), sin(ang)) * shape * u_windMul / m;
+      if (u_cur.x > 0.0) f += (vec2(cos(ang), sin(ang)) * shape * 1.2 - v) * u_cur.x / m;
+      else f += vec2(cos(ang), sin(ang)) * shape * u_windMul / m;
     }
   }
 
@@ -183,8 +188,13 @@ void main() {
     vec2 d2v = u_attract.xy - p;
     float d = length(d2v);
     if (d > 5.0) {
-      float mag = u_attract.z / max(20.0, d * 0.05);
-      f += (d2v / d) * mag / m;
+      if (u_cur.y > 0.0) {
+        // #1414: the well as a drift the body relaxes toward (toward it for seekers, away for fleers: the sign rides u_cur.z)
+        f += ((d2v / d) * u_cur.z - v) * u_cur.y / m;
+      } else {
+        float mag = u_attract.z / max(20.0, d * 0.05);
+        f += (d2v / d) * mag / m;
+      }
     }
   }
 
@@ -266,7 +276,7 @@ void main() {
     if (p.x < -120.0) p.x = u_canvas.x + 120.0; else if (p.x > u_canvas.x + 120.0) p.x = -120.0;
     if (p.y < -120.0) p.y = u_canvas.y + 120.0; else if (p.y > u_canvas.y + 120.0) p.y = -120.0;
   }
-  o_state = vec4(p, v);
+  o_state = u_cur.w > 0.5 ? vec4(p, f) : vec4(p, v);
 }`;
 
 export const SPINE_MAX = 7; // particles.js caps an organism's body at 7 segments (bodyLen = clamp(round(body), 1, 7))
@@ -323,6 +333,7 @@ export function swarmTextureLayout(n, width = 128) {
  *                                  attractor: {x, y} | null, attractStrength, wind: {seed, freq, offX, offY, nt, curl?, mul?} | null, chemotaxis (gain; needs setScent), levy: {gain, alpha, step, base: hashBase(seed, CH.dyn)}, lorenz: {rho, gain} (seed({lorenz:{x,y,z}}); readLorenz()), drives: {meta, step, base: hashBase(seed, CH.dyn)} (needs wind.freq/nt/seed for the detour; seed({energy,drive})), leak (0..1; seed({leakRgb}); readDrives()), bounds: 'wrap'|'bounce', canvasW, canvasH }
  *                                  heading: { mode: 1 (cloud: snap to the velocity) | 2 (organism: shortest turn x turn, capped at maxTurn deg), turn: 1 - exp(-lambda*dtSec) or 1, maxTurn: 600*dtSec } (seed({rotation}) degrees; readDrives().rotation)
  *                                  spine: { len (body segments, 1..7), follow (0.05..0.95, particles.js `tight`) } runs the spine pass after the step: readSpine(len) -> { x, y } indexed i*len+s
+ *                                  currents: { wind (coupling; 0 = legacy wind force), attract (coupling), drift (signed px/step) } = dishCurrents.mjs #1414; emit: 'force' makes read().vx/vy the steering ACCELERATION (the state is then not steppable further: reseed)
  *   read()                         { x, y, vx, vy } as Float32Arrays (synchronous: tests / measurement)
  */
 export function createGpuSwarm(gl, n) {
@@ -534,6 +545,14 @@ export function createGpuSwarm(gl, n) {
       );
       gl.uniform2f(U('u_canvas'), p.canvasW, p.canvasH);
       gl.uniform1i(U('u_bounce'), p.bounds === 'bounce' ? 1 : 0);
+      const cu = p.currents || null;
+      gl.uniform4f(
+        U('u_cur'),
+        cu && cu.wind > 0 ? cu.wind : 0,
+        cu && cu.attract > 0 ? cu.attract : 0,
+        cu && Number.isFinite(cu.drift) ? cu.drift : 0,
+        p.emit === 'force' ? 1 : 0,
+      );
       const hd = p.heading && p.heading.mode ? p.heading : null;
       gl.uniform4f(
         U('u_head'),
