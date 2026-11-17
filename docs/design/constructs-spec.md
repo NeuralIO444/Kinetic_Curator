@@ -246,8 +246,9 @@ Asked after seeing the ferrofluid on stage (build bef708a). Matt: "I wanted to h
 3. The library cut: the deal draws primitives + constructs; the complex assets become reference-only.
 4. The field break-up and reassembly (one-force-seam order step 2), on constructs.
 
-### Open (to ask Matt one at a time at build time, not decided here)
+### Rulings on the open questions — Matt, 2026-11-16
 
-- A construct has 2–4 primitives, so it breaks into 2–4 pieces; Matt asked for 12–16 pieces per asset. Do primitives also break further (by outline), or does a construct grow to more primitives, or is 2–4 right once everything is a construct?
-- What the cut does to systems that deal from the full library today: KINETIC's full-library pools (#1778), Loot pools, kits (#1955), creature parts dealt from the stage (#1937), the poem's stamps (not pool assets; unaffected).
-- Which styles' vocabularies need new primitives drawn, versus picked from existing simple assets.
+- **Pieces: 12–16 primitives per construct.** This replaces §1's "2–4 primitives". A construct is many small pieces, so the break-up has plenty to flow with the ferrofluid. §§1–6 are read with this number wherever they say 2–4.
+- **Budget: a small primitive set, heavily reused.** About 20–30 simple primitives (bars, arcs, dots, wedges, rings) per the styles' vocabularies. Constructs reuse them with scale and rotation, so the atlas and the cap of 64 stay small.
+- **The cut re-points every pool.** KINETIC's full-library pools (#1778), Loot pools, kits (#1955) and creature parts dealt from the stage (#1937) draw from primitives and constructs. The ~985 assets stay as read-only references and are never dealt. The poem's stamps are unaffected.
+- **Primitives: extract first, draw the gaps.** Pull the simplest shapes from the baked region data (`BAKED_REGIONS`), list which styles are still missing a vocabulary entry, and draw only those.
