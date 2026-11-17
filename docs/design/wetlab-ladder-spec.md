@@ -206,3 +206,24 @@ ATTACH point. The rulings below read with that in mind.
 6. **SHAPE shelf tiles grow to 44 px** (the touch target).
 7. **The "BANK · + BEAST" footer shows only under RIG**, with the beast strip.
 
+## 14. Phase 4 rulings: creatures built from constructs (Matt, 2026-11-17 — all taken as recommended)
+
+Phase 3 (the CONSTRUCT rung, issues #2297–#2301) is built by smaller models and reviewed. Phase 4 joins the ladder end to
+end: the CREATURE rung builds from what the artist kept below it.
+
+1. **A construct can be a body or a part.** Bodies come from the creature adapter's pool (`ctx.library` in
+   `deal/creatureAdapter.mjs`); parts are dealt by Davis onto the bones from the parts pile (`expandCreatureInstances`,
+   `engine/creatureRig.js`).
+2. **Bodies: the ladder once it holds 3.** With 3 or more banked constructs, KIN's bodies come only from them. With
+   fewer, the library fills in as today. (`LADDER_BODY_FLOOR = 3`.)
+3. **Parts: kept constructs and kept shapes join the pile automatically,** in the WetLab, whether or not they are on
+   the stage. The stage's own pile is unchanged.
+4. **Kept shapes are parts, never bodies.**
+
+**Not checked** (each issue checks first, and stops with a comment if it fails):
+- Whether a construct tile (`constructTile` in `engine/constructAssembler.js`) reads as a body: `attachPointsFor` must
+  find head and limb points on its svg, and the cultivate gate must pass it.
+- Whether a creature with a construct body or construct parts draws the same on the stage as in the WetLab. The stage
+  deals parts from what is on the stage; a construct that is not on the stage cannot ride there. This phase is the
+  WetLab only; stage parity is a ruling for later.
+
