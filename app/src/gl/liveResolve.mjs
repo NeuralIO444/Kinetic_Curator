@@ -41,7 +41,7 @@ import { packContactBodies } from './dishContactsGpu.mjs'; // K3 contacts produc
 import { createGpuSwarmHost, gpuSwarmWanted } from './gpuSwarmHost.mjs'; // K3 wiring: the GPU swarm in SHADOW (JS stays authoritative); OFF unless asked for
 import { isLiveSwarmMode, isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
-import { getQualityCaps } from '../data/quality.js';
+import { getQualityCaps, particleCapsFor } from '../data/quality.js';
 import { shapeMixWeights, liveShapeLevels } from '../data/voices.js';
 import { getAssetCost } from '../assets/cost.js';
 import { isFxLayer } from '../fx/fxFilters.js';
@@ -1295,7 +1295,9 @@ export function createLiveResolver() {
         activeAssets = activeAssets.filter((a) => !dropped.has(a.id));
       }
       const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
-      const safeParticles = Math.min(Math.max(0, layoutParams.particleCount || 150), caps.maxParticles);
+      // K3 cap ladder: a cloud swarm whose forces the GPU carries (the recorded swarmGpu marker) runs under the tier's GPU cap.
+      const pCaps = particleCapsFor(caps, !!input.swarmGpu && !isOrganismMode(layoutParams.mode));
+      const safeParticles = Math.min(Math.max(0, layoutParams.particleCount || 150), pCaps.maxParticles);
       const seed = (src.seed ?? 0) >>> 0;
       const seedOffsets = src.seedOffsets ?? input.seedOffsets ?? null;
 
@@ -1309,7 +1311,7 @@ export function createLiveResolver() {
           seed,
           seedOffsets,
           layoutParams,
-          caps,
+          caps: pCaps,
           scaleMul: input.scaleMul ?? 1,
           alphaBoost: input.alphaBoost ?? 0,
           slowRender: !!input.slowRender,
