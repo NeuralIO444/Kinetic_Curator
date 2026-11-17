@@ -474,6 +474,7 @@ export const createGlobalSlice = (set) => ({
   creatureBirthNote: null, // #2037 — what the last kept-take banking did: { id: null, status: 'banked', count }. Session-only.
   beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.
   creatureDealNote: null, // #2232 — what the last KIN tap did: { id, status: banked | already | full | … }. Session-only.
+  beastDealNote: null, // #2232 — what the last beast KIN / CUR tap did: { id, status: banked | already | pool-full | nobody }. Session-only.
   creatureAssembleNote: null, // #1849 — what the last ASSEMBLE did: { id, status: banked | already | full }. Session-only.
   creatureGeneNote: null, // #1870 — what the last hand edit did: { id, status: mutated | replaced | refused, why? }. Session-only.
   creatureCultivateNote: null, // #1872 — what the last CULTIVATE did: { id, status: viable | stillborn | refused | no-record }. Session-only.
@@ -1141,6 +1142,20 @@ export const createGlobalSlice = (set) => ({
       if (!rec || !rec.cultivated || rec.cultivated.outcome !== 'viable')
         return { creatureDealNote: { id: null, status: 'nobody' } };
       return bankCreature(state, rec, 'creatureDealNote');
+    }),
+  /**
+   * #2232 — a beast KIN / CUR tap: bank a dealt measure set as a pool tile, through the same door ASSEMBLE A BEAST uses
+   * (beastTile: the S2 gate runs there, so a stillbirth is 'nobody'). The same animal twice is 'already' (its tile stands);
+   * a full pool refuses rather than evicting. Never touches the creature bank.
+   */
+  bankDealtBeast: (measures) =>
+    set((state) => {
+      const tile = beastTile(measures);
+      if (!tile || sanitizeOverlay([tile]).length !== 1) return { beastDealNote: { id: null, status: 'nobody' } };
+      const overlay = state.customAssets || [];
+      if (overlay.some((a) => a && a.id === tile.id)) return { beastDealNote: { id: tile.id, status: 'already' } };
+      if (overlay.length >= OVERLAY_CAP) return { beastDealNote: { id: tile.id, status: 'pool-full' } };
+      return { customAssets: [...overlay, tile], beastDealNote: { id: tile.id, status: 'banked' } };
     }),
   /**
    * #1962 — ASSEMBLE A BEAST: deal the next Strandbeest off the project seed (inside the S2 gate — never a stillbirth)

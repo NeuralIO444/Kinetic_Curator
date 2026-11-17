@@ -383,6 +383,11 @@ function activeEntries(session) {
     .sort((a, b) => rank.get(a.key) - rank.get(b.key) || a.seq - b.seq);
 }
 
+/** K3 contacts producer — the session's active strata in the pass's canonical order (the GPU body table is packed from exactly these). */
+export function dishActiveEntries(session) {
+  return session ? activeEntries(session) : [];
+}
+
 /**
  * The cross-strata contact pass. Runs at most once per arm, triggered by
  * the first enrolled system's update() reaching its contact point; returns

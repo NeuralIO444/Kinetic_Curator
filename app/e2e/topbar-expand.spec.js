@@ -22,6 +22,28 @@ async function boot(page, { settle = true, hold = 1 } = {}) {
       timeout: 6000 * hold,
     });
 }
+// A KIN tap re-rolls the stage on the main thread, and the heat model reads wall-clock gaps between taps (a 600 ms rapid
+// window, a 2 s warm window). On a slow or loaded runner a tap alone outlasts them, so the same keys heat the button on
+// a fast machine and not on a slow one. These specs run the page on a paused fake clock instead: boot at real speed, then
+// pause, and every gap is exactly the one the spec advances with `tick`, whatever the machine is doing.
+async function bootPaused(page, { scope = null } = {}) {
+  await page.addInitScript(() => {
+    window.__KC_EXPOSE_STORE = true;
+  });
+  await page.clock.install({ time: new Date() });
+  await boot(page, { settle: false });
+  // the cold open settles at real speed; a starved runner gets a generous wait before the clock is paused
+  await expect(page.locator('.kc-topbar-curator .kinetic-btn')).not.toHaveAttribute('data-open', 'true', {
+    timeout: 30_000,
+  });
+  // the START pill is the ceiling over every pass (CHAOS only at KOZ, the default): a spec that cares says which
+  if (scope) await page.evaluate((m) => window.__kcStore.getState().setStartupMode(m), scope);
+  await page.clock.pauseAt(new Date(Date.now() + 1000));
+}
+// Advance the page's clock a little, running its timers (frames, the cooling tick) as it goes.
+const tick = (page, ms) => page.clock.runFor(ms);
+// Jump the page's clock far ahead (a run lapsing): due timers fire once, not once per frame (a 20 s runFor would draw 1200 frames).
+const leap = (page, ms) => page.clock.fastForward(ms);
 const group = (page) => page.locator('.kc-topbar-curator');
 const btn = (page, name) => group(page).getByRole('button', { name });
 const width = async (loc) => Math.round((await loc.boundingBox()).width);
@@ -129,15 +151,16 @@ test('opening and closing them never moves the rest of the bar', async ({ page }
 });
 
 test('KIN still builds and sheds heat: rapid taps widen it, and it cools back', async ({ page }) => {
-  await boot(page);
+  await bootPaused(page);
   const kin = group(page).locator('.kinetic-btn');
-  const w0 = await width(kin);
+  const w0 = await settledWidth(page, kin);
   for (let i = 0; i < 4; i++) {
-    await page.keyboard.press('k');
-    await page.waitForTimeout(120);
-  } // the K key: click() waits for the opening label to settle, and the taps would drift apart
+    await page.keyboard.press('k'); // the K key: click() waits for the opening label to settle
+    await tick(page, 120); // exactly 120 ms between taps, on the page's own clock
+  }
   await expect.poll(async () => width(kin)).toBeGreaterThan(w0 + 40);
   await page.mouse.move(600, 600);
+  await leap(page, 20_000); // the run lapses and the heat decays on the page's clock; the width glide plays out in real time
   await expect.poll(async () => width(kin), { timeout: 15_000 }).toBeLessThanOrEqual(w0 + 2);
 });
 
@@ -321,17 +344,16 @@ test('cooling is letter by letter, last letter first, and the width glides rathe
 });
 
 test('KIN cools by gliding: its width passes through many in-between values, never jumping', async ({ page }) => {
-  await boot(page);
+  await bootPaused(page);
   const kin = group(page).locator('.kinetic-btn');
-  const rest = await width(kin);
-  // the K key: click() waits for the opening label to settle, and the taps would drift apart. Tap until the button has
-  // actually heated (a loaded runner delays or drops taps, so a fixed four can leave it short of the threshold)
-  for (let i = 0; i < 12; i++) {
+  const rest = await settledWidth(page, kin);
+  // heat it on the paused clock: four K taps exactly 110 ms apart heat the button however slow the runner is
+  for (let i = 0; i < 4; i++) {
     await page.keyboard.press('k');
-    await page.waitForTimeout(110);
-    if ((await width(kin)) > rest + 40) break;
+    await tick(page, 110);
   }
   await expect.poll(async () => width(kin)).toBeGreaterThan(rest + 40);
+  await page.clock.resume(); // from here the page's clock runs for real: the glide below is the one a person would see
   // start the sampler BEFORE the cooling begins: awaiting the evaluate first lets a loaded runner spend the whole glide
   // in the round-trip, so the sampler would see only the finished state (no in-between widths at all)
   // each sample carries its own timestamp: a loaded runner stretches the frame tick (a stalled tick would otherwise read
@@ -404,23 +426,38 @@ test('TASTE: the readout names the standing taster, and DICE when off', async ({
 test('KIN detent: the next pass stands at rest, steps with the run, and never promises CHAOS below KOZ', async ({
   page,
 }) => {
-  await boot(page); // factory boot: scope is below KOZ, so CHAOS is not on the table
+  await bootPaused(page, { scope: 'med' }); // below KOZ, so CHAOS is not on the table
   const kin = group(page).locator('.kinetic-btn');
   const next = kin.locator('.kin-next');
   await expect(next).toHaveText('LOOK');
   await expect(next).toHaveAttribute('data-next', 'look');
 
   await page.keyboard.press('k');
+  await tick(page, 300);
   await expect(next, 'after tap 1 the next tap is the voice pass').toHaveText('VOICE');
   await page.keyboard.press('k');
+  await tick(page, 300);
   await expect(next, 'after tap 2 the next tap is the curator pass').toHaveText('CUR');
   // Hammer: heat pegs, but below KOZ the detent must never say CHAOS.
   for (let i = 0; i < 5; i++) {
     await page.keyboard.press('k');
-    await page.waitForTimeout(90);
+    await tick(page, 90);
     await expect(next).not.toHaveText('CHAOS');
   }
   await expect(next).toHaveAttribute('data-next', 'curator');
   // The run lapses: the detent returns to LOOK on the router's own clock.
-  await expect(next, 'the lapsed run reads LOOK again').toHaveText('LOOK', { timeout: 6000 });
+  await leap(page, 6000);
+  await expect(next, 'the lapsed run reads LOOK again').toHaveText('LOOK');
+});
+
+test('KIN detent at KOZ: the same hammering does promise CHAOS', async ({ page }) => {
+  await bootPaused(page, { scope: 'koz' });
+  const next = group(page).locator('.kinetic-btn').locator('.kin-next');
+  await expect(next).toHaveText('LOOK');
+  await page.keyboard.press('k');
+  await tick(page, 150);
+  await page.keyboard.press('k');
+  await tick(page, 150);
+  await expect(next, 'two quick taps heat the run past the curator pass').toHaveText('CHAOS');
+  await expect(next).toHaveAttribute('data-next', 'chaos');
 });

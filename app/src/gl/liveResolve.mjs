@@ -37,6 +37,7 @@ import {
   checkParallaxStoreSnapshot,
 } from '../engine/parallaxDrift.js'; // #1576: the parallax drift store
 import { ParticleSystem } from '../engine/particles.js';
+import { packContactBodies } from './dishContactsGpu.mjs'; // K3 contacts producer: the end-of-step body table
 import { createGpuSwarmHost, gpuSwarmWanted } from './gpuSwarmHost.mjs'; // K3 wiring: the GPU swarm in SHADOW (JS stays authoritative); OFF unless asked for
 import { isLiveSwarmMode, isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -72,6 +73,7 @@ import {
   restoreDishSession,
   checkDishSessionSnapshot,
   restoreDishEntries,
+  dishActiveEntries,
 } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata; #1367: its snapshot
 import { createFeedDelay } from '../engine/kernel/tracks/feedDelay.js'; // #1367 — restore validation builds a throwaway delay
 import { coalescenceFields } from '../engine/dishCoalesce.mjs'; // #1411: the layer system's composed merge fields
@@ -123,7 +125,6 @@ import { createDishLifeStage, isTerrain } from '../engine/dishLifeStage.mjs'; //
 import { isContactStamps } from '../engine/dishContactStamps.mjs'; // K3 slice 2c: the GPU contact list as a recorded input (consumed by the dish pass)
 import { isFluidCells, unpackFluidCells } from '../engine/dishFluidCells.mjs'; // K1 slice 4b: the GPU field as a recorded input
 import { createDishFluidStage } from '../engine/dishFluidStage.mjs'; // #1997: the ferrofluid, driven by input.dishFluid (absent = no work)
-import { fieldBodyBudgetFor, fieldBodyScaleBase } from '../engine/dishFluidChannel.mjs'; // #2178: the fluid's attached body is a GPU channel — the resolver publishes its descriptor on the plan, never items
 import { fluidDuplicateItems, isFluidDuplicate } from '../engine/dishFluidDuplicates.mjs'; // one force seam slice 1b — the fluid's density as copies of real marks
 import { coverageField } from '../engine/dishLifeSeed.mjs'; // #1997: the terrain coverage the attachment's bedrock mask is derived from (the culture seed's own field)
 import { FLUID_GRID_COLS, FLUID_GRID_ROWS } from '../engine/dishFluid.mjs'; // #1997: the dish grid the bedrock mask is sampled at
@@ -457,6 +458,13 @@ export function setLiveSwarmShadowGL(getter) {
 /** The shadow's running parity + cost numbers (null when it never ran): window-readable from the loop for the stage run. */
 export function getGpuSwarmShadowStats() {
   return swarmShadow ? swarmShadow.stats : null;
+}
+// K3 contacts producer (#2188) — the live loop asks for the dish's end-of-step body table to feed the GPU detection kernel (null
+// when fewer than two strata are in play). Last-resolver-wins, like its siblings; the table is only packed when asked.
+let lastDishSession = null;
+export function getLastDishContactTable() {
+  const active = lastDishSession ? dishActiveEntries(lastDishSession) : [];
+  return active.length >= 2 ? packContactBodies(active) : null;
 }
 let liveWetSampler = null;
 export function setLiveWetSampler(fn) {
@@ -1054,11 +1062,6 @@ export function createLiveResolver() {
     // #1469 — this frame's living-motion read, published at the end of the resolve (getLastFrameMotion).
     let frameKineme = null;
     let frameWind = null;
-    // #1997 — the top content layer's dealt pool, recorded per content layer below (the last
-    // one recorded is the top): the ferrofluid body's vocabulary — any pool asset shape,
-    // letterforms included (Matt's ruling, 2026-11-08). Since #2178 the pool is the body's
-    // ONLY vocabulary (the wear path retired with the CPU seating).
-    let fluidPoolIds = null;
     const aliveIds = new Set();
     // #450 — every layer id present in the document, regardless of
     // visibility. See prune()'s warpPhase branch for why this differs
@@ -1114,6 +1117,7 @@ export function createLiveResolver() {
     // stays bit-identical to the per-system engine.
     // K3 slice 2c — the recorded contact list for this frame's pass (null = the grid pass finds the pairs, as always). Set per
     // resolve so a stale list can never survive into a later frame; the pass consumes it once.
+    lastDishSession = dishSession;
     dishSession.contactStamps = isContactStamps(input.dishContactStamps) ? input.dishContactStamps : null;
     armDish(
       dishSession,
@@ -1279,10 +1283,6 @@ export function createLiveResolver() {
         const dropped = new Set(ranked.slice(0, drop).map((a) => a.id));
         activeAssets = activeAssets.filter((a) => !dropped.has(a.id));
       }
-      // #1997 — this layer's dealt pool (the dealer's exclusions and this layer's enabled
-      // set already applied) is the fluid body's vocabulary; content layers record
-      // in stack order, so the top content layer's pool is what stands at the bottom.
-      fluidPoolIds = activeAssets.map((a) => a.id);
       const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
       const safeParticles = Math.min(Math.max(0, layoutParams.particleCount || 150), caps.maxParticles);
       const seed = (src.seed ?? 0) >>> 0;
@@ -1965,18 +1965,8 @@ export function createLiveResolver() {
       H,
     });
     lastDishFluidPlan = dishFluid.plan;
-    // #2178 — the ATTACHED BODY is a GPU channel now (engine/dishFluidChannel.mjs), not
-    // resolver items: the system stays invisible (Matt's ruling, 2026-11-08) and the body is
-    // seated by the renderer from the published density, riding the TOP content layer's slot.
-    // The resolver's whole contribution is the plan's annotation, below: the bedrock mask
-    // (the terrain's coverage at the dish grid — the channel never seats on bedrock, the
-    // retired CPU body's law) and the channel descriptor (the top layer's id, the stage
-    // pool as vocabulary, the palette ink, the cycle's seed key, the governor's channel
-    // budget for this frame's shed rung + device class, and the stamp scale law for this
-    // canvas). Nothing enters the resolver's output, so the frame — and every take hash
-    // over it — is exactly the frame the field alone produces; the body's placement is
-    // presentation under the #2180 ruling (and PERFORMANCE_VERSION 3 marks the break for
-    // takes recorded while the body was still items). No plan (fluid off) = no annotation,
+    // The plan's annotation: the bedrock mask (the terrain's coverage at the dish grid — the fluid's copies never seat
+    // on bedrock). The #2178 field-body descriptor is retired (the clumps, below). No plan (fluid off) = no annotation,
     // and the frame is byte-identical to a build without this block.
     dishFluid.plan.blocked = null;
     dishFluid.plan.fieldBody = null;
@@ -1992,18 +1982,10 @@ export function createLiveResolver() {
         for (let i = 0; i < blocked.length; i++) if (cov[i] > 0) blocked[i] = 1;
         dishFluid.plan.blocked = blocked;
       }
-      const content = out.filter((e) => e && !e.isFx && !e.isPattern && Array.isArray(e.items));
-      if (content.length) {
-        dishFluid.plan.fieldBody = {
-          layerId: String(content[content.length - 1].id),
-          poolIds: fluidPoolIds,
-          ink: resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes).ink,
-          seedKey: dishFluid.plan.seedKey,
-          budget: fieldBodyBudgetFor(input.dishFluid?.shed, !!input.travelIpadClass),
-          scaleBase: fieldBodyScaleBase(W, H),
-          aspectHW: dishFluid.plan.aspectHW,
-        };
-      }
+      // One force seam (Matt, 2026-11-16: "I don't want those clumps") — the ferrofluid no longer publishes a field-body
+      // descriptor, so the renderer seats no clump body. The fluid shows only through the stage's own marks: their lean
+      // and their copies (below). The channel itself (engine/dishFluidChannel.mjs) stays as the #2180 capability for
+      // other field systems; plan.fieldBody stays null.
     }
     dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion, external: externalCulture(input) }); // the tertiary specks hold still under reduced motion
     // One force seam slice 1b — the ferrofluid's dense look as COPIES OF THE STAGE'S OWN MARKS (Matt, 2026-11-16: one
