@@ -1043,7 +1043,13 @@ export function createLiveLoop(
       ...(worldNow ? { world: worldNow } : {}),
       ...(dishLifeStamp ? { dishLife: dishLifeStamp, ...(dishCultureCells ? { dishCultureCells } : {}) } : {}),
       ...(dishFieldStamp
-        ? { dishField: dishFieldStamp, dishFieldCoupling, ...(dishFieldLife > 0 ? { dishFieldLife } : {}) }
+        ? {
+            dishField: dishFieldStamp,
+            dishFieldCoupling,
+            // #2152 slice 2 — dishFieldBorn marks that Life births copies of the marks. A take recorded before the slice
+            // lacks it and replays exactly as recorded (fade and die only).
+            ...(dishFieldLife > 0 ? { dishFieldLife, dishFieldBorn: 1 } : {}),
+          }
         : {}), // #1923 Phase 2 (+ #2152 LIFE dial, only when up)
       ...(dishFluidStamp
         ? {
