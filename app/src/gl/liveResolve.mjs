@@ -125,6 +125,7 @@ import { createDishLifeStage, isTerrain } from '../engine/dishLifeStage.mjs'; //
 import { isContactStamps } from '../engine/dishContactStamps.mjs'; // K3 slice 2c: the GPU contact list as a recorded input (consumed by the dish pass)
 import { isFluidCells, unpackFluidCells } from '../engine/dishFluidCells.mjs'; // K1 slice 4b: the GPU field as a recorded input
 import { createDishFluidStage } from '../engine/dishFluidStage.mjs'; // #1997: the ferrofluid, driven by input.dishFluid (absent = no work)
+import { lifeBornItems, isLifeBorn } from '../engine/dishLifeBorn.mjs'; // #2152 slice 2 — Life births as copies of real marks
 import { fluidDuplicateItems, isFluidDuplicate } from '../engine/dishFluidDuplicates.mjs'; // one force seam slice 1b — the fluid's density as copies of real marks
 import { coverageField } from '../engine/dishLifeSeed.mjs'; // #1997: the terrain coverage the attachment's bedrock mask is derived from (the culture seed's own field)
 import { FLUID_GRID_COLS, FLUID_GRID_ROWS } from '../engine/dishFluid.mjs'; // #1997: the dish grid the bedrock mask is sampled at
@@ -1961,6 +1962,29 @@ export function createLiveResolver() {
     // output, read by the coupling at the top of the next resolve. Only mode:'field' stamps are ever
     // fed to it — anything else on this slot of a recorded input reads as no stamp, so this stage can
     // never draw, dissolve or speck.
+    // #2152 slice 2 — LIFE births, READ here: the copies are worked out from the publication the marks' fade read this
+    // frame (before the field stage steps it below) and from the scene as dealt. They are seated further down, after the
+    // cultures have applied, so the field culture never seeds from a copy. Gate: the LIFE dial up (shed-folded), the loop's
+    // recorded marker (a take from before this slice lacks it and replays with fade-and-die only), the governor not
+    // shedding (copies shed first: gone at the first shed step), and no Life picture dissolving the scene (the quiet read
+    // the live loop stamps whenever DISH LIFE is on never dissolves it, so births run beside it).
+    let lifeBornContent = null;
+    let lifeBorn = null;
+    if (
+      lifeNow > 0 &&
+      input.dishFieldBorn === 1 &&
+      !(input.dishLife && input.dishLife.mode !== 'quiet') &&
+      (input.dishField?.shed | 0) < 1
+    ) {
+      lifeBornContent = out.filter((e) => e && !e.isFx && !e.isPattern && Array.isArray(e.items));
+      if (lifeBornContent.length)
+        lifeBorn = lifeBornItems(dishFieldStage.publishedField, lifeBornContent, {
+          W,
+          H,
+          life: lifeNow,
+          lean: fluidDrift,
+        });
+    }
     dishFieldStage.apply(input.dishField?.mode === 'field' ? input.dishField : null, out, W, H);
     // #1997 FERROFLUID — applies beside the culture at the bottom of the resolve (the dish's
     // standing place for stage state): it steps the grid kernel under this frame's stamp, reads
@@ -2002,6 +2026,10 @@ export function createLiveResolver() {
       // other field systems; plan.fieldBody stays null.
     }
     dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion, external: externalCulture(input) }); // the tertiary specks hold still under reduced motion
+    // #2152 slice 2 — LIFE births, SEATED: each copy joins its parent's own layer, after that layer's dealt marks.
+    if (lifeBorn)
+      for (let i = 0; i < lifeBornContent.length; i++)
+        if (lifeBorn[i].length) lifeBornContent[i].items = lifeBornContent[i].items.concat(lifeBorn[i]);
     // One force seam slice 1b — the ferrofluid's dense look as COPIES OF THE STAGE'S OWN MARKS (Matt, 2026-11-16: one
     // system, no separate body): where the field is densest near a magnet, up to DUP_CAP copies of the nearest dealt mark
     // ride the TOP content layer, culture-faded then leaned like any mark. Same gate as the marks' lean (fluidDrift: a
@@ -2012,7 +2040,7 @@ export function createLiveResolver() {
         const marks = [];
         for (const e of content)
           for (const it of e.items)
-            if (it && !isTerrain(it) && !isFluidDuplicate(it) && !isPoemItem(it)) marks.push(it); // the poem is never copied
+            if (it && !isTerrain(it) && !isFluidDuplicate(it) && !isLifeBorn(it) && !isPoemItem(it)) marks.push(it); // the poem and Life's copies are never copied
         const dups = fluidDuplicateItems(dishFluid.plan, marks, { W, H, culture: cultureScale });
         if (dups.length) {
           const top = content[content.length - 1];
