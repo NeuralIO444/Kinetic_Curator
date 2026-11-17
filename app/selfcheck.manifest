@@ -712,6 +712,7 @@ node src/gl/parity/cultureSim.selfcheck.mjs
 node src/gl/gpuCultureHost.selfcheck.mjs
 node src/gl/parity/swarmSim.selfcheck.mjs
 node src/gl/parity/gpuSwarmHost.selfcheck.mjs
+node src/gl/gpuContactsHost.selfcheck.mjs
 node src/gl/parity/dishContacts.selfcheck.mjs
 node src/gl/parity/dishContactsResolve.selfcheck.mjs
 node src/gl/simBackends.selfcheck.mjs

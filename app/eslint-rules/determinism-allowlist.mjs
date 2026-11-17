@@ -171,6 +171,12 @@ export const DETERMINISM_ALLOWLIST = {
       why: 'the GPU swarm SHADOW\u2019s cost meter (K3 wiring, #2188): times the GPU step + readback for the stage-hardware measurement; the number goes to stats only and never feeds the sim (the JS swarm stays authoritative, the shadow reaches neither screen nor take)',
     },
   },
+  'gl/gpuContactsHost.mjs': {
+    'performance.now': {
+      count: 1,
+      why: 'the GPU contacts producer\u2019s cost + latency meter (K3, #2188): times the submit and the readback wait for the stage-hardware measurement; the numbers go to stats only and never feed the sim (the list rides the take as a recorded input)',
+    },
+  },
   'gl/parity/costBench.mjs': {
     'Date.now': {
       count: 4,
