@@ -139,8 +139,17 @@ one-writer files `liveLoop.mjs`, `liveResolve.mjs`, `particles.js`.
 
 ## 10. Risks and unknowns
 
-- **Where "per artist" is stored.** I did not check whether KC-1 has a per-artist store separate from the project
-  file. Step 1 starts by checking; if there is none, that is its own ruling.
+- **Where "per artist" is stored (checked 2026-11-16).** KC-1 has no account store, but it has a per-viewer
+  preference pattern: a pure model with an injected, never-throwing `localStorage` (`dishFluidChip.model.mjs`, key
+  `kc.dishFluid.v1`, "never part of a saved project"). The rung unlocks follow it (`kc.wetLabLadder.v1`). The limit:
+  it is per browser profile, not per person, and cleared storage re-locks the rungs. That is acceptable for an
+  unlock, which is a nicety and not data.
+- **Overlap with the constructs ruling (not reconciled).** `constructs-spec.md` §8 (Matt, 2026-11-16, #2259) rules
+  that the dealt pool becomes primitives, and that a complex shape *is* a recipe: a construct of 12–16 primitives
+  assembled by a style's grammar. This ladder's rungs 2 and 3 (ASSET: 2–6 kept shapes composed; RECIPE: a
+  `hierarchy.js` part tree) may be the same thing as the construct, and rung 1's pool should be primitives, not the
+  ~985-asset library. This spec does not pick. Steps 1–3 do not depend on it; step 4 starts by reconciling the two,
+  and may collapse ASSET and RECIPE into one CONSTRUCT rung. That would be Matt's ruling.
 - **ASSET vs `AssetStudioModal`.** The studio already composes assets by hand. Whether the ASSET adapter writes
   the same record format, or a new one, is not checked. Step 4 starts there.
 - **Breathing every tile costs frames.** Six live tiles per hand on every rung, plus the stage. Needs a measured
