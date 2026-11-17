@@ -2,7 +2,7 @@
 //
 //   1. a construct assembles from a style's vocabulary: 12–16 pieces, every piece from the vocabulary
 //   2. the same seed + style + vocabulary assembles the identical record, byte for byte; the seed varies it
-//   3. every piece after the first sits on a join: its own point lands on a point of an earlier piece
+//   3. every piece after the first sits on a join, facing out: shapes abut and grow outward, never pile up
 //   4. the whole composition stays inside the box, and the record's own points are honest ATTACH points
 //   5. the deal rides its own registered channel and no other
 //   6. nothing to join at is refused: no style, or no primitive carrying a point, assembles nothing
@@ -90,8 +90,11 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
 // 3 — joins: each later piece's own point lands on a point of an earlier piece.
 {
   const pts = new Map(vocabulary.map((v) => [v.id, sanitizeAttachPoints(v.points)]));
+  const MID = { x: ATTACH_BOX / 2, y: ATTACH_BOX / 2 };
   let joins = 0;
   let worst = 0;
+  let faced = 0;
+  let outward = 0;
   for (const seed of SEEDS) {
     const rec = assembleConstruct({ ...rule, seed });
     rec.parts.forEach((part, i) => {
@@ -99,19 +102,38 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
       if (i === 0) return;
       const mine = constructPartPoint(part, pts.get(part.asset)[part.own]);
       let best = Infinity;
+      let host = null;
       for (const earlier of rec.parts.slice(0, i)) {
         for (const p of pts.get(earlier.asset)) {
           const q = constructPartPoint(earlier, p);
-          best = Math.min(best, Math.hypot(q.x - mine.x, q.y - mine.y));
+          const d = Math.hypot(q.x - mine.x, q.y - mine.y);
+          if (d < best) {
+            best = d;
+            host = earlier;
+          }
         }
       }
       worst = Math.max(worst, best);
       joins++;
+      // Facing out: the piece's body lies on the far side of the join from the piece it joins (quarter turns
+      // snap within 45° of straight out, so the two directions never oppose). A point at a box centre has no
+      // outward side and is skipped.
+      const centre = constructPartPoint(part, MID);
+      const hostCentre = constructPartPoint(host, MID);
+      const out = { x: mine.x - hostCentre.x, y: mine.y - hostCentre.y };
+      const body = { x: centre.x - mine.x, y: centre.y - mine.y };
+      if (Math.hypot(out.x, out.y) > 0.5 && Math.hypot(body.x, body.y) > 0.5) {
+        faced++;
+        if (out.x * body.x + out.y * body.y > 0) outward++;
+      }
     });
   }
+  // Two pieces can offer the same join, so the nearest-point host is occasionally not the dealt one; the rule
+  // must hold for nearly all of them, and a random turn would hold for about half.
+  assert.ok(outward / faced > 0.98, `pieces join facing out (${outward} of ${faced})`);
   // The record rounds positions to 2 decimals and scale to 4; a join holds well inside a tenth of a box unit.
   assert.ok(worst < 0.1, `every join holds (worst gap ${worst.toFixed(4)} box units)`);
-  ok(`${joins} joins: every piece sits on a point of an earlier piece (worst gap ${worst.toFixed(4)})`);
+  ok(`${joins} joins: every piece sits on a point of an earlier piece, facing out (${outward}/${faced})`);
 }
 
 // 4 — the box: nothing leaves it; the record's own points are honest.

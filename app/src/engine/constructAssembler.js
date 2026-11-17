@@ -133,7 +133,7 @@ export function assembleConstruct({ style, vocabulary = [], seed = 0, rotations 
   const growers = jointed.filter((v) => v.points.length > 1);
 
   const parts = [];
-  /** Join points still free: { x, y } in the working frame. */
+  /** Join points still free: { x, y } in the working frame, with the way OUT of the piece that offers it. */
   const open = [];
   /** Every join ever made, so a shape that runs out of free points still joins at a real one. */
   const used = [];
@@ -144,15 +144,28 @@ export function assembleConstruct({ style, vocabulary = [], seed = 0, rotations 
     const needGrower = growers.length > 0 && remaining > 0 && open.length <= 1;
     const prim = pick(needGrower ? growers : jointed);
     const own = Math.floor(draw() * prim.points.length) % prim.points.length;
-    const r = pick(turns);
     const sc = i === 0 ? 1 : range.min + draw() * (range.max - range.min);
     let join;
     if (i === 0) {
-      join = { x: ATTACH_BOX / 2, y: ATTACH_BOX / 2 };
+      join = { x: ATTACH_BOX / 2, y: ATTACH_BOX / 2, ox: 0, oy: 0 };
     } else if (open.length) {
       join = open.splice(Math.floor(draw() * open.length) % open.length, 1)[0];
     } else {
       join = pick(used);
+    }
+    // The turn. A piece joins facing OUT: its body lies on the far side of the join from the piece it joins,
+    // so shapes abut and the construct grows outward instead of piling up. The turn is the allowed one nearest
+    // to that; a join with no outward side (the first piece, or a point at a box centre) is dealt a turn.
+    const vx = prim.points[own].x - ATTACH_BOX / 2;
+    const vy = prim.points[own].y - ATTACH_BOX / 2;
+    let r;
+    if (Math.hypot(join.ox, join.oy) < 1e-6 || Math.hypot(vx, vy) < 1) {
+      r = pick(turns);
+    } else {
+      // R(r)·v must point back at the host: the angle of −out, less the angle of v.
+      const want = ((Math.atan2(-join.oy, -join.ox) - Math.atan2(vy, vx)) * 180) / Math.PI;
+      const gap = (t) => Math.abs(((((t - want) % 360) + 540) % 360) - 180);
+      r = turns.reduce((best, t) => (gap(t) < gap(best) - 1e-9 ? t : best), turns[0]);
     }
     // Place the piece so its own point sits on the join: T = join − R·s·own.
     const part = { asset: prim.id, own, x: 0, y: 0, s: sc, r };
@@ -161,8 +174,12 @@ export function assembleConstruct({ style, vocabulary = [], seed = 0, rotations 
     part.y = join.y - off.y;
     parts.push(part);
     used.push(join);
+    const centre = place(part, { x: ATTACH_BOX / 2, y: ATTACH_BOX / 2 });
     prim.points.forEach((p, j) => {
-      if (j !== own) open.push(place(part, p));
+      if (j === own) return;
+      const q = place(part, p);
+      const d = Math.hypot(q.x - centre.x, q.y - centre.y);
+      open.push({ x: q.x, y: q.y, ox: d > 1e-6 ? (q.x - centre.x) / d : 0, oy: d > 1e-6 ? (q.y - centre.y) / d : 0 });
     });
   }
 
