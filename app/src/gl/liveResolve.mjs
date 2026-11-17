@@ -37,6 +37,7 @@ import {
   checkParallaxStoreSnapshot,
 } from '../engine/parallaxDrift.js'; // #1576: the parallax drift store
 import { ParticleSystem } from '../engine/particles.js';
+import { packContactBodies } from './dishContactsGpu.mjs'; // K3 contacts producer: the end-of-step body table
 import { createGpuSwarmHost, gpuSwarmWanted } from './gpuSwarmHost.mjs'; // K3 wiring: the GPU swarm in SHADOW (JS stays authoritative); OFF unless asked for
 import { isLiveSwarmMode, isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -72,6 +73,7 @@ import {
   restoreDishSession,
   checkDishSessionSnapshot,
   restoreDishEntries,
+  dishActiveEntries,
 } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata; #1367: its snapshot
 import { createFeedDelay } from '../engine/kernel/tracks/feedDelay.js'; // #1367 — restore validation builds a throwaway delay
 import { coalescenceFields } from '../engine/dishCoalesce.mjs'; // #1411: the layer system's composed merge fields
@@ -457,6 +459,13 @@ export function setLiveSwarmShadowGL(getter) {
 /** The shadow's running parity + cost numbers (null when it never ran): window-readable from the loop for the stage run. */
 export function getGpuSwarmShadowStats() {
   return swarmShadow ? swarmShadow.stats : null;
+}
+// K3 contacts producer (#2188) — the live loop asks for the dish's end-of-step body table to feed the GPU detection kernel (null
+// when fewer than two strata are in play). Last-resolver-wins, like its siblings; the table is only packed when asked.
+let lastDishSession = null;
+export function getLastDishContactTable() {
+  const active = lastDishSession ? dishActiveEntries(lastDishSession) : [];
+  return active.length >= 2 ? packContactBodies(active) : null;
 }
 let liveWetSampler = null;
 export function setLiveWetSampler(fn) {
@@ -1114,6 +1123,7 @@ export function createLiveResolver() {
     // stays bit-identical to the per-system engine.
     // K3 slice 2c — the recorded contact list for this frame's pass (null = the grid pass finds the pairs, as always). Set per
     // resolve so a stale list can never survive into a later frame; the pass consumes it once.
+    lastDishSession = dishSession;
     dishSession.contactStamps = isContactStamps(input.dishContactStamps) ? input.dishContactStamps : null;
     armDish(
       dishSession,

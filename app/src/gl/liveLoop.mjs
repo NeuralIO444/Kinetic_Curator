@@ -38,6 +38,7 @@ import {
   getLastCouplingBackground,
   setLiveWetSampler,
   setLiveSwarmShadowGL,
+  getLastDishContactTable,
 } from './liveResolve.mjs';
 import { cultureBackgroundShift, cultureBackgroundHex } from '../engine/dishLifeCouple.mjs'; // #1923 Phase 2 slice D: the background fold's law (the seam)
 import { sanitizeWorld } from '../data/world.js'; // #2104: the standing Canon world, read through its door
@@ -59,6 +60,7 @@ import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
 import { createGpuFluidHost } from './gpuFluidHost.mjs'; // K1 slice 4c: the GPU fluid, render-side; OFF unless window.__KC_GPU_FLUID
+import { createGpuContactsHost, gpuContactsWanted } from './gpuContactsHost.mjs'; // K3 contacts producer (OFF unless asked for)
 import { packFluidCells } from '../engine/dishFluidCells.mjs';
 import { createGpuCultureHost } from './gpuCultureHost.mjs'; // K2 slice 2b: the GPU culture, render-side; OFF unless window.__KC_GPU_CULTURE
 import { packCultureCells } from '../engine/dishCultureCells.mjs';
@@ -443,6 +445,11 @@ export function createLiveLoop(
   let gpuCultureHost = null;
   let gpuCultureField = null; // the host's last handed field object, so an unchanged readback keeps its identity
   let gpuCultureCells = null;
+  // K3 contacts producer (#2188) — the GPU dish-contact detection (backend gpu.contacts.v1). OFF by default: only while the layout
+  // param gpuContacts, window.__KC_GPU_CONTACTS or ?gpuContacts=1 asks. The host detects on the end-of-step body table and reads back
+  // late; the list rides the NEXT resolve as the RECORDED input.dishContactStamps, so live == replay on any device.
+  let gpuContactsHost = null;
+  let gpuContactsDead = false;
   const disposeDishFluidMagnets = installDishFluidMagnets(canvas, getState);
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
@@ -1015,6 +1022,22 @@ export function createLiveLoop(
     // world stands, so a world-less frame's input — and any take recorded from it — carries
     // exactly the older input shape.
     const worldNow = sanitizeWorld(s.world);
+    // K3 contacts producer — the fresh GPU contact list for this frame's pass, as the recorded input (null = the grid pass, as always).
+    let dishContactStamps = null;
+    const wantContacts =
+      !gpuContactsDead && gpuContactsWanted(layoutParams, typeof window !== 'undefined' ? window : null);
+    if (wantContacts) {
+      try {
+        if (!gpuContactsHost && !live.getGL().isContextLost()) gpuContactsHost = createGpuContactsHost(live.getGL());
+        dishContactStamps = gpuContactsHost ? gpuContactsHost.take() : null;
+      } catch (e) {
+        gpuContactsDead = true; // fail soft: the grid pass is the reference (K0 R4)
+        console.warn('[gpuContacts] disabled for this session:', e && e.message ? e.message : e);
+      }
+    } else if (gpuContactsHost) {
+      gpuContactsHost.dispose();
+      gpuContactsHost = null;
+    }
     const resolved = resolver.resolveLayers({
       ...(worldNow ? { world: worldNow } : {}),
       ...(dishLifeStamp ? { dishLife: dishLifeStamp, ...(dishCultureCells ? { dishCultureCells } : {}) } : {}),
@@ -1032,6 +1055,7 @@ export function createLiveLoop(
             dishFluidMarks: 1,
           }
         : {}), // #1997 (+ K1 4c: the GPU field, when that backend runs) — stamp + magnets + dials, only while the mode is on
+      ...(dishContactStamps ? { dishContactStamps } : {}),
       ...(reviewMorphStamp ? { reviewMorph: reviewMorphStamp } : {}),
       canvasW,
       canvasH,
@@ -1130,6 +1154,17 @@ export function createLiveLoop(
       // use. mixSeconds<=0 means "instant", same as before.
       mixSeconds,
     });
+    // K3 contacts producer — queue detection on this frame's end-of-step body table (never waits; the list lands on a later frame).
+    if (gpuContactsHost) {
+      try {
+        gpuContactsHost.submit(getLastDishContactTable());
+      } catch (e) {
+        gpuContactsDead = true;
+        gpuContactsHost.dispose();
+        gpuContactsHost = null;
+        console.warn('[gpuContacts] disabled for this session:', e && e.message ? e.message : e);
+      }
+    }
 
     // #1694 slice 1 — the homes write-back: the resolver's spawn state moved the standing homes on
     // this frame (homesChanged — the exact condition App's frame tap used to write on), so the store's
@@ -2138,6 +2173,10 @@ export function createLiveLoop(
     disposeDishFluidMagnets(); // #1997
     clearTouch();
     setLiveWetSampler(null); // #1841: the dish's read dies with the loop that served it
+    if (gpuContactsHost) {
+      gpuContactsHost.dispose();
+      gpuContactsHost = null;
+    }
     setLiveSwarmShadowGL(null); // K3 wiring: the shadow dies with the loop that served it
     clearWetMode(); // #1841: the show block's shed line clears with the session
     resolver.dispose();
