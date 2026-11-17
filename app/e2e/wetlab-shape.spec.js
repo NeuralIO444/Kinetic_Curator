@@ -90,6 +90,10 @@ test('three keeps fill the pips and open CONSTRUCT; the shelf and the rung survi
   await expect(page.getByTestId('rung-pips-shape')).toHaveAttribute('data-filled', '3');
   await expect(page.getByTestId('rung-construct')).toBeEnabled();
   await expect(page.getByTestId('shape-shelf-tile')).toHaveCount(3);
+  // #2297 — a shelf tile is a 44 px touch target
+  const box = await page.getByTestId('shape-shelf-tile').first().boundingBox();
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(44);
   await shot(page, 's2-construct-open');
 
   // CUR narrows from the last kept shape: same style, never that shape
@@ -130,6 +134,8 @@ test('phone width: the strip wraps and the lab never scrolls sideways', async ({
   await openEmptyLab(page);
   await page.getByTestId('shape-kin').click();
   await expect(page.getByTestId('shape-tile').first()).toBeVisible();
+  await page.getByTestId('shape-tile').first().click(); // a kept shape puts a 44 px tile on the shelf
+  await expect(page.getByTestId('shape-shelf-tile')).toHaveCount(1);
   const sideways = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(sideways).toBe(false);
   await shot(page, 's3-phone');
