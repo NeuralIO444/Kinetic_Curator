@@ -30,7 +30,7 @@ import { creatureFigureSvg } from './wetLabLogic.mjs';
 
 const label = (scope) => (CREATURE_SCOPES.find((s) => s.id === scope) || CREATURE_SCOPES[0]).label;
 
-export function WetLabDealStrip({ subject = null, onTap }) {
+export function WetLabDealStrip({ subject = null, onTap, onKeep }) {
   const seed = useStore((s) => s.seed);
   const bank = useStore((s) => s.creatureRecords);
   const customAssets = useStore((s) => s.customAssets);
@@ -87,9 +87,12 @@ export function WetLabDealStrip({ subject = null, onTap }) {
     setPicked(r.picked ? r.picked.id : null);
     setCurN(curN + 1);
   };
-  const tap = (rec) => {
+  // `chosen`: the artist tapped this tile. The lead a KIN press lands by itself banks too, but it is not a keep:
+  // only a choice fills the ladder's pips (#2283), so pressing KIN three times cannot open a rung.
+  const tap = (rec, chosen = false) => {
     bankDealt(rec);
     const st = useStore.getState().creatureDealNote;
+    if (chosen && st && st.status === 'banked' && onKeep) onKeep();
     if (st && (st.status === 'banked' || st.status === 'already')) {
       setDealtIds((ids) => (ids.includes(rec.id) ? ids : [...ids, rec.id]));
       if (onTap) onTap(rec.id);
@@ -175,7 +178,7 @@ export function WetLabDealStrip({ subject = null, onTap }) {
                 data-testid="kin-tile"
                 aria-pressed={on}
                 title={`${rec.id} · ${lookName(rec.look) || rec.look}${rec.id === picked ? ' · CUR’s pick' : ''} · tap to ${on ? 'select' : 'bank'} it`}
-                onClick={() => tap(rec)}
+                onClick={() => tap(rec, true)}
               >
                 {svg ? (
                   <svg
