@@ -28,6 +28,9 @@ const BY_STYLE = (() => {
 })();
 const STYLE_ORDER = [...BY_STYLE.keys()];
 
+/** Constructs in a pool that dealt nothing else. */
+export const EMPTY_POOL = 3;
+
 /** How many of a pool's slots constructs take: half, rounded up (a pool of 4–6 gives 2–3). */
 export const constructSlots = (n) => Math.ceil(n / 2);
 
@@ -39,18 +42,21 @@ export const isHouseConstructId = (id) => ASSETS_CONSTRUCTS.some((t) => t.id ===
  * @param ids the dealt pool's asset ids.
  * @param style the style in play (a Look's first style), or none: the deal then names no style, so the pool's own
  *   hash picks one of the eleven.
- * @returns a new array of the same length: `constructSlots(n)` house constructs first (distinct, one style),
+ * @param seedKey names the deal (the look's id); only an EMPTY deal uses it.
+ * @returns a new array of the same length (an empty deal: EMPTY_POOL constructs alone): `constructSlots(n)` house constructs first (distinct, one style),
  *   then the dealt ids in their order (those not already a construct), cut to size.
  */
-export function leadWithConstructs(ids, style = null) {
+export function leadWithConstructs(ids, style = null, seedKey = '') {
   const list = Array.isArray(ids) ? ids : [];
-  if (!list.length) return list.slice();
-  const key = hash32(list.join('|'));
+  // A deal that came up empty (a chapter deck of only complex assets, once the library cut has run) is a pool of
+  // constructs alone: EMPTY_POOL of them, keyed by the caller's own name (the look's id) so it stays deterministic.
+  if (!list.length && !seedKey) return list.slice();
+  const key = hash32(list.length ? list.join('|') : `empty|${seedKey}|${style || ''}`);
   const chosen = style && BY_STYLE.has(style) ? style : STYLE_ORDER[key % STYLE_ORDER.length];
   const own = BY_STYLE.get(chosen) || [];
-  const k = Math.min(constructSlots(list.length), own.length);
+  const k = Math.min(list.length ? constructSlots(list.length) : EMPTY_POOL, own.length);
   const lead = [];
   for (let i = 0; i < own.length && lead.length < k; i++) lead.push(own[(key + i) % own.length]);
   const rest = list.filter((id) => !lead.includes(id));
-  return [...lead, ...rest].slice(0, list.length);
+  return [...lead, ...rest].slice(0, list.length || lead.length);
 }

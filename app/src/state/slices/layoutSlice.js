@@ -57,7 +57,14 @@ import {
 } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
 import { leadWithConstructs } from '../../engine/constructLead.js'; // #2108
-import { dealableRecords, dealMixedPool, dealKitTriad, kitDescriptors, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal; #1944: kits
+import {
+  reducedRecords,
+  dealableRecords,
+  dealMixedPool,
+  dealKitTriad,
+  kitDescriptors,
+  poolToEnabled,
+} from '../rollPool.mjs'; // #1767: the full-library deal; #1944: kits
 import { kitsById } from '../../data/kits.js';
 import { lookPass, voicePass, curatorPass, ACCUM_KEYS } from '../kineticSweep.mjs'; // #1772: look → voice → curator
 import { scopeDecks, sanitizeScope, CURATED_SETS, SCOPE_CYCLE } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
@@ -110,9 +117,15 @@ function kitNoteText(notes, kits) {
   return 'kits: nothing to deal — dealt the usual way';
 }
 /** #1944 — what the kit deal reads, built only when kits are in play (descriptors cost a pass over the library). */
+// #2108 — the library cut: with the CONSTRUCTS gate on, every deal draws from the simple shapes (the constructs
+// assemble the complex ones); off, exactly the dealable records as before.
+const dealRecordsFor = (state) =>
+  state.constructLead
+    ? reducedRecords(dealableRecords(ASSETS, state.customAssets))
+    : dealableRecords(ASSETS, state.customAssets);
 const kitContextFor = (state) => () => ({
   artistKits: state.kits || [],
-  descriptors: kitDescriptors(dealableRecords(ASSETS, state.customAssets), {
+  descriptors: kitDescriptors(dealRecordsFor(state), {
     assets: ASSETS,
     customAssets: state.customAssets,
     assetTags: state.assetTags,
@@ -126,7 +139,7 @@ function scopedLook(state) {
     looks: d.looks,
     pool: d.pool,
     sets: CURATED_SETS,
-    records: dealableRecords(ASSETS, state.customAssets),
+    records: dealRecordsFor(state),
     kitContext: kitContextFor(state),
   });
 }
@@ -138,7 +151,7 @@ function scopedLook(state) {
  * session's updated coverage ledger, so the action writes them in the same single undo step as the deal.
  */
 function scopedChapterLook(state) {
-  const records = dealableRecords(ASSETS, state.customAssets);
+  const records = dealRecordsFor(state);
   // #1858 — the lean rides in from the imported taste's chapter memory, read
   // fresh at the landing and never stored: no state key carries it, and a
   // taste without the extension (or below the keeps floor) leaves the walk
@@ -182,7 +195,7 @@ function scopedChapterLook(state) {
  */
 function scopedChapterVoices(state) {
   if (!state.kineticChapterId) return scopeDecks(state.startupMode).voices;
-  const records = dealableRecords(ASSETS, state.customAssets);
+  const records = dealRecordsFor(state);
   const eff = effectiveChapterScope(state.kineticChapterId, state.startupMode, { records });
   return chapterScopeDeck(state.kineticChapterId, eff.scope, { records }).voices;
 }
@@ -215,7 +228,7 @@ function runRound(state, r) {
   if (standing && standing.phase !== 'closed') return { kineticRound: absorbWarmTap(standing), cut: false };
   const landing = state.kineticLanding;
   if (!landing?.chapterId) return { kineticRound: standing ?? null, cut: false };
-  const records = dealableRecords(ASSETS, state.customAssets);
+  const records = dealRecordsFor(state);
   const deck = chapterScopeDeck(landing.chapterId, landing.dealtScope, { records });
   const lookId = state.layoutParams?.composition ?? null;
   const dealtLook = deck.looks.find((l) => l.id === lookId) || null;
@@ -602,7 +615,7 @@ function settledFunnel(state) {
       ? standing
       : openNarrowing(round.chapterId, round.deal?.lookId);
   if (!base) return null;
-  const records = dealableRecords(ASSETS, state.customAssets);
+  const records = dealRecordsFor(state);
   const deck = chapterScopeDeck(round.chapterId, round.deal.dealtScope, { records });
   const advanced = narrow(base);
   const ids = poolFor(
@@ -1869,7 +1882,7 @@ export const createLayoutSlice = (set) => ({
       // #1944 — a standing kit triad deals the pool when one is set (a kit that deals nothing falls back to today's deal,
       // and the reason lands in `kitNote`); with no triad this line is exactly as before.
       let kitNote = null;
-      const chaosRecords = dealableRecords(ASSETS, state.customAssets);
+      const chaosRecords = dealRecordsFor(state);
       const triad = kitsById(state.kitTriad, state.kits);
       let chaosIds = null;
       if (triad.length) {

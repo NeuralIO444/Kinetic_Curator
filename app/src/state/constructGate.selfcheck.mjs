@@ -7,6 +7,7 @@
 //   3. the lead helper: half the pool (rounded up), one style, distinct, the rest in dealt order
 //   4. the gate rides the project: absent = off, serialized only when on, round-trips, is in the watch list
 //   5. the placeable pool places a construct only when a pool names it
+//   7. the library cut: gate on, KIN/CHAOS/dice deal no complex (4+ shape) library asset
 //   6. the Curator's dice: off = the roll as it was; on = every cast led by its lead asset's style's constructs
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -51,12 +52,15 @@ const base = () => ({ ...S(), layoutParams: { ...S().layoutParams } });
 
 // 2 — on: led, same size, no extra rng, pure.
 {
+  // the slice hands the pass the library-cut records when the gate is on; compare like with like
+  const { reducedRecords } = await import('./rollPool.mjs');
+  const reduced = reducedRecords(records);
   let led = 0;
   for (let seed = 1; seed <= 60; seed++) {
     const a = mkRng(seed);
     const b = mkRng(seed);
-    const off = lookPass({ ...base(), constructLead: false }, a, { looks: COMPOSITION_PRESETS, records });
-    const on = lookPass({ ...base(), constructLead: true }, b, { looks: COMPOSITION_PRESETS, records });
+    const off = lookPass({ ...base(), constructLead: false }, a, { looks: COMPOSITION_PRESETS, records: reduced });
+    const on = lookPass({ ...base(), constructLead: true }, b, { looks: COMPOSITION_PRESETS, records: reduced });
     const offIds = Object.keys(off.enabledAssets);
     const onIds = Object.keys(on.enabledAssets);
     assert.equal(onIds.length, offIds.length, `seed ${seed}: the pool keeps its size`);
@@ -67,10 +71,15 @@ const base = () => ({ ...S(), layoutParams: { ...S().layoutParams } });
     assert.equal(on.lookId, off.lookId, 'the look is the same');
     led++;
   }
-  const again = lookPass({ ...base(), constructLead: true }, mkRng(5), { looks: COMPOSITION_PRESETS, records });
+  const again = lookPass({ ...base(), constructLead: true }, mkRng(5), {
+    looks: COMPOSITION_PRESETS,
+    records: reduced,
+  });
   assert.equal(
     JSON.stringify(again),
-    JSON.stringify(lookPass({ ...base(), constructLead: true }, mkRng(5), { looks: COMPOSITION_PRESETS, records })),
+    JSON.stringify(
+      lookPass({ ...base(), constructLead: true }, mkRng(5), { looks: COMPOSITION_PRESETS, records: reduced }),
+    ),
   );
   ok(`gate on: ${led} passes led by constructs, size kept, no extra rng, deterministic`);
 }
@@ -98,7 +107,11 @@ const base = () => ({ ...S(), layoutParams: { ...S().layoutParams } });
       `${style}: the rest are the dealt ids in order`,
     );
   }
-  assert.deepEqual(leadWithConstructs([]), []);
+  assert.deepEqual(leadWithConstructs([]), [], 'an empty deal with no name stays empty');
+  const alone = leadWithConstructs([], 'engraved', 'look-x');
+  assert.equal(alone.length, 3, 'an empty deal named by its look is three constructs alone');
+  assert.ok(alone.every((id) => construct.has(id) && styleOf.get(id) === 'engraved'));
+  assert.deepEqual(alone, leadWithConstructs([], 'engraved', 'look-x'), 'deterministic');
   assert.deepEqual(
     leadWithConstructs(ids, 'nonsense')
       .slice(0, 3)
@@ -162,6 +175,60 @@ const base = () => ({ ...S(), layoutParams: { ...S().layoutParams } });
     }
   }
   ok(`dice: gate off = the roll as it was (25 seeds); on: ${casts} casts led by one style's constructs, no extra rng`);
+}
+
+// 7 — the library cut, through the real store taps.
+{
+  const { isComplexAsset, reducedRecords, COMPLEX_SHAPES } = await import('./rollPool.mjs');
+  assert.equal(COMPLEX_SHAPES, 4);
+  const dealableNow = dealableRecords(ASSETS);
+  const complexAll = ASSETS.filter((a) => isComplexAsset(a.id) && dealableNow.some((r) => r.id === a.id));
+  assert.equal(complexAll.length, 130, 'the 130 complex (4+ shape) dealable assets Matt cut');
+  const reduced = reducedRecords(dealableRecords(ASSETS));
+  assert.equal(
+    reduced.length + complexAll.filter((a) => dealableRecords(ASSETS).some((r) => r.id === a.id)).length,
+    dealableRecords(ASSETS).length,
+  );
+  assert.ok(reduced.every((r) => !isComplexAsset(r.id)));
+  // an artist's own import is never cut
+  const imp = { id: 'user:mine', category: 'geometric', svg: '<g>' + '<rect/>'.repeat(9) + '</g>', source: 'import' };
+  assert.ok(
+    reducedRecords(dealableRecords(ASSETS, [imp])).some((r) => r.id === 'user:mine'),
+    'imports are never cut',
+  );
+  const kept = (ids) => ids.filter((id) => isComplexAsset(id));
+  let off = 0;
+  let on = 0;
+  for (let i = 0; i < 40; i++) {
+    useStore.setState({ constructLead: false, seed: 1000 + i });
+    S().kineticLookPass();
+    off += kept(Object.keys(S().enabledAssets || {})).length;
+    useStore.setState({ constructLead: true, seed: 1000 + i });
+    S().kineticLookPass();
+    const ids = Object.keys(S().enabledAssets || {});
+    assert.ok(ids.length >= 2, `seed ${i}: a pool is dealt`);
+    on += kept(ids).length;
+  }
+  assert.ok(off > 0, 'with the gate off, complex assets still deal (the deal as it was)');
+  assert.equal(on, 0, 'with the gate on, no complex library asset is dealt by KIN');
+  for (let i = 0; i < 20; i++) {
+    useStore.setState({ constructLead: true, seed: 2000 + i });
+    S().kineticRoll();
+    const ids = Object.keys(S().enabledAssets || {});
+    assert.equal(kept(ids).length, 0, 'CHAOS deals no complex asset');
+  }
+  const { rollDice } = await import('../curator/dice.js');
+  const { createPersonaScorer } = await import('../curator/diceScorer.js');
+  const sc = createPersonaScorer({ assetsById: new Map(ASSETS.map((a) => [a.id, a])) });
+  const r = rollDice({ assets: ASSETS, rng: mkRng(9), scorer: sc, constructLead: true });
+  assert.ok(
+    r.candidates.every((c) => kept(c.assetIds).length === 0),
+    'casts hold no complex asset',
+  );
+  useStore.setState({ constructLead: false });
+  ok(
+    `library cut: ${complexAll.length} complex assets undealt with the gate on (KIN, CHAOS, casts); imports never cut; gate off still deals them (${off} seen)`,
+  );
 }
 
 console.log(`constructGate.selfcheck: OK (${checks} checks)`);
