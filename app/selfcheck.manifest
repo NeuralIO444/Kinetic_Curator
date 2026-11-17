@@ -115,6 +115,7 @@ node src/state/quarantine.selfcheck.mjs
 node src/state/watchdog.selfcheck.mjs
 node src/state/renderFault.selfcheck.mjs
 node src/data/normalize.selfcheck.mjs
+node src/data/quality.particleCaps.selfcheck.mjs
 node src/data/te1202.selfcheck.mjs
 node src/components/taper.selfcheck.mjs
 node src/data/helpCopy.selfcheck.mjs
@@ -409,6 +410,7 @@ node src/deal/creatureAdapter.selfcheck.mjs
 node src/deal/beastAdapter.selfcheck.mjs
 node src/panels/wetLabDeal.selfcheck.mjs
 node src/panels/wetLabBeast.selfcheck.mjs
+node src/panels/wetLabLadder.selfcheck.mjs
 node src/engine/creatureKin.selfcheck.mjs
 node src/engine/creatureMoods.selfcheck.mjs
 node src/engine/beast.selfcheck.mjs
@@ -717,6 +719,7 @@ node src/gl/gpuCultureHost.selfcheck.mjs
 node src/gl/parity/swarmSim.selfcheck.mjs
 node src/gl/parity/gpuSwarmHost.selfcheck.mjs
 node src/gl/gpuContactsHost.selfcheck.mjs
+node src/gl/liveResolve.particleCap.selfcheck.mjs
 node src/engine/particles.gpuStep.selfcheck.mjs
 node src/gl/parity/dishContacts.selfcheck.mjs
 node src/gl/parity/dishContactsResolve.selfcheck.mjs

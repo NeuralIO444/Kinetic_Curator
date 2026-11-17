@@ -1378,12 +1378,12 @@ export class ParticleSystem {
     const aliRadius2 = aliRadius * aliRadius;
     const cohRadius2 = cohRadius * cohRadius;
     const numParticles = this.n;
-    // K3 swarm takeover (#2188) — a spread-only seam on the params, like dishSession: { n, vx, vy } = the GPU kernel's post-step
-    // velocities for this system's n agents (damped, speed-clamped; the kernel ran the same forces from this system's own state).
-    // When present the force loop below does not run and the integration takes these velocities; position, wrap, heading, scale,
-    // alpha and every other derived column stay JS (float64, unchanged). Absent = the legacy path, bit for bit. The host only
-    // offers it to a plain cloud swarm (no contacts, no organism, nobody dead), where the JS force loop adds nothing else to AX.
-    const gpuStep = layoutParams.gpuStep && layoutParams.gpuStep.n === numParticles ? layoutParams.gpuStep : null;
+    // K3 swarm takeover (#2188) — a spread-only seam on the params, like dishSession: { n, fx, fy } = the GPU kernel's steering
+    // acceleration for this system's n agents (the same force sum the loop below computes, from this system's own state, already
+    // divided by mass and damped by vigor). When present the force loop below does not run: the accelerations are added to the
+    // accumulators (so contact impulses already there still count) and everything after is the legacy step unchanged: the
+    // contact pass, damping, thermal kick, speed clamp, integration in float64. Absent = the legacy path, bit for bit.
+    let gpuStep = layoutParams.gpuStep && layoutParams.gpuStep.n === numParticles ? layoutParams.gpuStep : null;
     const { cellStart, order, cols, rows, minCx, minCy, cellSize } = this._buildSpatialHash(maxRadius);
     const cx0 = this.canvasW / 2;
     const cy0 = this.canvasH / 2;
@@ -1410,6 +1410,81 @@ export class ParticleSystem {
     const SCENT = sharedScent || this._scent;
     const seedU = seed >>> 0;
 
+    // The organism form of the seam: a function, called HERE with the step's own resolved values (the eased profile, radii, weights,
+    // wind kernel, the senses that are on, the step counter), so the kernel's params come from the one derivation above and can never
+    // drift from it. It returns the same { n, fx, fy } and writes the drive / Lorenz / pigment state it advanced straight into this
+    // system's columns (vigor below reads the new energy, as the legacy loop does).
+    if (!gpuStep && typeof layoutParams.gpuStepFn === 'function' && numParticles > 0) {
+      const r = layoutParams.gpuStepFn({
+        system: this,
+        n: numParticles,
+        organism,
+        dtFrames,
+        step: this._step,
+        seed: seedU,
+        noiseSeed: this._noiseSeed,
+        noiseFreq,
+        domainOffsetX,
+        domainOffsetY,
+        nt,
+        useCurl,
+        windMul,
+        windCurrents,
+        attractorCurrents,
+        sepRadius,
+        aliRadius,
+        cohRadius,
+        sepW,
+        aliW,
+        cohW,
+        attractor:
+          attractor &&
+          Number.isFinite(attractor.x) &&
+          Number.isFinite(attractor.y) &&
+          gravityWells > 0 &&
+          attractMul > 0
+            ? attractor
+            : null,
+        attractStrength: gravityWells * attractMul * ATTRACTOR_GAIN * seekMul,
+        attractDrift: ATTRACTOR_DRIFT_SPEED * attractorDriftSign(seekMul),
+        meta: drivesOn ? meta : 0,
+        chemotaxis: chemOn ? profile.chemotaxis : 0,
+        levy: levyOn ? { gain: levyGain, alpha: levyAlpha } : null,
+        lorenz: lorenzPhase ? { rho: lorenzRho, gain: lorenzGain } : null,
+        leak: leakOn ? leak : 0,
+        scent: SCENT,
+      });
+      if (r && r.n === numParticles) gpuStep = r;
+    }
+    if (gpuStep) {
+      const GFX = gpuStep.fx;
+      const GFY = gpuStep.fy;
+      for (let i = 0; i < numParticles; i++) {
+        if (!ALIVE[i]) continue;
+        let gx = GFX[i];
+        let gy = GFY[i];
+        // #1415 — the trail read is a per-body field sample, not a neighbour term: it stays here (the same line as the loop below).
+        if (trails.on) {
+          const tg = sampleTrailReadGradient(trails, X[i] / this.canvasW, Y[i] / this.canvasH);
+          gx += (tg.gx * TRAIL_GAIN) / MASS[i];
+          gy += (tg.gy * TRAIL_GAIN) / MASS[i];
+        }
+        // the organism's centre pull (orbit) is a pure function of the position: it joins the steering sum here, before vigor
+        if (organism && profile.orbit) {
+          const o = orbitForce(X[i], Y[i], cx0, cy0, profile.orbit);
+          gx += o.fx / MASS[i];
+          gy += o.fy / MASS[i];
+        }
+        if (drivesOn) {
+          // fatigue damps the whole steering sum (never the contact impulses already in AX), on the energy the kernel just advanced
+          const vigor = 0.45 + 0.55 * ENERGY[i];
+          gx *= vigor;
+          gy *= vigor;
+        }
+        AX[i] += gx;
+        AY[i] += gy;
+      }
+    }
     for (let i = 0; i < (gpuStep ? 0 : numParticles); i++) {
       // Dead slots integrate nothing and their forces are never consumed
       // (integration skips them; _breed zeroes ax/ay on recycle) — skip the
@@ -1838,8 +1913,8 @@ export class ParticleSystem {
       const dampI = wetDrag
         ? Math.pow(damp, dtFrames) * Math.pow(mediumDampRetentionAt(wetDrag(X[i], Y[i])), dtFrames)
         : dampDt;
-      let vxi = gpuStep ? gpuStep.vx[i] : (VX[i] + AX[i] * dtFrames) * dampI;
-      let vyi = gpuStep ? gpuStep.vy[i] : (VY[i] + AY[i] * dtFrames) * dampI;
+      let vxi = (VX[i] + AX[i] * dtFrames) * dampI;
+      let vyi = (VY[i] + AY[i] * dtFrames) * dampI;
       // #1538 — TEMPO: the thermal kick (law in dishThermal.mjs).
       // A Brownian velocity impulse, one draw per axis per body per
       // step from the dyn channel — step-mixed keys in the curiosity
@@ -1855,7 +1930,7 @@ export class ParticleSystem {
         vyi += (hashU01(seedU, CH.dyn, tk + 1048583) * 2 - 1) * thermal.amp * dtSqrt;
       }
       const speed = Math.sqrt(vxi * vxi + vyi * vyi);
-      if (speed > maxSpeed && !gpuStep) {
+      if (speed > maxSpeed) {
         vxi = (vxi / speed) * maxSpeed;
         vyi = (vyi / speed) * maxSpeed;
       }

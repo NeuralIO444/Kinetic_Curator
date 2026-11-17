@@ -5,8 +5,9 @@
 // their ATTACH points and reused with scale and rotation. Its pieces are its recipe, so the same list that
 // builds it is the list the field later breaks it into.
 //
-// This slice is data only: the assembler deals a RECORD. Nothing draws it, nothing saves it, nothing on stage
-// reads it (the tile composer, the record door and the deal are their own slices).
+// Data only: the assembler deals a RECORD, and the composer (slice 2, below) turns a record into ONE pool
+// tile's drawing. Nothing saves a record and nothing on stage reads one yet (the record door, the bank and
+// the deal are their own slices).
 //
 // Pure and deterministic (spec §4): no clock, no Math.random. Every draw rides the registered 'construct'
 // string channel — its own stream, so a construct deal never re-keys a creature deal sharing the seed — keyed
@@ -18,6 +19,7 @@
 
 import { hashU01 } from './kernel/rng.js';
 import { sanitizeAttachPoints, ATTACH_BOX, MAX_ATTACH } from './assetAttach.js';
+import { assetCostScore, COST_WARNING_THRESHOLD } from '../assets/ingest.js'; // the price of a drawing, whoever drew it
 
 export const CONSTRUCT_KIND = 'kc-construct/1';
 /** The string channel every construct draw rides (registered in kernel/rng.js STRING_CHANNEL_GROUPS). */
@@ -219,3 +221,73 @@ export function assembleConstruct({ style, vocabulary = [], seed = 0, rotations 
 
 /** Where a record's piece puts a point of its own box, in the construct's box. For the composer and the tests. */
 export const constructPartPoint = (part, p) => place(part, p);
+
+// ── Slice 2: the construct as ONE pool tile ───────────────────────────────────────────────────────────────────
+//
+// The tile is a pure function of the record (spec §4): composing its drawing is string work, so the same
+// record always bakes the same tile and a take that names the tile replays the shape exactly. Every piece is
+// its primitive's own drawing inside one `<g transform>` — the creature tile's discipline, N times. On stage
+// the whole composition costs one atlas cell.
+
+/** A construct tile's pool category and source: what it is, said by the record rather than by its id. */
+export const CONSTRUCT_CATEGORY = 'construct';
+export const CONSTRUCT_SOURCE = 'construct';
+/** True for a construct tile as a POOL RECORD — by what it is (category + source), never by its id. */
+export const isConstructTile = (asset) =>
+  !!asset && asset.category === CONSTRUCT_CATEGORY && asset.source === CONSTRUCT_SOURCE;
+
+const validPart = (part) =>
+  !!part &&
+  validId(part.asset) &&
+  [part.x, part.y, part.s, part.r].every((n) => typeof n === 'number' && Number.isFinite(n)) &&
+  part.s > 0;
+
+/**
+ * The tile's SVG: each piece's own drawing, moved to its join — translate, then turn, then size, so a point p
+ * of the piece's box lands at T + R(r)·s·p, exactly where the assembler placed it.
+ * @param record  a construct record.
+ * @param svgOf   (assetId) => that primitive's svg markup, or nothing when the pool no longer carries it.
+ * @returns the markup, or null when any piece cannot be drawn: no tile without every piece (a construct with a
+ *   hole in it is a different shape, and the record would no longer describe its tile).
+ */
+export function constructTileSvg(record, svgOf) {
+  if (!record || !Array.isArray(record.parts) || !record.parts.length || typeof svgOf !== 'function') return null;
+  let out = '';
+  for (const part of record.parts) {
+    if (!validPart(part)) return null;
+    const svg = svgOf(part.asset);
+    if (typeof svg !== 'string' || !svg) return null;
+    out += `<g transform="translate(${part.x} ${part.y}) rotate(${part.r}) scale(${part.s})">${svg}</g>`;
+  }
+  return out;
+}
+
+/**
+ * What the bake owes before it is banked (spec §5): the drawing's cost score, and whether it is over the
+ * house warning line. Over the line is a warning to show, never a silent bake and never a refusal.
+ */
+export function constructCost(svg) {
+  const score = assetCostScore(svg);
+  return { score, over: score > COST_WARNING_THRESHOLD };
+}
+
+/**
+ * The pool entry for a record — an ordinary pool asset. Returns null when the tile cannot be drawn.
+ * `points` are the construct's own ATTACH points (the joins it left free), carried on the tile so a consumer
+ * never has to guess them from the composed markup.
+ */
+export function constructTile(record, svgOf) {
+  const svg = constructTileSvg(record, svgOf);
+  if (!svg || !validId(record.style) || !/^cn-[0-9a-f]{8}$/.test(record.id)) return null;
+  return {
+    id: constructTileId(record.id),
+    category: CONSTRUCT_CATEGORY,
+    weight: 'medium',
+    tags: ['construct', record.style],
+    compound: true,
+    source: CONSTRUCT_SOURCE,
+    svg,
+    points: sanitizeAttachPoints(record.points).map((p) => ({ x: p.x, y: p.y })),
+    cost: constructCost(svg),
+  };
+}
