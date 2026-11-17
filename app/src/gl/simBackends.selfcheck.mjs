@@ -150,4 +150,32 @@ await ok(
   },
 );
 
+// K3 swarm takeover (#2188) — the swarm backend may now be 'gpu.swarm.v1': a take whose frames carried the swarmGpu marker.
+await ok(
+  'F: the swarm takeover stamp — gpu.swarm.v1 is known, decisions-exact, stamped exactly when a frame carried the marker',
+  async () => {
+    const gs = currentSimStamp({ ...DEFAULT_SIM_BACKENDS, swarm: 'gpu.swarm.v1' });
+    assert.equal(gs.simLaw, 'decisions-exact');
+    assert.deepEqual(checkSimStamp(gs.simLaw, gs.simBackends), gs);
+    assert.deepEqual(
+      unrunnableSimBackends(gs.simBackends),
+      [],
+      "a take that names it still replays here (the JS swarm runs; sim outcomes are the device's own)",
+    );
+    const rec = (marker) => {
+      const r = createPerformanceRecorder();
+      r.onInput({ loopTimeMs: 0, ...(marker ? { swarmGpu: 1 } : {}) });
+      r.onOutput({ layers: [] });
+      return r.finish();
+    };
+    const g = rec(true);
+    assert.equal(g.simBackends.swarm, 'gpu.swarm.v1');
+    assert.equal(g.simLaw, 'decisions-exact');
+    assert.equal(checkPerformance(JSON.parse(JSON.stringify(g))).simBackends.swarm, 'gpu.swarm.v1');
+    const j = rec(false);
+    assert.equal(j.simBackends.swarm, 'js.swarm.v1', 'no marker = the unchanged all-JS header');
+    assert.equal(j.simLaw, 'js-exact');
+  },
+);
+
 console.log(`simBackends.selfcheck: OK (${n} groups) — K1 slice 1 #2186`);

@@ -231,6 +231,7 @@ export function createPerformanceRecorder({
   let pending = false; // an input was recorded and its output has not arrived yet
   let gpuCulture = false; // K2 slice 2b — some frame's culture grid came from the GPU (input.dishCultureCells)
   let gpuContacts = false; // K3 slice 2c — some frame's contact list came from the GPU (input.dishContactStamps)
+  let gpuSwarm = false; // K3 takeover — some frame carried the swarmGpu marker (the GPU kernel's velocities drove eligible swarms)
   let gpuFluid = false; // K1 slice 4c — some frame's fluid field came from the GPU (input.dishFluidCells)
   return {
     get frames() {
@@ -252,6 +253,7 @@ export function createPerformanceRecorder({
       if (input && input.dishFluidCells) gpuFluid = true;
       if (input && input.dishCultureCells) gpuCulture = true;
       if (input && input.dishContactStamps) gpuContacts = true;
+      if (input && input.swarmGpu) gpuSwarm = true;
       log.record(input);
       pending = true;
     },
@@ -281,6 +283,7 @@ export function createPerformanceRecorder({
           ...DEFAULT_SIM_BACKENDS,
           ...(gpuFluid ? { fluid: 'gpu.gs.v1' } : {}),
           ...(gpuCulture ? { culture: 'gpu.life.v1' } : {}),
+          ...(gpuSwarm ? { swarm: 'gpu.swarm.v1' } : {}),
           ...(gpuContacts ? { contacts: 'gpu.contacts.v1' } : {}),
         }),
         frames,

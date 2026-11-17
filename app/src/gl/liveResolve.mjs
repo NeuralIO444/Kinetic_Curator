@@ -808,7 +808,7 @@ export function createLiveResolver() {
       if (
         liveSwarmGl &&
         !swarmShadowDead &&
-        gpuSwarmWanted(ctx.layoutParams, typeof window !== 'undefined' ? window : null)
+        (ctx.swarmGpu || gpuSwarmWanted(ctx.layoutParams, typeof window !== 'undefined' ? window : null))
       ) {
         try {
           if (!swarmShadow) swarmShadow = createGpuSwarmHost(liveSwarmGl());
@@ -819,14 +819,19 @@ export function createLiveResolver() {
             loopTimeMs: ctx.loopTimeMs,
             seedOffsets: ctx.seedOffsets,
             slowRender: ctx.slowRender,
+            noiseSeed: worldNoise ? worldNoiseSeed || 444 : null,
+            dtSec: ctx.dtSec,
           });
         } catch (e) {
           swarmShadowDead = true; // fail soft: the JS swarm is the reference and never waits on the shadow
           console.warn('[gpuSwarm] shadow disabled for this session:', e && e.message ? e.message : e);
         }
       }
+      // K3 takeover: the loop's `swarmGpu` input marker is the switch (recorded, so the take's header says the GPU ran). The kernel's
+      // velocities replace the JS force loop for an eligible layer; anything else (or a blocker this frame) runs the JS step as always.
+      const gpuStep = ctx.swarmGpu && shadowTok ? swarmShadow.velocities(shadowTok, st.system) : null;
       st.system.update(
-        updLp,
+        gpuStep ? { ...updLp, gpuStep } : updLp,
         ctx.activeAssets,
         ctx.palette,
         ctx.seed,
@@ -1302,6 +1307,7 @@ export function createLiveResolver() {
           scaleMul: input.scaleMul ?? 1,
           alphaBoost: input.alphaBoost ?? 0,
           slowRender: !!input.slowRender,
+          swarmGpu: !!input.swarmGpu,
           attractor: input.attractor ?? null,
           phraseWrapGen: input.phraseWrapGen || 0,
           // Spine A (#387): dt clock + loop time replace Date.now().
