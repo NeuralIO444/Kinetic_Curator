@@ -8,6 +8,7 @@ import {
   sceneRuntimeResets,
   pushSceneUndo,
 } from '../sceneApply.js'; // #2322 — the scene half of a document, shared with recipes and undo
+import { assetStyle } from '../../data/assetStyle.js'; // #2339 — PAINT: a body's Canon style
 import {
   sanitizeOverlay,
   OVERLAY_CAP, // #1850
@@ -1104,6 +1105,7 @@ export const createGlobalSlice = (set) => ({
         lookId: picks && picks.lookId ? picks.lookId : null,
         voiceId: picks && picks.voiceId ? picks.voiceId : null,
         kept: picks ? picks.kept : undefined,
+        styleId: picks && picks.styleId ? picks.styleId : null, // #2339 — the body's Canon style
       });
       return rec ? bankCreature(state, rec) : {};
     }),
@@ -1232,6 +1234,7 @@ export const createGlobalSlice = (set) => ({
         legalBodies,
         donors: bank.filter((r) => r.id !== rec.id),
         bodyAttachPoints,
+        bodyStyle: bodyAsset ? assetStyle(bodyAsset) : null, // #2339 — a first material for a pre-PAINT creature
       });
       if (!edited) return refuse(refusal);
       const tileId = creatureTileId(edited.id);

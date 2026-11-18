@@ -395,6 +395,8 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // creature through its pool TILE alone.
     'panels/WetLabDealStrip.jsx',
     'panels/wetLabDeal.selfcheck.mjs',
+    // #2339: PAINT's material-gene suite — a test of the assembler and breeder, not a stage reader
+    'engine/creatureMaterial.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

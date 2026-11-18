@@ -22,6 +22,7 @@ import { attachPointsFor } from '../engine/autoAttach.js';
 import { cultivationNote } from '../components/cultivate.model.mjs';
 import { CURATED_SETS, scopeDecks } from '../state/kineticScope.mjs';
 import { hash32, u01, pickIndex } from './dealKey.mjs';
+import { assetStyle } from '../data/assetStyle.js'; // #2339 — the body's Canon style deals its material
 
 /** The ladder, narrowest first: the stage's own four ids and labels (ruling Q1). */
 export const CREATURE_SCOPES = Object.freeze([
@@ -119,6 +120,7 @@ function founder(scope, { seed, press, attempt, ctx }, assets) {
     seed: seedOf(`${stem}|seed`),
     lookId,
     voiceId: voice.id,
+    styleId: assetStyle(asset),
   });
   return rec ? cultivated(rec, assets, seed) : null;
 }

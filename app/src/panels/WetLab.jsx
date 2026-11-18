@@ -25,6 +25,7 @@ import { MUTATION_RATE, BREED_PARENTS } from '../engine/creatureBreed.js'; // #1
 import { COMPOSITION_PRESETS } from '../data/presets.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
 import { ASSETS } from '../data/assets/index.js';
+import { assetStyle } from '../data/assetStyle.js'; // #2339 — PAINT: a creature's material is its body's style
 import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
 import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
 import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
@@ -794,6 +795,7 @@ export function WetLab({ assetId, onClose }) {
                       lookId: lookPick || null,
                       voiceId: voicePick || null,
                       kept,
+                      styleId: assetStyle(asset), // #2339 — PAINT: the body's style deals its material
                     })
                   }
                 >
