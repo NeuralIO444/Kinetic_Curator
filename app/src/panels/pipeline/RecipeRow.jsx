@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useStore } from '../../state/store.js';
 import { parseRecipe, recipeToProjectDoc, recipeApplyOptions, copyTextToClipboard } from '../../state/recipes.js';
 import { recipeFieldsFromState } from '../../state/recipeLive.js';
+import { sceneFrame0Hash, fidelityNotice } from '../../state/recipeFidelity.js';
+import { serializeProject } from '../../state/projectDocument.js';
 import {
   encodeRecipeUrl,
   decodeRecipeUrl,
@@ -31,7 +33,9 @@ export function RecipeRow({ onMessage }) {
     const store = useStore.getState();
     const fields = recipeFieldsFromState(store);
     const { dropped } = await fitCustomAssets(fields.scene);
-    const payload = await encodeRecipeUrl(fields);
+    // #2325 — the link carries the hash of its own frame 0, so the receiver can tell a different build.
+    const frame0Hash = await sceneFrame0Hash(serializeProject(store));
+    const payload = await encodeRecipeUrl(frame0Hash ? { ...fields, frame0Hash } : fields);
     const href = buildShareHref(payload, typeof window !== 'undefined' ? window.location.href : '');
     const ok = await copyTextToClipboard(href);
     if (ok) {
@@ -47,7 +51,7 @@ export function RecipeRow({ onMessage }) {
     }
   };
 
-  const applyUrlRecipe = (recipe) => {
+  const applyUrlRecipe = async (recipe) => {
     // #2322 — a recipe is an edit of the stage: the scene keys it carries are replaced, the rig (title, audio
     // routes, MIDI, macros, fps) is left alone, and ONE undo step brings the old scene back. The seed offsets and
     // the palette overrides ride in the doc; the follow-up store calls this used to make would each have been a
@@ -61,8 +65,11 @@ export function RecipeRow({ onMessage }) {
     setText('');
     setOpen(false);
     const note = describeDroppedAssets(recipe.droppedCustomAssets);
-    onMessage(note ? `Link applied · ${note}` : 'Link applied');
-    setTimeout(() => onMessage(null), 2000);
+    // #2325 — diagnostic only: a different frame 0 adds a note, it never undoes or blocks the apply.
+    const drift = await fidelityNotice(recipe, useStore.getState());
+    const notes = [note, drift].filter(Boolean).join(' · ');
+    onMessage(notes ? `Link applied · ${notes}` : 'Link applied');
+    setTimeout(() => onMessage(null), drift ? 6000 : 2000);
   };
 
   const applyRecipe = async () => {
@@ -74,7 +81,7 @@ export function RecipeRow({ onMessage }) {
         onMessage(`Link: ${result.error}`);
         return;
       }
-      applyUrlRecipe(result.recipe);
+      await applyUrlRecipe(result.recipe);
       return;
     }
     const result = parseRecipe(text);
