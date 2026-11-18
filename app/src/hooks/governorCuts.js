@@ -238,6 +238,13 @@ export const GOVERNOR_RESTORE_CUTS = [
     needsRestore: (s, ctx) => ctx.healthy && !!s.slowRender && s.slowRenderSource === 'cut6',
     restoredLabel: 'freeze frame off — motion back',
   },
+  {
+    kind: 'constructCollapse',
+    // #2327 (gait ruling 5) — the last shed before the ladder runs out: constructs collapse from live pieces to their
+    // flat tiles, after the freeze has pinned every piece at rest (so the swap never pops). The first restored.
+    needsRestore: (s, ctx) => ctx.healthy && !!s.constructCollapse,
+    restoredLabel: 'constructs back as live pieces',
+  },
 ];
 
 /** Dynamic resolution ladder — the primary shed. GPU headroom means the
@@ -431,6 +438,14 @@ export function nextGovernorCut(s) {
   // evolve/ambient-drift/ACCUM/swarm). A still instrument beats a dead one.
   if (!s.slowRender) {
     return { kind: 'slowRender', label: 'FREEZE FRAME — motion held' };
+  }
+
+  // Cut 6.5 (#2327, gait ruling 5: freeze → pin → collapse to the flat tile → zero): constructs drawn as live pieces
+  // collapse to their tiles. Only after the freeze above, so every piece rests where its tile draws and the swap is
+  // exact. Opt-in per caller (`constructPiecesActive === true` = the CONSTRUCTS gate is on, not already collapsed)
+  // so older callers and their pinned ladder walks keep the ladder exactly as it was.
+  if (s.constructPiecesActive === true && !s.constructCollapse) {
+    return { kind: 'constructCollapse', constructCollapse: true, label: 'CONSTRUCTS COLLAPSE — pieces rest as tiles' };
   }
 
   // Ladder exhausted — hold. Only from here is the watchdog (cut 7)
@@ -652,6 +667,8 @@ export function shedSummary(s) {
   }
   // #1574 — and about a travel shed: held marks read as settled home.
   if (s.travelShed) out.push('travel held');
+  // #2327 — and about a construct collapse: the constructs draw as flat tiles.
+  if (s.constructCollapse) out.push('constructs as tiles');
   // #264 — governor-shed quality is a shed like any other: the badge shows
   // it. qualityShedFrom is only set by the governor's own shed, so a
   // user-chosen tier never appears here.

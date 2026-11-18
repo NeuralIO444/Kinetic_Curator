@@ -414,6 +414,7 @@ node src/engine/constructBank.selfcheck.mjs
 node src/engine/constructPool.selfcheck.mjs
 node src/engine/constructHouse.selfcheck.mjs
 node src/engine/constructPieces.selfcheck.mjs
+node src/engine/constructStage.selfcheck.mjs
 node src/data/constructCatalogue.selfcheck.mjs
 node src/state/constructGate.selfcheck.mjs
 node src/engine/creatureInjection.selfcheck.mjs
@@ -755,3 +756,4 @@ node src/gl/gpuFluidHost.selfcheck.mjs
 node src/engine/dishFluidCells.selfcheck.mjs
 node src/engine/dishCultureCells.selfcheck.mjs
 node src/engine/gait.selfcheck.mjs
+node src/hooks/constructCollapse.selfcheck.mjs

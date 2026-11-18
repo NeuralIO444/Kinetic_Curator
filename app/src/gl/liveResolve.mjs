@@ -99,7 +99,8 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js'; // #2002:
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js'; // #2005: the poem-only plate stamps
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js'; // #2008: the grammar-composed riso icons
-import { ASSETS_CONSTRUCTS } from '../data/assets/index.js'; // #2108: the house constructs (catalogue-only until the gate)
+import { ASSETS_CONSTRUCTS, HOUSE_CONSTRUCT_RECORDS } from '../data/assets/index.js'; // #2108: the house constructs (catalogue-only until the gate); #2327: and their records
+import { constructPieceItems } from '../engine/constructStage.js'; // #2327: a construct tile dealt as its live pieces
 
 // #1982 — the kana stamps are catalogue members for the census and the stage
 // atlas, but they are dealt by the FIELD director alone (Teijo's native
@@ -1690,6 +1691,16 @@ export function createLiveResolver() {
       // The coalescence fields turn with the marks they fuse. At detent
       // 0 (the absence state) both pass through untouched — the same
       // array references, the same contract, the same hash.
+      // #2327 — constructs as live pieces. Gated by `input.constructPieces` (absent = off = the SAME array, so today's
+      // render is today's): a construct's flat tile deals as its pieces, parent-transformed, resting exactly where the
+      // tile draws. Matt's ruling (2026-11-18): AT REST a construct stays its tile, so it deals pieces only for a `moving`
+      // source — none is passed until gait M3/M4, so every construct draws as its tile. The rotation turns all alike.
+      if (input.constructPieces) {
+        items = constructPieceItems(items, {
+          enabled: true,
+          recordOf: (id) => HOUSE_CONSTRUCT_RECORDS.get(id) || null,
+        });
+      }
       const rotation = stratumRotationOf(layer);
       out.push({
         id: layer.id,

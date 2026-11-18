@@ -201,6 +201,9 @@ export function sceneRuntimeResets() {
     accumFeedShed: false,
     // #1837 — the steering shed is likewise a governor claim on the OLD document's look.
     trailSteerShed: false,
+    // #2327 — the construct collapse is likewise a governor claim on the OLD document's constructs.
+    constructCollapse: false,
+    constructPiecesLive: false,
   };
 }
 

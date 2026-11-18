@@ -118,6 +118,7 @@ import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
 import { createBallisticsState, processBallistics, resetBallistics } from './audioBallistics.mjs';
 import { createRenderFaultTracker, RENDER_FAULT_FAILS, frameFaultReason, bakeFaultReason } from './renderFault.mjs';
+import { constructPiecesDealtTotal } from '../engine/constructStage.js'; // #2327: arms the collapse rung only while pieces are on stage
 
 /**
  * #265 — the atlas is resolution-independent (asset/color combos only), so
@@ -450,6 +451,7 @@ export function createLiveLoop(
   // param gpuContacts, window.__KC_GPU_CONTACTS or ?gpuContacts=1 asks. The host detects on the end-of-step body table and reads back
   // late; the list rides the NEXT resolve as the RECORDED input.dishContactStamps, so live == replay on any device.
   let gpuContactsHost = null;
+  let lastConstructDealt = constructPiecesDealtTotal(); // #2327 review: pieces on stage = the counter moved this frame
   let gpuContactsDead = false;
   const disposeDishFluidMagnets = installDishFluidMagnets(canvas, getState);
   // FLOW wire: one curl table per project seed, shared with the swarm.
@@ -1149,6 +1151,10 @@ export function createLiveLoop(
           }
         : {}),
       ...(s.trailSteerShed ? { trailSteerShed: true } : {}),
+      // #2327 (gait ruling 5) — constructs draw as live pieces while the CONSTRUCTS gate is on and the governor has not
+      // collapsed them (cut 6.5). Stamped only when on, so a frame without it carries exactly the older input shape and a
+      // take replays what the frame ran with.
+      ...(s.constructLead === true && !s.constructCollapse ? { constructPieces: true } : {}),
       assetAttach: s.assetAttach, // #1355: the artist's attach points (where the wings join)
       scaleMul,
       alphaBoost,
@@ -1165,6 +1171,14 @@ export function createLiveLoop(
       // use. mixSeconds<=0 means "instant", same as before.
       mixSeconds,
     });
+    // #2327 review — the governor's construct collapse rung arms only while constructs are actually dealt as pieces
+    // (today none moves, so it never does). The store is written only when the answer changes.
+    {
+      const dealtNow = constructPiecesDealtTotal();
+      const piecesLive = dealtNow !== lastConstructDealt;
+      lastConstructDealt = dealtNow;
+      if (piecesLive !== (s.constructPiecesLive === true)) getState().setConstructPiecesLive(piecesLive);
+    }
     // K3 contacts producer — queue detection on this frame's end-of-step body table (never waits; the list lands on a later frame).
     if (gpuContactsHost) {
       try {

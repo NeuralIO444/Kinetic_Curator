@@ -223,6 +223,10 @@ export function usePerformanceGovernor() {
   // may exist, ACCUM is on (no buffer, no grid), and the tier-1 shed has not
   // already killed the buffer the grid reads. #1838: either pole activates
   // the rung — the ember weight, or the signed fresh weight.
+  const constructCollapse = useStore((s) => s.constructCollapse); // #2327 cut 6.5
+  const setConstructCollapse = useStore((s) => s.setConstructCollapse);
+  // #2327 review: only while pieces are actually drawn (the CONSTRUCTS gate on AND the loop dealing them)
+  const constructPiecesActive = useStore((s) => s.constructLead === true && s.constructPiecesLive === true);
   const trailSteerShed = useStore((s) => s.trailSteerShed);
   const setTrailSteerShed = useStore((s) => s.setTrailSteerShed);
   const trailSteerActive =
@@ -276,6 +280,8 @@ export function usePerformanceGovernor() {
       travelActive,
       travelShed,
       slowRender,
+      constructPiecesActive,
+      constructCollapse,
       gpuSaturated,
     }),
     [
@@ -303,6 +309,8 @@ export function usePerformanceGovernor() {
       travelActive,
       travelShed,
       slowRender,
+      constructPiecesActive,
+      constructCollapse,
       gpuSaturated,
     ],
   );
@@ -625,6 +633,7 @@ export function usePerformanceGovernor() {
       feedbackWarpShed,
       accumFeedShed,
       trailSteerShed,
+      constructCollapse,
     };
     for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
       if (!cut.needsRestore(snap, { healthy })) continue;
@@ -675,6 +684,9 @@ export function usePerformanceGovernor() {
           break;
         case 'slowRender':
           setSlowRender(false);
+          break;
+        case 'constructCollapse':
+          setConstructCollapse(false);
           break;
         default:
           break;
@@ -762,6 +774,9 @@ export function usePerformanceGovernor() {
       case 'slowRender':
         setSlowRender(true, 'cut6');
         break;
+      case 'constructCollapse':
+        setConstructCollapse(true);
+        break;
       default:
         break;
     }
@@ -819,6 +834,8 @@ export function usePerformanceGovernor() {
     slowRender,
     slowRenderSource,
     setSlowRender,
+    constructCollapse,
+    setConstructCollapse,
     shedFps,
     recoverFps,
     gpuSaturated,

@@ -56,12 +56,26 @@ export function houseConstructs(findAsset, assetAttach = null) {
   return out;
 }
 
-/** The house set's pool tiles: records whose every piece the pool can draw. Others are left out. */
-export function houseConstructTiles(findAsset, assetAttach = null) {
+/**
+ * The house set as tiles AND the records they were baked from, in one pass (#2327: the stage deals a construct as its
+ * pieces from the record, so the record must stay reachable). Only records whose every piece the pool can draw.
+ */
+export function houseConstructSet(findAsset, assetAttach = null) {
   const tiles = [];
+  const records = [];
+  const byTile = new Map(); // pool tile id → the record it was baked from
   for (const rec of houseConstructs(findAsset, assetAttach)) {
     const tile = constructTile(rec, (id) => findAsset(id)?.svg);
-    if (tile) tiles.push(tile);
+    if (tile) {
+      tiles.push(tile);
+      records.push(rec);
+      byTile.set(tile.id, rec);
+    }
   }
-  return tiles;
+  return { tiles, records, byTile };
+}
+
+/** The house set's pool tiles: records whose every piece the pool can draw. Others are left out. */
+export function houseConstructTiles(findAsset, assetAttach = null) {
+  return houseConstructSet(findAsset, assetAttach).tiles;
 }

@@ -16,7 +16,7 @@ import { ASSETS_WEAR } from './assets-wear.js';
 import { ASSETS_RISO } from './assets-riso.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
-import { houseConstructTiles } from '../../engine/constructHouse.js'; // #2108: the construct house set
+import { houseConstructSet } from '../../engine/constructHouse.js'; // #2108: the construct house set
 import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes (#725) baked for the library
 
 /** The catalogue as authored, before the baked mattes are attached (what the bake reads). */
@@ -62,7 +62,10 @@ const CREATURE_CITIZEN = {
 // authored content, excluded by id on every dealing surface. Nothing deals them yet; the gate that lifts that
 // exclusion is the next slice, so every existing roll, deal and take stays as it was.
 const authoredById = new Map(ASSETS_AUTHORED.map((a) => [a.id, a]));
-export const ASSETS_CONSTRUCTS = houseConstructTiles((id) => authoredById.get(id));
+const HOUSE_CONSTRUCTS = houseConstructSet((id) => authoredById.get(id));
+export const ASSETS_CONSTRUCTS = HOUSE_CONSTRUCTS.tiles;
+/** #2327 — the house constructs' records by pool tile id: the stage deals a construct as pieces from its record. */
+export const HOUSE_CONSTRUCT_RECORDS = HOUSE_CONSTRUCTS.byTile;
 
 export const ASSETS = [
   ...ASSETS_AUTHORED.map((a) => (BAKED_REGIONS[a.id] ? { ...a, ...BAKED_REGIONS[a.id] } : a)),
