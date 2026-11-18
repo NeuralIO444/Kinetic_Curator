@@ -38,6 +38,13 @@ export function constructPieceItems(
     if (!it || typeof it.assetId !== 'string') continue;
     if (!finite(it.x) || !finite(it.y) || !finite(it.scale) || !(it.scale > 0) || !finite(it.rotation ?? 0)) continue;
     if (it.scaleY !== undefined && !(Math.abs(it.scaleY - it.scale) <= SQUARE_EPS * Math.max(1, it.scale))) continue;
+    // A mirrored copy (buildPlacements' mirror, bilateral symmetry) stays its tile: the pieces are placed unreflected,
+    // so a reflected copy would deal them off its tile (review of #2374: up to 63 px at scale 0.8).
+    if (it._mirrored) continue;
+    // A blended tile (screen, multiply…) stays its tile: blending each piece against the pieces under it is not
+    // blending the whole mark once. (A see-through tile still deals: where its pieces overlap at a join they read a
+    // little denser than the flat tile — flagged to Matt on #2327; the rest pose itself is exact.)
+    if (it.blend && it.blend !== 'normal') continue;
     const record = recordOf(it.assetId);
     if (record) found.push({ key: i, record });
   }
