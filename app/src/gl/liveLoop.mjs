@@ -1149,6 +1149,10 @@ export function createLiveLoop(
           }
         : {}),
       ...(s.trailSteerShed ? { trailSteerShed: true } : {}),
+      // #2327 (gait ruling 5) — constructs draw as live pieces while the CONSTRUCTS gate is on and the governor has not
+      // collapsed them (cut 6.5). Stamped only when on, so a frame without it carries exactly the older input shape and a
+      // take replays what the frame ran with.
+      ...(s.constructLead === true && !s.constructCollapse ? { constructPieces: true } : {}),
       assetAttach: s.assetAttach, // #1355: the artist's attach points (where the wings join)
       scaleMul,
       alphaBoost,

@@ -112,6 +112,7 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   // #1997 re-pin (cause: the ferrofluid joins the restore table right after its sibling the
   // culture — cut 1.395 sheds after it, so the reverse walk restores the fluid first; the full
   // walk is pinned in governorDishFluid.selfcheck).
+  // #2327 — 'constructCollapse' joins last (cut 6.5): after the freeze, so pieces rest where their tiles draw.
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
   assert.deepStrictEqual(order, [
     'fxaa',
@@ -128,6 +129,7 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
     'assetThin',
     'countClamp',
     'slowRender',
+    'constructCollapse', // #2327: cut 6.5, after the freeze; the first restored (pinned in constructCollapse below)
   ]);
   console.log(
     '[selfcheck] governorCuts (#264 restore coverage):',
