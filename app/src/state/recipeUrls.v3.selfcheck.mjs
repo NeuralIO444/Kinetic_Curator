@@ -451,7 +451,8 @@ function dress(over = {}) {
     });
     const fields = recipeFieldsFromState(S());
     assert.ok(Object.keys(fields.scene).length >= 8, `${name}: the scene is really dressed`);
-    const link = await encodeRecipeUrl(fields, { buildId: 'abc1234' });
+    // #2325 — the budget holds WITH the frame-0 proof (`f`, 16 hex) on the link.
+    const link = await encodeRecipeUrl({ ...fields, frame0Hash: '276009aa90fb8c42' }, { buildId: 'abc1234' });
     const href = buildShareHref(link, BASE);
     results.push(`${name} ${href.length}`);
     assert.ok(href.length <= 2000, `${name}: ${href.length} URL characters (budget 2000)`);

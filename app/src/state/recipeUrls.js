@@ -26,6 +26,7 @@ import { RECIPE_OFFSET_CHANNELS, readSeedOffsets } from './recipes.js';
 import { expandStack, stackOf } from './recipeStack.js';
 import { LAYOUT_DEFAULTS_EPOCH, defaultsForEpoch } from '../data/recipeDefaults/index.js';
 import { sceneBlockFrom } from './recipeSceneKeys.js';
+import { isFrame0Hash } from './recipeFidelity.js';
 
 /** Version tag — cleartext prefix of every recipe URL. Bump on format change. */
 export const RECIPE_URL_VERSION = 'kc-r/1';
@@ -362,7 +363,7 @@ export function describeDroppedAssets(n) {
  * Fields: { seed, seedOffsets, paletteId, paletteOverrides?, layoutParams, stack?, scene? } — `scene` is the scene
  * block (recipeSceneKeys.pickSceneBlock of `sceneOf(state)`); a carrier without one (a favorite) writes no `x`.
  * The layout is a delta against the frozen defaults of the epoch the link names, never the live defaults.
- * opts: { buildId }.
+ * `frame0Hash` (optional, 16 hex) is the #2325 fidelity proof, written as `f`. opts: { buildId }.
  */
 export async function encodeRecipeUrl(fields, opts = {}) {
   const f = fields && typeof fields === 'object' ? fields : {};
@@ -383,6 +384,8 @@ export async function encodeRecipeUrl(fields, opts = {}) {
   if (Object.keys(o).length) payload.o = o;
 
   if (typeof f.paletteId === 'string' && f.paletteId) payload.p = f.paletteId;
+  // #2325 — the optional frame-0 hash (recipeFidelity.sceneFrame0Hash); a malformed one is simply not written.
+  if (isFrame0Hash(f.frame0Hash)) payload.f = f.frame0Hash;
   if (f.paletteOverrides !== undefined && f.paletteOverrides !== null) payload.po = f.paletteOverrides;
 
   // No always-write list here: a v3 link is read against its own epoch, so an absent key means the epoch's default.
@@ -482,6 +485,7 @@ async function decodeV3Url(t) {
       scene: sceneBlockFrom(json.x),
       layoutEpoch: json.d,
       buildId: typeof json.b === 'string' ? json.b.slice(0, 40) : null,
+      ...(isFrame0Hash(json.f) ? { frame0Hash: json.f } : {}),
       droppedCustomAssets: Number.isInteger(json.n) && json.n > 0 ? Math.min(json.n, 9999) : 0,
     },
   };

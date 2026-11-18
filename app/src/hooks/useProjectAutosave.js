@@ -7,6 +7,7 @@ import { decideBoot } from '../state/startupBoot.mjs';
 import { projectDirty } from '../state/projectWatch.mjs'; // every field the document saves
 import { recipeToProjectDoc, recipeApplyOptions } from '../state/recipes.js';
 import { parseBootHash, describePaletteFallback, describeDroppedAssets } from '../state/recipeUrls.js';
+import { fidelityNotice } from '../state/recipeFidelity.js';
 import { scopeDecks } from '../state/kineticScope.mjs'; // #1772: START sets the opener's width
 import { projectFolderLive } from './useProjectFolder.js'; // #1709: a project folder, when one is open
 
@@ -96,11 +97,21 @@ async function bootFromHash() {
   );
   const fb = describePaletteFallback(recipe.paletteId, st.userPalettes);
   const dropped = describeDroppedAssets(recipe.droppedCustomAssets);
-  st.setBootNotice(
+  const bootNote =
     (fb
       ? `Opened from link · palette "${fb.requested}" not here — using "${fb.used}"`
-      : 'Opened shared scene from link') + (dropped ? ` · ${dropped}` : ''),
-  );
+      : 'Opened shared scene from link') + (dropped ? ` · ${dropped}` : '');
+  st.setBootNotice(bootNote);
+  // #2325 — the fidelity proof, off the boot path: it loads the resolver, so it never delays the first frame.
+  // Diagnostic only; it appends to the notice and never blocks or undoes anything.
+  if (recipe.frame0Hash) {
+    const landed = useStore.getState();
+    void fidelityNotice(recipe, landed)
+      .then((drift) => {
+        if (drift) useStore.getState().setBootNotice(`${bootNote} · ${drift}`);
+      })
+      .catch(() => {});
+  }
   try {
     sessionStorage.setItem(RESTORED_FLAG, '1');
   } catch {

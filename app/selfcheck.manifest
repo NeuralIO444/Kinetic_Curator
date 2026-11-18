@@ -110,6 +110,7 @@ node src/state/allEraGolden.selfcheck.mjs
 node src/state/recipes.selfcheck.mjs
 node src/state/recipeUrls.selfcheck.mjs
 node src/state/recipeUrls.v3.selfcheck.mjs
+node src/state/recipeFidelity.selfcheck.mjs
 node src/data/recipeDefaults/recipeDefaults.selfcheck.mjs
 node src/state/recipeStack.selfcheck.mjs
 node src/state/qaRegression.selfcheck.mjs
