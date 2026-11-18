@@ -109,6 +109,25 @@ Do not start a new vocabulary. These are the same class of bug as PRESET.
 
 Do not edit PERF/POLISH/session roadmaps for this. Those docs are frozen or historical. This section is the board.
 
+## Recipe, and the words that are not recipe
+
+"Recipe" is overloaded in code and comments. In docs and on the face, **recipe means the scene recipe** and nothing else. Everything else that has been called a recipe keeps its own name, in the table below. No code renames: this is the vocabulary for docs and tickets, and the code names stay as they are.
+
+| Say | Means | Lives in |
+|-----|-------|----------|
+| **Recipe** (the scene recipe) | The portable text or link that restores a scene: `kc-recipe/1\|2` text and `kc-r/1\|2` URL fragments, plus the layer-stack block. Audited in [`design/recipes-v3-spec.md`](design/recipes-v3-spec.md). | `state/recipes.js`, `state/recipeUrls.js`, `state/recipeStack.js` |
+| **ACCUM frame params** | The per-frame parameter bag the ACCUM trail pass is run with. Built by `accumRecipeParams()`; it is a render input, not something a person saves or shares. | `gl/accum.mjs` |
+| **Variant recipe** | The curator's breeding record for a new mark: `{ parents, op, seed, params }`. The same record plus the same library gives the same SVG string. It makes an asset, not a scene. | `curator/variants.mjs` |
+| **Construct record** | The data record the construct assembler deals for a design shape built from one style's simple shapes (`kc-construct/1`). Its pieces are its recipe for the construct, but the record is called a construct record. | `engine/constructAssembler.js`, [`design/constructs-spec.md`](design/constructs-spec.md) |
+| **Price** (cost) | What something costs the governor: a cost tier on the cost registry, or an asset's cost score for a drawing. Not a recipe, and not a setting. | `engine/kernel/costRegistry.mjs`, `gl/costTiers.mjs`, `assets/ingest.js` |
+| **Gait** | A portable motion record for kineme (join-tree depth, beat cascade). See [`design/gait-spec.md`](design/gait-spec.md). Not a recipe. | spec only so far |
+
+Rules:
+
+1. A saved or shared scene is a **recipe**. Never call an ACCUM param set, a variant record, a construct record or a gait a recipe in a doc, ticket or face string.
+2. The tour's old "Pick a recipe" wording (1.2.1) named palettes; it stays retired. Palettes are paint.
+3. `RECIPE_VERSION` strings (`kc-recipe/N`, `kc-r/N`) version the scene recipe only.
+
 ## Changelog
 
 - 2026-09-28 — initial. LOOK replaces PRESET on the face. Four nouns. Boot is not a noun. #735. (1.0.0)
@@ -121,3 +140,4 @@ Do not edit PERF/POLISH/session roadmaps for this. Those docs are frozen or hist
 - 2026-09-30 — 1.3.0 MINOR (new home): the Curator cluster `[LOOKS ▾] [VOICE ▾] [Curator]` leaves BUILD for the top bar, next to KC-1 — a global verb, not a panel control. Same popups, same layout-only Look apply; menus open downward; the persona hint is the Curator button's tooltip. #716 Part 1, #735 step 3.
 - 2026-09-30 — 1.4.0 MINOR (new home): the flagship Voices (Night Migration / Chrome Parade / Deep Water / Dark Glass — all four, Dark Glass included under one-home-per-Voice) move from BUILD to DAVIS as load-only tiles through the existing voice MIX; the MIX bar readout shows under them. BUILD keeps Systems, MOTION, SHAPES, MY VOICES. `taxonomy.selfcheck` guards the one home. #717.
 - 2026-10-03 — Clarifications, no version bump (not a face string, noun, home, alias, or click change): Kineme (#781) is not a fifth noun — its drivers (breath / drift / pulse / brush-wobble) are modulation on the living-motion path, and RATE / per-driver amounts / BOIL are controls, not face nouns. The four-noun set is closed. Deliberate Preset-ban exceptions: CANVAS PRESET (canvas dimensions, #606) and QUALITY_PRESETS (governor budgets) name different objects than the composition preset — the ban covers the composition noun only. #735.
+- 2026-11-17 — Clarification, no version bump (no face string, noun, home, alias, or click change): "recipe" means the scene recipe. ACCUM frame params, variant recipe, construct record, the governor's price and gait get their own names. Docs only, no code renames. #2326.

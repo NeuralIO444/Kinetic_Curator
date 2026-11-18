@@ -402,6 +402,8 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'panels/wetLabDeal.selfcheck.mjs',
     // #2339: PAINT's material-gene suite — a test of the assembler and breeder, not a stage reader
     'engine/creatureMaterial.selfcheck.mjs',
+    // #2340: PAINT's drawing suite — a test of the tile bake, not a stage reader
+    'engine/creaturePaint.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {
