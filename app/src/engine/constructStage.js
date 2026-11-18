@@ -8,11 +8,18 @@
 // degrees, y down. A piece is the same kind of mark for one primitive, placed by engine/constructPieces.js so the
 // pieces rest exactly where the tile draws them. Each piece inherits everything else from the tile's item (colour,
 // accent, alpha, z tier, kineme slot…): the tile was ONE mark, its pieces are that mark taken apart.
-import { expandConstructPieces, pieceMark, planConstructPieces } from './constructPieces.js';
+import { canDealAsPieces, expandConstructPieces, pieceMark, planConstructPieces } from './constructPieces.js';
 import { HIER_GLOBAL_BUDGET } from './hierarchy.js';
 
+/** A stage item's tile placement: centre, turn, and the stretch on each axis. */
+const placeOf = (it) => ({
+  centre: { x: it.x, y: it.y },
+  rot: it.rotation ?? 0,
+  unit: it.scale,
+  unitY: it.scaleY ?? it.scale,
+});
+
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
-const SQUARE_EPS = 1e-9;
 
 /** The id a piece's item carries: the tile's own key, then the piece, so a take that names the mark names the piece. */
 const pieceKey = (key, id) => (key === undefined || key === null ? undefined : `${key}#${id}`);
@@ -31,13 +38,14 @@ export function constructPieceItems(
   { enabled = false, recordOf = null, budget = HIER_GLOBAL_BUDGET, taken = 0 } = {},
 ) {
   if (!enabled || typeof recordOf !== 'function' || !Array.isArray(items) || !items.length) return items;
-  // the constructs on stage, in stage order; a non-square mark (scaleY ≠ scale) is a stretched tile — it stays one
+  // the constructs on stage, in stage order; a stretched mark (scaleY ≠ scale) deals as pieces when its pieces are
+  // on quarter turns (a sprite cannot shear), else it stays its tile
   const found = [];
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     if (!it || typeof it.assetId !== 'string') continue;
     if (!finite(it.x) || !finite(it.y) || !finite(it.scale) || !(it.scale > 0) || !finite(it.rotation ?? 0)) continue;
-    if (it.scaleY !== undefined && !(Math.abs(it.scaleY - it.scale) <= SQUARE_EPS * Math.max(1, it.scale))) continue;
+    if (it.scaleY !== undefined && !(finite(it.scaleY) && it.scaleY > 0)) continue;
     // A mirrored copy (buildPlacements' mirror, bilateral symmetry) stays its tile: the pieces are placed unreflected,
     // so a reflected copy would deal them off its tile (review of #2374: up to 63 px at scale 0.8).
     if (it._mirrored) continue;
@@ -46,7 +54,7 @@ export function constructPieceItems(
     // little denser than the flat tile — flagged to Matt on #2327; the rest pose itself is exact.)
     if (it.blend && it.blend !== 'normal') continue;
     const record = recordOf(it.assetId);
-    if (record) found.push({ key: i, record });
+    if (record && canDealAsPieces(record, placeOf(it))) found.push({ key: i, record });
   }
   if (!found.length) return items;
   const { pieces: dealt } = planConstructPieces(found, { budget, taken });
@@ -60,15 +68,22 @@ export function constructPieceItems(
       out.push(it);
       continue;
     }
-    const place = { centre: { x: it.x, y: it.y }, rot: it.rotation ?? 0, unit: it.scale };
-    const { pieces } = expandConstructPieces(recordAt.get(i), place);
+    const { pieces } = expandConstructPieces(recordAt.get(i), placeOf(it));
     if (!pieces) {
       out.push(it); // a record that will not expand stays its tile
       continue;
     }
     for (const p of pieces) {
       const m = pieceMark(p);
-      const next = { ...it, assetId: m.assetId, x: m.x, y: m.y, rotation: m.rotation, scale: m.scale, scaleY: m.scale };
+      const next = {
+        ...it,
+        assetId: m.assetId,
+        x: m.x,
+        y: m.y,
+        rotation: m.rotation,
+        scale: m.scale,
+        scaleY: m.scaleY,
+      };
       const k = pieceKey(it.key, p.id);
       if (k !== undefined) next.key = k;
       out.push(next);
@@ -76,3 +91,16 @@ export function constructPieceItems(
   }
   return out;
 }
+
+/**
+ * #2327 — the session switch: the page opened with `?constructPieces=1` deals constructs as pieces. A URL flag, read
+ * once by the caller (the `?alife=1` / `?debug=skeleton` precedent): it is not saved with the project and not a
+ * store field, so no project, share link or recipe carries it. It rides the resolver input only when on.
+ */
+export const constructPiecesFlag = (search) => {
+  try {
+    return new URLSearchParams(typeof search === 'string' ? search : '').get('constructPieces') === '1';
+  } catch {
+    return false;
+  }
+};

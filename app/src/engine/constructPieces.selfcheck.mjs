@@ -12,6 +12,7 @@ import {
   maxPieceDelta,
   canCollapse,
   planConstructPieces,
+  canDealAsPieces,
   REST_EPSILON,
 } from './constructPieces.js';
 import { HIER_GLOBAL_BUDGET } from './hierarchy.js';
@@ -181,6 +182,38 @@ const placeOf = (seed) => {
   assert.equal(expandConstructPieces(rec, { ...place, unit: 0 }).pieces, null, 'a zero size draws nothing');
   assert.equal(expandConstructPieces(rec, null).pieces, null);
   ok('pure and deterministic; a bad placement draws nothing');
+}
+
+// 8 — a STRETCHED tile (the stage's marks are not square): on quarter turns the pieces are exact sprites and still rest
+// on the tile; a stretched tile with any other turn would shear, so it does not deal as pieces.
+{
+  const quarter = (seed, n) => {
+    const r = recordOf(seed, n);
+    r.parts.forEach((p, i) => (p.r = [0, 90, 180, 270][(seed + i) % 4]));
+    return r;
+  };
+  let worst = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const rec = quarter(seed, 12 + (seed % 5));
+    const base = placeOf(seed);
+    const place = { ...base, unitY: base.unit * (0.3 + ((seed * 37) % 100) / 60) }; // 0.3x .. 1.97x
+    const { pieces } = expandConstructPieces(rec, place);
+    assert.ok(pieces, `seed ${seed}: a stretched quarter-turn tile deals`);
+    const d = maxPieceDelta(pieces, flatPiecePlacements(rec, place));
+    const rel = d / Math.max(1, Math.max(place.unit, place.unitY) * 100);
+    worst = Math.max(worst, rel);
+    assert.ok(rel <= REST_EPSILON, `seed ${seed}: stretched pieces ≠ tile by ${d}`);
+    assert.ok(canCollapse(pieces, rec, place).ok);
+  }
+  const turned = recordOf(2, 14); // r includes 37.5
+  const place = { centre: { x: 0, y: 0 }, rot: 10, unit: 1, unitY: 2 };
+  assert.equal(canDealAsPieces(turned, place), false);
+  assert.equal(expandConstructPieces(turned, place).pieces, null);
+  assert.equal(canDealAsPieces(turned, { ...place, unitY: 1 }), true, 'the same record deals when the mark is square');
+  assert.equal(canDealAsPieces(turned, { ...place, unitY: -1 }), false, 'a bad stretch deals nothing');
+  ok(
+    `stretched quarter-turn tiles rest on the tile (worst relative gap ${worst.toExponential(1)}); a stretched shear is refused`,
+  );
 }
 
 console.log(`constructPieces.selfcheck: OK (${checks} checks)`);

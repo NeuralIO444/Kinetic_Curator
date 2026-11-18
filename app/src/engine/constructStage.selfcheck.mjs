@@ -1,6 +1,6 @@
 // constructStage.selfcheck — #2327 slice 2. Run: node src/engine/constructStage.selfcheck.mjs
 import assert from 'node:assert/strict';
-import { constructPieceItems } from './constructStage.js';
+import { constructPieceItems, constructPiecesFlag } from './constructStage.js';
 import { flatPiecePlacements, pieceMark } from './constructPieces.js';
 import { ASSETS_CONSTRUCTS, HOUSE_CONSTRUCT_RECORDS } from '../data/assets/index.js';
 
@@ -102,17 +102,29 @@ const on = { enabled: true, recordOf: recordFor };
   ok('piece items sit exactly where the flat tile draws the same pieces');
 }
 
-// 4 — a stretched tile (scaleY ≠ scale) and an unreadable one stay as tiles; so does an unknown asset.
+// 4 — a stretched tile (scaleY ≠ scale) deals as pieces when its pieces are on quarter turns; an unreadable tile or an
+// unknown asset stays a tile; so does a stretched tile whose record has a turned piece (a sprite cannot shear).
 {
-  const stretched = tile(1, { scaleY: 2 });
+  const stretched = tile(1, { scaleY: 0.6 });
+  const out = constructPieceItems([stretched], on);
+  assert.equal(out.length, 16, 'a stretched quarter-turn tile deals');
+  assert.ok(out.every((p) => p.scale > 0 && p.scaleY > 0));
   const bad = tile(2, { x: NaN });
   const ghost = tile(9);
-  const items = [stretched, bad, ghost];
+  const items = [bad, ghost];
   assert.equal(constructPieceItems(items, on), items, 'nothing to expand: the same array');
+  const turnedRec = recordOf(6, 14);
+  turnedRec.parts[0].r = 33; // not a quarter turn
+  const withTurn = { ...on, recordOf: (id) => (id === 'user:turned' ? turnedRec : recordFor(id)) };
+  const t1 = { ...tile(1), assetId: 'user:turned', scaleY: 0.6 };
+  const keep = [t1];
+  assert.equal(constructPieceItems(keep, withTurn), keep, 'a stretched turned tile stays one');
+  const square = [{ ...t1, scaleY: t1.scale }];
+  assert.equal(constructPieceItems(square, withTurn).length, 14, 'the same record deals when the mark is square');
   const noY = tile(4);
   delete noY.scaleY;
   assert.equal(constructPieceItems([noY], on).length, 16, 'an item with no scaleY is square');
-  ok('stretched, unreadable and unknown tiles stay tiles');
+  ok('stretched quarter-turn tiles deal; a stretched shear, unreadable and unknown tiles stay tiles');
 }
 
 // 4b — review of #2374: a mirrored copy and a blended tile stay tiles (pieces would land off a reflected tile, and a
@@ -158,6 +170,18 @@ const on = { enabled: true, recordOf: recordFor };
     assert.ok(rec.parts.length >= 12 && rec.parts.length <= 16);
   }
   ok('every house tile has its record, and deals as its 12–16 pieces');
+}
+
+// 8 — the session switch is a URL flag, exactly "1", and never anything else.
+{
+  assert.equal(constructPiecesFlag('?constructPieces=1'), true);
+  assert.equal(constructPiecesFlag('?a=b&constructPieces=1'), true);
+  for (const off of ['', '?constructPieces=0', '?constructPieces=true', '?constructPieces', '?debug=skeleton']) {
+    assert.equal(constructPiecesFlag(off), false, off);
+  }
+  assert.equal(constructPiecesFlag(undefined), false);
+  assert.equal(constructPiecesFlag(null), false);
+  ok('the session switch reads ?constructPieces=1 and nothing looser');
 }
 
 console.log(`constructStage.selfcheck: OK (${checks} checks)`);

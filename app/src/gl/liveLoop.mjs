@@ -182,7 +182,7 @@ export function swellProgress(loopTimeMs, swellStartMs) {
 
 export function createLiveLoop(
   canvas,
-  { getState, viewRef, wrapEl = null, wantSkeletons = false, wantEngraving = true } = {},
+  { getState, viewRef, wrapEl = null, wantSkeletons = false, wantEngraving = true, wantConstructPieces = false } = {},
 ) {
   // #1734-#1738 — the ALife creature is opt-in while it is young: ?alife=1 turns the channel on (stamped on every
   // input as creatureAlife, so a take records whether it ran). Read once: the page's URL does not change mid-run.
@@ -1094,6 +1094,9 @@ export function createLiveLoop(
       lockedParams: s.lockedParams,
       batchPaused: s.batchPaused,
       focusSwap,
+      // #2327 — the session switch (?constructPieces=1): constructs deal as live pieces. Absent when off, so a take and every
+      // input pin read exactly as before; on, the key rides the input and a take records that it ran.
+      ...(wantConstructPieces ? { constructPieces: true } : {}),
       wantSkeletons, // Phase 2 S1 — a skeleton consumer is live (the ?debug=skeleton overlay); the creature builder builds bones only then
       wantEngraving, // Phase 2 S4 — the engraved body finish is a shipped look (default on in createLiveLoop); the builder binds spine joints to body items only when asked. A future governor shed rung flips this input, the way perfTier1 sheds passes
       room: readRoomCodes(), // #1949 — Lois's face + Davis's state for the creature rigs; recorded with the take, replayed from it

@@ -71,11 +71,36 @@ export function constructJoinTree(record) {
 }
 
 /**
+ * Each piece's size per axis in scene px per box unit. A piece turned a quarter turn swaps which of the tile's two
+ * stretches lands on which of its axes (a stretch then a quarter turn is a quarter turn then the other stretch), so
+ * a stretched tile's pieces stay exact sprites. Any other turn of a stretched tile would shear — not a sprite — and
+ * is refused (`stretchOk`).
+ */
+function axesOf(part, place) {
+  const ux = place.unit;
+  const uy = place.unitY ?? place.unit;
+  const t = (((part.r % 180) + 180) % 180) / 90; // 0 → even quarter turn, 1 → odd quarter turn
+  const odd = Math.abs(t - 1) < 1e-9;
+  return odd ? { sx: part.s * uy, sy: part.s * ux } : { sx: part.s * ux, sy: part.s * uy };
+}
+
+/** A tile stretched (unit ≠ unitY) can deal as pieces only when every piece sits on a quarter turn. */
+function stretchOk(parts, place) {
+  const uy = place.unitY ?? place.unit;
+  if (Math.abs(uy - place.unit) <= 1e-9 * Math.max(1, place.unit)) return true;
+  return parts.every(
+    (p) => Math.abs((((p.r % 90) + 90) % 90) / 90) < 1e-9 || Math.abs((((p.r % 90) + 90) % 90) / 90 - 1) < 1e-9,
+  );
+}
+
+/**
  * The hierarchy recipe for a record: one part per piece, one named anchor per child on its parent. An anchor is the
  * child's placement in the parent's own frame — the inverse of `computeWorldTransform` — so the walk reproduces the
- * record's flat placements.
+ * record's flat placements, stretch included.
  */
-function recipeOf(parts, tree) {
+function recipeOf(parts, tree, place) {
+  const ux = place.unit;
+  const uy = place.unitY ?? place.unit;
   const recipe = { parts: {} };
   for (let i = 0; i < parts.length; i++) recipe.parts[`p${i}`] = { asset: parts[i].asset, anchors: {}, children: [] };
   for (let i = 1; i < parts.length; i++) {
@@ -85,15 +110,17 @@ function recipeOf(parts, tree) {
     const a = rad(P.r);
     const cos = Math.cos(a);
     const sin = Math.sin(a);
-    const wx = C.x - P.x;
-    const wy = C.y - P.y;
-    // the parent's frame turns by P.r and sizes by P.s: undo both to get the offset in the parent's own units
+    const pj = axesOf(P, place);
+    const ci = axesOf(C, place);
+    // the tile's stretch acts on the box offset first, then the parent's turn is undone, then the parent's own size
+    const wx = (C.x - P.x) * ux;
+    const wy = (C.y - P.y) * uy;
     const anchor = {
-      dx: (cos * wx + sin * wy) / P.s,
-      dy: (-sin * wx + cos * wy) / P.s,
+      dx: (cos * wx + sin * wy) / pj.sx,
+      dy: (-sin * wx + cos * wy) / pj.sy,
       dRot: C.r - P.r,
-      dScaleX: C.s / P.s,
-      dScaleY: C.s / P.s,
+      dScaleX: ci.sx / pj.sx,
+      dScaleY: ci.sy / pj.sy,
     };
     const name = `a${i}`;
     recipe.parts[`p${j}`].anchors[name] = anchor;
@@ -102,51 +129,62 @@ function recipeOf(parts, tree) {
   return recipe;
 }
 
-/** Where the tile's box origin sits in the scene: the centre, minus the box's half-diagonal turned by `rot`. */
-function boxOrigin({ centre, rot, unit }) {
+/** Where the tile's box origin sits in the scene: the centre, minus the box's half-diagonal stretched and turned. */
+function boxOrigin({ centre, rot, unit, unitY }) {
   const a = rad(rot);
   const cos = Math.cos(a);
   const sin = Math.sin(a);
-  return {
-    x: centre.x + unit * (-HALF * cos + HALF * sin),
-    y: centre.y + unit * (-HALF * sin - HALF * cos),
-  };
+  const hx = HALF * unit;
+  const hy = HALF * (unitY ?? unit);
+  return { x: centre.x - (hx * cos - hy * sin), y: centre.y - (hx * sin + hy * cos) };
 }
 
 const validPlace = (place) =>
   !!place &&
   finite(place.unit) &&
   place.unit > 0 &&
+  (place.unitY === undefined || (finite(place.unitY) && place.unitY > 0)) &&
   finite(place.rot) &&
   finite(place.centre?.x) &&
   finite(place.centre?.y);
 
+/** Can this record deal as pieces under this placement? (drawable shape, readable placement, no shear). */
+export function canDealAsPieces(record, place) {
+  const parts = partsOf(record);
+  return !!parts && validPlace(place) && stretchOk(parts, place);
+}
+
 /**
  * A construct as pieces, at rest.
  * @param record  a construct record ({ parts: [{ asset, x, y, r, s }] }).
- * @param place   { centre: {x,y}, rot, unit } — the tile mark's placement (see UNITS above).
+ * @param place   { centre: {x,y}, rot, unit, unitY? } — the tile mark's placement (see UNITS above). `unitY` is the
+ *   vertical stretch when the mark is not square; a stretched tile deals as pieces only on quarter turns.
  * @param opts    { budget } — the most pieces this call may emit (defaults to the hierarchy's global budget).
  * @returns { pieces, truncated, problems } where each piece is
- *   { id, parent, depth, asset, origin: {x,y}, rot, scale } — `origin` is where the primitive's box origin lands, `rot`
- *   its turn in degrees, `scale` scene pixels per box unit. Null pieces (`pieces: null`) for an undrawable record.
+ *   { id, parent, depth, asset, origin: {x,y}, rot, scale, scaleY } — `origin` is where the primitive's box origin
+ *   lands, `rot` its turn in degrees, `scale`/`scaleY` scene pixels per box unit on its two axes. `pieces: null` for an
+ *   undrawable record or placement, or a stretched tile whose pieces are not on quarter turns (that would shear).
  */
 export function expandConstructPieces(record, place, { budget = HIER_GLOBAL_BUDGET } = {}) {
   const parts = partsOf(record);
   if (!parts || !validPlace(place)) return { pieces: null, truncated: false, problems: ['no drawable construct'] };
+  if (!stretchOk(parts, place)) return { pieces: null, truncated: false, problems: ['a stretched tile would shear'] };
   const tree = constructJoinTree(record);
-  const recipe = recipeOf(parts, tree);
+  const recipe = recipeOf(parts, tree, place);
   const o = boxOrigin(place);
+  const uy = place.unitY ?? place.unit;
   // the root piece is the tile's own frame composed with part 0's placement
   const a = rad(place.rot);
   const cos = Math.cos(a);
   const sin = Math.sin(a);
   const p0 = parts[0];
+  const ax0 = axesOf(p0, place);
   const rootWorld = {
-    x: o.x + place.unit * (cos * p0.x - sin * p0.y),
-    y: o.y + place.unit * (sin * p0.x + cos * p0.y),
+    x: o.x + (cos * p0.x * place.unit - sin * p0.y * uy),
+    y: o.y + (sin * p0.x * place.unit + cos * p0.y * uy),
     rot: place.rot + p0.r,
-    scaleX: place.unit * p0.s,
-    scaleY: place.unit * p0.s,
+    scaleX: ax0.sx,
+    scaleY: ax0.sy,
     part: 'p0',
     key: 'construct',
   };
@@ -169,6 +207,7 @@ export function expandConstructPieces(record, place, { budget = HIER_GLOBAL_BUDG
       origin: { x: it.x, y: it.y },
       rot: it.rotation,
       scale: it.scaleX,
+      scaleY: it.scaleY,
     });
   }
   return { pieces: out, truncated, problems };
@@ -180,18 +219,26 @@ export function expandConstructPieces(record, place, { budget = HIER_GLOBAL_BUDG
  */
 export function flatPiecePlacements(record, place) {
   const parts = partsOf(record);
-  if (!parts || !validPlace(place)) return null;
+  if (!parts || !validPlace(place) || !stretchOk(parts, place)) return null;
   const o = boxOrigin(place);
+  const uy = place.unitY ?? place.unit;
   const a = rad(place.rot);
   const cos = Math.cos(a);
   const sin = Math.sin(a);
-  return parts.map((p, i) => ({
-    id: `p${i}`,
-    asset: p.asset,
-    origin: { x: o.x + place.unit * (cos * p.x - sin * p.y), y: o.y + place.unit * (sin * p.x + cos * p.y) },
-    rot: place.rot + p.r,
-    scale: place.unit * p.s,
-  }));
+  return parts.map((p, i) => {
+    const ax = axesOf(p, place);
+    return {
+      id: `p${i}`,
+      asset: p.asset,
+      origin: {
+        x: o.x + (cos * p.x * place.unit - sin * p.y * uy),
+        y: o.y + (sin * p.x * place.unit + cos * p.y * uy),
+      },
+      rot: place.rot + p.r,
+      scale: ax.sx,
+      scaleY: ax.sy,
+    };
+  });
 }
 
 /** The four corners of a piece's primitive box in the scene (the primitive's own box, whole). */
@@ -199,28 +246,31 @@ export function pieceCorners(piece) {
   const a = rad(piece.rot);
   const cos = Math.cos(a);
   const sin = Math.sin(a);
+  const sy = piece.scaleY ?? piece.scale;
   return [
     [0, 0],
     [ATTACH_BOX, 0],
     [0, ATTACH_BOX],
     [ATTACH_BOX, ATTACH_BOX],
   ].map(([x, y]) => ({
-    x: piece.origin.x + piece.scale * (cos * x - sin * y),
-    y: piece.origin.y + piece.scale * (sin * x + cos * y),
+    x: piece.origin.x + (cos * x * piece.scale - sin * y * sy),
+    y: piece.origin.y + (sin * x * piece.scale + cos * y * sy),
   }));
 }
 
-/** The mark a piece draws as: the centre of its primitive box, the turn, and the size (scene px per box unit). */
+/** The mark a piece draws as: the centre of its primitive box, the turn, and the size on each axis (px per box unit). */
 export function pieceMark(piece) {
   const a = rad(piece.rot);
   const cos = Math.cos(a);
   const sin = Math.sin(a);
+  const sy = piece.scaleY ?? piece.scale;
   return {
     assetId: piece.asset,
-    x: piece.origin.x + piece.scale * (cos * HALF - sin * HALF),
-    y: piece.origin.y + piece.scale * (sin * HALF + cos * HALF),
+    x: piece.origin.x + (cos * HALF * piece.scale - sin * HALF * sy),
+    y: piece.origin.y + (sin * HALF * piece.scale + cos * HALF * sy),
     rotation: piece.rot,
     scale: piece.scale,
+    scaleY: sy,
   };
 }
 
