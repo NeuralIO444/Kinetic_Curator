@@ -13,6 +13,13 @@ import { HIER_GLOBAL_BUDGET } from './hierarchy.js';
 
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const SQUARE_EPS = 1e-9;
+/**
+ * #2329 review: the house breath (layout `breath`, #1202) stretches Y a few percent, so nearly every stage mark is a
+ * little non-square. Up to this much stretch (scaleY / scale − 1) a moving construct still deals: each piece's CENTRE
+ * goes exactly where the stretched tile puts it (the renderer's R·S order), and each piece carries the same Y stretch.
+ * A turned piece inside a stretched tile is then a hair off true (a sprite can't shear): at most this fraction.
+ */
+export const STRETCH_TOLERANCE = 0.15;
 
 /** The id a piece's item carries: the tile's own key, then the piece, so a take that names the mark names the piece. */
 const pieceKey = (key, id) => (key === undefined || key === null ? undefined : `${key}#${id}`);
@@ -54,7 +61,9 @@ export function constructPieceItems(
     const it = items[i];
     if (!it || typeof it.assetId !== 'string') continue;
     if (!finite(it.x) || !finite(it.y) || !finite(it.scale) || !(it.scale > 0) || !finite(it.rotation ?? 0)) continue;
-    if (it.scaleY !== undefined && !(Math.abs(it.scaleY - it.scale) <= SQUARE_EPS * Math.max(1, it.scale))) continue;
+    const stretch = it.scaleY === undefined ? 1 : it.scaleY / it.scale;
+    if (!finite(stretch) || !(stretch > 0)) continue;
+    if (Math.abs(stretch - 1) > STRETCH_TOLERANCE + SQUARE_EPS) continue; // a truly stretched tile stays one
     // A mirrored copy (buildPlacements' mirror, bilateral symmetry) stays its tile: the pieces are placed unreflected,
     // so a reflected copy would deal them off its tile (review of #2374: up to 63 px at scale 0.8).
     if (it._mirrored) continue;
@@ -84,9 +93,23 @@ export function constructPieceItems(
       out.push(it); // a record that will not expand stays its tile
       continue;
     }
+    const sy = it.scaleY === undefined ? 1 : it.scaleY / it.scale; // the tile's Y stretch (1 = square)
+    const th = ((it.rotation ?? 0) * Math.PI) / 180;
+    const co = Math.cos(th);
+    const si = Math.sin(th);
     for (const p of pieces) {
       const m = pieceMark(p);
-      const next = { ...it, assetId: m.assetId, x: m.x, y: m.y, rotation: m.rotation, scale: m.scale, scaleY: m.scale };
+      let { x, y } = m;
+      if (sy !== 1) {
+        // into the tile's own frame, stretch Y, back out (R·S, the renderer's order): the centre lands where the tile draws
+        const dx = x - it.x;
+        const dy = y - it.y;
+        const lx = dx * co + dy * si;
+        const ly = (-dx * si + dy * co) * sy;
+        x = it.x + lx * co - ly * si;
+        y = it.y + lx * si + ly * co;
+      }
+      const next = { ...it, assetId: m.assetId, x, y, rotation: m.rotation, scale: m.scale, scaleY: m.scale * sy };
       const k = pieceKey(it.key, p.id);
       if (k !== undefined) next.key = k;
       out.push(next);

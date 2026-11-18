@@ -1,6 +1,6 @@
 // constructStage.selfcheck — #2327 slice 2. Run: node src/engine/constructStage.selfcheck.mjs
 import assert from 'node:assert/strict';
-import { constructPieceItems } from './constructStage.js';
+import { STRETCH_TOLERANCE, constructPieceItems } from './constructStage.js';
 import { flatPiecePlacements, pieceMark } from './constructPieces.js';
 import { ASSETS_CONSTRUCTS, HOUSE_CONSTRUCT_RECORDS } from '../data/assets/index.js';
 
@@ -158,6 +158,29 @@ const on = { enabled: true, recordOf: recordFor, moving: () => true }; // in mot
     assert.ok(rec.parts.length >= 12 && rec.parts.length <= 16);
   }
   ok('every house tile has its record, and deals as its 12–16 pieces');
+}
+
+// #2329 review — the house breath stretches Y a few percent: a moving construct still deals, every piece carries the
+// stretch, and each piece centre is where the stretched tile draws that point (checked against the square deal mapped
+// through the tile's own R·S). Past STRETCH_TOLERANCE it stays its tile.
+{
+  const base = { assetId: tile(1).assetId, x: 300, y: 200, scale: 1.4, rotation: 30, key: 'b' };
+  const square = constructPieceItems([base], on);
+  const sy = 1.06;
+  const breathing = constructPieceItems([{ ...base, scaleY: 1.4 * sy }], on);
+  assert.equal(breathing.length, square.length, 'a breathing construct deals the same pieces');
+  const th = (30 * Math.PI) / 180;
+  for (let i = 0; i < square.length; i++) {
+    const dx = square[i].x - base.x;
+    const dy = square[i].y - base.y;
+    const lx = dx * Math.cos(th) + dy * Math.sin(th);
+    const ly = (-dx * Math.sin(th) + dy * Math.cos(th)) * sy;
+    assert.ok(Math.abs(breathing[i].x - (base.x + lx * Math.cos(th) - ly * Math.sin(th))) < 1e-9);
+    assert.ok(Math.abs(breathing[i].y - (base.y + lx * Math.sin(th) + ly * Math.cos(th))) < 1e-9);
+    assert.ok(Math.abs(breathing[i].scaleY / breathing[i].scale - sy) < 1e-12, 'each piece carries the stretch');
+  }
+  const far = [{ ...base, scaleY: 1.4 * (1 + STRETCH_TOLERANCE + 0.05) }];
+  assert.equal(constructPieceItems(far, on), far, 'past the tolerance: a stretched tile stays one');
 }
 
 console.log(`constructStage.selfcheck: OK (${checks} checks)`);
