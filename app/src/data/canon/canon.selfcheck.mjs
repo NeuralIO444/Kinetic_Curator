@@ -22,7 +22,8 @@ import {
   canonChapterForStyle,
   canonStyleOfLook,
 } from './index.js';
-import { STYLES } from '../assetStyle.js';
+import { STYLES, FAMILIES, assetFamily, assetStyle } from '../assetStyle.js';
+import { ASSETS } from '../assets/index.js';
 import { STYLE_LOOK_GROUPS, STYLE_LOOKS } from '../styleLooks.js';
 import { FAMILY_PAIRING, VOICE_DECK } from '../voiceDeck.js';
 import { CHAPTERS, chapterDeck, chapterLooks, chapterVoices } from '../chapters.js';
@@ -151,8 +152,8 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   const withoutStyle = CHAPTERS.map(({ style: _style, settings: _settings, ...rest }) => rest); // #2046 added `settings`
   assert.equal(
     sha(withoutStyle),
-    '8687c7d8965ca546',
-    'chapter records are the old records plus `style` (#2044) and `settings` (#2046)',
+    '36705638d852fd08', // #2105 re-pin: engraving, swiss and grunge gain their families (haeckel, letterforms, riso); every chapter deck is unchanged
+    'chapter records are the old records plus `style` (#2044), `settings` (#2046) and the #2105 families',
   );
 }
 
@@ -263,6 +264,37 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   // …and the trained head's feature vector is untouched (no silent FEATURES_VERSION bump — see tasteStyle.js)
   assert.equal(FEATURES_VERSION, 4);
   assert.ok(!('style' in recipeFeatures({ layoutParams: { composition: opLook } })));
+}
+
+// ── 6. families (#2105): a declared family is a real library pack that only this style owns, and every
+//      member of that pack already sorts into the style — so filling it moves no chapter deck. An empty list
+//      must say why in familiesNote.
+{
+  const owner = new Map();
+  for (const s of CANON_STYLES) {
+    const fams = s.assets.families;
+    if (fams.length === 0) {
+      assert.ok(
+        typeof s.assets.familiesNote === 'string' && s.assets.familiesNote.length > 0,
+        `${s.id}: an empty families list carries a familiesNote`,
+      );
+      continue;
+    }
+    for (const f of fams) {
+      assert.ok(FAMILIES.includes(f), `${s.id}: ${f} is a library family`);
+      assert.ok(!owner.has(f), `${f}: claimed by one style only (${owner.get(f)} and ${s.id})`);
+      owner.set(f, s.id);
+      const members = ASSETS.filter((a) => assetFamily(a) === f);
+      assert.ok(members.length > 0, `${f}: resolves to at least one asset`);
+      const styles = new Set(members.map((a) => assetStyle(a)));
+      assert.deepEqual([...styles], [s.id], `${f}: every member already sorts into ${s.id}`);
+    }
+  }
+  assert.deepEqual(
+    [...owner.keys()].sort(),
+    ['haeckel', 'letterforms', 'marks', 'micro-hud', 'pixel-glyphs', 'riso'],
+    'the single-owner packs (#2105 ruling A)',
+  );
 }
 
 console.log(

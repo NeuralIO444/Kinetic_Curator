@@ -62,6 +62,7 @@ const style = (r) =>
     assets: Object.freeze({
       note: r.assets.note,
       families: Object.freeze([...r.assets.families]),
+      familiesNote: r.assets.familiesNote || null,
       primitives: Object.freeze([...(r.assets.primitives || [])]),
       turns: r.assets.turns === 'free' ? 'free' : 'quarter',
     }),
@@ -83,7 +84,7 @@ export const CANON_STYLES = Object.freeze(
       },
       assets: {
         note: 'grid discipline, type-led, solid primitives',
-        families: [],
+        families: ['letterforms'],
         primitives: ['geo_square_01', 'line_solid_01', 'geo_cross_01', 'geo_diamond_01'],
       },
       lookGroup: { rank: 2 },
@@ -102,6 +103,8 @@ export const CANON_STYLES = Object.freeze(
       assets: {
         note: 'primary geometry: circle / square / triangle / wedge',
         families: [],
+        familiesNote:
+          'bauhaus: shares organic-geo and stamp-radial with other styles; filling them moves their shapes into this deck.',
         primitives: ['geo_circle_01', 'geo_square_01', 'geo_tri_01', 'geo_quartercircle_01', 'geo_halfcircle_01'],
       },
       lookGroup: { rank: 3 },
@@ -120,6 +123,8 @@ export const CANON_STYLES = Object.freeze(
       assets: {
         note: 'ma and asymmetry: sprig, branch, petal, the single ring',
         families: [],
+        familiesNote:
+          'japanese: shares organic-geo, line-floral and stamp-radial with other styles; filling them moves their shapes into this deck.',
         primitives: ['flora_sprig_01', 'flora_branch_01', 'org_petal_03', 'geo_circle_02'],
         turns: 'free',
       },
@@ -138,7 +143,7 @@ export const CANON_STYLES = Object.freeze(
       },
       assets: {
         note: 'distress: stamps, scribble, photocopy, torn fragments',
-        families: [],
+        families: ['riso'],
         primitives: ['frg01', 'frg10', 'frg04', 'stamp_glyph_06'],
         turns: 'free',
       },
@@ -157,7 +162,7 @@ export const CANON_STYLES = Object.freeze(
       },
       assets: {
         note: 'Haeckel plates: fine-line natural history',
-        families: [],
+        families: ['haeckel'],
         primitives: ['hae_kelp_01', 'hae_tendril_01', 'hae_diatom_02'],
         turns: 'free',
       },
@@ -176,7 +181,7 @@ export const CANON_STYLES = Object.freeze(
       },
       assets: {
         note: 'HUD, circuitry, crystal, scan',
-        families: [],
+        families: ['micro-hud'],
         primitives: ['mic_bracket_tl', 'mic_plus', 'xsh04', 'mic_needle'],
       },
       lookGroup: null,
@@ -194,7 +199,7 @@ export const CANON_STYLES = Object.freeze(
       },
       assets: {
         note: 'the 8-bit grid',
-        families: [],
+        families: ['pixel-glyphs'],
         primitives: ['pxg_speck', 'pxg_speck_ne', 'pxg_spark', 'pxg_dust'],
       },
       lookGroup: null,
@@ -213,6 +218,8 @@ export const CANON_STYLES = Object.freeze(
       assets: {
         note: 'blob, cell, root, colony',
         families: [],
+        familiesNote:
+          'organic: shares organic-geo with five other styles; filling it moves their shapes into this deck.',
         primitives: ['org_blob_01', 'org_drop_01', 'org_pod_01', 'org_lobe_01'],
         turns: 'free',
       },
@@ -232,6 +239,8 @@ export const CANON_STYLES = Object.freeze(
       assets: {
         note: 'optical: halftone, concentric, hatch, moiré',
         families: [],
+        familiesNote:
+          'op: shares organic-geo, line-floral and stamp-radial with other styles; filling them moves their shapes into this deck.',
         primitives: ['rad_orbit_01', 'rad_target_01', 'rad_rings_03', 'line_hatch_02'],
       },
       lookGroup: { rank: 4 },
@@ -250,6 +259,8 @@ export const CANON_STYLES = Object.freeze(
       assets: {
         note: 'confetti, squiggle, zigzag, star',
         families: [],
+        familiesNote:
+          'memphis: shares organic-geo and line-floral with other styles; filling either moves their shapes into this deck.',
         primitives: ['dot_single_01', 'line_squiggle_01', 'line_zigzag_01', 'geo_star5_01'],
         turns: 'free',
       },
