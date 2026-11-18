@@ -183,6 +183,7 @@ node src/engine/dishLifeSeed.selfcheck.mjs
 node src/engine/dishLifePhase.selfcheck.mjs
 node src/engine/dishLifeRender.selfcheck.mjs
 node src/engine/dishLifeStage.selfcheck.mjs
+node src/engine/dishLifeStageQuietSeek.selfcheck.mjs
 node src/engine/dishLifeQuiet.selfcheck.mjs
 node src/engine/dishLifeField.selfcheck.mjs
 node src/engine/dishLifeCoupling.selfcheck.mjs
