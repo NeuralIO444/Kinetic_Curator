@@ -202,8 +202,8 @@ const mindSection = (getFrame) => {
   };
 };
 
-// #2329 — the take carries every GAIT_ASSIGN that landed (the QUEEN's picks, the user's picks and locks), stored as
-// `gaits`: playback re-publishes them and never asks the QUEEN.
+// #2329 — the take carries every GAIT_ASSIGN that landed (the per-phrase picks, the user's picks and locks), stored as
+// `gaits`: playback re-publishes them and never picks again.
 const gaitsSection = (getFrame) => {
   const rec = createGaitRecorder({ getFrame });
   setGaitTap((e) => rec.update(e));

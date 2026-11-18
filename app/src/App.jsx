@@ -73,7 +73,7 @@ import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
 import { startBreak } from './curator/breakLive.js'; // #2116: the assemble trigger
 import { startLean } from './curator/leanLive.js'; // #1640: the dial lean, applied in silence
-import { startGaitQueen } from './curator/gaitLive.js'; // #2329: the QUEEN picks each construct's gait once a phrase
+import { startGaitPick } from './curator/gaitLive.js'; // #2329: each construct's gait is picked once a phrase
 import { replayGaitFrame, endGaitReplay } from './curator/gaitRecord.mjs'; // #2329: a take re-publishes its gait picks
 import { ASSETS_CONSTRUCTS } from './data/assets/index.js'; // #2329: the house constructs (the gait wearers) and their styles
 import { startTrio } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
@@ -181,10 +181,10 @@ function AppInner() {
       getEvolveInterval: () => useStore.getState().evolveInterval,
       context: roomNow,
     });
-    // #2329 — gait M3: once a phrase the QUEEN picks each standing construct's gait among its style's Canon defaults
+    // #2329 — gait M3: once a phrase each standing construct's gait is picked among its style's Canon defaults
     // (still / idle / performing) from the audio envelope; a user lock wins; muted while a take plays.
     const constructStyle = new Map(ASSETS_CONSTRUCTS.map((a) => [a.id, a.style]));
-    const stopGaitQueen = startGaitQueen({
+    const stopGaitPick = startGaitPick({
       getTargets: () => {
         const st = useStore.getState();
         const pool = st.enabledAssets; // { assetId: true } (null = the whole library, which never places a construct)
@@ -405,7 +405,7 @@ function AppInner() {
       stopPace();
       stopBreak();
       stopLean();
-      stopGaitQueen();
+      stopGaitPick();
       stopMind();
       canonBus.stop();
       stopReviewVoice();

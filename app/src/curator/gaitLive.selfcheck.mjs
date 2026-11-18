@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { Events, emit, on } from '../composition/eventBus.js';
 import { observeClock, resetClock } from '../composition/clockLive.js';
-import { startGaitQueen } from './gaitLive.js';
+import { startGaitPick } from './gaitLive.js';
 import { startTrio } from './trioLive.js';
 import { OWN_BARS, PHRASE_BARS } from './mindConduct.js';
 import {
@@ -41,7 +41,7 @@ const B = ASSETS_CONSTRUCTS.find((a) => a.style === 'organic').id;
 const styleOf = (id) => ASSETS_CONSTRUCTS.find((a) => a.id === id)?.style ?? null;
 let replaying = false;
 let targets = [A, B];
-const stopQueen = startGaitQueen({
+const stopQueen = startGaitPick({
   getTargets: () => targets,
   styleOf,
   getAssignments: () => state.gaitAssignments,

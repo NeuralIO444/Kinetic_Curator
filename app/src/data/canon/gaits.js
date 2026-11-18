@@ -1,6 +1,6 @@
 // data/canon/gaits.js — #2329 (GAIT M3; docs/design/gait-spec.md ruling 4): each Canon style's default gaits, as data.
 //
-// Three per style (spec §5's suggested start): `still`, `idle`, `performing`. The QUEEN picks among a wearer's three
+// Three per style (spec §5's suggested start): `still`, `idle`, `performing`. The persona pick chooses among a wearer's three
 // once per phrase from the audio (curator/gaitLive.js); a user lock wins (engine/gaitAssign.js).
 //
 //   still       every amount 0 — the KINEME hard gate. A construct wearing it rests as its flat tile: today's render.
@@ -17,7 +17,7 @@
 import { CANON_STYLE_IDS } from './styles.js';
 import { GAIT_KIND, sanitizeGait } from '../../engine/gait.js';
 
-/** The default gait kinds, quiet to loud — the order the QUEEN reads them in. */
+/** The default gait kinds, quiet to loud — the order the pick reads them in. */
 export const CANON_GAIT_KINDS = Object.freeze(['still', 'idle', 'performing']);
 
 /** How loud `idle` is against `performing` (the same lean, one level down). */

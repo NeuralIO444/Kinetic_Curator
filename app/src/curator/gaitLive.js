@@ -22,7 +22,7 @@ import { PHRASE_BARS } from './paceLive.js';
  * @param isReplaying    () => true while a take plays
  * @returns stop()
  */
-export function startGaitQueen({ getTargets, styleOf, getAssignments, assign, isReplaying = () => false }) {
+export function startGaitPick({ getTargets, styleOf, getAssignments, assign, isReplaying = () => false }) {
   let energy = null;
   let silent = false;
   const stop = [];
