@@ -135,6 +135,10 @@ export const EVENT_REGISTRY = {
     handler: ['components/BackendIndicator.jsx'],
     note: 'telemetry: which backend answers (#1462); the dev panel reads it, and the footer backend indicator (#2078) renders it as standing state — a glyph that is simply there; nothing announces a switch',
   },
+  TRIO_HANDBACK: {
+    handler: null,
+    note: 'telemetry: the artist handed dials back to Davis by double-tap reset (#2092 PR 3); the take records it through trioLive.setHandbackTap, nothing changes the stage on it',
+  },
   MIND_REQ: { handler: null, note: 'telemetry: a persona asked the on-device model (#1463)' },
   MIND_REPLY: {
     handler: ['curator/megamindSurfacesLive.js'],

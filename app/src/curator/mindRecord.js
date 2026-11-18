@@ -18,6 +18,8 @@ const VERSIONS = [1, 2];
 export const MIND_RECORD_MAX = 20000;
 /** At most one route edit a phrase, so this is far above any real take. */
 export const CONDUCT_RECORD_MAX = 2000;
+/** #2092 PR 3: hand-backs, [frame, bar, targets[]]. A double-tap reset per row; far above any real take. */
+export const HANDBACK_RECORD_MAX = 2000;
 const CONDUCT_STATUS = Object.freeze(['applied', 'dropped']);
 /**
  * #2160 — the skip trace: one row per candidate davisRoute discarded, [frame, bar, reason, input|null, target|null].
@@ -34,6 +36,7 @@ export function createMindRecorder({ getFrame = () => 0, getSystem = () => null 
   const rows = [];
   const conduct = [];
   const skips = [];
+  const handbacks = [];
   const systems = {};
   return {
     /** #1483: what became of one of Davis's route proposals (trioLive's mind:route): applied with its delta, or dropped with why. */
@@ -50,6 +53,12 @@ export function createMindRecorder({ getFrame = () => 0, getSystem = () => null 
         op,
         e.delta ? JSON.parse(JSON.stringify(e.delta)) : null,
       ]);
+    },
+    /** #2092 PR 3: the artist handed targets back to Davis (trioLive's trio:handback). */
+    handback(e) {
+      if (!e || handbacks.length >= HANDBACK_RECORD_MAX || !Array.isArray(e.targets) || !e.targets.length) return;
+      const targets = e.targets.filter((t) => typeof t === 'string').map((t) => t.slice(0, 32));
+      if (targets.length) handbacks.push([getFrame() | 0, Number.isInteger(e.bar) ? e.bar : 0, targets]);
     },
     /** A decision as mindLive published it, and whether it asked the stage for something. */
     update(d, requested) {
@@ -100,6 +109,7 @@ export function createMindRecorder({ getFrame = () => 0, getSystem = () => null 
         ...(Object.keys(systems).length ? { systems: JSON.parse(JSON.stringify(systems)) } : {}),
         ...(conduct.length ? { conduct: JSON.parse(JSON.stringify(conduct)) } : {}), // absent when Davis did not conduct: the file is unchanged
         ...(skips.length ? { skips: skips.map((r) => r.slice()) } : {}), // #2160: absent when nothing was skipped
+        ...(handbacks.length ? { handbacks: JSON.parse(JSON.stringify(handbacks)) } : {}), // #2092: absent when nothing was handed back
       };
     },
   };
@@ -143,6 +153,18 @@ export function checkMindRecord(r) {
       if (!Number.isInteger(frame) || frame < last || !Number.isInteger(bar)) return null;
       if (typeof reason !== 'string' || reason.length > 16) return null;
       if ((input !== null && typeof input !== 'string') || (target !== null && typeof target !== 'string')) return null;
+      last = frame;
+    }
+  }
+  if (r.handbacks !== undefined) {
+    // #2092 PR 3 — optional: the artist's hand-backs
+    if (!Array.isArray(r.handbacks) || r.handbacks.length > HANDBACK_RECORD_MAX) return null;
+    let last = -1;
+    for (const h of r.handbacks) {
+      if (!Array.isArray(h) || h.length !== 3) return null;
+      const [frame, bar, targets] = h;
+      if (!Number.isInteger(frame) || frame < last || !Number.isInteger(bar)) return null;
+      if (!Array.isArray(targets) || !targets.length || targets.some((t) => typeof t !== 'string')) return null;
       last = frame;
     }
   }

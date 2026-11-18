@@ -50,6 +50,11 @@ let tapErrors = 0;
 export function setConductTap(fn) {
   tap = typeof fn === 'function' ? fn : null;
 }
+let handbackTap = null;
+/** #2092 PR 3: observe every hand-back ({ targets, bar }) for the take's record. One listener (or null). */
+export function setHandbackTap(fn) {
+  handbackTap = typeof fn === 'function' ? fn : null;
+}
 
 // The dev readout (DEV -> MIND): what the trio is doing, for tuning. Not state: a holder, like the presence view.
 const LOG_MAX = 12;
@@ -423,8 +428,25 @@ export function startTrio({
   };
   // #2092 PR 3 (Matt, 2026-11-17): the double-tap reset IS the hand-back. A reset releases the dial's targets at once
   // instead of owning them. A locked marks dial stays owned while locked: the lock is read from getMarks, not from here.
+  // It announces on the bus and to the take (Matt's ruling, 2026-11-11: "it announces on the bus so the take records it").
   const handsBack = (key) => {
-    for (const [target, keys] of Object.entries(DIAL_FOR_TARGET)) if (keys.includes(key)) conductor.release(target);
+    const targets = [];
+    for (const [target, keys] of Object.entries(DIAL_FOR_TARGET))
+      if (keys.includes(key)) {
+        if (conductor.isOwned(target, bar)) targets.push(target);
+        conductor.release(target);
+      }
+    if (!targets.length) return; // nothing was owned: nothing was handed back
+    const e = { targets, bar };
+    emit(Events.TRIO_HANDBACK, e, { cause: 'artist' });
+    if (handbackTap !== null) {
+      try {
+        handbackTap(e);
+      } catch (err) {
+        tapErrors += 1;
+        console.error('[trio] handback tap', err);
+      }
+    }
   };
   stops.push(
     on(Events.LAYOUT_PARAM, (p) => {

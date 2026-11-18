@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { emit, on, Events } from '../composition/eventBus.js';
-import { startTrio, setConductTap, DIAL_FOR_TARGET, getTrioView, subscribeTrio } from './trioLive.js';
+import { startTrio, setConductTap, setHandbackTap, DIAL_FOR_TARGET, getTrioView, subscribeTrio } from './trioLive.js';
 import { createMindRecorder, checkMindRecord, createMindReplay } from './mindRecord.js';
 import { sanitizeAudioRoutes, isDefaultRoutes } from '../data/audioRoutes.js';
 import { DEFAULT_ROUTES, ROUTE_TARGETS } from '../gl/audioRoutes.mjs';
@@ -911,6 +911,37 @@ ok('the reset path is wired: RangeRow flags its double-tap, and every conducting
     assert.match(src(file), /const set = \(key, value, how\)/, `${file}: set() forwards the reset`);
   assert.match(src('../panels/layout/AppearanceSliders.jsx'), /set\('squash', v, how\)/);
   assert.match(src('../panels/layout/HypeSliders.jsx'), /set\('breath', v, how\)/);
+});
+
+ok('a hand-back announces on the bus and reaches the take; a reset of a dial nobody owned announces nothing', () => {
+  const g = rig();
+  audioOn();
+  const bus = [];
+  const taps = [];
+  const off = on(Events.TRIO_HANDBACK, (e) => bus.push(e));
+  setHandbackTap((e) => taps.push(e));
+  try {
+    emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: 1.2 });
+    g.bar(3);
+    emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: 0.45, reset: true });
+    assert.deepEqual(bus, [{ targets: ['render.scale'], bar: 3 }]);
+    assert.deepEqual(taps, bus);
+    emit(Events.LAYOUT_PARAM, { key: 'audioSwell', value: 1, reset: true }); // never owned
+    assert.equal(bus.length, 1, 'nothing was handed back');
+    // into a take, and the record checks; none = the file it always was
+    const rec = createMindRecorder({ getFrame: () => 40 });
+    rec.handback(taps[0]);
+    const out = rec.finish();
+    assert.deepEqual(out.handbacks, [[40, 3, ['render.scale']]]);
+    assert.ok(checkMindRecord(out));
+    assert.equal(checkMindRecord({ ...out, handbacks: [[40, 3, []]] }), null, 'an empty hand-back fails closed');
+    assert.equal('handbacks' in createMindRecorder().finish(), false);
+  } finally {
+    off();
+    setHandbackTap(null);
+  }
+  assert.match(src('../components/PerformanceButton.jsx'), /setHandbackTap\(\(e\) => rec\.handback\(e\)\)/);
+  g.done();
 });
 
 console.log(`trioLive.selfcheck: ${n} checks passed`);
