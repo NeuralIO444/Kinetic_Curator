@@ -257,6 +257,7 @@ export function evaluateGait(soa, gait, tree, beatTime, seed = 0) {
   const beat = new Float64Array(n);
   const phase0 = gaitPhase(seed);
   const cascade = fin(gait.cascade) ? gait.cascade : 0;
+  let wrote = false;
   for (let k = 0; k < n; k++) {
     const { depth } = tree.nodes[k];
     beat[k] = beatTime - (phase0 + depth * cascade);
@@ -266,7 +267,10 @@ export function evaluateGait(soa, gait, tree, beatTime, seed = 0) {
       if (!(d.amount > 0)) continue;
       if (!amounts[d.id]) amounts[d.id] = new Float64Array(n);
       amounts[d.id][k] = d.amount;
+      wrote = true;
     }
   }
+  // a gait whose moving roles this wearer has no node for (leaf drivers on a one-node asset) moves nothing: inactive
+  if (!wrote) return { active: false, amounts: {}, beat: null };
   return { active: true, amounts, beat };
 }

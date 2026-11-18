@@ -228,6 +228,9 @@ ok('the hard gate: amount 0 everywhere is not active, writes nothing, and leaves
   // and the drivers, fed those (zero) amounts, are the identity: today's render exactly
   assert.equal(applyKinemeDrivers(soa, { driverSec: 1, seed: 1, amounts: {} }), null);
   assert.equal(JSON.stringify([...soa.x, ...soa.y, ...soa.scale]), before);
+  // a gait that moves only a role this wearer lacks (leaf drivers on a one-node asset) is inactive too
+  const leafOnly = sanitizeGait({ ...SPEC_EXAMPLE, roles: { leaf: { drivers: [{ id: 'pulse', amount: 1 }] } } });
+  assert.deepEqual(evaluateGait(soa, leafOnly, tree, 5, 1), { active: false, amounts: {}, beat: null });
   // a tree that does not line up with the marks is a malformed call
   assert.equal(evaluateGait(soaOf(2), zero, tree, 5, 1), null);
 });
