@@ -48,12 +48,21 @@ const find = (id) => byId.get(id);
   ok(`eleven styles, ${all.size} primitives in all, every one a real pool asset`);
 }
 
-// 2 — `families` is untouched: still the pack-family slot, exactly as before this build.
+// 2 — `families` is the pack-family slot. #2105 ruling A fills it for the five single-owner packs only;
+//      the five shared-pack styles stay empty. Anything else changing it is a deliberate ruling, not drift.
 {
+  const ruled = {
+    marks: ['marks'],
+    swiss: ['letterforms'],
+    engraved: ['haeckel'],
+    techno: ['micro-hud'],
+    pixel: ['pixel-glyphs'],
+    grunge: ['riso'],
+  };
   for (const s of CANON_STYLES) {
-    assert.deepEqual([...s.assets.families], s.id === 'marks' ? ['marks'] : [], `${s.id}: families unchanged`);
+    assert.deepEqual([...s.assets.families], ruled[s.id] || [], `${s.id}: families match the #2105 ruling`);
   }
-  ok('the pack-family slot is unchanged (ten empty, marks claims marks)');
+  ok('the pack-family slot matches the #2105 ruling (six claim a pack, five stay empty)');
 }
 
 // 3 — every rule resolves against the real pool and can grow.
