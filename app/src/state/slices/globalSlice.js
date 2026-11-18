@@ -750,6 +750,8 @@ export const createGlobalSlice = (set) => ({
    * A render-only overlay in the creatureShed class — never serialized; liveLoop reads it beside the CONSTRUCTS gate. */
   constructCollapse: false,
   setConstructCollapse: (on) => set({ constructCollapse: !!on }),
+  constructPiecesLive: false, // #2327 review: the live loop says when constructs are on stage as pieces (arms cut 6.5)
+  setConstructPiecesLive: (on) => set({ constructPiecesLive: !!on }),
   dishPins: [],
   setDishPins: (pins) => set({ dishPins: sanitizePins(pins) }),
   setSlowRender: (slow, source) =>

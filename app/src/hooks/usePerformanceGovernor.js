@@ -225,7 +225,8 @@ export function usePerformanceGovernor() {
   // the rung — the ember weight, or the signed fresh weight.
   const constructCollapse = useStore((s) => s.constructCollapse); // #2327 cut 6.5
   const setConstructCollapse = useStore((s) => s.setConstructCollapse);
-  const constructPiecesActive = useStore((s) => s.constructLead === true);
+  // #2327 review: only while pieces are actually drawn (the CONSTRUCTS gate on AND the loop dealing them)
+  const constructPiecesActive = useStore((s) => s.constructLead === true && s.constructPiecesLive === true);
   const trailSteerShed = useStore((s) => s.trailSteerShed);
   const setTrailSteerShed = useStore((s) => s.setTrailSteerShed);
   const trailSteerActive =

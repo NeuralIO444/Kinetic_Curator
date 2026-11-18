@@ -30,6 +30,12 @@ const pieceKey = (key, id) => (key === undefined || key === null ? undefined : `
  * @returns the items, with each planned construct's tile replaced in place by its pieces. The same array when there
  *   is nothing to change.
  */
+// #2327 review: how many constructs have ever been dealt as pieces (monotonic, module-level). The live loop compares it
+// frame to frame, so the governor's collapse rung arms only while pieces are actually on stage.
+let dealtTotal = 0;
+/** Constructs dealt as pieces so far (monotonic). A readout, never part of a resolve's output. */
+export const constructPiecesDealtTotal = () => dealtTotal;
+
 export function constructPieceItems(
   items,
   { enabled = false, recordOf = null, budget = HIER_GLOBAL_BUDGET, taken = 0, moving = null } = {},
@@ -85,6 +91,7 @@ export function constructPieceItems(
       if (k !== undefined) next.key = k;
       out.push(next);
     }
+    dealtTotal += 1;
   }
   return out;
 }

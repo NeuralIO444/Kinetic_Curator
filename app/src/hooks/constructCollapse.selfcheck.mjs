@@ -5,7 +5,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { nextGovernorCut, GOVERNOR_RESTORE_CUTS, watchdogMayTrip } from './governorCuts.js';
-import { constructPieceItems } from '../engine/constructStage.js';
+import { constructPieceItems, constructPiecesDealtTotal } from '../engine/constructStage.js';
+import { sceneRuntimeResets } from '../state/sceneApply.js';
 import { canCollapse, expandConstructPieces } from '../engine/constructPieces.js';
 import { HOUSE_CONSTRUCT_RECORDS } from '../data/assets/index.js';
 
@@ -131,6 +132,24 @@ ok('at rest a construct draws as its tile (Matt, 2026-11-18): exact, thin lines 
   assert.equal(constructPieceItems(items, { enabled: true, recordOf: rec }), items, 'no motion source: the tile');
   assert.equal(constructPieceItems(items, { enabled: true, recordOf: rec, moving: () => false }), items, 'at rest');
   assert.ok(constructPieceItems(items, { enabled: true, recordOf: rec, moving: () => true }).length >= 12, 'moving');
+});
+
+ok('review: the collapse rung arms only while pieces are on stage; a scene change clears the claim', () => {
+  const gov = readFileSync(new URL('./usePerformanceGovernor.js', import.meta.url), 'utf8');
+  assert.match(gov, /s\.constructLead === true && s\.constructPiecesLive === true/);
+  const loop = readFileSync(new URL('../gl/liveLoop.mjs', import.meta.url), 'utf8');
+  assert.match(loop, /setConstructPiecesLive\(piecesLive\)/);
+  const before = constructPiecesDealtTotal();
+  const [id] = HOUSE_CONSTRUCT_RECORDS.keys();
+  const items = [{ assetId: id, x: 10, y: 10, scale: 1, rotation: 0 }];
+  const rec = (x) => HOUSE_CONSTRUCT_RECORDS.get(x) || null;
+  constructPieceItems(items, { enabled: true, recordOf: rec }); // at rest: nothing dealt
+  assert.equal(constructPiecesDealtTotal(), before, 'a tile at rest does not arm the rung');
+  constructPieceItems(items, { enabled: true, recordOf: rec, moving: () => true });
+  assert.equal(constructPiecesDealtTotal(), before + 1, 'a construct dealt as pieces does');
+  const resets = sceneRuntimeResets();
+  assert.equal(resets.constructCollapse, false);
+  assert.equal(resets.constructPiecesLive, false);
 });
 
 console.log(`constructCollapse.selfcheck: ${n} checks passed`);
