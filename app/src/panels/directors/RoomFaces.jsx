@@ -6,8 +6,8 @@
 //   Davis — his live rosette (the seed's sigil geometry) as a colour field, ordered-Bayer into a ramp of his
 //           amber. The source turns at his state's own tempo (davisSigil's table) and breathes; the dither
 //           stays stable while the source moves.
-//   LOIS  — a shaded face construction read as glyph dither: cells shaded by character weight from her
-//           state's fixed glyph set, her red entering by the state's tint.
+//   LOIS  — a shaded face construction read as glyph dither: cells shaded by character weight from his
+//           state's fixed glyph set, his red entering by the state's tint.
 // Both faces render the persona's REAL current state — the same honest state and mind overlay the panel
 // already resolves — at the resolution of the persona's engagement tier (tier = resolution; the presence
 // view's per-persona row, the dev panel's own source). State changes ease the face parameters to the new
@@ -135,11 +135,11 @@ function useFaceCanvas({ target, draw }) {
       const spin = tgt.spinS && next.spinDir ? next.spinDir / tgt.spinS : 0; // radians/sec comes from the tempo
       if (!reduced && spin) st.angle += spin * Math.PI * 2 * dt;
       const t = now / 1000;
-      // Her breath, at an amplitude the dither can feel (Matt, 2026-10-23: LOIS was hardly visible — an idle
+      // His breath, at an amplitude the dither can feel (Matt, 2026-10-23: LOIS was hardly visible — an idle
       // animation like Davis's): the lift used to run ±0.006, under the glyph ramp's quantization step
       // (~0.055 of shade), so the construction breathed on paper and sat still on screen. It now runs
-      // Davis's breath magnitude at HER per-state tempo (params.breathS — BURN hurries, AWAY drifts), and
-      // the cells at every contour flip as the face rises and settles. His draw reads `breath`; hers `lift`.
+      // Davis's breath magnitude at HIS per-state tempo (params.breathS — BURN hurries, AWAY drifts), and
+      // the cells at every contour flip as the face rises and settles. His draw reads `breath`; his `lift`.
       const liftS = Number.isFinite(next.breathS) && next.breathS > 0 ? next.breathS : 5.25;
       const phase = {
         angle: st.angle,

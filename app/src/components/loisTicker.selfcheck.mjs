@@ -59,7 +59,7 @@ const outlier = {
 
 ok('parity: a seeded pick puts the exact top-bar string on the ticker', () => {
   clearLoisVerdict();
-  assert.equal(tickerLine(), '', 'nothing said yet: no line — the slot shows her state alone');
+  assert.equal(tickerLine(), '', 'nothing said yet: no line — the slot shows his state alone');
   const pool = [...Array.from({ length: 6 }, () => ({ ...mid })), { ...outlier }];
   const ranked = rankLois(pool);
   assert.ok(ranked.verdict.length > 0, 'the seeded pool earns a verdict');

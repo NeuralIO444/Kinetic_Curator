@@ -44,7 +44,7 @@ export const RULES = Object.freeze({
     if (route && !allowed.includes(route.op)) route = null; // tier 2 may nudge a depth, not add: it does not ask
     return { ...neutralReply('davis'), ...(route ? { route } : {}), ...reading('davis', ctx) };
   },
-  // #1483 — a show that has stayed flat is a failed show: she burns it. She is the cautious one (Matt 2026-10-27): she
+  // #1483 — a show that has stayed flat is a failed show: he burns it. His is the restraint, not caution (Matt 2026-10-27): he
   // gives it a second phrase first (LOIS_BURN_BARS) — Davis already re-rolls on the first, so he gets the rope.
   lois: (ctx) => {
     const flat = !!(ctx && ctx.show && !ctx.show.silent && ctx.show.flatBars >= LOIS_BURN_BARS);
