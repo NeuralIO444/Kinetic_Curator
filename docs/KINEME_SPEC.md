@@ -76,6 +76,25 @@ The engine guarantees every driver, in return:
 - Governor shed = freeze → pin → zero, in that order, never a reset; recovery resumes from the held pose.
 - Stills evaluate deterministically from the seed.
 
+## Gaits — motion records drivers are worn through (GAIT, #2328)
+
+A **gait** is a named, portable motion record (`kc-gait/1`) that any asset or construct can wear. Creatures, beasts and glyphs follow in gait M5. It is how one choice of motion moves a whole jointed shape with follow-through, instead of every mark moving alone. Spec and rulings: [`design/gait-spec.md`](design/gait-spec.md). Code: `app/src/engine/gait.js`.
+
+**The record.** Per depth role (`root`, `inner`, `leaf`): a list of **registered** drivers with amounts, plus an optional rhythm pattern and transport mode. Then structure: `cascade` (beats of phase delay per depth step), `release` (order, stagger, scatter) and `rejoin` (ease, beats, path). The last two are used only when the field breaks the shape. The id is a content hash (`gait:<fnv64>` of the canonical JSON), so the same gait always has the same id. A project keeps up to 64 in `gaitRecords`, a **scene** field, so share links carry them.
+
+**Addressing.** A gait is addressed by join-tree depth, never by mark. `treeOf(kind, record)` maps a wearer to `{ nodes: [{ id, parent, depth }] }`. Depth 0 is the root, the deepest depth is the leaf, and anything between is inner. A plain asset is one root. A construct's tree is derived from its record: each piece's parent is the earlier piece whose ATTACH point it was joined to. The record format is unchanged.
+
+**The clock.** Beats (ruling 6). The QUEEN's beat position drives a gait when there is one. Otherwise the driver clock runs at the tempo, and with no audio at `GAIT_DEFAULT_BPM` (120). A wearer gets one seeded phase on the registered `gait` channel. Each node's beat time is the clock less (that phase + depth × cascade), so a leaf lags the root by exactly depth × cascade beats.
+
+**The contract it keeps.** A gait only writes amounts for drivers that are already registered (ruling 8). A new move lands as a driver first, under the Driver API above. Amount 0 everywhere is today's render exactly: `evaluateGait` reports inactive and writes nothing. Freeze, the governor's shed order and the still path are the drivers' own, unchanged.
+
+**What a gait is NOT.**
+- Not a recipe. "Recipe" means the scene recipe ([TAXONOMY](TAXONOMY.md)). A gait is a gait.
+- Not a new driver or a new render feature. It routes amounts to the drivers that exist.
+- Not a creature pose. The pose stays and layers under the gait (M5).
+- Not the decider of *when* a shape breaks. The field decides when; the gait decides how (ruling 3, M4).
+- Not picked by anyone yet. Until M3 (Canon defaults, the QUEEN's pick, the user lock, `GAIT_ASSIGN` in the take), only a test assigns one.
+
 ## What kineme is NOT
 
 - Not a new render feature. No new shaders features, no new assets, no atlas changes. It moves existing knobs.
