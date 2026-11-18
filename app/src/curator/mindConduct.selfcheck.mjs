@@ -36,10 +36,12 @@ import {
   SPECTRUM_PARAMS,
   SPECTRUM_MAP_COUNT,
   spectrumTarget,
+  SKIP,
 } from './mindConduct.js';
+import { createMindRecorder, checkMindRecord } from './mindRecord.js';
 import { validateReply, wantsStage, neutralReply } from './mindContract.js';
 import { rulesReply, LOIS_BURN_BARS } from './mindRules.js';
-import { createThinker } from './mindThinker.js';
+import { createThinker, SKIPS_PER_DECISION } from './mindThinker.js';
 import { readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -828,6 +830,143 @@ ok('#1483 Davis is the wild man: every move in reach at any heat; the heat order
   for (const dir of ['panels', 'components'])
     for (const f of walk(join(srcRoot, dir)).filter((p) => /\.(jsx?|mjs)$/.test(p) && !p.endsWith('.selfcheck.mjs')))
       assert.ok(!readFileSync(f, 'utf8').includes('conductHeat'), `${f}: no surface reads the conducting temperature`);
+});
+
+// #2160 — THE SKIP TRACE (Matt's fix ruling 3 of 3, 2026-11-12): every candidate davisRoute discards leaves a one-line
+// reason. Observability only: the same moves land with or without the trace.
+ok('the skip trace never changes what Davis returns (a grid of shows, seeds and heats)', () => {
+  const all = ENERGY_LEVELS.flatMap((l) => PRESETS[l]);
+  const tables = [[], [r('band.mids', 'render.glow', 0.3)], [{ ...r('band.mids', 'render.glow', 0.3), by: 'davis' }]];
+  let cases = 0;
+  for (const energy of [...ENERGY_LEVELS, 'odd'])
+    for (const bpm of [null, 90, 124, 180])
+      for (const silent of [false, true])
+        for (const routes of tables)
+          for (const owned of [[], [all[0].target], all.map((c) => c.target)])
+            for (const flatBars of [0, PHRASE_BARS, 3 * PHRASE_BARS])
+              for (const brake of [false, true])
+                for (const seed of [0, 7, 12345])
+                  for (const heat of [0, 0.5, 1]) {
+                    const show = { energy, bpm, silent, routes, owned, flatBars, brake };
+                    const trace = [];
+                    assert.deepEqual(davisRoute(show, seed, heat, trace), davisRoute(show, seed, heat));
+                    for (const t of trace) assert.ok(Object.values(SKIP).includes(t.reason), t.reason);
+                    cases++;
+                  }
+  assert.ok(cases > 5000);
+});
+ok('every reason is at most 16 characters (the record width) and the family is named', () => {
+  for (const v of Object.values(SKIP)) assert.ok(v.length <= 16, v);
+  assert.deepEqual(Object.keys(SKIP).sort(), [
+    'brake',
+    'holdsFew',
+    'owned',
+    'paired',
+    'rowOwned',
+    'sameTarget',
+    'silent',
+    'tableFull',
+    'tempo',
+  ]);
+});
+ok('each skip in the family is traced with the candidate it names', () => {
+  const show = { energy: 'mid', bpm: 124, silent: false, routes: [], owned: [], flatBars: 0 };
+  const reasons = (s, seed = 0) => {
+    const t = [];
+    davisRoute(s, seed, 0, t);
+    return t;
+  };
+  assert.deepEqual(reasons({ ...show, silent: true }), [{ reason: SKIP.silent, input: null, target: null }]);
+  const full = Array.from({ length: MAX_ROUTES }, (_, i) => r('beat', Object.keys(ROUTE_TARGETS)[i % 12], 0.1));
+  assert.deepEqual(reasons({ ...show, routes: full }), [{ reason: SKIP.tableFull, input: null, target: null }]);
+  const few = PRESETS.mid.slice(0, DAVIS_MAX_ROUTES).map((c) => ({ ...r(c.input, c.target, c.depth), by: 'davis' }));
+  assert.deepEqual(reasons({ ...show, routes: few }), [{ reason: SKIP.holdsFew, input: null, target: null }]);
+  // the first pick, owned: it is traced as owned, and the next candidate lands
+  const first = davisRoute(show, 0);
+  const t = reasons({ ...show, owned: [first.target] });
+  assert.ok(t.some((x) => x.reason === SKIP.owned && x.target === first.target));
+  // the first pick, already on the table: traced as paired
+  assert.ok(
+    reasons({ ...show, routes: [r(first.input, first.target, first.depth)] }).some(
+      (x) => x.reason === SKIP.paired && x.target === first.target,
+    ),
+  );
+  // the brake names every move it took out of reach, and only those bolder than BRAKE_MAX
+  const braked = reasons({ ...show, brake: true }).filter((x) => x.reason === SKIP.brake);
+  const bold = ENERGY_LEVELS.flatMap((l) => PRESETS[l]).filter(
+    (c) => (Number.isFinite(c.bold) ? c.bold : 1) > BRAKE_MAX,
+  );
+  assert.ok(braked.length > 0 && braked.length <= bold.length);
+  for (const x of braked) assert.ok(bold.some((c) => c.target === x.target && c.input === x.input));
+  // a tempo outside a preset's window traces it as tempo
+  const slow = reasons({ ...show, bpm: 60 });
+  assert.ok(slow.some((x) => x.reason === SKIP.tempo && x.target === 'clock.kinemeRate'));
+  // a flat show re-rolls his own row: same target and an owned row are named
+  const mine = { ...r('band.mids', 'render.glow', 0.3), by: 'davis' };
+  const flatShow = { ...show, routes: [mine], flatBars: PHRASE_BARS };
+  assert.ok(
+    reasons({ ...flatShow, owned: ['render.glow'] }).every(
+      (x) => x.reason !== SKIP.sameTarget || x.target === 'render.glow',
+    ),
+  );
+  assert.ok(
+    reasons({ ...flatShow, owned: ['render.glow'] }).some(
+      (x) => x.reason === SKIP.rowOwned || x.reason === SKIP.sameTarget,
+    ),
+  );
+});
+ok('the #2075 stall is attributable from the record alone: MID, a standing flat call, the brake on', () => {
+  // the shape the diagnosis recorded: mid energy, LOIS's brake holding, his row on the table, every safe move used up
+  const safe = ENERGY_LEVELS.flatMap((l) => PRESETS[l]).filter((c) => (c.bold ?? 1) <= BRAKE_MAX);
+  const show = {
+    energy: 'mid',
+    bpm: 124,
+    silent: false,
+    brake: true,
+    flatBars: 2 * PHRASE_BARS,
+    routes: [{ ...r('band.mids', 'render.glow', 0.3), by: 'davis' }, ...safe.map((c) => r(c.input, c.target, c.depth))],
+    owned: [],
+  };
+  const reply = rulesReply('davis', { tier: 't3', show }, { seed: 3, heat: 0.5, trace: [] });
+  const trace = [];
+  const again = rulesReply('davis', { tier: 't3', show }, { seed: 3, heat: 0.5, trace });
+  assert.deepEqual(again, reply, 'the trace does not change the reply');
+  const brake = trace.filter((x) => x.reason === SKIP.brake).length;
+  const skips = trace.filter((x) => x.reason !== SKIP.brake).length;
+  assert.ok(brake > 0, 'brake-narrowing is counted');
+  assert.ok(skips > 0, 'and the silent skips are named apart from it');
+  // into a take's record, and the record still checks
+  const rec = createMindRecorder({ getFrame: () => 10 });
+  rec.update(
+    { persona: 'davis', bar: 160, backend: 'rules', seed: 3, invented: false, reply: again, skips: trace },
+    false,
+  );
+  const out = rec.finish();
+  assert.equal(out.skips.length, trace.length, 'one line per discarded candidate');
+  assert.deepEqual(out.skips[0].slice(0, 2), [10, 160]);
+  assert.ok(checkMindRecord(out), 'a record with a skip trace checks');
+  assert.equal(
+    checkMindRecord({ ...out, skips: [[10, 160, 'x'.repeat(17), null, null]] }),
+    null,
+    'a long reason fails closed',
+  );
+  // a take with no skips is the file it always was
+  const quiet = createMindRecorder({ getFrame: () => 0 });
+  quiet.update({ persona: 'davis', bar: 1, backend: 'rules', seed: 0, invented: false, reply: again }, false);
+  assert.equal('skips' in quiet.finish(), false);
+});
+
+ok('a rules decision carries the trace as `skips`; a quiet one carries none; the reply is the traceless one', () => {
+  const show = { energy: 'mid', bpm: 124, silent: true, routes: [], owned: [], flatBars: 0 };
+  const d = createThinker({ persona: 'davis' }).onBar({ bar: 4, context: { tier: 't3', show }, seed: 1 });
+  assert.deepEqual(d.skips, [{ reason: SKIP.silent, input: null, target: null }]);
+  assert.deepEqual(d.reply, rulesReply('davis', { tier: 't3', show }, { seed: 1, heat: 0 }));
+  const q = createThinker({ persona: 'queen' }).onBar({ bar: 4, context: {}, seed: 1 });
+  assert.equal('skips' in q, false, 'no trace, no field');
+  assert.ok(
+    SKIPS_PER_DECISION >= ENERGY_LEVELS.flatMap((l) => PRESETS[l]).length + 1,
+    'the cap never cuts a real trace',
+  );
 });
 
 console.log(`mindConduct.selfcheck: ${n} checks passed`);

@@ -14,6 +14,8 @@ import { validateReply, isInvented, PERSONAS } from './mindContract.js';
 import { rulesReply } from './mindRules.js';
 
 export const MAX_LATE_BARS = 2;
+/** #2160: at most this many skip lines ride one decision (the candidate pool is three preset levels, far below it). */
+export const SKIPS_PER_DECISION = 32;
 /** The backends a decision may be stamped with, in the order they are asked. */
 export const BACKENDS = Object.freeze(['ollama', 'apple', 'rules', 'demo']); // 'demo': the ?debug=mind stand-in, never shipped live
 
@@ -55,7 +57,19 @@ export function createThinker({
       return 0;
     }
   };
-  const rules = (context, seed, bar) => rulesReply(persona, context, { seed, bar, heat: heatNow() });
+  // #2160: the rules answer carries Davis's skip trace (why each candidate was discarded) on the decision as `skips`.
+  // Observability only: the reply is exactly what it was without the trace.
+  const rules = (context, seed, bar) => {
+    const trace = [];
+    const reply = rulesReply(persona, context, { seed, bar, heat: heatNow(), trace });
+    return { reply, skips: trace.slice(0, SKIPS_PER_DECISION) };
+  };
+  const decideRules = (bar, seed, context) => {
+    const r = rules(context, seed, bar);
+    const d = decide(bar, 'rules', seed, r.reply);
+    if (d && r.skips.length) d.skips = r.skips;
+    return d;
+  };
   const decide = (bar, from, seed, raw) => {
     // #1526 — a backend CHAIN (MegaMind S2) answers through one mind fn, so its reply may arrive as a
     // stamped envelope { backend, reply }: the stamp names the backend that actually answered, and the
@@ -96,7 +110,7 @@ export function createThinker({
           if (d) return d;
         }
         // nothing usable from the model this bar: the rules answer below, and the model is asked again next bar
-        return decide(bar, 'rules', seed, rules(context, seed, bar));
+        return decideRules(bar, seed, context);
       }
       // the model is asked at most once at a time; the request is made off the bar, and the rules answer THIS bar
       // (and every bar the model has not answered): a slow or absent model never silences a persona
@@ -116,7 +130,7 @@ export function createThinker({
             },
           );
       }
-      return decide(bar, 'rules', seed, rules(context, seed, bar));
+      return decideRules(bar, seed, context);
     },
     /** True while a model request is outstanding. */
     inFlight: () => flight !== null,
