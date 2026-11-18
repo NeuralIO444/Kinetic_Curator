@@ -51,8 +51,16 @@ assert.ok(Object.isFrozen(DOC_FIELD_CLASS), 'the table is frozen');
   const keys = serializedKeys(SRC);
   assert.ok(keys.size >= 35, `the scan found the document's keys (${keys.size})`);
   const { unclassified, stale } = diffAgainstTable(keys);
-  assert.deepStrictEqual(unclassified, [], `serializeProject writes unclassified key(s): ${unclassified.join(', ')} — add them to DOC_FIELD_CLASS`);
-  assert.deepStrictEqual(stale, [], `DOC_FIELD_CLASS names key(s) serializeProject no longer writes: ${stale.join(', ')}`);
+  assert.deepStrictEqual(
+    unclassified,
+    [],
+    `serializeProject writes unclassified key(s): ${unclassified.join(', ')} — add them to DOC_FIELD_CLASS`,
+  );
+  assert.deepStrictEqual(
+    stale,
+    [],
+    `DOC_FIELD_CLASS names key(s) serializeProject no longer writes: ${stale.join(', ')}`,
+  );
 }
 
 // The guard has teeth: a key injected into serializeProject is named; a removed one is reported stale.
@@ -60,7 +68,7 @@ assert.ok(Object.isFrozen(DOC_FIELD_CLASS), 'the table is frozen');
   const injected = SRC.replace('  return doc;\n}\n', '  doc.fakeInjectedKey = 1;\n  return doc;\n}\n');
   assert.notStrictEqual(injected, SRC, 'injection applied');
   assert.deepStrictEqual(diffAgainstTable(serializedKeys(injected)).unclassified, ['fakeInjectedKey']);
-  const dropped = SRC.replace("  if (state.constructLead === true) doc.constructLead = true;", '  if (false) {}');
+  const dropped = SRC.replace('  if (state.constructLead === true) doc.constructLead = true;', '  if (false) {}');
   assert.notStrictEqual(dropped, SRC, 'removal applied');
   assert.deepStrictEqual(diffAgainstTable(serializedKeys(dropped)).stale, ['constructLead']);
 }
@@ -95,16 +103,41 @@ const dressed = {
 };
 const emitted = Object.keys(serializeProject(dressed));
 for (const k of emitted) assert.ok(k in DOC_FIELD_CLASS, `serializeProject emitted unclassified key "${k}"`);
-const single = Object.keys(serializeProject({ ...dressed, midiBanks: undefined, midiActiveBank: undefined, midiMap: { cc1: 'x' } }));
+const single = Object.keys(
+  serializeProject({ ...dressed, midiBanks: undefined, midiActiveBank: undefined, midiMap: { cc1: 'x' } }),
+);
 for (const k of single) assert.ok(k in DOC_FIELD_CLASS, `serializeProject emitted unclassified key "${k}"`);
 
 // sceneOf: exactly the scene keys, none of the rig, and the rulings hold.
 {
   const scene = sceneOf(dressed);
-  for (const k of Object.keys(scene)) assert.strictEqual(DOC_FIELD_CLASS[k], 'scene', `${k} is in sceneOf, so it must be scene`);
-  for (const k of ['title', 'audioRoutes', 'paletteLocks', 'kits', 'assetTags', 'quality', 'autoQuality', 'canvasFps', 'stageMode', 'midiBanks', 'mathMacros', 'version'])
+  for (const k of Object.keys(scene))
+    assert.strictEqual(DOC_FIELD_CLASS[k], 'scene', `${k} is in sceneOf, so it must be scene`);
+  for (const k of [
+    'title',
+    'audioRoutes',
+    'paletteLocks',
+    'kits',
+    'assetTags',
+    'quality',
+    'autoQuality',
+    'canvasFps',
+    'stageMode',
+    'midiBanks',
+    'mathMacros',
+    'version',
+  ])
     assert.ok(!(k in scene), `${k} never rides a recipe`);
-  for (const k of ['canvasW', 'canvasH', 'canvasPresetId', 'constructLead', 'seed', 'paletteOverrides', 'light', 'world'])
+  for (const k of [
+    'canvasW',
+    'canvasH',
+    'canvasPresetId',
+    'constructLead',
+    'seed',
+    'paletteOverrides',
+    'light',
+    'world',
+  ])
     assert.ok(k in scene, `${k} rides a recipe`);
   assert.strictEqual(scene.canvasW, 1080);
   // Same normalizers as a save: sceneOf is a strict subset of the serialized document, value for value.
@@ -112,4 +145,6 @@ for (const k of single) assert.ok(k in DOC_FIELD_CLASS, `serializeProject emitte
   for (const [k, v] of Object.entries(scene)) assert.deepStrictEqual(v, full[k], `${k} matches the save`);
 }
 
-console.log(`projectDocument.fields.selfcheck: OK (${Object.keys(DOC_FIELD_CLASS).length} classed, ${emitted.length} emitted)`);
+console.log(
+  `projectDocument.fields.selfcheck: OK (${Object.keys(DOC_FIELD_CLASS).length} classed, ${emitted.length} emitted)`,
+);
