@@ -27,6 +27,7 @@ import { RISO_FIELD_LOOK_ID } from './risoField.mjs'; // #2008 — the picker-on
 import { creatureTileId } from './creatureTileId.js';
 import { creatureTileSvg, buildRig, sanitizeRig } from './creatureRig.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
+import { materialsForStyle, materialById } from '../data/canon/materials.js'; // #2339 — PAINT: the MATERIAL value space
 
 export const CREATURE_ASSEMBLY_KIND = 'kc-assembled/1';
 /** The gene families, in the record's canonical order (#1849 scope amendment). */
@@ -104,6 +105,8 @@ const pickFrom = (order, seed, key, salt) =>
  *   points:  the asset's attach points as the WetLab shows them (the artist's own, or the shape's AUTO points).
  *   seed:    the deal seed (uint32). Same seed + asset + points → the identical record.
  *   lookId / voiceId: optional references; when absent (or not a real deck entry) they are dealt from the seed.
+ *   styleId: #2339 — the body's Canon style (the caller reads it with data/assetStyle.js assetStyle(bodyAsset)). A
+ *            material of that style is dealt from the seed; with no style the MATERIAL gene stays null (lawful).
  *   kept:    #1871 — the warnings the performer was shown for this combination and kept (the Strand Bank's
  *            derivation, components/strandBank.model.mjs). Sanitized against the record being born; a kept
  *            list the door would refuse refuses the assembly instead — the engine never writes a record its
@@ -111,7 +114,15 @@ const pickFrom = (order, seed, key, salt) =>
  *            every fact about the performer's choices beyond the genome itself.
  * @returns the record, or null when the asset id is missing (or a given kept list is dishonest).
  */
-export function assembleCreature({ assetId, points = [], seed = 0, lookId = null, voiceId = null, kept = null } = {}) {
+export function assembleCreature({
+  assetId,
+  points = [],
+  seed = 0,
+  lookId = null,
+  voiceId = null,
+  kept = null,
+  styleId = null,
+} = {}) {
   if (typeof assetId !== 'string' || !assetId || assetId.length > 120) return null;
   const pts = sanitizeAttachPoints(points);
   const s = seed >>> 0;
@@ -125,6 +136,10 @@ export function assembleCreature({ assetId, points = [], seed = 0, lookId = null
   const lookSource = isLookId(lookId) ? `look:${look}` : 'dealt';
   const voiceSource = isVoiceId(voiceId) ? `voice:${voice}` : 'dealt';
   const assetSource = `asset:${assetId}`;
+  // #2339 — the material is dealt from the body's style; it is not an ingredient of the record id (a record
+  // assembled before PAINT keeps its id), and it is never a colour: the room colours it (data/canon/materials.js)
+  const mats = materialsForStyle(styleId);
+  const material = mats.length ? pickFrom(mats, s, key, 0x2339).id : null;
 
   const genome = [
     { family: 'FORM', id: 'body', value: assetId, source: assetSource },
@@ -133,8 +148,9 @@ export function assembleCreature({ assetId, points = [], seed = 0, lookId = null
     { family: 'FORM', id: 'joints', value: joints.map((p) => ({ x: p.x, y: p.y })), source: assetSource },
     { family: 'LOOK', id: 'look', value: look, source: lookSource },
     { family: 'VOICE', id: 'voice', value: voice, source: voiceSource },
-    // MATERIAL is stubbed from day one so the genome shape never migrates (proposal 2 on #1848): no material yet.
-    { family: 'MATERIAL', id: 'material', value: null, source: 'none' },
+    // MATERIAL was stubbed from day one so the genome shape never migrates (proposal 2 on #1848); #2339 gives it a
+    // value space. A record with no style keeps the stub (null, 'none'), and old null records load unchanged.
+    { family: 'MATERIAL', id: 'material', value: material, source: material ? 'dealt' : 'none' },
     ...BIRTH_DRIVES.map((d) => ({ family: 'DRIVE', id: d, value: DRIVE_NORM, source: 'wild' })),
   ];
 
@@ -238,7 +254,8 @@ function sanitizeGenomeBlock(raw, rec) {
     else if (id === 'limbs' || id === 'joints') value = cleanPts(g.value, 4) ?? undefined;
     else if (id === 'look') value = isLookId(g.value) ? g.value : undefined;
     else if (id === 'voice') value = isVoiceId(g.value) ? g.value : undefined;
-    else if (id === 'material') value = g.value === null || typeof g.value === 'string' ? g.value : undefined;
+    else if (id === 'material')
+      value = g.value === null || materialById(g.value) ? g.value : undefined; // #2339
     else value = inDriveRange(g.value) ? g.value : undefined;
     if (value === undefined) return null;
     out.push({ family, id, value, source: g.source });
@@ -570,7 +587,7 @@ function sanitizeSummaryGene(g) {
   else if (g.family === 'LOOK' && g.id === 'look') value = isLookId(g.value) ? g.value : undefined;
   else if (g.family === 'VOICE' && g.id === 'voice') value = isVoiceId(g.value) ? g.value : undefined;
   else if (g.family === 'MATERIAL' && g.id === 'material')
-    value = g.value === null || typeof g.value === 'string' ? g.value : undefined;
+    value = g.value === null || materialById(g.value) ? g.value : undefined; // #2339 — null, or a real material
   else if (g.family === 'DRIVE') value = inDriveRange(g.value) ? g.value : undefined;
   else return cleanExtraGene(g);
   if (value === undefined) return null;
