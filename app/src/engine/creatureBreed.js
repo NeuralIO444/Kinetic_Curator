@@ -37,6 +37,7 @@ import { sanitizeAttachPoints } from './assetAttach.js';
 import { COMPOSITION_PRESETS } from '../data/presets.js';
 import { RISO_FIELD_LOOK_ID } from './risoField.mjs'; // #2008 — the picker-only Look stays off the dice
 import { VOICE_DECK } from '../data/voiceDeck.js';
+import { materialsForStyle, materialStyle } from '../data/canon/materials.js'; // #2339 — PAINT
 
 /** Matt's ruling (2026-10-29): lively mutation, ~1 gene in 8. Named so the suite can assert it (rider to ruling 2). */
 export const MUTATION_RATE = 1 / 8;
@@ -73,6 +74,7 @@ export function sourceRecord(src, seed = 0) {
       seed,
       lookId: src.lookId,
       voiceId: src.voiceId,
+      styleId: src.styleId ?? null, // #2339 — optional: the body's Canon style deals its material
     });
     if (!rec || rec.look !== src.lookId || rec.voice !== src.voiceId) return null;
     return sanitizeCreatureRecord(rec);
@@ -213,11 +215,11 @@ export function breedCreature(parents, seed = 0) {
 //
 //   - MUTATE applies this module's mutation laws to one gene: a continuous (DRIVE) gene re-rolls anywhere inside
 //     its legal range (the reroll formula below, verbatim); a discrete gene re-picks a DIFFERENT holder of its
-//     family's value space — the deck for LOOK / VOICE, the asset pool for the body — the way a breeding swap
-//     re-picks another parent's different value. Two families of genes have no lawful single-gene mutation here
-//     and REFUSE (never clamp, never invent): the skeleton (head / limbs / joints travel as ONE linkage group —
-//     a single-gene mutation would break the group; the skeleton changes whole, by replace, or by breeding) and
-//     MATERIAL (a stub with no legal value space yet).
+//     family's value space — the deck for LOOK / VOICE, the asset pool for the body, the material's own style
+//     for MATERIAL (#2339) — the way a breeding swap re-picks another parent's different value. Two cases have no
+//     lawful single-gene mutation here and REFUSE (never clamp, never invent): the skeleton (head / limbs / joints
+//     travel as ONE linkage group — a single-gene mutation would break the group; the skeleton changes whole, by
+//     replace, or by breeding) and a null MATERIAL when the host names no body style.
 //   - REPLACE takes a value from a legal source only — the same sources assembly and breeding draw from: the
 //     family's deck (LOOK / VOICE), the asset pool (the body), the body shape's own ATTACH points (a skeleton
 //     gene, derived exactly as assembleCreature derives it), or the corresponding gene of another banked record
@@ -238,12 +240,12 @@ const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
  * The value a hand mutation would give one gene, under this module's mutation laws — or null when the gene has
- * no lawful mutation (the skeleton linkage group, the MATERIAL stub, a family this build does not mutate, or a
+ * no lawful mutation (the skeleton linkage group, a null MATERIAL with no body style to pick in, a family this build does not mutate, or a
  * value space holding nothing different). Seeded from the record, so the same record + gene + seed always
  * mutates the same way; a DRIVE candidate equal to the current value is re-drawn (a mutation that changes
  * nothing is no mutation), and after a bounded walk of draws the gene refuses rather than repeats.
  */
-export function handMutateValue(record, gene, seed = 0, legalBodies = []) {
+export function handMutateValue(record, gene, seed = 0, legalBodies = [], bodyStyle = null) {
   if (!record || !gene || typeof gene !== 'object') return null;
   const key = `hand|${record.id}|${gene.family}.${gene.id}|${seed >>> 0}`;
   if (gene.family === 'DRIVE') {
@@ -256,6 +258,16 @@ export function handMutateValue(record, gene, seed = 0, legalBodies = []) {
   if (gene.family === 'LOOK' || gene.family === 'VOICE') {
     const deck = gene.family === 'LOOK' ? LOOK_ORDER : VOICE_ORDER;
     const rest = deck.filter((id) => id !== gene.value);
+    return rest.length ? rest[Math.floor(u01(key) * rest.length) % rest.length] : null;
+  }
+  if (gene.family === 'MATERIAL' && gene.id === 'material') {
+    // #2339 — another material of the SAME style: a material id names its style, so a painted Swiss creature
+    // repaints Swiss. A null material (a record from before PAINT) takes its first one from the body's style, which
+    // the host reads (Matt, 2026-11-17); with no body style it refuses.
+    const style = gene.value === null ? bodyStyle : materialStyle(gene.value);
+    const rest = materialsForStyle(style)
+      .map((m) => m.id)
+      .filter((id) => id !== gene.value);
     return rest.length ? rest[Math.floor(u01(key) * rest.length) % rest.length] : null;
   }
   if (gene.family === 'FORM' && gene.id === 'body') {
@@ -273,7 +285,7 @@ export function handMutateValue(record, gene, seed = 0, legalBodies = []) {
  *         {action:'replace', family:string, id:string,
  *          origin:{kind:'deck', value:string} | {kind:'pool', value:string} |
  *                  {kind:'asset'} | {kind:'donor', donorId:string}}} edit
- * @param {{seed?:number, legalBodies?:string[], donors?:object[], bodyAttachPoints?:Array}} [env]
+ * @param {{seed?:number, legalBodies?:string[], donors?:object[], bodyAttachPoints?:Array, bodyStyle?:string}} [env]
  *   seed: the project seed (mutation draws); legalBodies: the asset ids a body gene may name (the pool);
  *   donors: the other banked records; bodyAttachPoints: the body shape's ATTACH points (for a skeleton replace)
  * @returns {{record:object, refusal:null} | {record:null, refusal:string}} exactly one of the two is non-null;
@@ -288,7 +300,7 @@ export function handEditRecord(record, edit, env = {}) {
   let value;
   let source;
   if (edit.action === 'mutate') {
-    value = handMutateValue(rec, gene, env.seed ?? 0, env.legalBodies ?? []);
+    value = handMutateValue(rec, gene, env.seed ?? 0, env.legalBodies ?? [], env.bodyStyle ?? null);
     if (value === null) return { record: null, refusal: 'no-mutation' };
     source = 'hand:mut';
   } else if (edit.action === 'replace') {
