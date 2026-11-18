@@ -20,7 +20,8 @@ const fadeTaper = getTaper('halfLife', { minFrames: 1, maxFrames: 40 });
 const glowTaper = getTaper('power', { min: 0, max: 0.25, exp: 2 }); // #317 review: old full-scale blew out at ~50% slider — full travel now sweeps the usable range only
 const wetTaper = getTaper('power', { min: 0, max: 1, exp: 2 }); // Matt 2026-10-30: linear travel crammed the whole response into 0–0.1 and the rest just got ugly — power-2 spreads the low end (0.1 sits at ~32% travel, wet 0.35 at ~59%, soaked 0.8 at ~89%); full range kept, stored values unchanged
 
-const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
+// #2092: `how.reset` (the double-tap reset) rides along so the Trio can read it as the hand-back.
+const set = (key, value, how) => emit(Events.LAYOUT_PARAM, { key, value, ...(how?.reset ? { reset: true } : {}) });
 
 // #1607 (Strata Q Phase 1) — a trail value is a mode row on the shelf: the
 // detents write authored stops in PHYSICAL units (PARAM_STOPS), the exact
@@ -51,7 +52,7 @@ function TrailValue({ label, paramKey, value, min = 0, max = 1, step = 0.01, tap
           step={step}
           format={format}
           defaultValue={editorDefault}
-          onChange={(v) => set(paramKey, taper ? taper.toParam(v) : v)}
+          onChange={(v, how) => set(paramKey, taper ? taper.toParam(v) : v, how)}
         />
       )}
     />

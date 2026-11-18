@@ -25,7 +25,7 @@ import { createSpectrumRecorder } from '../curator/spectrumRecord.js';
 import { setSpectrumTap } from '../gl/spectrumLive.mjs';
 import { createMindRecorder } from '../curator/mindRecord.js';
 import { setMindTap, getMindSystem } from '../curator/mindLive.js';
-import { setConductTap } from '../curator/trioLive.js'; // #1483: Davis's route outcomes ride in the take
+import { setConductTap, setHandbackTap } from '../curator/trioLive.js'; // #1483: Davis's route outcomes ride in the take
 import { createRouteRecorder } from '../gl/routeRecord.mjs';
 import { createGestureRecorder } from '../gl/gestureRecord.mjs';
 import { createBirthRecorder, setBirthTap, birthRecordsFromSection } from '../curator/birthRecord.mjs';
@@ -190,10 +190,12 @@ const mindSection = (getFrame) => {
   const rec = createMindRecorder({ getFrame, getSystem: getMindSystem });
   setMindTap((d, requested) => rec.update(d, requested));
   setConductTap((e) => rec.conduct(e));
+  setHandbackTap((e) => rec.handback(e)); // #2092 PR 3: the take records the artist's hand-backs
   return {
     stop() {
       setMindTap(null);
       setConductTap(null);
+      setHandbackTap(null);
       return rec.finish();
     },
   };

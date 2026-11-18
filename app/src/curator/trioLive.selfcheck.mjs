@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { emit, on, Events } from '../composition/eventBus.js';
-import { startTrio, setConductTap, DIAL_FOR_TARGET, getTrioView, subscribeTrio } from './trioLive.js';
+import { startTrio, setConductTap, setHandbackTap, DIAL_FOR_TARGET, getTrioView, subscribeTrio } from './trioLive.js';
 import { createMindRecorder, checkMindRecord, createMindReplay } from './mindRecord.js';
 import { sanitizeAudioRoutes, isDefaultRoutes } from '../data/audioRoutes.js';
 import { DEFAULT_ROUTES, ROUTE_TARGETS } from '../gl/audioRoutes.mjs';
@@ -848,6 +848,99 @@ ok('the DEV view counts owned against ownable', () => {
   g.bar(1);
   assert.deepEqual(getTrioView().owned, ['render.breath', 'spectrum.scale']);
   assert.equal(getTrioView().ownable, ownable.length);
+  g.done();
+});
+
+// #2092 PR 3 — THE RESET IS THE HAND-BACK (Matt's Ruling, 2026-11-17): the existing double-tap reset hands the dial
+// back to Davis at once. The reset rides layout:param with `reset: true` (RangeRow -> onChange(default, { reset })).
+ok('a double-tap reset hands the dial back at once: a proposal on it goes through on the same bar', () => {
+  const g = rig();
+  audioOn();
+  emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: 1.2 }); // the artist's hand: owned
+  g.bar(1);
+  assert.deepEqual(g.trio.conductor.owned(1), ['render.scale']);
+  emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: 0.45, reset: true }); // the double-tap reset
+  assert.deepEqual(g.trio.conductor.owned(1), [], 'released at once, long before OWN_BARS');
+  assert.deepEqual(getTrioView().owned, [], 'the DEV view agrees');
+  const op = { op: 'add', input: 'band.mids', target: 'render.scale', depth: routeDepthRange('render.scale').max / 2 };
+  assert.equal(g.trio.conductor.consider(op, { bar: 1, tier: 't3' }).ok, true, 'back in his reach');
+  // a later drag owns it again — the hand-back is not a lock-out
+  emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: 0.9 });
+  assert.deepEqual(g.trio.conductor.owned(1), ['render.scale']);
+  g.done();
+});
+ok('a reset releases only that dial; a dial never touched is unaffected; one that was not owned stays unowned', () => {
+  const g = rig();
+  audioOn();
+  emit(Events.LAYOUT_PARAM, { key: 'breath', value: 0.4 });
+  emit(Events.LAYOUT_PARAM, { key: 'squash', value: 0.4 });
+  emit(Events.LAYOUT_PARAM, { key: 'breath', value: 0, reset: true });
+  assert.deepEqual(g.trio.conductor.owned(0), ['render.squash'], 'only breath was handed back');
+  emit(Events.LAYOUT_PARAM, { key: 'audioSwell', value: 1, reset: true }); // reset of a dial nobody owned
+  assert.deepEqual(g.trio.conductor.owned(0), ['render.squash']);
+  emit(Events.LAYOUT_PARAM, { key: 'count', value: 40, reset: true }); // not a conducting dial: no effect
+  assert.deepEqual(g.trio.conductor.owned(0), ['render.squash']);
+  g.done();
+});
+ok('a locked marks dial stays owned through a reset (the lock owns it, not the touch)', () => {
+  const g = rig({ marks: MARKS0 });
+  audioOn();
+  g.mk.locked.push('displace');
+  emit(Events.LAYOUT_PARAM, { key: 'spectrumDisplace', value: 0.6 });
+  emit(Events.LAYOUT_PARAM, { key: 'spectrumDisplace', value: 0, reset: true });
+  g.bar(1);
+  assert.ok(g.trio.showBlock().owned.includes('spectrum.displace'), 'still owned: it is locked');
+  g.request(1, { op: 'spectrum', key: 'displace', value: 0.4 });
+  assert.equal(g.out.dropped.at(-1).reason, 'owned');
+  g.done();
+});
+ok('the reset path is wired: RangeRow flags its double-tap, and every conducting dial with a reset forwards it', () => {
+  assert.match(src('../components/RangeRow.jsx'), /onChange\(defaultValue, \{ reset: true \}\)/);
+  for (const [file, keys] of [
+    ['../panels/stimulus/ReactivityControls.jsx', ['audioScaleMod', 'audioAlphaMod', 'audioSwell']],
+    ['../panels/stimulus/SpectrumMarks.jsx', ['a.key']],
+  ]) {
+    const text = src(file);
+    for (const k of keys) assert.ok(text.includes('how?.reset'), `${file} forwards the reset for ${k}`);
+  }
+  for (const file of [
+    '../panels/layout/AppearanceSliders.jsx',
+    '../panels/layout/HypeSliders.jsx',
+    '../panels/layout/AccumFamily.jsx',
+  ])
+    assert.match(src(file), /const set = \(key, value, how\)/, `${file}: set() forwards the reset`);
+  assert.match(src('../panels/layout/AppearanceSliders.jsx'), /set\('squash', v, how\)/);
+  assert.match(src('../panels/layout/HypeSliders.jsx'), /set\('breath', v, how\)/);
+});
+
+ok('a hand-back announces on the bus and reaches the take; a reset of a dial nobody owned announces nothing', () => {
+  const g = rig();
+  audioOn();
+  const bus = [];
+  const taps = [];
+  const off = on(Events.TRIO_HANDBACK, (e) => bus.push(e));
+  setHandbackTap((e) => taps.push(e));
+  try {
+    emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: 1.2 });
+    g.bar(3);
+    emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: 0.45, reset: true });
+    assert.deepEqual(bus, [{ targets: ['render.scale'], bar: 3 }]);
+    assert.deepEqual(taps, bus);
+    emit(Events.LAYOUT_PARAM, { key: 'audioSwell', value: 1, reset: true }); // never owned
+    assert.equal(bus.length, 1, 'nothing was handed back');
+    // into a take, and the record checks; none = the file it always was
+    const rec = createMindRecorder({ getFrame: () => 40 });
+    rec.handback(taps[0]);
+    const out = rec.finish();
+    assert.deepEqual(out.handbacks, [[40, 3, ['render.scale']]]);
+    assert.ok(checkMindRecord(out));
+    assert.equal(checkMindRecord({ ...out, handbacks: [[40, 3, []]] }), null, 'an empty hand-back fails closed');
+    assert.equal('handbacks' in createMindRecorder().finish(), false);
+  } finally {
+    off();
+    setHandbackTap(null);
+  }
+  assert.match(src('../components/PerformanceButton.jsx'), /setHandbackTap\(\(e\) => rec\.handback\(e\)\)/);
   g.done();
 });
 
