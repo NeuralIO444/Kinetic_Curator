@@ -43,6 +43,10 @@ ok('a patterned material tones accent: an ink pattern vanishes on an ink-filled 
     for (const x of list) if (x.pattern !== 'none') assert.equal(x.tone, 'accent', x.id);
 });
 
+ok('Swiss ships a patterned material: most library bodies sort into Swiss (Matt, 2026-11-17)', () => {
+  assert.ok(MATERIALS_BY_STYLE.swiss.some((x) => x.pattern !== 'none'));
+});
+
 ok('ids are unique across styles and each names its own style', () => {
   const ids = Object.values(MATERIALS_BY_STYLE).flatMap((l) => l.map((x) => x.id));
   assert.equal(new Set(ids).size, ids.length);
