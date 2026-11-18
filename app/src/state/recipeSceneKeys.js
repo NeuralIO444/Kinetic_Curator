@@ -22,6 +22,7 @@ export const SCENE_BLOCK_KEYS = Object.freeze([
   'creatureRecords',
   'shapeShelf',
   'constructRecords',
+  'gaitRecords',
   'constructLead',
   'kitTriad',
   'canvasW',

@@ -47,6 +47,7 @@ import {
   withCultivation,
 } from '../../engine/creatureAssembler.js'; // #1849 / #1850, cultivation notes #1872
 import { bankConstructRecord, constructTileId } from '../../engine/constructAssembler.js'; // #2108
+import { bankGait } from '../../engine/gait.js'; // #2328
 import { findBodyAsset } from '../../engine/constructPool.js'; // spec §14 — a banked construct can be a creature body
 import { dealBeastMeasures, beastTile } from '../../engine/beastTile.js'; // #1962
 import { keepShape, dropShape } from '../../panels/shapeShelf.mjs'; // #2280
@@ -445,6 +446,7 @@ export const createGlobalSlice = (set) => ({
   constructLead: false, // #2108 — the CONSTRUCTS gate: on, KIN/CHAOS pools are led by the house constructs (default off = every roll as before)
   setConstructLead: (on) => set({ constructLead: !!on }),
   constructRecords: [], // #2108 — construct records (recipes); their tiles are drawn from them, never saved
+  gaitRecords: [], // #2328 — gait records (portable motion records); assigned by a test or a dev hook until M3 picks
   creatureBreedNote: null, // #1852 — what the last BREED did (the same statuses, plus need-three). Session-only.
   creatureBirthNote: null, // #2037 — what the last kept-take banking did: { id: null, status: 'banked', count }. Session-only.
   beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.
@@ -1108,6 +1110,12 @@ export const createGlobalSlice = (set) => ({
         styleId: picks && picks.styleId ? picks.styleId : null, // #2339 — the body's Canon style
       });
       return rec ? bankCreature(state, rec) : {};
+    }),
+  /** #2328 — bank one gait record through its door (a dishonest or already-banked record changes nothing). */
+  bankGaitRecord: (record) =>
+    set((state) => {
+      const next = bankGait(state.gaitRecords, record);
+      return next === state.gaitRecords ? {} : { gaitRecords: next };
     }),
   /**
    * #2108 — bank one construct record through its door. A dishonest record or one already banked changes
