@@ -9,6 +9,7 @@
 //     path, so pasting a recipe back restores the exact scene.
 //
 import { stackOf, expandStack } from './recipeStack.js';
+import { SCENE_BLOCK_KEYS, sceneBlockFrom } from './recipeSceneKeys.js';
 
 // Pure, node-importable: no React, no DOM, no store. The selfcheck covers the
 // round-trip. Node-safe: copyTextToClipboard guards navigator/document.
@@ -17,6 +18,15 @@ import { stackOf, expandStack } from './recipeStack.js';
 export const RECIPE_VERSION = 'kc-recipe/1';
 /** A recipe that also carries the layer stack (#1131). Scenes with nothing beyond one plain KC track stay /1. */
 export const RECIPE_VERSION_2 = 'kc-recipe/2';
+/** #2324 — the recipe that carries the whole scene: paletteOverrides, the stack, and one JSON line per scene-block key. */
+export const RECIPE_VERSION_3 = 'kc-recipe/3';
+
+/** A recipe (text or link) of version 3 is the WHOLE scene: apply it with replaceAll. Older ones stay merges. */
+export const isWholeSceneRecipe = (recipe) =>
+  !!recipe && (recipe.version === RECIPE_VERSION_3 || recipe.version === 'kc-r/3');
+
+/** The applyScene options a parsed recipe asks for (recipes-v3-spec §3.2: old formats merge, v3 replaces). */
+export const recipeApplyOptions = (recipe) => ({ replaceAll: isWholeSceneRecipe(recipe) });
 
 /**
  * Sub-seed offset channels. Issue #305 stores these at state.seedOffsets as
@@ -88,8 +98,10 @@ function encodeValue(v) {
 }
 
 /**
- * Serialize recipe fields to the kc-recipe/1 text format. Layout params are
- * emitted sorted for stable, diff-friendly text.
+ * Serialize recipe fields to the kc-recipe/3 text format (opts.legacy: the v1/v2 text). Layout params are
+ * emitted sorted for stable, diff-friendly text. A v3 recipe adds `paletteOverrides:` and one JSON line per
+ * scene-block key (`light:`, `world:`, `assetKineme:` …); the caller applies recipeUrls.fitCustomAssets first
+ * when the scene may carry custom assets.
  *
  *   kc-recipe/1
  *   seed: 0x1a2b3c4d
@@ -100,19 +112,28 @@ function encodeValue(v) {
  *   layout.blendMode: normal
  *   layout.scale: [0.4,1.6]
  */
-export function encodeRecipe(fields) {
+export function encodeRecipe(fields, opts = {}) {
   const f = fields && typeof fields === 'object' ? fields : {};
   const seed = (f.seed >>> 0).toString(16);
   const offsets = readSeedOffsets({ seedOffsets: f.seedOffsets });
   const layout = f.layoutParams && typeof f.layoutParams === 'object' ? f.layoutParams : {};
   const stack = f.stack && typeof f.stack === 'object' ? f.stack : null;
-  const lines = [stack ? RECIPE_VERSION_2 : RECIPE_VERSION, `seed: 0x${seed}`];
+  const legacy = opts && opts.legacy === true; // the v1/v2 text, for tests and any caller that must emit one
+  const lines = [legacy ? (stack ? RECIPE_VERSION_2 : RECIPE_VERSION) : RECIPE_VERSION_3, `seed: 0x${seed}`];
   lines.push(`palette: ${typeof f.paletteId === 'string' && f.paletteId ? encodeValue(f.paletteId) : 'null'}`);
+  if (!legacy && f.paletteOverrides !== undefined && f.paletteOverrides !== null) {
+    lines.push(`paletteOverrides: ${JSON.stringify(f.paletteOverrides)}`);
+  }
   for (const ch of RECIPE_OFFSET_CHANNELS) lines.push(`seedOffset.${ch}: ${offsets[ch]}`);
   for (const key of Object.keys(layout).sort()) {
     lines.push(`layout.${key}: ${encodeValue(layout[key])}`);
   }
   if (stack) lines.push(`stack: ${JSON.stringify(stack)}`); // one JSON line: layers, active track, the other tracks' save states
+  if (!legacy) {
+    // One JSON line per scene-block key, sorted, so the text diffs cleanly and each part stays hand-editable.
+    const scene = sceneBlockFrom(f.scene);
+    for (const key of Object.keys(scene).sort()) lines.push(`${key}: ${JSON.stringify(scene[key])}`);
+  }
   return lines.join('\n');
 }
 
@@ -152,21 +173,25 @@ function parseSeed(raw) {
  * hostile input.
  */
 export function parseRecipe(text) {
-  if (typeof text !== 'string' || !text.trim()) return fail('Empty recipe — paste kc-recipe/1 text first.');
+  if (typeof text !== 'string' || !text.trim()) return fail('Empty recipe — paste kc-recipe text first.');
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith('#'));
   const [head, ...rest] = lines;
-  if (head !== RECIPE_VERSION && head !== RECIPE_VERSION_2) {
-    return fail(`Not a recipe: the first line must be "${RECIPE_VERSION}" or "${RECIPE_VERSION_2}".`);
+  if (head !== RECIPE_VERSION && head !== RECIPE_VERSION_2 && head !== RECIPE_VERSION_3) {
+    return fail(
+      `Not a recipe: the first line must be "${RECIPE_VERSION}", "${RECIPE_VERSION_2}" or "${RECIPE_VERSION_3}".`,
+    );
   }
+  const v3 = head === RECIPE_VERSION_3;
   const recipe = {
     version: head,
     seed: null,
     seedOffsets: readSeedOffsets(null),
     paletteId: null,
     layoutParams: {},
+    ...(v3 ? { paletteOverrides: null, scene: {} } : {}),
   };
   for (const line of rest) {
     const idx = line.indexOf(':');
@@ -190,7 +215,26 @@ export function parseRecipe(text) {
       const param = key.slice('layout.'.length);
       if (!param || param.includes('.')) return fail(`Bad layout key "${key}".`);
       recipe.layoutParams[param] = parseValue(rawVal);
-    } else if (key === 'stack' && head === RECIPE_VERSION_2) {
+    } else if (v3 && key === 'paletteOverrides') {
+      let raw;
+      try {
+        raw = JSON.parse(rawVal);
+      } catch {
+        return fail('Bad paletteOverrides line: it is not readable.');
+      }
+      if (raw !== null && (typeof raw !== 'object' || Array.isArray(raw))) {
+        return fail('Bad paletteOverrides line: it must be an object.');
+      }
+      recipe.paletteOverrides = raw;
+    } else if (v3 && SCENE_BLOCK_KEYS.includes(key)) {
+      let raw;
+      try {
+        raw = JSON.parse(rawVal);
+      } catch {
+        return fail(`Bad ${key} line: it is not readable.`);
+      }
+      recipe.scene[key] = raw;
+    } else if (key === 'stack' && (head === RECIPE_VERSION_2 || v3)) {
       let raw;
       try {
         raw = JSON.parse(rawVal);
@@ -222,6 +266,7 @@ export function recipeToProjectDoc(recipe) {
     paletteId: recipe.paletteId,
     layoutParams: { ...recipe.layoutParams },
     seedOffsets: { ...recipe.seedOffsets },
+    ...(recipe.scene ? sceneBlockFrom(recipe.scene) : {}), // #2324 — a v3 recipe's scene block
     ...(recipe.stack
       ? {
           layers: recipe.stack.layers,

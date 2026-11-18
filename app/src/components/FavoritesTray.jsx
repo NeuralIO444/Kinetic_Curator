@@ -61,7 +61,7 @@ export function FavoritesTray() {
   // #534 — favorite-as-link: favorites carry the identical field set as
   // live state, so one shared function encodes them.
   const copyLink = useCallback(async (fav) => {
-    const payload = encodeRecipeUrl(recipeFieldsFromKept(fav));
+    const payload = await encodeRecipeUrl(recipeFieldsFromKept(fav));
     const href = buildShareHref(payload, typeof window !== 'undefined' ? window.location.href : '');
     const ok = await copyTextToClipboard(href);
     const key = fav.id ?? `${fav.seed}-${fav.timestamp || ''}`;

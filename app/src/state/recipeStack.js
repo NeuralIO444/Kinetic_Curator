@@ -40,9 +40,10 @@ const enabledIds = (map) =>
 
 /**
  * The compact stack of any carrier: the live store ({ layers, activeLayerId, layerSnapshots }) or a keep that
- * stored one ({ stack: <compact> } is returned as is). Null when there is nothing to carry.
+ * stored one ({ stack: <compact> } is returned as is). Null when there is nothing to carry. `defaults` is what
+ * the other tracks' layouts are a delta against: the live defaults for kc-r/2 (unchanged), a frozen epoch for kc-r/3.
  */
-export function stackOf(src) {
+export function stackOf(src, defaults = DEFAULT_LAYOUT_PARAMS) {
   if (!isObj(src)) return null;
   if (isObj(src.stack)) return src.stack;
   if (!Array.isArray(src.layers) || isTrivialStack(src.layers)) return null;
@@ -55,8 +56,8 @@ export function stackOf(src) {
     const s = snaps[l.id];
     const lay = isObj(s.layoutParams) ? s.layoutParams : {};
     const delta = {};
-    for (const k of new Set([...Object.keys(DEFAULT_LAYOUT_PARAMS), ...Object.keys(lay)]))
-      if (!same(lay[k], DEFAULT_LAYOUT_PARAMS[k])) delta[k] = lay[k];
+    for (const k of new Set([...Object.keys(defaults), ...Object.keys(lay)]))
+      if (!same(lay[k], defaults[k])) delta[k] = lay[k];
     const o = {};
     for (const [ch, v] of Object.entries(isObj(s.seedOffsets) ? s.seedOffsets : {}))
       if (Number.isFinite(v) && v !== 0) o[ch] = Math.trunc(v);
@@ -76,7 +77,7 @@ export function stackOf(src) {
  * Compact stack -> { ok:true, stack:{ layers, activeLayerId, layerSnapshots } } ready for applyProject,
  * or { ok:false, error }. Everything goes through the project normalizers.
  */
-export function expandStack(compact) {
+export function expandStack(compact, defaults = DEFAULT_LAYOUT_PARAMS) {
   if (!isObj(compact) || !Array.isArray(compact.l)) return { ok: false, error: 'the layer stack is malformed' };
   const { layers, activeLayerId } = normalizeLayers(compact.l, compact.a);
   if (!layers) return { ok: false, error: 'the layer stack has no usable tracks' };
@@ -88,7 +89,7 @@ export function expandStack(compact) {
       seedOffsets: isObj(s.o) ? s.o : {},
       paletteId: typeof s.p === 'string' && s.p ? s.p : undefined,
       paletteOverrides: isObj(s.po) ? s.po : null,
-      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, ...(isObj(s.l) ? s.l : {}) },
+      layoutParams: { ...defaults, ...(isObj(s.l) ? s.l : {}) },
       enabledAssets: Object.fromEntries(
         (Array.isArray(s.e) ? s.e : []).filter((k) => typeof k === 'string').map((k) => [k, true]),
       ),

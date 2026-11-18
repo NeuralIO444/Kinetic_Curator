@@ -5,8 +5,8 @@ import { Events, emit } from '../composition/eventBus.js';
 import { serializeProject, writePipelineAutosave, readPipelineAutosave } from '../state/projectDocument.js';
 import { decideBoot } from '../state/startupBoot.mjs';
 import { projectDirty } from '../state/projectWatch.mjs'; // every field the document saves
-import { recipeToProjectDoc } from '../state/recipes.js';
-import { parseBootHash, describePaletteFallback } from '../state/recipeUrls.js';
+import { recipeToProjectDoc, recipeApplyOptions } from '../state/recipes.js';
+import { parseBootHash, describePaletteFallback, describeDroppedAssets } from '../state/recipeUrls.js';
 import { scopeDecks } from '../state/kineticScope.mjs'; // #1772: START sets the opener's width
 import { projectFolderLive } from './useProjectFolder.js'; // #1709: a project folder, when one is open
 
@@ -69,14 +69,14 @@ let bootFired = false;
  * Returns 'applied' (skip the rest of boot), 'bad' (consumed but broken —
  * continue with the normal boot), or 'none' (no fragment).
  */
-function bootFromHash() {
+async function bootFromHash() {
   let hash = '';
   try {
     hash = window.location.hash || '';
   } catch {
     // no window (SSR/tests) — normal boot
   }
-  const parsed = parseBootHash(hash);
+  const parsed = await parseBootHash(hash); // #2324: a v3 link inflates through DecompressionStream
   if (parsed.status === 'none') return 'none';
   try {
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -90,10 +90,16 @@ function bootFromHash() {
   }
   const recipe = parsed.recipe;
   // #2322 — a link at boot lands as an edit of the fresh stage, not a document load; nothing to undo back to.
-  st.applyScene({ ...recipeToProjectDoc(recipe), paletteOverrides: recipe.paletteOverrides }, { undo: false });
+  st.applyScene(
+    { ...recipeToProjectDoc(recipe), paletteOverrides: recipe.paletteOverrides },
+    { undo: false, ...recipeApplyOptions(recipe) },
+  );
   const fb = describePaletteFallback(recipe.paletteId, st.userPalettes);
+  const dropped = describeDroppedAssets(recipe.droppedCustomAssets);
   st.setBootNotice(
-    fb ? `Opened from link · palette "${fb.requested}" not here — using "${fb.used}"` : 'Opened shared scene from link',
+    (fb
+      ? `Opened from link · palette "${fb.requested}" not here — using "${fb.used}"`
+      : 'Opened shared scene from link') + (dropped ? ` · ${dropped}` : ''),
   );
   try {
     sessionStorage.setItem(RESTORED_FLAG, '1');
@@ -107,7 +113,7 @@ function bootFromHash() {
  * The browser session's boot (#33 / #534 / #946): the scratch autosave, a share link, the startup roll. #1709 runs it
  * only when no project folder reopens.
  */
-function browserBoot() {
+async function browserBoot() {
   // #1646 — narrowed by progress below: a throw while the saved
   // document is still at risk (the flag read, the hash, the
   // autosave read, the apply) is a lost session and must say so;
@@ -127,7 +133,7 @@ function browserBoot() {
     // autosave. 'bad' was consumed but broken: fall through to the normal
     // boot with the note already set. 'applied' wins over everything —
     // an explicit paste is never rolled over.
-    const hashBoot = bootFromHash();
+    const hashBoot = await bootFromHash(); // awaited BEFORE the autosave read: an explicit link wins
     if (hashBoot === 'applied') return;
     const st = useStore.getState();
     const { doc, quarantined } = readPipelineAutosave();

@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import { useStore } from '../../state/store.js';
-import { parseRecipe, recipeToProjectDoc, recipeFieldsFromKept, copyTextToClipboard } from '../../state/recipes.js';
-import { encodeRecipeUrl, decodeRecipeUrl, buildShareHref, extractRecipePayload } from '../../state/recipeUrls.js';
+import { parseRecipe, recipeToProjectDoc, recipeApplyOptions, copyTextToClipboard } from '../../state/recipes.js';
+import { recipeFieldsFromState } from '../../state/recipeLive.js';
+import {
+  encodeRecipeUrl,
+  decodeRecipeUrl,
+  buildShareHref,
+  extractRecipePayload,
+  fitCustomAssets,
+  describeDroppedAssets,
+} from '../../state/recipeUrls.js';
 
 // #307 — the way back in for kc-recipe/1 text. Lives inside OUTPUT (no new
 // panel): copy buttons sit on each snapshot in SnapshotGallery; this row is
@@ -9,10 +17,11 @@ import { encodeRecipeUrl, decodeRecipeUrl, buildShareHref, extractRecipePayload 
 // undoable edit (#2322 applyScene) and leaves the rig alone; it is no longer a project
 // load. onMessage writes to OUTPUT's shared status line.
 //
-// #534 — COPY LINK shares the current scene as a kc-r/1 URL
-// (…/#r=kc-r/1.…): seed, nonzero offsets, palette id + dirty overrides,
-// non-default layout params. The paste box accepts kc-recipe/1 text OR a
-// recipe link; links route through decodeRecipeUrl and the same apply path.
+// #534 / #2324 — COPY LINK shares the whole scene as a kc-r/3 URL
+// (…/#r=kc-r/3.…): seed, offsets, palette + overrides, layout, the layer stack and the scene block (world, light,
+// kinemes, constructs, canvas, cast, custom assets that fit 8 KB). The paste box accepts kc-recipe text OR a
+// recipe link; links route through decodeRecipeUrl and the same apply path. A v3 recipe REPLACES the scene
+// (recipeApplyOptions); an older one merges, as it always did.
 export function RecipeRow({ onMessage }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -20,13 +29,15 @@ export function RecipeRow({ onMessage }) {
 
   const copyLink = async () => {
     const store = useStore.getState();
-    const fields = { ...recipeFieldsFromKept(store), paletteOverrides: store.paletteOverrides ?? null };
-    const payload = encodeRecipeUrl(fields);
+    const fields = recipeFieldsFromState(store);
+    const { dropped } = await fitCustomAssets(fields.scene);
+    const payload = await encodeRecipeUrl(fields);
     const href = buildShareHref(payload, typeof window !== 'undefined' ? window.location.href : '');
     const ok = await copyTextToClipboard(href);
     if (ok) {
       setCopied(true);
-      onMessage('Link copied — paste it anywhere to share this exact scene');
+      const note = describeDroppedAssets(dropped);
+      onMessage(note ? `Link copied — ${note}` : 'Link copied — paste it anywhere to share this exact scene');
       setTimeout(() => {
         setCopied(false);
         onMessage(null);
@@ -43,18 +54,22 @@ export function RecipeRow({ onMessage }) {
     // second undo step. #534: the link carries the full override state (null = clean).
     useStore
       .getState()
-      .applyScene({ ...recipeToProjectDoc(recipe), paletteOverrides: recipe.paletteOverrides ?? null });
+      .applyScene(
+        { ...recipeToProjectDoc(recipe), paletteOverrides: recipe.paletteOverrides ?? null },
+        recipeApplyOptions(recipe),
+      );
     setText('');
     setOpen(false);
-    onMessage('Link applied');
+    const note = describeDroppedAssets(recipe.droppedCustomAssets);
+    onMessage(note ? `Link applied · ${note}` : 'Link applied');
     setTimeout(() => onMessage(null), 2000);
   };
 
-  const applyRecipe = () => {
-    // A recipe link pastes as a full URL or a bare kc-r/1.… payload.
+  const applyRecipe = async () => {
+    // A recipe link pastes as a full URL or a bare kc-r/3.… payload.
     const payload = extractRecipePayload(text);
     if (payload) {
-      const result = decodeRecipeUrl(payload);
+      const result = await decodeRecipeUrl(payload);
       if (!result.ok) {
         onMessage(`Link: ${result.error}`);
         return;
@@ -67,11 +82,14 @@ export function RecipeRow({ onMessage }) {
       onMessage(`Recipe: ${result.error}`);
       return;
     }
-    // #2322 — as above. kc-recipe text carries no palette overrides, so the palette it names comes back stock
-    // (null), exactly as a load did before.
+    // #2322 — as above. kc-recipe/1 and /2 text carry no palette overrides, so the palette they name comes back
+    // stock (null), exactly as a load did before; kc-recipe/3 carries them.
     useStore
       .getState()
-      .applyScene({ ...recipeToProjectDoc(result.recipe), paletteOverrides: result.recipe.paletteOverrides ?? null });
+      .applyScene(
+        { ...recipeToProjectDoc(result.recipe), paletteOverrides: result.recipe.paletteOverrides ?? null },
+        recipeApplyOptions(result.recipe),
+      );
     setText('');
     setOpen(false);
     onMessage('Recipe applied');
@@ -90,7 +108,7 @@ export function RecipeRow({ onMessage }) {
           className="big-btn"
           onClick={() => (open ? close() : setOpen(true))}
           style={{ flex: 1 }}
-          title="Paste a kc-recipe/1 recipe or a kc-r/1 link to restore its exact scene"
+          title="Paste a kc-recipe recipe or a kc-r link to restore its exact scene"
         >
           {open ? '▾ PASTE RECIPE' : '▸ PASTE RECIPE'}
         </button>
