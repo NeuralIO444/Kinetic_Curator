@@ -17,7 +17,6 @@ import { ASSETS_RISO } from './assets-riso.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
 import { houseConstructSet } from '../../engine/constructHouse.js'; // #2108: the construct house set
-import { constructTileId } from '../../engine/constructAssembler.js'; // #2327: a record's pool tile id
 import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes (#725) baked for the library
 
 /** The catalogue as authored, before the baked mattes are attached (what the bake reads). */
@@ -66,7 +65,7 @@ const authoredById = new Map(ASSETS_AUTHORED.map((a) => [a.id, a]));
 const HOUSE_CONSTRUCTS = houseConstructSet((id) => authoredById.get(id));
 export const ASSETS_CONSTRUCTS = HOUSE_CONSTRUCTS.tiles;
 /** #2327 — the house constructs' records by pool tile id: the stage deals a construct as pieces from its record. */
-export const HOUSE_CONSTRUCT_RECORDS = new Map(HOUSE_CONSTRUCTS.records.map((r) => [constructTileId(r.id), r]));
+export const HOUSE_CONSTRUCT_RECORDS = HOUSE_CONSTRUCTS.byTile;
 
 export const ASSETS = [
   ...ASSETS_AUTHORED.map((a) => (BAKED_REGIONS[a.id] ? { ...a, ...BAKED_REGIONS[a.id] } : a)),
