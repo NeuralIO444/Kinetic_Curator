@@ -204,6 +204,8 @@ export function sceneRuntimeResets() {
     // #2327 — the construct collapse is likewise a governor claim on the OLD document's constructs.
     constructCollapse: false,
     constructPiecesLive: false,
+    // #2329 (review of #2402) — gait picks and locks are session claims on the OLD document's constructs.
+    gaitAssignments: {},
   };
 }
 

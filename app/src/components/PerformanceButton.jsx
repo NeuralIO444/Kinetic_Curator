@@ -205,7 +205,7 @@ const mindSection = (getFrame) => {
 // #2329 — the take carries every GAIT_ASSIGN that landed (the per-phrase picks, the user's picks and locks), stored as
 // `gaits`: playback re-publishes them and never picks again.
 const gaitsSection = (getFrame) => {
-  const rec = createGaitRecorder({ getFrame });
+  const rec = createGaitRecorder({ getFrame, initial: useStore.getState().gaitAssignments }); // review of #2402: what already stands
   setGaitTap((e) => rec.update(e));
   return {
     stop() {

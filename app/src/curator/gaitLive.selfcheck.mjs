@@ -19,6 +19,7 @@ import {
 } from './gaitRecord.mjs';
 import { createGlobalSlice } from '../state/slices/globalSlice.js';
 import { canonGaits } from '../data/canon/gaits.js';
+import { sceneRuntimeResets } from '../state/sceneApply.js';
 import { ASSETS_CONSTRUCTS } from '../data/assets/index.js';
 
 let n = 0;
@@ -226,4 +227,26 @@ stopQueen();
 trio.stop();
 offHeard();
 offBar();
+
+ok('review of #2402: a take starts with what already stands; a scene change clears picks and locks', () => {
+  const g = canonGaits('organic');
+  const rec = createGaitRecorder({
+    getFrame: () => 5,
+    initial: {
+      'user:cn-bbbbbbbb': { gaitId: g.idle.id, by: 'queen', locked: false },
+      'user:cn-aaaaaaaa': { gaitId: g.performing.id, by: 'user', locked: true },
+    },
+  });
+  const out = rec.finish();
+  assert.deepEqual(
+    out.events.map((r) => [r[0], r[1]]),
+    [
+      [5, 'user:cn-aaaaaaaa'],
+      [5, 'user:cn-bbbbbbbb'],
+    ],
+  );
+  assert.ok(checkGaitRecord(out));
+  assert.deepEqual(sceneRuntimeResets().gaitAssignments, {});
+});
+
 console.log(`gaitLive.selfcheck: ${n} checks ok`);

@@ -33,9 +33,19 @@ export function noteGaitAssign(event) {
 const rowOf = (frame, e) => [frame | 0, e.target, e.gaitId, e.by, e.locked ? 1 : 0];
 const eventOf = (row) => ({ target: row[1], gaitId: row[2], by: row[3], locked: row[4] === 1 });
 
-/** The take-side recorder. */
-export function createGaitRecorder({ getFrame = () => 0 } = {}) {
+/**
+ * The take-side recorder. `initial` is the assignment map standing when the take starts (review of #2402): its rows are
+ * written at the start frame, sorted by target, so a seek to the start lands on what was already performing.
+ */
+export function createGaitRecorder({ getFrame = () => 0, initial = null } = {}) {
   const events = [];
+  if (initial && typeof initial === 'object') {
+    const f = getFrame() | 0;
+    for (const target of Object.keys(initial).sort()) {
+      const e = sanitizeGaitAssign({ target, ...initial[target] });
+      if (e && events.length < GAIT_RECORD_MAX) events.push(rowOf(f, e));
+    }
+  }
   return {
     update(raw) {
       const e = sanitizeGaitAssign(raw);

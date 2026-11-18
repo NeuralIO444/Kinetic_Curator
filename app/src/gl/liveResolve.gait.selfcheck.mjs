@@ -21,8 +21,8 @@ const ok = (name, fn) => {
 
 const TILE = ASSETS_CONSTRUCTS.find((a) => a.style === 'organic').id;
 const L = { id: 'lyr-a', name: 'a', visible: true, layerBlendMode: 'normal', layerOpacity: 1 };
-// The scene: house constructs on stage. The kineme drivers are off on purpose: today a breathing mark's scale and
-// scaleY differ, and constructStage keeps a non-square mark as its tile (flagged on the PR).
+// The scene: house constructs on stage. The kineme drivers are off here so the hashes pin the gait alone; the last
+// check runs the house defaults (breath on), which constructStage deals within STRETCH_TOLERANCE (review of #2402).
 const STABLE = {
   canvasW: 1000,
   canvasH: 700,
@@ -52,7 +52,7 @@ const STABLE = {
 const FRAMES = 480;
 
 /** One session: `stampAt(f)` gives frame f's `gaits` stamp (or null: no key). */
-function session({ pieces = true, stampAt = () => null, record = false } = {}) {
+function session({ pieces = true, stampAt = () => null, record = false, layoutParams = null } = {}) {
   const recorder = record ? createPerformanceRecorder() : null;
   const resolver = record ? withResolveTap(createLiveResolver) : createLiveResolver();
   if (recorder) {
@@ -68,6 +68,7 @@ function session({ pieces = true, stampAt = () => null, record = false } = {}) {
     const g = stampAt(f);
     const input = {
       ...STABLE,
+      ...(layoutParams ? { layoutParams } : {}),
       loopTimeMs: t,
       dtSec: 1 / 60,
       ...(pieces ? { constructPieces: true } : {}),
@@ -159,6 +160,22 @@ ok('a take with QUEEN swaps replays to every checkpoint, and two runs are hash-i
     ],
   };
   assert.equal(verifyPerformance(forged).ok, false, 'a swapped gait in the take is caught');
+});
+
+ok('review of #2402: under the house defaults (breath on) a performing construct deals as pieces', () => {
+  const lp = { ...STABLE.layoutParams };
+  delete lp.kinemeBreath;
+  delete lp.kinemePulse;
+  delete lp.kinemeDrift;
+  const live = session({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, ...lp, kinemeBreath: DEFAULT_LAYOUT_PARAMS.kinemeBreath },
+    stampAt: () => gaitInputStamp({ [TILE]: { gaitId: canonGaits('organic').performing.id } }, 120),
+  });
+  assert.ok(DEFAULT_LAYOUT_PARAMS.kinemeBreath > 0, 'the house breath is on');
+  assert.ok(
+    live.pieceCounts.some((c) => c >= 12),
+    'pieces appear on stage',
+  );
 });
 
 console.log(`liveResolve.gait.selfcheck: ${n} checks ok`);
