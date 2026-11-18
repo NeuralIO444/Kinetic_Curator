@@ -267,8 +267,6 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       setBedrock(st.culture, bedrock);
       st.terrain = terrain.map(freeze); // the snapshot records the terrain the culture currently lives under
     }
-    const quiet = dl.mode === 'quiet';
-    st.quiet = quiet ? { strength: Number(dl.strength) || 0, cycleGens: Number(dl.cycleGens) || undefined } : null;
     const target = Math.max(0, Math.floor(Number(dl.gen) || 0));
     // K2 slice 2b — a RECORDED culture grid ({ gen, grid }, from dishCultureCells) IS this frame's culture: the host's GPU
     // generations are not re-derived here, the stage loads what was read, so live == replay. A seek back is moot (the grid
@@ -284,6 +282,9 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       st.seedEpoch = epoch;
       st.rollFrom = rollFrom;
     }
+    // #2290 — set AFTER the seek-back rebuild above: build() replaces `st`, which dropped a dial set earlier in the frame
+    const quiet = dl.mode === 'quiet';
+    st.quiet = quiet ? { strength: Number(dl.strength) || 0, cycleGens: Number(dl.cycleGens) || undefined } : null;
     const shed = Math.max(0, Math.min(SHED_STEPS.length - 1, Number(dl.shed) | 0));
     // #1997 — the ferrofluid's birth bias lands before each generation it feeds (one frame
     // behind: fluidBias is the density published at the last applied frame). No bias handed in
