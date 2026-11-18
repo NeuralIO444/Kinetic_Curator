@@ -115,6 +115,15 @@ const on = { enabled: true, recordOf: recordFor };
   ok('stretched, unreadable and unknown tiles stay tiles');
 }
 
+// 4b — review of #2374: a mirrored copy and a blended tile stay tiles (pieces would land off a reflected tile, and a
+// blend applied per piece is not the blend of the whole mark).
+{
+  const items = [tile(1, { _mirrored: true }), tile(3, { blend: 'screen' })];
+  assert.equal(constructPieceItems(items, on), items, 'mirrored / blended: the same array');
+  assert.equal(constructPieceItems([tile(5, { alpha: 100, blend: 'normal' })], on).length, 16, 'opaque + normal deals');
+  ok('mirrored and blended tiles stay tiles');
+}
+
 // 5 — the cap ladder: whole constructs while the budget holds, earliest on stage first; `taken` counts against it.
 {
   const items = [1, 2, 3, 4].map((k) => tile(k));
