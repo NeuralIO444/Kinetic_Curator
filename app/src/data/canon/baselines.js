@@ -331,6 +331,39 @@ export const CANON_BASELINES = deepFreeze([
       },
     },
   },
+  {
+    // #2106 (Matt, 2026-11-17): pixel's baseline. Authored, not measured — pixel has no Looks to measure from.
+    id: 'menkman',
+    label: 'BLOCK TEAR', // proposed surface alias; the persona's own alias is COMPRESSION (curator/personaTastes.js)
+    style: 'pixel', // the Canon style it anchors (identity comes from that record — declared once, #2044)
+    identity: {
+      movement: 'Glitch studies — the compression artefact as method',
+      period: '2000s–2010s',
+      place: 'Netherlands', // not in the persona doc — Menkman is Netherlands-based; Matt to confirm
+      figures: ['Rosa Menkman'],
+      note: 'The codec’s hard 8×8 block, torn open so the format shows; damage runs to the edges, colour is evidence.',
+    },
+    basis:
+      'Authored, not measured: pixel has no Looks to measure from. The numbers sit inside the Menkman render ' +
+      'profile’s own biases (curator/renderProfiles.js) — hard opaque rectilinear blocks with rotation near zero, ' +
+      'displacement high and damage to the edges, noise moving at her range, no glow. The palette is her persona palette.',
+    settings: {
+      marks: { categories: ['stamps', 'dots'], styles: ['pixel'] },
+      palette: { id: 'persona-menkman', shift: 'split', blend: 'difference' },
+      motion: { behave: 'cruise', lifeDrift: 0.1, noiseSpeed: 1.0, wind: 0.2, flap: 0, breath: 0 },
+      density: { count: 300, density: 96, scale: [0.3, 0.8], alpha: [90, 100], zTiers: 2 },
+      rules: {
+        mode: 'grid',
+        mirror: 'off',
+        overlap: true,
+        bleed: true,
+        jitter: 30,
+        displacement: 80,
+        rotate: [0, 0],
+        extra: {},
+      },
+    },
+  },
 ]);
 
 /** The baseline ids, in declaration order. */
