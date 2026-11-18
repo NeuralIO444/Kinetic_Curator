@@ -84,6 +84,7 @@ ok('no pop at the swap frame: the pieces at rest are exactly the tile, for every
     const pieces = constructPieceItems([item], {
       enabled: true,
       recordOf: (id) => HOUSE_CONSTRUCT_RECORDS.get(id) || null,
+      moving: () => true,
     });
     assert.equal(pieces.length, record.parts.length, `${tileId}: dealt as its pieces`);
     // collapsing (the switch off) hands back the tile item itself: the same array, the same object
@@ -102,7 +103,11 @@ ok('no pop at the swap frame: the pieces at rest are exactly the tile, for every
 ok('the cap ladder holds with 4 constructs on stage', () => {
   const ids = [...HOUSE_CONSTRUCT_RECORDS.keys()].slice(0, 4);
   const items = ids.map((assetId, i) => ({ assetId, x: 100 * i, y: 50, scale: 1, rotation: 0 }));
-  const out = constructPieceItems(items, { enabled: true, recordOf: (id) => HOUSE_CONSTRUCT_RECORDS.get(id) || null });
+  const out = constructPieceItems(items, {
+    enabled: true,
+    recordOf: (id) => HOUSE_CONSTRUCT_RECORDS.get(id) || null,
+    moving: () => true,
+  });
   const want = ids.reduce((s, id) => s + HOUSE_CONSTRUCT_RECORDS.get(id).parts.length, 0);
   assert.equal(out.length, want, 'all four dealt as pieces');
   assert.ok(want <= 64);
@@ -110,12 +115,22 @@ ok('the cap ladder holds with 4 constructs on stage', () => {
   const tight = constructPieceItems(items, {
     enabled: true,
     recordOf: (id) => HOUSE_CONSTRUCT_RECORDS.get(id) || null,
+    moving: () => true,
     budget: want - 1,
   });
   assert.ok(
     tight.some((it) => it.assetId === ids[3]),
     'the one over budget stays its tile',
   );
+});
+
+ok('at rest a construct draws as its tile (Matt, 2026-11-18): exact, thin lines whole — pieces only in motion', () => {
+  const [id] = HOUSE_CONSTRUCT_RECORDS.keys();
+  const items = [{ assetId: id, x: 10, y: 10, scale: 1, rotation: 0 }];
+  const rec = (x) => HOUSE_CONSTRUCT_RECORDS.get(x) || null;
+  assert.equal(constructPieceItems(items, { enabled: true, recordOf: rec }), items, 'no motion source: the tile');
+  assert.equal(constructPieceItems(items, { enabled: true, recordOf: rec, moving: () => false }), items, 'at rest');
+  assert.ok(constructPieceItems(items, { enabled: true, recordOf: rec, moving: () => true }).length >= 12, 'moving');
 });
 
 console.log(`constructCollapse.selfcheck: ${n} checks passed`);

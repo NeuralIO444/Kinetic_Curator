@@ -45,7 +45,7 @@ const tile = (k, extra = {}) => ({
   ...extra,
 });
 const plain = (n) => ({ assetId: 'geo_circle_01', x: n, y: n, scale: 1, rotation: 0, alpha: 100, key: `g${n}` });
-const on = { enabled: true, recordOf: recordFor };
+const on = { enabled: true, recordOf: recordFor, moving: () => true }; // in motion: pieces (at rest: the tile, check 0)
 
 // 1 — the hard gate: off, no resolver, no constructs, or an empty stage return THE SAME ARRAY.
 {
@@ -150,7 +150,7 @@ const on = { enabled: true, recordOf: recordFor };
   assert.ok(ASSETS_CONSTRUCTS.length > 0);
   assert.equal(HOUSE_CONSTRUCT_RECORDS.size, ASSETS_CONSTRUCTS.length, 'one record per tile');
   for (const t of ASSETS_CONSTRUCTS) assert.ok(HOUSE_CONSTRUCT_RECORDS.has(t.id), `${t.id} has its record`);
-  const house = { enabled: true, recordOf: (id) => HOUSE_CONSTRUCT_RECORDS.get(id) || null };
+  const house = { enabled: true, recordOf: (id) => HOUSE_CONSTRUCT_RECORDS.get(id) || null, moving: () => true };
   for (const t of ASSETS_CONSTRUCTS.slice(0, 12)) {
     const rec = HOUSE_CONSTRUCT_RECORDS.get(t.id);
     const out = constructPieceItems([{ assetId: t.id, x: 640, y: 360, scale: 1.2, scaleY: 1.2, rotation: 15 }], house);

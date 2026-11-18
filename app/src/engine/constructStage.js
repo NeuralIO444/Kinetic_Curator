@@ -23,14 +23,25 @@ const pieceKey = (key, id) => (key === undefined || key === null ? undefined : `
  *                recordOf   (assetId) => the construct record that tile was baked from, or null for any other asset
  *                budget     the most pieces this frame may deal (the hierarchy's global cap by default)
  *                taken      pieces already spoken for (the creatures' items), counted against the same budget
+ *                moving     (item) => true when a gait or a break-up is moving that construct. Matt's ruling
+ *                           (2026-11-18, the #2327 still check): a construct AT REST draws as its flat tile — exact,
+ *                           and its thin lines stay whole — and deals as pieces only while something moves it. None
+ *                           moves a construct before gait M3/M4, so absent = every construct rests as its tile.
  * @returns the items, with each planned construct's tile replaced in place by its pieces. The same array when there
  *   is nothing to change.
  */
 export function constructPieceItems(
   items,
-  { enabled = false, recordOf = null, budget = HIER_GLOBAL_BUDGET, taken = 0 } = {},
+  { enabled = false, recordOf = null, budget = HIER_GLOBAL_BUDGET, taken = 0, moving = null } = {},
 ) {
-  if (!enabled || typeof recordOf !== 'function' || !Array.isArray(items) || !items.length) return items;
+  if (
+    !enabled ||
+    typeof recordOf !== 'function' ||
+    typeof moving !== 'function' ||
+    !Array.isArray(items) ||
+    !items.length
+  )
+    return items;
   // the constructs on stage, in stage order; a non-square mark (scaleY ≠ scale) is a stretched tile — it stays one
   const found = [];
   for (let i = 0; i < items.length; i++) {
@@ -45,6 +56,7 @@ export function constructPieceItems(
     // blending the whole mark once. (A see-through tile still deals: where its pieces overlap at a join they read a
     // little denser than the flat tile — flagged to Matt on #2327; the rest pose itself is exact.)
     if (it.blend && it.blend !== 'normal') continue;
+    if (!moving(it)) continue; // at rest: the tile (exact, and its thin lines whole)
     const record = recordOf(it.assetId);
     if (record) found.push({ key: i, record });
   }

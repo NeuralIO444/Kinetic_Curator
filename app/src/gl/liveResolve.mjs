@@ -1693,7 +1693,8 @@ export function createLiveResolver() {
       // array references, the same contract, the same hash.
       // #2327 — constructs as live pieces. Gated by `input.constructPieces` (absent = off = the SAME array, so today's
       // render is today's): a construct's flat tile deals as its pieces, parent-transformed, resting exactly where the
-      // tile draws. The rotation below then turns pieces and marks alike.
+      // tile draws. Matt's ruling (2026-11-18): AT REST a construct stays its tile, so it deals pieces only for a `moving`
+      // source — none is passed until gait M3/M4, so every construct draws as its tile. The rotation turns all alike.
       if (input.constructPieces) {
         items = constructPieceItems(items, {
           enabled: true,
