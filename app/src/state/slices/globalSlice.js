@@ -1,6 +1,13 @@
 import { ASSETS } from '../../data/assets/index.js';
 import { getQualityCaps } from '../../data/quality.js';
-import { normalizeLayoutParams } from '../../data/layout-modes.js';
+import {
+  initialEnabledAssets,
+  rigFieldsFromDoc,
+  sceneFieldsFromDoc,
+  sceneFieldsFor,
+  sceneRuntimeResets,
+  pushSceneUndo,
+} from '../sceneApply.js'; // #2322 — the scene half of a document, shared with recipes and undo
 import { assetStyle } from '../../data/assetStyle.js'; // #2339 — PAINT: a body's Canon style
 import {
   sanitizeOverlay,
@@ -11,16 +18,7 @@ import {
   renameOverlayAsset,
   replaceOverlayAsset,
 } from '../../assets/overlay.js';
-import {
-  normalizeSnapshots,
-  sanitizeEnabledAssets,
-  sanitizeAssetWeightOverrides,
-  sanitizeAssetOptions,
-  sanitizeQuality,
-  sanitizePaletteLocks,
-  MAX_LAYERS,
-} from '../projectNormalize.js';
-import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
+import {} from '../projectNormalize.js';
 import { clampCycleGens, FIELD_CYCLE_GENS } from '../../engine/dishLifeField.mjs'; // #1923 Phase 4: the re-seed interval's detents
 import { sanitizeMagnets, clampFluidDial, clampFluidRung, MAX_MAGNETS } from '../../engine/dishFluid.mjs'; // #1997: the ferrofluid's stamped-state sanitizers
 import { emit, Events } from '../../composition/eventBus.js';
@@ -28,33 +26,18 @@ import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../
 import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { chapterMemorySummary } from '../../curator/chapterMemory.mjs'; // #1858: the book-memory line
 import { experimentalOn, setExperimental } from '../../curator/tasteGate.js';
-import { sanitizeLight } from '../../data/light.js';
-import { sanitizeWorld } from '../../data/world.js';
-import {
-  sanitizeAssetKineme,
-  sanitizeAssetStill,
-  getKineme,
-  getAssetKineme,
-  getKinemePhrase,
-  DEFAULT_ASSET_KINEME,
-} from '../../data/kinemes.js';
-import { sanitizeRegionKinemesDoc } from '../../data/regionKinemes.js';
-import { sanitizeAssetTags, sanitizeAssetTagsDoc, editTags, suggestTags } from '../../data/assetFacets.js';
+import { getKineme, getAssetKineme, getKinemePhrase, DEFAULT_ASSET_KINEME } from '../../data/kinemes.js';
+import { sanitizeAssetTags, editTags, suggestTags } from '../../data/assetFacets.js';
 import { libraryTraits } from '../../data/assetDescriptor.js';
-import { sanitizeKit, sanitizeKitsDoc, sanitizeKitTriad, SEED_KITS, KITS_MAX } from '../../data/kits.js';
+import { sanitizeKit, sanitizeKitTriad, SEED_KITS, KITS_MAX } from '../../data/kits.js';
 import { tagImportedRegions } from '../../data/regionDefaults.js';
-import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
-import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
-import { sanitizeMidiBanks, sanitizeMidiActiveBank, activeBankMap } from '../../midi/banks.mjs';
-import { sanitizeMathMacros } from '../../curator/mathMacros.js';
 import { normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
 import { queueRegionDetect } from '../../assets/regionRaster.js';
 import { sanitizePins } from '../../curator/dishPins.js';
-import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../engine/assetAttach.js';
+import { clickAttach, sanitizeAttachPoints } from '../../engine/assetAttach.js';
 import {
   assembleCreature,
   sanitizeCreatureRecord,
-  sanitizeCreatureRecords,
   MAX_CREATURE_RECORDS,
   creatureTile,
   creatureTileId,
@@ -63,36 +46,15 @@ import {
   skeletonFounder,
   withCultivation,
 } from '../../engine/creatureAssembler.js'; // #1849 / #1850, cultivation notes #1872
-import { sanitizeConstructRecords, bankConstructRecord, constructTileId } from '../../engine/constructAssembler.js'; // #2108
+import { bankConstructRecord, constructTileId } from '../../engine/constructAssembler.js'; // #2108
 import { findBodyAsset } from '../../engine/constructPool.js'; // spec §14 — a banked construct can be a creature body
 import { dealBeastMeasures, beastTile } from '../../engine/beastTile.js'; // #1962
-import { sanitizeShapeShelf, keepShape, dropShape } from '../../panels/shapeShelf.mjs'; // #2280
+import { keepShape, dropShape } from '../../panels/shapeShelf.mjs'; // #2280
 import { sourceRecord, breedCreature, handEditRecord, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852, hand edits #1870
 import { autoAttachPoints } from '../../engine/autoAttach.js'; // #1870 — a skeleton replace reads the body shape's points
 import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
 import { BEAST_SETTING_DEFAULTS, sanitizeBeastSettings } from '../../engine/beastSettings.mjs';
 import { snapExposureStops } from '../../gl/exposureModel.mjs'; // #1830: the resolve exposure detents
-
-// HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
-const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
-const initialEnabledAssets = Object.fromEntries(DEFAULT_4_ASSETS.map((id) => [id, true]));
-// #1694 S2 — the creature citizen starts ENABLED in the default document: creatures were never
-// gated by this map (the artist's count alone governed them), so citizenship must not unbirth
-// them at rest. Only an explicit off — the tile toggle, or a solo of another asset — ever
-// writes `creature: false` (see curator/creatureCitizen.js for the resolver-side read).
-initialEnabledAssets.creature = true;
-
-/**
- * #1062 — a document's asset map, taken as the WHOLE set rather than an overlay
- * on the defaults. `false` is a deliberate OFF and is kept. A map with no keys
- * (absent, `{}`, or a hostile map the sanitizer collapsed to nothing) is read as
- * "the document does not say" and falls back to the default four: a damaged
- * file must not open to a blank canvas, and a genuine all-off state is stored as
- * explicit `false` values, never as `{}`.
- */
-function wholeEnabledAssets(map) {
-  return map && typeof map === 'object' && Object.keys(map).length > 0 ? { ...map } : { ...initialEnabledAssets };
-}
 
 const WEIGHT_CYCLE = ['light', 'medium', 'heavy'];
 
@@ -1567,135 +1529,45 @@ export const createGlobalSlice = (set) => ({
 
   applyProject: (doc) => {
     // #2095 — every load path funnels through this action (the EXPORT_LOAD_PROJECT dispatch, a project-folder
-    // open, the boot restore, a share link). Announce the load action itself BEFORE the state lands: the Trio
-    // hears it, resets its books, and knows the table change arriving with this set is the document's — a load
-    // is hooked as an action, never inferred from a diff of the table.
+    // open, the boot restore). Announce the load action itself BEFORE the state lands: the Trio hears it, resets
+    // its books, and knows the table change arriving with this set is the document's — a load is hooked as an
+    // action, never inferred from a diff of the table.
     emit(Events.PROJECT_LOADED);
     set((state) => {
-      const next = {
-        seed: doc.seed >>> 0,
-        // #305 — sub-seed offsets restore with the seed; absent → zeros.
-        seedOffsets: normalizeSeedOffsets(doc.seedOffsets),
-        paletteId: doc.paletteId || state.paletteId,
-        // #103 Track B — a dangling quality key must never reach the caps lookup.
-        quality: sanitizeQuality(doc.quality, state.quality || 'balanced'),
-        // #310: AUTO left performer sight, but the governor still reads the
-        // flag — the document carries the hidden default.
-        autoQuality: doc.autoQuality !== false,
+      // #2322 — a document load is the rig half + the scene half + the resets. The scene half lives in
+      // state/sceneApply.js so a recipe (applyScene) and undo read the very same sanitizers.
+      const rig = rigFieldsFromDoc(doc, state);
+      return {
+        ...rig,
+        ...sceneFieldsFromDoc(doc, state, { kits: rig.kits }),
+        ...sceneRuntimeResets(),
         // #264 — a fresh document owns its quality; any governor shed claim ends here.
         qualityShedFrom: null,
-        // #1694 S2 — the creature shed is likewise a governor claim on the OLD document's population.
-        creatureShed: 0,
-        dishLifeShed: 0, // #1923 — a governor claim on the OLD document's culture
-        // #1574 — the travel shed is likewise a governor claim on the OLD document's roam.
-        travelShed: false,
-        // #1627 S1 — the weather shed is likewise a governor claim on the OLD document's air.
-        weatherShed: false,
-        // #1490 — the warp shed is likewise a governor claim on the OLD document's FX strata.
-        feedbackWarpShed: false,
-        // #1806 slice 2 — the accum-feed shed is likewise a governor claim on the OLD document's selection.
-        accumFeedShed: false,
-        // #1837 — the steering shed is likewise a governor claim on the OLD document's look.
-        trailSteerShed: false,
-        layoutParams: normalizeLayoutParams(doc.layoutParams),
-        customAssets: sanitizeOverlay(doc.customAssets),
-        ingestError: null,
+        kitNote: null,
+        mathLearnArmed: null, // #724 — learn never survives a load; it is a gesture
+        // #639 — an import is a new document: undo must never resurrect the
+        // pre-import composition. This runs for every import, not just ones with
+        // layers (a layerless doc used to leave stale undo history behind).
+        historyUndoStack: [],
+        historyRedoStack: [],
       };
-      if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
-        // #103 Track B — apply-path defense in depth: collapse hostile maps to
-        // known asset ids (+ the doc's own sanitized custom assets) before they
-        // reach the store.
-        // #1062 — what the document lists IS the set. This used to seed the
-        // default four ON and overlay the document, so an asset the file never
-        // mentioned came back enabled and export -> import -> export widened.
-        next.enabledAssets = wholeEnabledAssets(sanitizeEnabledAssets(doc.enabledAssets, next.customAssets));
-      }
-      if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
-        next.assetWeightOverrides = { ...sanitizeAssetWeightOverrides(doc.assetWeightOverrides, next.customAssets) };
-      } else {
-        // The serializer omits the field when empty — without this, loading a
-        // clean project over a session with overrides kept the old weights.
-        next.assetWeightOverrides = {};
-      }
-      next.paletteOverrides = doc.paletteOverrides ?? null;
-      next.paletteChosen = false; // #1365 — a loaded document's palette is the document's, not a pick made this session
-      // #639 — an import is a new document: undo must never resurrect the
-      // pre-import composition. This runs for every import, not just ones with
-      // layers (a layerless doc used to leave stale undo history behind).
-      next.historyUndoStack = [];
-      next.historyRedoStack = [];
-      // #638 — restore palette locks so harmony regeneration keeps building
-      // around the swatches the designer pinned.
-      next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
-      next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
-      next.world = sanitizeWorld(doc.world); // #2104 step 3 — a doc's recorded world stands back up through the door; a doc without one stands world-less (never the session's leftover world, never the house default)
-      next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
-      next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
-      next.creatureRecords = sanitizeCreatureRecords(doc.creatureRecords); // #1849 — a doc without records has none
-      next.shapeShelf = sanitizeShapeShelf(doc.shapeShelf); // #2280 — a doc without a shelf has an empty one
-      next.constructRecords = sanitizeConstructRecords(doc.constructRecords); // #2108 — a doc without constructs has none
-      next.constructLead = doc.constructLead === true; // #2108 — the gate rides the project; absent = off
-      next.stageBirths = []; // #2037 — a loaded document starts its own performance: the old one's unbanked children leave with it
-      // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
-      // rest of the params; parseProject lands a pre-fold-in document's top-level creatureCount
-      // there). Homes are found again for the new dish either way.
-      next.dishPins = [];
-      next.assetKineme = { ...DEFAULT_ASSET_KINEME, ...sanitizeAssetKineme(doc.assetKineme) }; // #781 — a doc without kinemes is still; #705 — doc values win over the micro-HUD defaults
-      next.assetTags = sanitizeAssetTagsDoc(doc.assetTags) || {}; // #1942
-      next.kits = sanitizeKitsDoc(doc.kits) || []; // #1944
-      next.kitTriad = sanitizeKitTriad(doc.kitTriad, [...SEED_KITS, ...next.kits]); // #1944
-      next.kitNote = null;
-      next.regionKinemes = sanitizeRegionKinemesDoc(doc.regionKinemes) || {}; // #1434 — a doc without region edits leaves the family defaults alone
-      next.assetOptions = sanitizeAssetOptions(doc.assetOptions, next.customAssets) || {}; // #1694 S2 — a doc without tile options is all-defaults (citizen family: both)
-      next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
-      {
-        const canvas = sanitizeCanvasSpec(doc);
-        next.canvasW = canvas.canvasW;
-        next.canvasH = canvas.canvasH;
-        next.canvasFps = canvas.canvasFps;
-        next.canvasPresetId = canvas.canvasPresetId;
-        next.stageMode = canvas.stageMode;
-      }
-      {
-        // #617 + #1720 — banks land together: the bank list, the active bank, and
-        // the active bank's map as the `midiMap` mirror. A doc without banks
-        // (the legacy midiMap shape) becomes the single MAIN bank.
-        const banks = sanitizeMidiBanks(doc.midiBanks, doc.midiMap);
-        const active = sanitizeMidiActiveBank(doc.midiActiveBank, banks);
-        next.midiBanks = banks;
-        next.midiActiveBank = active;
-        next.midiMap = activeBankMap(banks, active);
-      }
-      next.mathMacros = sanitizeMathMacros(doc.mathMacros); // #724 — a doc without macros has none
-      next.mathLearnArmed = null; // #724 — learn never survives a load; it is a gesture
-      // #651 — reimported titles persist; a doc without a title clears it.
-      next.projectTitle = typeof doc.title === 'string' ? doc.title.slice(0, 80) : '';
-      if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
-        // #103 Track B — bound on the apply path too; the live loop resolves
-        // every layer per frame.
-        next.layers = doc.layers.slice(0, MAX_LAYERS);
-        next.activeLayerId = doc.activeLayerId;
-        next.layerSnapshots = normalizeSnapshots(doc.layerSnapshots, doc.customAssets, doc);
-        // Install the active layer's snapshot onto live state. The serializer
-        // writes lockedParams/caGrid only into snapshots (never root fields),
-        // so without this a load silently dropped parameter locks and the CA
-        // grid; and a doc whose root values disagree with its active snapshot
-        // rendered the wrong composition until a layer switch. For well-formed
-        // docs this is a no-op — the snapshot was captured from the same
-        // state as the root values.
-        const activeSnap = next.layerSnapshots[doc.activeLayerId];
-        if (activeSnap) {
-          next.seed = activeSnap.seed >>> 0;
-          next.seedOffsets = normalizeSeedOffsets(activeSnap.seedOffsets ?? doc.seedOffsets);
-          next.paletteId = activeSnap.paletteId || next.paletteId;
-          next.paletteOverrides = activeSnap.paletteOverrides ?? null;
-          next.layoutParams = normalizeLayoutParams(activeSnap.layoutParams);
-          next.lockedParams = activeSnap.lockedParams || {};
-          next.caGrid = activeSnap.caGrid || null;
-          next.enabledAssets = wholeEnabledAssets(activeSnap.enabledAssets); // #1062 — the snapshot is the whole set too
-        }
-      }
-      return next;
+    });
+  },
+
+  /**
+   * #2322 (recipes-v3-spec §3.2) — a recipe is an EDIT of the stage, not a new document. Replaces the scene keys
+   * the recipe speaks for, never touches a rig key (title, audio routes, MIDI, macros, locks, kit library, quality,
+   * fps), and lands as ONE undo step instead of clearing history.
+   *   opts.replaceAll  true: the recipe carries the whole scene (kc-r/3), so a scene key it omits is cleared.
+   *                    false (default): an old-format recipe touches only what it carries.
+   *   opts.undo        false for the boot path, where there is nothing to go back to.
+   */
+  applyScene: (doc, opts = {}) => {
+    emit(Events.PROJECT_LOADED); // #2095 — the Trio resets its books, as for any load
+    set((state) => {
+      const fields = sceneFieldsFor(doc, state, opts);
+      const undoPush = opts.undo === false ? {} : pushSceneUndo(state);
+      return { ...undoPush, ...fields, ...sceneRuntimeResets() };
     });
   },
 });

@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { emit, Events } from '../../composition/eventBus.js';
 import { useStore } from '../../state/store.js';
 import { parseRecipe, recipeToProjectDoc, recipeFieldsFromKept, copyTextToClipboard } from '../../state/recipes.js';
 import { encodeRecipeUrl, decodeRecipeUrl, buildShareHref, extractRecipePayload } from '../../state/recipeUrls.js';
 
 // #307 — the way back in for kc-recipe/1 text. Lives inside OUTPUT (no new
 // panel): copy buttons sit on each snapshot in SnapshotGallery; this row is
-// the paste/apply affordance. APPLY restores the exact scene through the
-// existing project-load path, so recipe apply is exactly as safe as project
-// import. onMessage writes to OUTPUT's shared status line.
+// the paste/apply affordance. APPLY replaces the scene the recipe carries as ONE
+// undoable edit (#2322 applyScene) and leaves the rig alone; it is no longer a project
+// load. onMessage writes to OUTPUT's shared status line.
 //
 // #534 — COPY LINK shares the current scene as a kc-r/1 URL
 // (…/#r=kc-r/1.…): seed, nonzero offsets, palette id + dirty overrides,
@@ -38,18 +37,13 @@ export function RecipeRow({ onMessage }) {
   };
 
   const applyUrlRecipe = (recipe) => {
-    emit(Events.EXPORT_LOAD_PROJECT, recipeToProjectDoc(recipe));
-    // #305 defensive: if the sibling task landed a store setter for the
-    // sub-seed offsets, apply through it too.
-    const store = useStore.getState();
-    if (typeof store.setSeedOffsets === 'function') {
-      store.setSeedOffsets(recipe.seedOffsets);
-    }
-    // #534: the link carries the full override state (null = clean), so
-    // applying the link restores it exactly.
-    if (typeof store.setPaletteOverrides === 'function') {
-      store.setPaletteOverrides(recipe.paletteOverrides);
-    }
+    // #2322 — a recipe is an edit of the stage: the scene keys it carries are replaced, the rig (title, audio
+    // routes, MIDI, macros, fps) is left alone, and ONE undo step brings the old scene back. The seed offsets and
+    // the palette overrides ride in the doc; the follow-up store calls this used to make would each have been a
+    // second undo step. #534: the link carries the full override state (null = clean).
+    useStore
+      .getState()
+      .applyScene({ ...recipeToProjectDoc(recipe), paletteOverrides: recipe.paletteOverrides ?? null });
     setText('');
     setOpen(false);
     onMessage('Link applied');
@@ -73,14 +67,11 @@ export function RecipeRow({ onMessage }) {
       onMessage(`Recipe: ${result.error}`);
       return;
     }
-    emit(Events.EXPORT_LOAD_PROJECT, recipeToProjectDoc(result.recipe));
-    // #305 defensive: if the sibling task landed a store setter for the
-    // sub-seed offsets, apply through it too. Pre-#305 this is a no-op and
-    // the offsets ride along in the doc for the load path to pick up.
-    const store = useStore.getState();
-    if (typeof store.setSeedOffsets === 'function') {
-      store.setSeedOffsets(result.recipe.seedOffsets);
-    }
+    // #2322 — as above. kc-recipe text carries no palette overrides, so the palette it names comes back stock
+    // (null), exactly as a load did before.
+    useStore
+      .getState()
+      .applyScene({ ...recipeToProjectDoc(result.recipe), paletteOverrides: result.recipe.paletteOverrides ?? null });
     setText('');
     setOpen(false);
     onMessage('Recipe applied');

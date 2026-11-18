@@ -89,7 +89,8 @@ function bootFromHash() {
     return 'bad';
   }
   const recipe = parsed.recipe;
-  st.applyProject({ ...recipeToProjectDoc(recipe), paletteOverrides: recipe.paletteOverrides });
+  // #2322 — a link at boot lands as an edit of the fresh stage, not a document load; nothing to undo back to.
+  st.applyScene({ ...recipeToProjectDoc(recipe), paletteOverrides: recipe.paletteOverrides }, { undo: false });
   const fb = describePaletteFallback(recipe.paletteId, st.userPalettes);
   st.setBootNotice(
     fb ? `Opened from link · palette "${fb.requested}" not here — using "${fb.used}"` : 'Opened shared scene from link',

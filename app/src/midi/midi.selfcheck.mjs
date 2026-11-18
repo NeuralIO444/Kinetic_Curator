@@ -820,7 +820,7 @@ assert.strictEqual(describeMessage(M([0x80, 36, 0])), 'note 36 · ch 1 · off');
   const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
   const sites = {
     'state/projectDocument.js': 3,
-    'state/slices/globalSlice.js': 1,
+    'state/sceneApply.js': 1, // applyProject's rig half (#2322 moved it out of globalSlice)
     'hooks/useProjectPayload.js': 2,
     'state/projectWatch.mjs': 1,
     'panels/PipelinePanel.jsx': 3,
