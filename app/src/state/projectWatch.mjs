@@ -33,6 +33,7 @@ export const PROJECT_STATE_KEYS = Object.freeze([
   'shapeShelf', // #2280
   'constructRecords', // #2108
   'constructLead', // #2108
+  'gaitRecords', // #2328
   'audioRoutes',
   'canvasW',
   'canvasH',

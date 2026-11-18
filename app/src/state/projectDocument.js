@@ -16,6 +16,7 @@ import { sanitizeAssetAttach } from '../engine/assetAttach.js';
 import { sanitizeCreatureRecords } from '../engine/creatureAssembler.js'; // #1849
 import { sanitizeShapeShelf } from '../panels/shapeShelf.mjs'; // #2280
 import { sanitizeConstructRecords } from '../engine/constructAssembler.js'; // #2108
+import { sanitizeGaitRecords } from '../engine/gait.js'; // #2328
 import { sanitizeCount } from '../curator/spawn.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
 import { sanitizeCanvasSpec, isInstrumentCanvas } from '../data/canvasPresets.js';
@@ -213,6 +214,9 @@ export function serializeProject(state) {
   const constructs = sanitizeConstructRecords(state.constructRecords);
   if (constructs.length) doc.constructRecords = constructs;
   if (state.constructLead === true) doc.constructLead = true; // #2108 — only when on: an off project serializes as before
+  // #2328 — gait records. Written only when there are some: a project with none exports as before.
+  const gaits = sanitizeGaitRecords(state.gaitRecords);
+  if (gaits.length) doc.gaitRecords = gaits;
   // #1694 S3 — the creature count has no top-level field any more: it is the BUILD layout
   // param `creatures`, written above inside layoutParams like every other param (the
   // pre-fold-in top-level `creatureCount` field is read back only by parseProject's
@@ -289,6 +293,7 @@ export const DOC_FIELD_CLASS = Object.freeze({
   shapeShelf: 'scene',
   constructRecords: 'scene',
   constructLead: 'scene',
+  gaitRecords: 'scene', // #2328 (gait-spec: scene, so share links carry gaits)
   kitTriad: 'scene',
   canvasW: 'scene',
   canvasH: 'scene',
@@ -413,6 +418,7 @@ export function parseProject(raw) {
       shapeShelf: sanitizeShapeShelf(raw.shapeShelf), // #2280
       constructRecords: sanitizeConstructRecords(raw.constructRecords), // #2108
       constructLead: raw.constructLead === true, // #2108 — the CONSTRUCTS gate
+      gaitRecords: sanitizeGaitRecords(raw.gaitRecords), // #2328
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
       ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
       mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
@@ -481,6 +487,7 @@ export function parseProject(raw) {
     shapeShelf: sanitizeShapeShelf(raw.shapeShelf), // #2280
     constructRecords: sanitizeConstructRecords(raw.constructRecords), // #2108
     constructLead: raw.constructLead === true, // #2108 — the CONSTRUCTS gate
+    gaitRecords: sanitizeGaitRecords(raw.gaitRecords), // #2328
     audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
     ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
     mathMacros: sanitizeMathMacros(raw.mathMacros), // #724

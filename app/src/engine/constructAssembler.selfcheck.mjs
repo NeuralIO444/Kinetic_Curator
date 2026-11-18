@@ -255,6 +255,8 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
     'panels/constructSettle.mjs', // the WetLab construct tile's settle drawing (#2300)
     'panels/ladderPools.mjs', // the WetLab CREATURE rung's body pool and parts pile (#2303)
     'panels/ladderPools.selfcheck.mjs', // its suite builds real constructs to test against
+    'engine/gait.selfcheck.mjs', // #2328: its suite derives join trees from real house constructs (a test)
+    'engine/gait.js', // #2328 (gait M2): the join-tree adapter reads where a piece's own point lands (constructPartPoint) — geometry only, no stage path
   ]);
   const importers = [];
   const walk = (dir) => {

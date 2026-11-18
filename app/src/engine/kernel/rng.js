@@ -219,6 +219,9 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // assembler passes no offsets, so the group offset is the identity for its draws; its own channel keeps
   // a construct deal from re-keying a creature deal that shares the seed.
   construct: 'asset',
+  // #2328 — a gait wearer's phase (engine/gait.js gaitPhase): one draw per wearer, a motion decision, so it rides
+  // the noise stream; re-rolling colour or placement never moves a gait.
+  gait: 'noise',
 });
 
 const OFFSET_GROUP_OF = new Map([

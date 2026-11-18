@@ -114,7 +114,12 @@ const find = (id) => byId.get(id);
     }
   };
   walk(root);
-  assert.deepEqual(importers, ['data/assets/index.js'], 'only the catalogue reads the house set');
+  // #2328: the gait suite reads the house set as real constructs to derive join trees from (a test, not a stage path)
+  assert.deepEqual(
+    importers.filter((f) => f !== 'engine/gait.selfcheck.mjs'),
+    ['data/assets/index.js'],
+    'only the catalogue reads the house set',
+  );
   ok('only the catalogue (data/assets/index.js) reads the house set');
 }
 

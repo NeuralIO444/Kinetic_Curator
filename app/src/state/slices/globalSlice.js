@@ -445,6 +445,7 @@ export const createGlobalSlice = (set) => ({
   constructLead: false, // #2108 — the CONSTRUCTS gate: on, KIN/CHAOS pools are led by the house constructs (default off = every roll as before)
   setConstructLead: (on) => set({ constructLead: !!on }),
   constructRecords: [], // #2108 — construct records (recipes); their tiles are drawn from them, never saved
+  gaitRecords: [], // #2328 — gait records (kc-gait/1); assigned only by a test until M3
   creatureBreedNote: null, // #1852 — what the last BREED did (the same statuses, plus need-three). Session-only.
   creatureBirthNote: null, // #2037 — what the last kept-take banking did: { id: null, status: 'banked', count }. Session-only.
   beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.
