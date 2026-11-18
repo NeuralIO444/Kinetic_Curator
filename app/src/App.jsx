@@ -364,10 +364,11 @@ function AppInner() {
     });
     // #1462 — a take plays back its recorded decisions, frame by frame; no backend is asked
     // #1534 — and its recorded hearing: the take's spectrum feeds the live core in the analyser's place
+    // #2329 — and its gait picks, re-published as they happened (nothing re-picks)
     setPlaybackFrameTap((frame, perf, o) => {
       replayMindFrame(frame, perf && perf.mind, o);
       replaySpectrumFrame(frame, perf && perf.spectrum, o);
-      replayGaitFrame(frame, perf && perf.gaits, o); // #2329: the take's gait picks, as they happened
+      replayGaitFrame(frame, perf && perf.gaits, o);
     });
     const offPlayback = subscribePlayback(() => {
       endMindReplay();
