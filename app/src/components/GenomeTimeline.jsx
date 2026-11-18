@@ -13,7 +13,7 @@
  */
 import { useState } from 'react';
 import { useStore } from '../state/store.js';
-import { genomeStrip, geneActions, geneKey } from './genomeTimeline.model.mjs';
+import { genomeStrip, geneActions, geneKey, paintLikeOptions } from './genomeTimeline.model.mjs';
 
 const REFUSAL_TEXT = {
   'no-mutation': 'that gene has no lawful mutation — the record was not changed',
@@ -27,7 +27,7 @@ const REFUSAL_TEXT = {
   'no-record': 'that record is no longer banked — nothing was changed',
 };
 
-export function GenomeTimeline({ record, donors = [], legalBodies = [], hasBodyPoints = false }) {
+export function GenomeTimeline({ record, donors = [], legalBodies = [], hasBodyPoints = false, bodyStyle = null }) {
   const editCreatureGene = useStore((s) => s.editCreatureGene); // #1870
   const note = useStore((s) => s.creatureGeneNote);
   const strip = genomeStrip(record);
@@ -37,7 +37,8 @@ export function GenomeTimeline({ record, donors = [], legalBodies = [], hasBodyP
   const gene = genes.find((g) => geneKey(g) === selectedKey) || genes[0] || null;
   if (!gene) return null;
   const node = strip.bands.flatMap((b) => b.nodes).find((n) => n.key === geneKey(gene));
-  const actions = geneActions(record, gene, { legalBodies, donors, hasBodyPoints });
+  const actions = geneActions(record, gene, { legalBodies, donors, hasBodyPoints, bodyStyle });
+  const paintLike = gene.family === 'MATERIAL' ? paintLikeOptions(record, donors) : []; // #2341
   const pick = Math.min(Math.max(Number(choice) || 0, 0), Math.max(actions.replace.length - 1, 0));
   const myNote = note && note.id === record.id ? note : null;
 
@@ -141,6 +142,40 @@ export function GenomeTimeline({ record, donors = [], legalBodies = [], hasBodyP
           )}
           {!actions.mutate.ok && <span style={{ fontSize: 10, color: 'var(--dim)' }}>{actions.mutate.why}</span>}
         </div>
+        {gene.family === 'MATERIAL' && (
+          /* #2341 — PAINT LIKE: take another banked creature's material in one tap (a donor replace, through the
+             same hand-edit door). Only creatures whose material differs are offered. */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }} data-testid="paint-like">
+            <span style={{ ...caps, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.1em' }}>paint like</span>
+            {paintLike.length ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {paintLike.map((o) => (
+                  <button
+                    key={o.donorId}
+                    type="button"
+                    className="chip-btn act"
+                    style={{ ...lower, height: 'auto', padding: '4px 6px', fontSize: 9 }}
+                    data-testid="paint-like-option"
+                    data-material={o.material}
+                    title={`Paint this creature like ${o.donorId}: take its material, in place`}
+                    onClick={() =>
+                      editCreatureGene(record.id, {
+                        action: 'replace',
+                        family: gene.family,
+                        id: gene.id,
+                        origin: { kind: 'donor', donorId: o.donorId },
+                      })
+                    }
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span style={{ fontSize: 10, color: 'var(--dim)' }}>no banked creature wears another material</span>
+            )}
+          </div>
+        )}
         <span style={noteText} role="status" aria-live="polite" data-testid="gene-note">
           {myNote && myNote.status === 'mutated' && 'mutated in place — the gene’s source now records the hand edit'}
           {myNote && myNote.status === 'replaced' && 'replaced in place — the gene’s source now names its origin'}

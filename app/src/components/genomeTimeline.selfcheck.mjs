@@ -111,7 +111,7 @@ ok('readout: assembled genes read as value + origin', () => {
   assert.equal(geneSourceText(geneOf(named, 'VOICE', 'voice')), 'dealt at assembly');
   assert.equal(geneSourceText(geneOf(named, 'DRIVE', 'approval')), 'wild type');
   assert.equal(geneSourceText(geneOf(named, 'MATERIAL', 'material')), 'no source — a stub');
-  assert.equal(geneValueText(geneOf(named, 'MATERIAL', 'material')), 'none — no material yet');
+  assert.equal(geneValueText(geneOf(named, 'MATERIAL', 'material')), 'none — unpainted');
   assert.equal(geneValueText(geneOf(named, 'DRIVE', 'approval')), '1');
   const head = geneOf(named, 'FORM', 'head');
   if (head.value) assert.equal(geneValueText(head), `(${head.value.x}, ${head.value.y})`);
@@ -159,23 +159,26 @@ ok('mutate: deck and body genes re-pick a different legal holder', () => {
   assert.equal(geneOf(body.record, 'FORM', 'body').source, 'hand:mut');
 });
 
-ok('mutate: the skeleton, the material stub and a one-shape pool refuse — never clamp, never invent', () => {
-  for (const id of ['head', 'limbs', 'joints']) {
-    const r = handEditRecord(rec, { action: 'mutate', family: 'FORM', id }, { seed: 1, legalBodies: BODIES });
-    assert.deepEqual([r.record, r.refusal], [null, 'no-mutation'], `${id} is one linkage group`);
-  }
-  const mat = handEditRecord(rec, { action: 'mutate', family: 'MATERIAL', id: 'material' }, { seed: 1 });
-  assert.deepEqual([mat.record, mat.refusal], [null, 'no-mutation']);
-  const onePool = handEditRecord(
-    rec,
-    { action: 'mutate', family: 'FORM', id: 'body' },
-    { seed: 1, legalBodies: [rec.body] },
-  );
-  assert.deepEqual([onePool.record, onePool.refusal], [null, 'no-mutation'], 'nothing different to mutate to');
-  const actions = geneActions(rec, geneOf(rec, 'FORM', 'limbs'), { legalBodies: BODIES, donors: [] });
-  assert.equal(actions.mutate.ok, false);
-  assert.match(actions.mutate.why, /linkage group/);
-});
+ok(
+  'mutate: the skeleton, an unpainted material with no body style and a one-shape pool refuse — never clamp, never invent',
+  () => {
+    for (const id of ['head', 'limbs', 'joints']) {
+      const r = handEditRecord(rec, { action: 'mutate', family: 'FORM', id }, { seed: 1, legalBodies: BODIES });
+      assert.deepEqual([r.record, r.refusal], [null, 'no-mutation'], `${id} is one linkage group`);
+    }
+    const mat = handEditRecord(rec, { action: 'mutate', family: 'MATERIAL', id: 'material' }, { seed: 1 });
+    assert.deepEqual([mat.record, mat.refusal], [null, 'no-mutation']);
+    const onePool = handEditRecord(
+      rec,
+      { action: 'mutate', family: 'FORM', id: 'body' },
+      { seed: 1, legalBodies: [rec.body] },
+    );
+    assert.deepEqual([onePool.record, onePool.refusal], [null, 'no-mutation'], 'nothing different to mutate to');
+    const actions = geneActions(rec, geneOf(rec, 'FORM', 'limbs'), { legalBodies: BODIES, donors: [] });
+    assert.equal(actions.mutate.ok, false);
+    assert.match(actions.mutate.why, /linkage group/);
+  },
+);
 
 ok('replace: the deck, the pool and the shape’s own points are legal sources', () => {
   const otherLook = rec.look === 'praystation' ? 'megacity' : 'praystation';

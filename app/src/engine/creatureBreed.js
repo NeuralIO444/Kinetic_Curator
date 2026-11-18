@@ -37,7 +37,7 @@ import { sanitizeAttachPoints } from './assetAttach.js';
 import { COMPOSITION_PRESETS } from '../data/presets.js';
 import { RISO_FIELD_LOOK_ID } from './risoField.mjs'; // #2008 — the picker-only Look stays off the dice
 import { VOICE_DECK } from '../data/voiceDeck.js';
-import { materialsForStyle, materialStyle } from '../data/canon/materials.js'; // #2339 — PAINT
+import { materialsForStyle, materialStyle, materialById } from '../data/canon/materials.js'; // #2339 — PAINT
 
 /** Matt's ruling (2026-10-29): lively mutation, ~1 gene in 8. Named so the suite can assert it (rider to ruling 2). */
 export const MUTATION_RATE = 1 / 8;
@@ -286,6 +286,7 @@ export function handMutateValue(record, gene, seed = 0, legalBodies = [], bodySt
  *          origin:{kind:'deck', value:string} | {kind:'pool', value:string} |
  *                  {kind:'asset'} | {kind:'donor', donorId:string}}} edit
  * @param {{seed?:number, legalBodies?:string[], donors?:object[], bodyAttachPoints?:Array, bodyStyle?:string}} [env]
+ *   bodyStyle: the body's Canon style (#2339 / #2341) — a null material's first mutation, and the material deck
  *   seed: the project seed (mutation draws); legalBodies: the asset ids a body gene may name (the pool);
  *   donors: the other banked records; bodyAttachPoints: the body shape's ATTACH points (for a skeleton replace)
  * @returns {{record:object, refusal:null} | {record:null, refusal:string}} exactly one of the two is non-null;
@@ -313,6 +314,13 @@ export function handEditRecord(record, edit, env = {}) {
       } else if (gene.family === 'VOICE' && isVoiceId(origin.value)) {
         value = origin.value;
         source = `hand:voice:${value}`;
+      } else if (gene.family === 'MATERIAL' && materialById(origin.value)) {
+        // #2341 — the material deck is the BODY's style (Matt, 2026-11-17): a Swiss creature repaints Swiss. With no
+        // body style named, the material's own style; another style's material arrives only by Paint Like (donor).
+        const style = env.bodyStyle ?? materialStyle(gene.value);
+        if (materialStyle(origin.value) !== style) return { record: null, refusal: 'illegal-value' };
+        value = origin.value;
+        source = `hand:material:${value}`;
       } else return { record: null, refusal: 'illegal-source' };
     } else if (origin.kind === 'pool') {
       if (gene.family !== 'FORM' || gene.id !== 'body') return { record: null, refusal: 'illegal-source' };

@@ -399,6 +399,8 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'engine/creatureMaterial.selfcheck.mjs',
     // #2340: PAINT's drawing suite — a test of the tile bake, not a stage reader
     'engine/creaturePaint.selfcheck.mjs',
+    // #2341: PAINT's genome-card suite — a test of the hand-edit door, not a stage reader
+    'components/genomeMaterial.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {
