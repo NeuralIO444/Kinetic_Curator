@@ -164,7 +164,7 @@ const base = {
   );
   const sites = {
     'state/projectDocument.js': 3, // serialize + both parse branches
-    'state/slices/globalSlice.js': 1, // applyProject
+    'state/sceneApply.js': 1, // applyProject's rig half (#2322 moved it out of globalSlice)
     'state/slices/audioSlice.js': 2, // default + setter
     'state/history.js': 3, // capture + signature + restore (the sun missed the signature)
     'hooks/useProjectPayload.js': 2, // destructure + serialize call

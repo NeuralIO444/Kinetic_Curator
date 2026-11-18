@@ -316,6 +316,10 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'engine/creatureAssembler.js',
     'engine/creatureAssembler.selfcheck.mjs',
     'state/slices/globalSlice.js',
+    // #2322: the scene half of the project load moved out of globalSlice into state/sceneApply.js (applyProject and
+    // applyScene both call it); it sanitizes the doc's creatureRecords exactly as the load always has — a backstage
+    // door, not a stage reader (the stage still reaches every creature through its pool TILE alone)
+    'state/sceneApply.js',
     'state/projectDocument.js',
     'state/projectWatch.mjs',
     'panels/WetLab.jsx',

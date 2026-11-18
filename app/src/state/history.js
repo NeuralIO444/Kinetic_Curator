@@ -33,6 +33,10 @@ export const UNDO_DEBOUNCE_MS = 800;
 export const UNDO_KIND_EDIT = 'edit';
 export const UNDO_KIND_LAYERS = 'layers';
 export const UNDO_KIND_SHELF = 'shelf';
+// #2322 — a recipe applied to the stage. The entry holds the WHOLE scene document (`sceneOf`, so a field that joins
+// DOC_FIELD_CLASS is undoable with no change here), because the content fields every entry carries stop at the seed,
+// palette, layout, cast and sun: world, constructs, kinemes, canvas and kits would not come back on Cmd-Z.
+export const UNDO_KIND_SCENE = 'scene';
 
 let lastPushTime = 0;
 
@@ -46,7 +50,7 @@ function deep(value) {
  * structure (layers, activeLayerId, per-layer snapshots). Field list
  * mirrors captureSnapshot in slices/layersSlice.js.
  */
-export function captureUndoEntry(state, kind = UNDO_KIND_EDIT) {
+export function captureUndoEntry(state, kind = UNDO_KIND_EDIT, scene = null) {
   const entry = {
     kind,
     layerId: state.activeLayerId,
@@ -65,6 +69,9 @@ export function captureUndoEntry(state, kind = UNDO_KIND_EDIT) {
     entry.layers = deep(state.layers);
     entry.activeLayerId = state.activeLayerId;
     entry.layerSnapshots = deep(state.layerSnapshots);
+  }
+  if (kind === UNDO_KIND_SCENE) {
+    entry.scene = deep(scene); // the caller hands over sceneOf(state): this file must not import projectDocument (a cycle through midi/targets → voiceSlice → history)
   }
   if (kind === UNDO_KIND_SHELF) {
     entry.shelf = {
@@ -104,6 +111,7 @@ function entrySignature(entry) {
     entry.activeLayerId,
     entry.layerSnapshots,
     entry.shelf ?? null, // #1590: a shelf-only change must not dedupe away
+    entry.scene ?? null, // #2322: a recipe that changes only the world must not dedupe away
   ]);
 }
 
@@ -126,7 +134,7 @@ export function trimUndoStack(stack) {
   return trimmed;
 }
 
-export function pushToUndo(state, force = false, kind = UNDO_KIND_EDIT) {
+export function pushToUndo(state, force = false, kind = UNDO_KIND_EDIT, scene = null) {
   const now = Date.now();
   if (!force && now - lastPushTime < UNDO_DEBOUNCE_MS) {
     // Debounced slider tick: not an entry, but it does invalidate redo —
@@ -135,7 +143,7 @@ export function pushToUndo(state, force = false, kind = UNDO_KIND_EDIT) {
     return { historyRedoStack: [] };
   }
 
-  const current = captureUndoEntry(state, kind);
+  const current = captureUndoEntry(state, kind, scene);
 
   // Defensive: slice unit tests drive the actions with partial mock state
   // that has no history stacks — pushing there must not crash.
@@ -157,7 +165,11 @@ export function pushToUndo(state, force = false, kind = UNDO_KIND_EDIT) {
 /** A top entry applies if it is structural, or its layer is active (#92). */
 export function entryApplies(entry, activeLayerId) {
   return (
-    !!entry && (entry.kind === UNDO_KIND_LAYERS || entry.kind === UNDO_KIND_SHELF || entry.layerId === activeLayerId)
+    !!entry &&
+    (entry.kind === UNDO_KIND_LAYERS ||
+      entry.kind === UNDO_KIND_SHELF ||
+      entry.kind === UNDO_KIND_SCENE || // #2322 — it holds the whole scene, every layer lands back on its own
+      entry.layerId === activeLayerId)
   );
 }
 

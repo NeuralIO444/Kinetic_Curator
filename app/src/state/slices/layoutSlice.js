@@ -8,10 +8,12 @@ import {
   editRestoreFields,
   layersRestoreFields,
   shelfRestoreFields,
+  UNDO_KIND_SCENE,
   trimUndoStack,
   UNDO_KIND_LAYERS,
   UNDO_KIND_SHELF,
 } from '../history.js';
+import { sceneRestoreFields, sceneSnapshotFor } from '../sceneApply.js'; // #2322
 import { KEEPS_KEY, STAGE_KEY, SHELF_HISTORY_KEY, DISK_KEY } from './davisSlice.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
@@ -2212,7 +2214,7 @@ export const createLayoutSlice = (set) => ({
       if (state.historyUndoStack.length === 0) return {};
       const previous = state.historyUndoStack[state.historyUndoStack.length - 1];
       if (!entryApplies(previous, state.activeLayerId)) return {};
-      const current = captureUndoEntry(state, previous.kind);
+      const current = captureUndoEntry(state, previous.kind, sceneSnapshotFor(state, previous.kind));
       // #1590: a 'shelf' entry restores the shelf only (a fill touched
       // nothing else) and re-persists its three storage keys.
       if (previous.kind === UNDO_KIND_SHELF) {
@@ -2224,10 +2226,13 @@ export const createLayoutSlice = (set) => ({
           historyRedoStack: trimUndoStack([...state.historyRedoStack, current]),
         };
       }
+      // #2322 — a 'scene' entry (a recipe applied) restores the whole scene it saved, never the rig.
       const restore =
-        previous.kind === UNDO_KIND_LAYERS
-          ? { ...editRestoreFields(previous), ...layersRestoreFields(previous) }
-          : editRestoreFields(previous);
+        previous.kind === UNDO_KIND_SCENE
+          ? sceneRestoreFields(previous, state)
+          : previous.kind === UNDO_KIND_LAYERS
+            ? { ...editRestoreFields(previous), ...layersRestoreFields(previous) }
+            : editRestoreFields(previous);
       return {
         ...restore,
         historyUndoStack: state.historyUndoStack.slice(0, -1),
@@ -2246,7 +2251,7 @@ export const createLayoutSlice = (set) => ({
       if (state.historyRedoStack.length === 0) return {};
       const next = state.historyRedoStack[state.historyRedoStack.length - 1];
       if (!entryApplies(next, state.activeLayerId)) return {};
-      const current = captureUndoEntry(state, next.kind);
+      const current = captureUndoEntry(state, next.kind, sceneSnapshotFor(state, next.kind));
       // #1590: the shelf half of undo, mirrored.
       if (next.kind === UNDO_KIND_SHELF) {
         const shelfFwd = shelfRestoreFields(next);
@@ -2258,9 +2263,11 @@ export const createLayoutSlice = (set) => ({
         };
       }
       const restore =
-        next.kind === UNDO_KIND_LAYERS
-          ? { ...editRestoreFields(next), ...layersRestoreFields(next) }
-          : editRestoreFields(next);
+        next.kind === UNDO_KIND_SCENE
+          ? sceneRestoreFields(next, state)
+          : next.kind === UNDO_KIND_LAYERS
+            ? { ...editRestoreFields(next), ...layersRestoreFields(next) }
+            : editRestoreFields(next);
       return {
         ...restore,
         historyUndoStack: trimUndoStack([...state.historyUndoStack, current]),
