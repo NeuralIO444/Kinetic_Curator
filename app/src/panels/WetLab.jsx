@@ -1162,6 +1162,7 @@ export function WetLab({ assetId, onClose }) {
                     .filter((a) => a.category !== 'creature' && !GLYPH_BODY_IDS.has(a.id))
                     .map((a) => a.id)}
                   hasBodyPoints={assets.some((a) => a.id === selRecord.body)}
+                  bodyStyle={selBodyAsset ? assetStyle(selBodyAsset) : null} // #2341 — the material deck
                 />
               ) : (
                 <div style={panelCol}>

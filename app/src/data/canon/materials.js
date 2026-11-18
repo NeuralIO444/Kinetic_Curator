@@ -21,7 +21,7 @@ export const MATERIAL_TONES = Object.freeze(['ink', 'accent']);
 
 const m = (id, fill, pattern, tone) => Object.freeze({ id, fill, pattern, tone });
 
-/** Three materials per Canon style, in Canon order; the first is the style's plain default.
+/** Three materials per Canon style (Swiss four), in Canon order; the first is the style's plain default.
  *  #2340 (Matt, 2026-11-17): a patterned material tones ACCENT. Most bodies are filled in ink, so an ink pattern
  *  over them is invisible (ink-tone hatch / stipple showed on 8–10 of 31 sampled bodies, accent on 25–29). */
 export const MATERIALS_BY_STYLE = Object.freeze({
@@ -29,6 +29,9 @@ export const MATERIALS_BY_STYLE = Object.freeze({
     m('swiss-solid', 'solid', 'none', 'ink'),
     m('swiss-signal', 'solid', 'none', 'accent'),
     m('swiss-rule', 'outline', 'none', 'ink'),
+    // Matt (2026-11-17): Swiss gets one patterned material — most library bodies sort into Swiss, and without one
+    // most creatures showed no paint. Added, never swapped: a record holding a Swiss id must keep loading.
+    m('swiss-hatch', 'solid', 'hatch', 'accent'),
   ]),
   bauhaus: Object.freeze([
     m('bauhaus-primary', 'solid', 'none', 'accent'),

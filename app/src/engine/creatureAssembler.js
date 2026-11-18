@@ -191,7 +191,8 @@ const inDriveRange = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 
  * dealt / none / wild; breeding (#1852) adds parent:/cross:/mut:; the Genome Timeline's hand edits (#1870) add
  * hand: — hand:mut (a hand mutation), hand:look:<id> / hand:voice:<id> (replaced from the family's deck),
  * hand:asset:<id> (replaced from that shape: the body itself, or its own ATTACH points for a skeleton gene),
- * hand:donor:<recordId> (replaced from that record's corresponding gene). A hand source is the ONLY source a
+ * hand:donor:<recordId> (replaced from that record's corresponding gene), hand:material:<id> (#2341, replaced from
+ * the body style's materials). A hand source is the ONLY source a
  * post-birth edit may claim: mut:/parent: carry lineage semantics (below) that a hand act must not borrow.
  */
 const SOURCE_RE = /^(?:(?:asset|look|voice|parent|cross|mut|hand):[A-Za-z0-9_:.~-]{1,120}|dealt|none|wild)$/;
