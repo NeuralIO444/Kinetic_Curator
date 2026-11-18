@@ -258,6 +258,71 @@ export function serializeProject(state) {
 }
 
 /**
+ * #2321 (recipes-v3-spec §3.1) — every key `serializeProject` can write, classed once.
+ *   scene — what is ON STAGE: a recipe carries it, and applying a recipe replaces it.
+ *   rig   — the performer's own setup: a recipe never reads it and never writes it.
+ *   meta  — the document format itself (`version`).
+ * Matt's rulings, 2026-11-17: audio routes, palette locks, the kit LIBRARY, asset tags, quality, the title,
+ * MIDI and macros are rig; the canvas size and preset, the dealt kit triad and the construct lead are scene;
+ * fps and stage mode stay rig. A new document field must be classed here: `projectDocument.fields.selfcheck`
+ * fails, naming the key, until it is.
+ */
+export const DOC_FIELD_CLASS = Object.freeze({
+  version: 'meta',
+  // scene
+  seed: 'scene',
+  seedOffsets: 'scene',
+  paletteId: 'scene',
+  paletteOverrides: 'scene',
+  layoutParams: 'scene',
+  enabledAssets: 'scene',
+  assetWeightOverrides: 'scene',
+  customAssets: 'scene',
+  light: 'scene',
+  world: 'scene',
+  assetKineme: 'scene',
+  regionKinemes: 'scene',
+  assetStill: 'scene',
+  assetOptions: 'scene',
+  assetAttach: 'scene',
+  creatureRecords: 'scene',
+  shapeShelf: 'scene',
+  constructRecords: 'scene',
+  constructLead: 'scene',
+  kitTriad: 'scene',
+  canvasW: 'scene',
+  canvasH: 'scene',
+  canvasPresetId: 'scene',
+  layers: 'scene',
+  activeLayerId: 'scene',
+  layerSnapshots: 'scene',
+  // rig
+  title: 'rig',
+  quality: 'rig',
+  autoQuality: 'rig',
+  paletteLocks: 'rig',
+  kits: 'rig',
+  assetTags: 'rig',
+  audioRoutes: 'rig',
+  canvasFps: 'rig',
+  stageMode: 'rig',
+  midiMap: 'rig',
+  midiBanks: 'rig',
+  midiActiveBank: 'rig',
+  mathMacros: 'rig',
+});
+
+/** #2321 — the scene half of a state's document: `serializeProject(state)` filtered to the `scene` keys. The layer
+ *  stack (layers, activeLayerId, layerSnapshots) is scene, so it rides in this already. Pure; every value has been
+ *  through the same normalizers a save uses. */
+export function sceneOf(state) {
+  const doc = serializeProject(state);
+  const out = {};
+  for (const k of Object.keys(doc)) if (DOC_FIELD_CLASS[k] === 'scene') out[k] = doc[k];
+  return out;
+}
+
+/**
  * #1694 S3 — the creature count's home moved from a top-level document field to the BUILD
  * layout param `creatures`. A document written before the move carries `creatureCount` at
  * the top level and no `creatures` key anywhere in its layout params: land the old field in
