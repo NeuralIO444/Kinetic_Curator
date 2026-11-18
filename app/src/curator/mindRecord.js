@@ -19,6 +19,11 @@ export const MIND_RECORD_MAX = 20000;
 /** At most one route edit a phrase, so this is far above any real take. */
 export const CONDUCT_RECORD_MAX = 2000;
 const CONDUCT_STATUS = Object.freeze(['applied', 'dropped']);
+/**
+ * #2160 — the skip trace: one row per candidate davisRoute discarded, [frame, bar, reason, input|null, target|null].
+ * Observability only: a replay never reads it (the recorded reply is what replays).
+ */
+export const SKIP_RECORD_MAX = 20000;
 
 /**
  * Recorder. `getFrame()` returns the take's current frame index; `getSystem()` the answering model's identity
@@ -28,6 +33,7 @@ const CONDUCT_STATUS = Object.freeze(['applied', 'dropped']);
 export function createMindRecorder({ getFrame = () => 0, getSystem = () => null } = {}) {
   const rows = [];
   const conduct = [];
+  const skips = [];
   const systems = {};
   return {
     /** #1483: what became of one of Davis's route proposals (trioLive's mind:route): applied with its delta, or dropped with why. */
@@ -60,6 +66,19 @@ export function createMindRecorder({ getFrame = () => 0, getSystem = () => null 
       ];
       if (d.traits) row.push(JSON.parse(JSON.stringify(d.traits)));
       rows.push(row);
+      if (Array.isArray(d.skips))
+        for (const k of d.skips) {
+          if (skips.length >= SKIP_RECORD_MAX) break;
+          if (!k || typeof k.reason !== 'string') continue;
+          const str = (v) => (typeof v === 'string' ? v.slice(0, 32) : null);
+          skips.push([
+            getFrame() | 0,
+            Number.isInteger(d.bar) ? d.bar : 0,
+            k.reason.slice(0, 16),
+            str(k.input),
+            str(k.target),
+          ]);
+        }
       if (d.backend !== 'rules' && !systems[d.backend]) {
         let s;
         try {
@@ -80,6 +99,7 @@ export function createMindRecorder({ getFrame = () => 0, getSystem = () => null 
         decisions: rows.map((r) => r.slice()),
         ...(Object.keys(systems).length ? { systems: JSON.parse(JSON.stringify(systems)) } : {}),
         ...(conduct.length ? { conduct: JSON.parse(JSON.stringify(conduct)) } : {}), // absent when Davis did not conduct: the file is unchanged
+        ...(skips.length ? { skips: skips.map((r) => r.slice()) } : {}), // #2160: absent when nothing was skipped
       };
     },
   };
@@ -110,6 +130,19 @@ export function checkMindRecord(r) {
       if (landBar !== null && !Number.isInteger(landBar)) return null;
       if (!validateRouteOp(op)) return null;
       if (delta !== null && (typeof delta !== 'object' || Array.isArray(delta))) return null;
+      last = frame;
+    }
+  }
+  if (r.skips !== undefined) {
+    // #2160 — optional: the skip trace
+    if (!Array.isArray(r.skips) || r.skips.length > SKIP_RECORD_MAX) return null;
+    let last = -1;
+    for (const k of r.skips) {
+      if (!Array.isArray(k) || k.length !== 5) return null;
+      const [frame, bar, reason, input, target] = k;
+      if (!Number.isInteger(frame) || frame < last || !Number.isInteger(bar)) return null;
+      if (typeof reason !== 'string' || reason.length > 16) return null;
+      if ((input !== null && typeof input !== 'string') || (target !== null && typeof target !== 'string')) return null;
       last = frame;
     }
   }

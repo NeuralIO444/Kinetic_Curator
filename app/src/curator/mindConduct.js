@@ -235,14 +235,43 @@ export const BRAKE_MAX = 0.4;
  * @param seed  the decision seed (document seed x bar), so the same dish conducts the same way
  * @param heat  0..1, the conducting temperature: it orders his tries inside the level (boldBand) — never what is in reach.
  *              What is in reach narrows only on LOIS's brake (`show.brake`: the safe moves, bold <= BRAKE_MAX).
+ * @param trace optional array (#2160, the skip trace): every candidate he discards pushes one `{ reason, input, target }`
+ *              line, and a null for a reason of the whole call (silence, a full table, his few). Observability only:
+ *              the trace never changes what he returns.
  * @returns an add op (or, on a flat show, a retarget of one of his own rows), or null (nothing worth doing: silence, a full
  *          table, he already holds his few, every candidate already wired or owned)
  */
-export function davisRoute(show, seed = 0, heat = 0) {
-  if (!show || show.silent) return null;
+/**
+ * #2160 (Matt's fix ruling 3 of 3, 2026-11-12): the skip family — why davisRoute discarded a candidate (or the whole
+ * call). Each reason is at most 16 characters, the record's reason width.
+ */
+export const SKIP = Object.freeze({
+  silent: 'silent', // the show is silent: nothing to conduct
+  tableFull: 'table-full', // the route table is at MAX_ROUTES
+  holdsFew: 'holds-few', // he already holds DAVIS_MAX_ROUTES rows
+  tempo: 'tempo', // the preset's bpm window does not fit the tempo
+  brake: 'brake', // LOIS's brake: bolder than BRAKE_MAX
+  owned: 'owned', // the target is the artist's
+  rowOwned: 'row-owned', // a retarget: the row he would move sits on an owned target
+  sameTarget: 'same-target', // a retarget onto the target the row already drives
+  paired: 'paired', // that input -> target pair is already on the table
+});
+
+export function davisRoute(show, seed = 0, heat = 0, trace = null) {
+  const skip = Array.isArray(trace)
+    ? (reason, c = null) => trace.push({ reason, input: c ? c.input : null, target: c ? c.target : null })
+    : () => {};
+  if (!show) return null;
+  if (show.silent) {
+    skip(SKIP.silent);
+    return null;
+  }
   const level = ENERGY_LEVELS.includes(show.energy) ? show.energy : 'mid';
   const table = Array.isArray(show.routes) ? show.routes : [];
-  if (table.length >= MAX_ROUTES) return null;
+  if (table.length >= MAX_ROUTES) {
+    skip(SKIP.tableFull);
+    return null;
+  }
   const owned = new Set(Array.isArray(show.owned) ? show.owned : []);
   const bpm = Number.isFinite(show.bpm) ? show.bpm : null;
   const fits = (c) => !c.bpm || bpm === null || (bpm >= c.bpm[0] && bpm <= c.bpm[1]);
@@ -253,7 +282,10 @@ export function davisRoute(show, seed = 0, heat = 0) {
   const pool = [];
   for (let k = 0; k < ENERGY_LEVELS.length; k++) {
     const lvl = ENERGY_LEVELS[(order + rerolls + k) % ENERGY_LEVELS.length];
-    for (const c of PRESETS[lvl]) if (fits(c)) pool.push(c);
+    for (const c of PRESETS[lvl]) {
+      if (fits(c)) pool.push(c);
+      else if (k === 0) skip(SKIP.tempo, c); // his own level's moves the tempo rules out (the other levels are fallbacks)
+    }
   }
   const start = pool.length
     ? (seed >>> 0) % Math.min(pool.length, PRESETS[ENERGY_LEVELS[(order + rerolls) % 3]].length)
@@ -269,7 +301,11 @@ export function davisRoute(show, seed = 0, heat = 0) {
       band: boldBand(c.bold, heat),
       rot: (i - start + pool.length) % pool.length,
     }))
-    .filter((t) => !braked || (Number.isFinite(t.c.bold) ? t.c.bold : 1) <= BRAKE_MAX)
+    .filter((t) => {
+      const inReach = !braked || (Number.isFinite(t.c.bold) ? t.c.bold : 1) <= BRAKE_MAX;
+      if (!inReach) skip(SKIP.brake, t.c);
+      return inReach;
+    })
     .sort((a, b) => a.lvl - b.lvl || a.band - b.band || a.rot - b.rot)
     .map((t) => t.c);
   const mine = table.filter((r) => r && r.by === DAVIS_TAG);
@@ -277,21 +313,23 @@ export function davisRoute(show, seed = 0, heat = 0) {
   if (rerolls > 0 && mine.length > 0) {
     const m = mine[0];
     for (const c of tries) {
-      if (
-        c.target === m.target ||
-        owned.has(c.target) ||
-        owned.has(m.target) ||
-        pairIndex(table, m.input, c.target) >= 0
-      )
-        continue;
-      return { op: 'retarget', input: m.input, from: m.target, to: c.target };
+      // the order of these tests is the order the reason is read in: the first that holds names the skip
+      if (c.target === m.target) skip(SKIP.sameTarget, c);
+      else if (owned.has(c.target)) skip(SKIP.owned, c);
+      else if (owned.has(m.target)) skip(SKIP.rowOwned, c);
+      else if (pairIndex(table, m.input, c.target) >= 0) skip(SKIP.paired, c);
+      else return { op: 'retarget', input: m.input, from: m.target, to: c.target };
     }
     return null;
   }
-  if (mine.length >= DAVIS_MAX_ROUTES) return null; // he conducts with a few, he does not fill the table
+  if (mine.length >= DAVIS_MAX_ROUTES) {
+    skip(SKIP.holdsFew);
+    return null; // he conducts with a few, he does not fill the table
+  }
   for (const c of tries) {
-    if (owned.has(c.target) || pairIndex(table, c.input, c.target) >= 0) continue;
-    return { op: 'add', input: c.input, target: c.target, depth: c.depth };
+    if (owned.has(c.target)) skip(SKIP.owned, c);
+    else if (pairIndex(table, c.input, c.target) >= 0) skip(SKIP.paired, c);
+    else return { op: 'add', input: c.input, target: c.target, depth: c.depth };
   }
   return null;
 }
