@@ -48,8 +48,8 @@ const N = CANON_BASELINE_IDS.length;
 const records = assetRecords(ASSETS);
 const categories = new Set(records.map((r) => r.category));
 
-// ── 1. twelve complete native records ────────────────────────────────────────────────────────────────────────
-assert.deepEqual([...CANON_BASELINE_IDS], ['op-art', 'warhol', 'davis', 'tdr', ...MEASURED, 'menkman']); // #2106: pixel's authored baseline
+// ── 1. thirteen complete native records ────────────────────────────────────────────────────────────────────────
+assert.deepEqual([...CANON_BASELINE_IDS], ['op-art', 'warhol', 'davis', 'tdr', ...MEASURED, 'menkman', 'oxman']); // #2106: pixel's authored baseline, then organic's partly measured one
 for (const b of CANON_BASELINES) {
   assert.ok(Object.isFrozen(b) && Object.isFrozen(b.settings.density.scale), `${b.id}: deep-frozen`);
   assert.equal(canonBaseline(b.id), b);
@@ -315,5 +315,5 @@ assert.equal(baselineRecipe('nope'), null);
 }
 
 console.log(
-  'canonBaselines.selfcheck: ok — twelve baselines (op-art / warhol / davis / tdr + seven measured styles + menkman) are complete native records; each applies to the stage; taste reads a recipe against all of them',
+  'canonBaselines.selfcheck: ok — thirteen baselines (op-art / warhol / davis / tdr + seven measured styles + menkman + oxman) are complete native records; each applies to the stage; taste reads a recipe against all of them',
 );
