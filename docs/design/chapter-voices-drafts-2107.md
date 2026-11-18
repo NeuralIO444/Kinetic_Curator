@@ -2,11 +2,13 @@
 
 Status: **drafts for Matt's yes.** Nothing is wired. Ruled 2026-11-18 on #2107: Claude drafts the voices the three new chapters still need to reach the deck floor of **8 voices**. Matt's word lifts the authoring freeze for these voices only.
 
+Why organic gets 6, not 3: `voiceDeck.selfcheck` requires every style Look group to have **at least six family voices** with no two sharing a mode + motion. Organic's five existing voices are promoted, not family voices, so it needs six family voices of its own once it has looks.
+
 | Style | Voices today | Drafted | Total |
 |---|---|---|---|
 | Techno | 2 (`dark-glass`, `noise`) | 6 | 8 |
 | Pixel | 1 (`abacus`) | 7 | 8 |
-| Organic | 5 (`flow`, `ca`, `dla`, `eden`, `voronoi-cells`) | 3 | 8 |
+| Organic | 5 (`flow`, `ca`, `dla`, `eden`, `voronoi-cells`) | 6 | 11 |
 
 They are **family voices**, the same compact form as the eight style families already in `data/voiceDeck.js` (`VARIANTS`). One row is `[id, title, vibe, mode, motion, palette, count, trail, cost tier]`, and the wardrobe is drawn from the style's own assets the way every family's is. Landing them also gives each of the three Canon styles a voice `pairing`, which sets the asset categories its wardrobe draws from:
 - techno → `geometric`, `scanlines`, `stamps`
@@ -45,6 +47,9 @@ Every id is checked unique against the current 72 voices. Only existing modes, m
 | **Hyphae** (`hyphae`) | colonize · still | GROWN | 160 | off | light | Threads under the soil, reaching food by the shortest living route. |
 | **Tide Pool** (`tide-pool`) | poisson · drift | TIDEPOOL | 90 | off | light | Blobs drift in a shallow pool, bumping and settling. |
 | **Slime Mould** (`slime-mould`) | random · mold | GROWN | 200 | long (8f) | medium | The forager that maps a city: marks crawl toward food and leave a trail. |
+| **Lichen** (`lichen`) | eden · still | GROWN | 140 | off | light | Slow crusts spreading across stone, a millimetre a year. |
+| **Kelp Bed** (`kelp-bed`) | flow · flow | TIDEPOOL | 120 | off | light | Fronds leaning together in one long current. |
+| **Spore Cloud** (`spore-cloud`) | gaussian · scatter | GROWN | 220 | short (4f) | medium | A puff of spores scatters, settles, and begins again. |
 
 ## Rows (exact, ready to paste into `VARIANTS`)
 
@@ -70,11 +75,15 @@ Every id is checked unique against the current 72 voices. Only existing modes, m
     ['hyphae', 'Hyphae', 'Threads under the soil, reaching food by the shortest living route.', 'colonize', 'still', 'persona-oxman', 160, ACCUM_OFF, 'light'],
     ['tide-pool', 'Tide Pool', 'Blobs drift in a shallow pool, bumping and settling.', 'poisson', 'drift', 'tidepool', 90, ACCUM_OFF, 'light'],
     ['slime-mould', 'Slime Mould', 'The forager that maps a city: marks crawl toward food and leave a trail.', 'random', 'mold', 'persona-oxman', 200, accum(8, 0.04), 'medium'],
+    ['lichen', 'Lichen', 'Slow crusts spreading across stone, a millimetre a year.', 'eden', 'still', 'persona-oxman', 140, ACCUM_OFF, 'light'],
+    ['kelp-bed', 'Kelp Bed', 'Fronds leaning together in one long current.', 'flow', 'flow', 'tidepool', 120, ACCUM_OFF, 'light'],
+    ['spore-cloud', 'Spore Cloud', 'A puff of spores scatters, settles, and begins again.', 'gaussian', 'scatter', 'persona-oxman', 220, accum(4, 0.05), 'medium'],
   ],
 ```
 
 ## What landing them takes (after the yes)
 
-- Add the rows and the three `pairing` lists. The voice deck grows 72 → 88, so the voice-deck hash pins re-pin (`canonMotion`, `canonSettings`), and so do the deck counts (`kineticScope`, chapters `now`).
+- Add the rows and the three `pairing` lists. The voice deck grows 72 → 91, so the voice-deck hash pins re-pin (`canonMotion`, `canonSettings`), and so do the deck counts (`kineticScope`, chapters `now`).
 - The creature dice deal a Voice gene from the deck the way they deal a Look. The new voices stay off those dice (the #2107 looks precedent), so every seeded creature keeps its voice.
+- Looks and voices land in **one** PR: the looks can't land alone, because the same guard fails any style Look group without its six family voices. Re-pins also include the FIELD review census (`fieldReview*`, which samples every look).
 - Then the chapter entries (#2107's original ask): Organic after Bauhaus, Pixel after Memphis, Techno after Grunge.
