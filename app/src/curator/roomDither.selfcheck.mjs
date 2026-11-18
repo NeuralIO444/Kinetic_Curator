@@ -185,7 +185,7 @@ ok('LOIS: every honest state (CUT included, #1856) has a parameter set and a fix
     const p = loisFaceParams(code);
     assert.ok(LOIS_GLYPHS[p.glyphs], `${code}: a glyph set`);
     assert.equal(LOIS_GLYPHS[p.glyphs].length, LOIS_LEVELS, 'one glyph per level');
-    assert.ok(p.tint >= 0 && p.tint <= 1 && p.dim === 1, `${code}: full light — she never fades (Matt, 2026-10-23)`);
+    assert.ok(p.tint >= 0 && p.tint <= 1 && p.dim === 1, `${code}: full light — he never fades (Matt, 2026-10-23)`);
   }
   // re-pin (#1856): CUT is a key of LOIS_FACES now, so the params table keys are the face keys
   // exactly — the old form appended 'CUT' to the face keys by hand, which double-counted it
@@ -193,7 +193,7 @@ ok('LOIS: every honest state (CUT included, #1856) has a parameter set and a fix
   assert.deepEqual(LOIS_FACE_CODES, Object.keys(LOIS_FACES), 'the code list is the face table, no appends');
   for (const f of LOIS_EXTRA_FACES)
     assert.ok(LOIS_EXTRA_EXPRS[f], `${f}: a micro-expression has a construction preset`);
-  assert.ok(loisFaceParams('BURN').tint > loisFaceParams('VIBE').tint, 'her red floods a burn, barely touches a vibe');
+  assert.ok(loisFaceParams('BURN').tint > loisFaceParams('VIBE').tint, 'his red floods a burn, barely touches a vibe');
   const inv1 = loisFaceParams('side-eye');
   const inv2 = loisFaceParams('side-eye');
   assert.deepEqual(inv1, inv2, 'an invented state wears the same face every time');
@@ -205,9 +205,9 @@ ok('LOIS construction: features read — eyes and mouth are gaps in the lit face
   assert.ok(vibe(0, 0.46) < vibe(0, 0.62) - 0.3, 'the mouth is a gap above the chin');
   assert.ok(vibe(0, -0.72) < vibe(0, 0.05), 'hair masses darker than the lit face');
   // Never fade to black (Matt, 2026-10-23: "always visible like Davis"): every honest state keeps the
-  // face's full light — AWAY reads as gone through her expression (no eyes, a flat line), not a dim.
+  // face's full light — AWAY reads as gone through his expression (no eyes, a flat line), not a dim.
   for (const code of LOIS_FACE_CODES) {
-    assert.ok(mean(loisSampler(loisFaceParams(code))) > mean(vibe) * 0.75, `${code} keeps her light`);
+    assert.ok(mean(loisSampler(loisFaceParams(code))) > mean(vibe) * 0.75, `${code} keeps his light`);
   }
   const burn = loisSampler(loisFaceParams('BURN'));
   assert.notDeepEqual(
@@ -251,7 +251,7 @@ ok('LOIS expressions: the Unicode faces read at dither resolution — ◉ open, 
     }
 });
 
-ok('LOIS ink: paper scaled by level, her red mixed by tint — strongest in the darks', () => {
+ok('LOIS ink: paper scaled by level, his red mixed by tint — strongest in the darks', () => {
   const ink = [232, 232, 224];
   const red = [255, 77, 0];
   const rgbOf = (css) => css.match(/\d+/g).map(Number);
@@ -262,9 +262,9 @@ ok('LOIS ink: paper scaled by level, her red mixed by tint — strongest in the 
   assert.ok(lite[0] > dark[0] && lite[1] > dark[1], 'the ramp climbs with the level');
 });
 
-// LOIS's idle animation (Matt, 2026-10-23, PR #1728 review): her side was hardly visible — the breath S2
+// LOIS's idle animation (Matt, 2026-10-23, PR #1728 review): his side was hardly visible — the breath S2
 // shipped ran ±0.006, under the glyph ramp's quantization step, so the construction breathed on paper and
-// sat still on screen. The breath now runs Davis's magnitude at her own per-state tempo, and this pins both
+// sat still on screen. The breath now runs Davis's magnitude at his own per-state tempo, and this pins both
 // halves: a tempo every state wears, and cells that actually change glyph level at peak lift.
 ok('LOIS idle: every state breathes at its own tempo, and the breath crosses the dither', () => {
   for (const code of LOIS_FACE_CODES) {
@@ -294,7 +294,7 @@ ok('LOIS idle: every state breathes at its own tempo, and the breath crosses the
     /lift: reduced \? 0 : 0\.028 \* Math\.sin/,
     'the lift runs at breath magnitude, not the 0.006 the dither ate',
   );
-  assert.match(faces, /next\.breathS/, 'her per-state tempo drives the cycle');
+  assert.match(faces, /next\.breathS/, 'his per-state tempo drives the cycle');
 });
 
 ok('parameter easing: numbers lerp, the glyph set switches at the midpoint', () => {

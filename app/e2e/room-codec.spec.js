@@ -159,7 +159,7 @@ test('the caption never sizes the frame: a 12-char state keeps the window on the
   expect(m.real, 'the window is not the face cell (plus its 1 px border each side)').toBe(m.face + 2);
 });
 
-test('LOIS’s face stays inside her window, tall windows and short ones', async ({ page }) => {
+test('LOIS’s face stays inside his window, tall windows and short ones', async ({ page }) => {
   for (const [w, h] of [
     [1440, 900],
     [1280, 720],

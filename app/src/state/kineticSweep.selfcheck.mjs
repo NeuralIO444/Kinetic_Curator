@@ -76,7 +76,7 @@ const snap = () => {
   const voice = VOICE_DECK.find((v) => v.id === S().kineticVoiceId);
   assert.ok(voice, 'VOICE deals one of the dealt voices');
   // #1856 re-pin (cause: D2 — LOIS's kill, Matt 2026-10-31): the voice-pass commit is also where the
-  // round sits (BOOK S3). If LOIS spent her one cut, the look was killed and redealt inside the same
+  // round sits (BOOK S3). If LOIS spent his one cut, the look was killed and redealt inside the same
   // update, and the structure / pool / composition movement is the KILL's — the audit now proves the
   // attribution against the round record instead of charging it to the voice. When no cut was spent,
   // the original audit stands exactly as written.
@@ -240,7 +240,7 @@ const snap = () => {
     const roundBefore = S().kineticRound;
     S().kineticVoicePass();
     const v = VOICE_DECK.find((x) => x.id === S().kineticVoiceId);
-    // #1856 (cause: D2, Matt 2026-10-31): if this pass sat a round and LOIS spent her cut, a glow move
+    // #1856 (cause: D2, Matt 2026-10-31): if this pass sat a round and LOIS spent his cut, a glow move
     // is the redealt LOOK's (looks deal the glow under the same #1768 law), not the voice's — the
     // voice's own law is asserted on every pass where no cut was spent.
     const spentCut = S().kineticRound !== roundBefore && !!S().kineticRound?.cut;

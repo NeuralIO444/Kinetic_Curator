@@ -150,7 +150,7 @@ export function CuratorBar() {
   // when off, because off honestly means a uniform dice pick.
   const taster = tasterReadout(voice);
   const tasterFull = voice === 'off' ? 'dice' : activeAlias;
-  // #1588 — LOIS's verdict line no longer renders here; it rides the footer ticker in her slot
+  // #1588 — LOIS's verdict line no longer renders here; it rides the footer ticker in his slot
   // (components/LoisPill.jsx). The pick record stays in the Curator button's tooltip, via the hint.
   // #1122 — affective grammar derivations. Every one traces to a real signal:
   const lookState = !appliedLook ? 'none' : composition === appliedLook.id ? 'clean' : 'dirty';

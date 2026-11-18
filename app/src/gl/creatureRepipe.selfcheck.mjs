@@ -342,7 +342,7 @@ if (process.env.CREATURE_REPIPE_EMIT) {
     assert.notDeepEqual(partOf(bobOut, 'R#h'), partOf(undealt, 'R#h'), 'rock and bob pose the head differently');
   });
 
-  ok('the deal: Lois still moves — her face chooses the gait for gait-sourced bones through the re-pipe', () => {
+  ok('the deal: Lois still moves — his face chooses the gait for gait-sourced bones through the re-pipe', () => {
     const over = overlayOf(recordedRec);
     const at = (face) =>
       expandCreatureInstances(recordedScene(), over, { poseFigure, seed: 7, t: 1.3, face, fitOf: davisFitOf(over) });

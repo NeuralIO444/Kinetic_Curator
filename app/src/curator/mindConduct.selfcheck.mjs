@@ -356,7 +356,7 @@ ok(
 );
 
 ok(
-  "LOIS's keep-rate read: keeping a lot loosens her flat-show threshold, passes piling up tighten it, little evidence is neutral",
+  "LOIS's keep-rate read: keeping a lot loosens his flat-show threshold, passes piling up tighten it, little evidence is neutral",
   () => {
     assert.equal(flatBias({}), 0);
     assert.equal(flatBias({ keeps: 3, rolls: 0 }), 0, 'no rolls: nothing to read');

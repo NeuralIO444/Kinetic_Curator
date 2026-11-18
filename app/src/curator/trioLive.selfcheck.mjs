@@ -322,7 +322,7 @@ ok('end to end: the context carries the show, the rules conduct, LOIS burns the 
   const ctx = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: g.trio.showBlock() });
   const dv = rulesReply('davis', ctx, { seed: 7, bar: 6 });
   assert.ok(dv.route && dv.route.op === 'add', 'Davis proposes');
-  assert.notEqual(rulesReply('lois', ctx, {}).state, 'BURN', 'six bars: she gives a flat show a second phrase first');
+  assert.notEqual(rulesReply('lois', ctx, {}).state, 'BURN', 'six bars: he gives a flat show a second phrase first');
   g.request(6, dv.route);
   g.bar(7);
   g.bar(8);
@@ -364,7 +364,7 @@ ok('the take records what he did and replays it; a take without conducting is un
   assert.equal('conduct' in plain, false, 'no conducting: the section is exactly what it was');
 });
 
-ok("LOIS's keep-rate moves the threshold she calls a show flat at, and the dev view says so", () => {
+ok("LOIS's keep-rate moves the threshold he calls a show flat at, and the dev view says so", () => {
   const read = (activity) => {
     const g = rig({ activity });
     audioOn();
@@ -377,12 +377,12 @@ ok("LOIS's keep-rate moves the threshold she calls a show flat at, and the dev v
   assert.equal(neutral.bias, 0);
   assert.ok(Math.abs(neutral.flatBelow - 0.03) < 1e-9, 'no activity read: the base threshold');
   const passing = read({ keeps: 0, rolls: 12 });
-  assert.ok(passing.bias > 0.99 && passing.flatBelow > neutral.flatBelow, 'passes pile up: she calls it flat sooner');
+  assert.ok(passing.bias > 0.99 && passing.flatBelow > neutral.flatBelow, 'passes pile up: he calls it flat sooner');
   const keeping = read({ keeps: 5, rolls: 12 });
-  assert.ok(keeping.bias < -0.99 && keeping.flatBelow < neutral.flatBelow, 'you are keeping: she lets it ride');
-  // her brake on Davis (#1483, Matt 2026-10-27: she is the cautious one): passes piling up hold him to safe moves
+  assert.ok(keeping.bias < -0.99 && keeping.flatBelow < neutral.flatBelow, 'you are keeping: he lets it ride');
+  // his brake on Davis (#1483, Matt 2026-10-27; restraint, not caution): passes piling up hold him to safe moves
   assert.equal(passing.brake, true);
-  assert.equal(passing.show.brake, true, 'the show block carries her brake to the conductor');
+  assert.equal(passing.show.brake, true, 'the show block carries his brake to the conductor');
   assert.equal(neutral.brake, false);
   assert.equal('brake' in neutral.show, false);
   assert.equal(keeping.brake, false, 'keeps: the brake is off');

@@ -121,14 +121,14 @@ let cutFlagAtSpend = null;
 }
 ok('rounds settle through the store: pass and kill both seen, every record honest', () => {
   assert.ok(rounds >= 6, `rounds ran (${rounds})`);
-  assert.ok(cuts >= 3, `LOIS spent her cut live (${cuts}/${rounds})`);
+  assert.ok(cuts >= 3, `LOIS spent his cut live (${cuts}/${rounds})`);
   assert.ok(passes >= 3, `LOIS passed live (${passes}/${rounds})`);
 });
 console.log(
   `  · live cut rate over ${rounds} wired rounds: ${cuts} cuts (${((100 * cuts) / rounds).toFixed(0)}%) — feel data, not a pin`,
 );
 
-ok('the feed’s CUT flag stands after a spend (the pill paints CUT in her red)', () => {
+ok('the feed’s CUT flag stands after a spend (the pill paints CUT in his red)', () => {
   assert.equal(cutFlagAtSpend, true, 'noteCut landed post-commit; the redeal did not clear its own flag');
 });
 

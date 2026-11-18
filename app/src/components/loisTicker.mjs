@@ -14,7 +14,7 @@
 
 import { getLoisVerdict } from '../curator/loisRank.js';
 
-/** The line the ticker carries. '' until LOIS has actually picked; then the slot shows her state alone. */
+/** The line the ticker carries. '' until LOIS has actually picked; then the slot shows his state alone. */
 export function tickerLine() {
   return getLoisVerdict();
 }

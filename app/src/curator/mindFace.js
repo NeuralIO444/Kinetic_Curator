@@ -18,7 +18,7 @@ export const EASE_BARS = 1;
 const holdBarsOf = (decay) => Math.max(1, decay | 0);
 
 /**
- * LOIS's micro-expressions for states she has no fixed face for (invented ones). Picked by a stable hash of
+ * LOIS's micro-expressions for states he has no fixed face for (invented ones). Picked by a stable hash of
  * the state id, so the same invented state always wears the same face. Matt reviews these glyphs.
  * (CUT wore one of these until #1856 gave it a fixed face in loisFace.js — loisLook('CUT') reads the table now.)
  */

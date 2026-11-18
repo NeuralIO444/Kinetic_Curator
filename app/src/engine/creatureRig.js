@@ -285,7 +285,7 @@ export const DAVIS_VARIETY = Object.freeze({ BLOOM: 'wide', FLOW: 'wide', STUCK:
 export const varietyFor = (davis) => DAVIS_VARIETY[davis] || null;
 
 /**
- * LOIS's gait table — how the creatures move in each of her moods (curator/loisFace.js codes). period = one stride
+ * LOIS's gait table — how the creatures move in each of his moods (curator/loisFace.js codes). period = one stride
  * (s); swing = the thigh's swing (±°); knee = the lower bones' flex (±°); head = the head's look about (±°);
  * crouch = the rest bend's multiplier (posture: >1 hunched, <1 reaching). NOD is the default walk.
  */
@@ -731,7 +731,7 @@ function placeMark(it, m, i, glow, co, si, flip) {
  *   poseFigure?: Function|null, sourcePalette?: string[]|null, pullField?: object|null }} opts
  *   fitOf = #1945's id → { limb, head, mass, elong } (absent = Davis deals as he always did, byte for byte);
  *   pileOnly = #1945's kit triad pool: the pile is the stage's assets ∩ it, and with no overlap the stage's pile
- *   face = Lois's live face (her gait), davis = Davis's live state (how varied his deal is) — #1949
+ *   face = Lois's live face (his gait), davis = Davis's live state (how varied his deal is) — #1949
  *   poseFigure = #2119 step 3.3: the Motion Core figure poser (motionCore/rigSources), handed in by the
  *   scene-contract seam — the same injection shape as fitOf, and for the same reason: the adapter reads
  *   this module (poseRig, LOIS_GAITS), so this module cannot import it back. When it is handed in, posing

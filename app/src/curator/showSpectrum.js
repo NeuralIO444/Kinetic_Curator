@@ -4,7 +4,7 @@
 //
 // The show block is sampled once a bar, so `flux` there is the BAR's movement — how far the smoothed spectrum travelled
 // since the last bar (createShowSpectrum) — not the core's per-frame fluxTotal, which one sample a bar would catch on a
-// random frame (an onset or not). That bar-to-bar change is what LOIS reads when she judges a held show.
+// random frame (an onset or not). That bar-to-bar change is what LOIS reads when he judges a held show.
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const EPS = 1e-6;

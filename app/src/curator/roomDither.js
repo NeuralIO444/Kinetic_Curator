@@ -237,14 +237,14 @@ export function davisRamp(rgb, warmth = 0, levels = DAVIS_LEVELS) {
   return out;
 }
 
-// ── LOIS: glyph dither — her face made of type ───────────────────────────────
+// ── LOIS: glyph dither — his face made of type ───────────────────────────────
 
 /** Levels in LOIS's glyph ramp (one glyph per level, light → heavy). */
 export const LOIS_LEVELS = 10;
 
 /**
  * LOIS's glyph vocabulary, a FIXED set per state (08-Q12 default): ten glyphs ordered by weight. The sets
- * are flavours of one ramp — sparse lights, dense darks — so a state reads as her mood in type: slashes for
+ * are flavours of one ramp — sparse lights, dense darks — so a state reads as his mood in type: slashes for
  * CUT, heavy marks for BURN, a set that thins to almost nothing for AWAY.
  */
 export const LOIS_GLYPHS = Object.freeze({
@@ -261,11 +261,11 @@ export const LOIS_GLYPHS = Object.freeze({
  * expression like we had in Unicode"): VIBE wears `─‿─` (soft slits, a smile), BURN `◉‿◉` (wide round
  * eyes, a grin), AWAY `──` (no eyes at all, a flat line), CUT the glare — and the amplitudes are sized so
  * each expression crosses a dither cell at the coarsest tier: eyes run from -0.02 (gone) to 0.135 (◉),
- * the mouth's curve bends its corners past the line. Tint is how far her red enters — red = structure/
- * verdict, so it floods BURN and CUT, barely touches VIBE. `dim` is floored at 1: she never fades (Matt,
- * 2026-10-23: "always visible like Davis. never fade to black") — AWAY reads as gone through her
- * expression, not through an absence of light. `breathS` is her ambient cycle in seconds — the tempo of
- * the breath that crosses the dither (BURN hurries, AWAY drifts), her answer to Davis's per-state spin
+ * the mouth's curve bends its corners past the line. Tint is how far his red enters — red = structure/
+ * verdict, so it floods BURN and CUT, barely touches VIBE. `dim` is floored at 1: he never fades (Matt,
+ * 2026-10-23: "always visible like Davis. never fade to black") — AWAY reads as gone through his
+ * expression, not through an absence of light. `breathS` is his ambient cycle in seconds — the tempo of
+ * the breath that crosses the dither (BURN hurries, AWAY drifts), his answer to Davis's per-state spin
  * tempo (Matt, 2026-10-23: an idle animation like his).
  */
 export const LOIS_FACE_PARAMS = Object.freeze({
@@ -330,7 +330,7 @@ export const LOIS_FACE_PARAMS = Object.freeze({
  * The mind's micro-expressions, in construction form: one preset per Unicode extra face, in
  * LOIS_EXTRA_FACES' order (keyed by the kaomoji itself, so the pairing can't drift). An invented state
  * wears the expression its kaomoji always named — hash-picked, stable — so the states the mind invents
- * keep the face variety the kaomoji set gave her. Each preset owns one dominant axis (sly, lidded,
+ * keep the face variety the kaomoji set gave him. Each preset owns one dominant axis (sly, lidded,
  * level, skeptical, sad, wry, glare, flat) so all eight read apart at dither resolution. Tint, glyph
  * set and breath stay hash-derived per state.
  */
@@ -441,11 +441,11 @@ export function loisSampler(p, { lift = 0, contrast = 1 } = {}) {
 }
 
 /**
- * LOIS's ink for one level: her paper colour scaled by the level's weight, with her red mixed in by the
- * state's tint — strongest in the darks, where the structure of the face is (06: "her red enters here").
+ * LOIS's ink for one level: his paper colour scaled by the level's weight, with his red mixed in by the
+ * state's tint — strongest in the darks, where the structure of the face is (06: "his red enters here").
  * Warmth bends the paper toward cream (warm) or cool white.
- * The floor is 0.3 of the paper, not 0.22 (Matt, 2026-10-23: her side was hardly visible): the darks were
- * painting at a fifth of her paper colour, so the mass read as near-black — and the tint reaches a little
+ * The floor is 0.3 of the paper, not 0.22 (Matt, 2026-10-23: his side was hardly visible): the darks were
+ * painting at a fifth of his paper colour, so the mass read as near-black — and the tint reaches a little
  * further down the ramp for the same reason. The ramp still climbs (roomDither.selfcheck pins it).
  */
 export function loisInk(level, tint, warmth, inkRgb, redRgb) {

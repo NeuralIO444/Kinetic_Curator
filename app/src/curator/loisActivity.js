@@ -108,7 +108,7 @@ export function createLoisActivity({
     passRun: 0, // the artist's own passes (CURATOR, KIN) since the last keep; EVOLVE fires are Davis's and do not count
     muted: 0, // >0 while the machine (the dead-frame guard) is re-dealing: not the artist, not noted
     frameKept: false, // the frame on screen was kept: true from a keep until the next roll or seed change (#1126: NOD)
-    cut: false, // #1856: LOIS spent her one cut on the round's deal: true from noteCut until the next roll or seed change (the pill's CUT face)
+    cut: false, // #1856: LOIS spent his one cut on the round's deal: true from noteCut until the next roll or seed change (the pill's CUT face)
     keepNote: { at: -Infinity, door: null },
     favNote: { at: -Infinity, door: null },
     undos: [], // ts
@@ -165,7 +165,7 @@ export function createLoisActivity({
     const seen = s.dwells.some((d) => d.seed === seed);
     s.dwell = { seed, comp, startedAt: at };
     s.frameKept = false; // a new seed or composition is not the frame that was kept
-    s.cut = false; // #1856: nor is it the deal LOIS cut — her spend belongs to that deal's frame
+    s.cut = false; // #1856: nor is it the deal LOIS cut — his spend belongs to that deal's frame
     s.seedRevisit = seen && s.seed !== seed;
     const first = s.seed === null;
     if (s.seed !== seed) {
@@ -215,10 +215,10 @@ export function createLoisActivity({
     // announced AFTER the ledgers are updated and while the kept frame is still the live one (#1153 mints from it)
     if (bloomed) emit(Events.BLOOM, { rolls, at });
   }
-  // #1856 — LOIS spent her one cut (BOOK S3: layoutSlice's round wiring calls this at the spend,
+  // #1856 — LOIS spent his one cut (BOOK S3: layoutSlice's round wiring calls this at the spend,
   // after the store commit, so the kill's own redeal — a seed/composition change — cannot clear the
   // flag it just earned; noteRoll and noteSeed above clear it on the NEXT roll or seed change,
-  // exactly frameKept's lifecycle). The pill reads snapshot().cut and paints CUT in her red.
+  // exactly frameKept's lifecycle). The pill reads snapshot().cut and paints CUT in his red.
   function noteCut() {
     s.cut = true;
   }

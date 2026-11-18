@@ -10,7 +10,7 @@
 //
 // Pure: the same (time, idle, audio level) sequence gives the same weights. Time is the loop clock.
 
-export const IDLE_MS = 60 * 1000; // "a while": shorter than LOIS's AWAY (5 min), so she is already in when he leaves
+export const IDLE_MS = 60 * 1000; // "a while": shorter than LOIS's AWAY (5 min), so he is already in when he leaves
 export const FADE_BARS = 2;
 export const MIN_FADE_MS = 1500; // a very fast tempo still gets a visible crossfade
 export const SOUND_ON = 0.05; // real audio is "there" above this smoothed level

@@ -8,15 +8,15 @@ exists and already behaves this way.
 
 | | |
 |---|---|
-| **Real person** | None: the Governor is not a real person, so the date below is whimsical like the Queen's. **Inspired by David Bowie** (born 8 January 1947, the same day, thirty years earlier). 1977 is the year of *Low*, released 14 January, the first of the Berlin albums with Brian Eno |
-| **Born / sign** | **8 January 1977 (Matt, 2026-10-14).** A Capricorn in the Zodiac, second decan, ruled by Saturn with a warmer Venus undertone: structure first, craft mastery, grit, work built to last. Its growth area is overcommitting, which is exactly what the Governor exists to stop |
+| **Real person** | **David Bowie** (8 January 1947 – 10 January 2016). 1977 is the year of *Low*, released 14 January, the first of the Berlin albums with Brian Eno — kept below as the constraint-as-method story |
+| **Born / sign** | **8 January 1947** — Bowie's real date (the 1977 "whimsical" date is retired). A Capricorn in the Zodiac, second decan, ruled by Saturn with a warmer Venus undertone: structure first, craft mastery, grit, work built to last. Its growth area is overcommitting, which is exactly what the Governor exists to stop |
 | **Role in KC-1** | Protects the frame. When the machine cannot afford what is asked, it gives up the cheapest thing first and says so honestly |
 | **Register** | Dry, exact, fair, with a warm undertone. Never alarmed, never apologetic. Reports a cut the way a gauge reports a level. Constraint as a creative method, not a punishment |
 | **Visible?** | **Yes, but as instruments, not a face:** the tape readout, the budget switch (FULL / SHOW / LEAN), the load-shed pills, the DEV X-RAY ladder. It has no mark, no avatar, no voice line |
 | **Wants** | The frame held at the tempo you set; the picture degraded in the order that hurts least; everything restored the moment it can be afforded |
 | **Never** | Invents a cut that is not measured, hides one it made, or pretends the machine is fine. No timer with an opinion: it acts only on measured frame time |
 
-## Why Bowie (the inspiration, not the character)
+## Why Bowie
 - **Constraint as method.** For *Low*, Bowie and Eno worked with Eno's *Oblique Strategies*, a deck of cryptic cards
   turned over to push the music somewhere new: a limit that makes the work, not one that stops it. That is the
   Governor's whole idea (the TE one: a limit you choose).

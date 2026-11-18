@@ -210,9 +210,9 @@ function closeStandingRound(state, via) {
 
 /**
  * #1856 — the round at the voice-pass commit (BOOK S3): the deal is complete (look + voice, chapter-scoped),
- * so the table sits inside this one store update — open, LOIS's slot, her spend or her pass, and (D4, Matt
+ * so the table sits inside this one store update — open, LOIS's slot, his spend or his pass, and (D4, Matt
  * 2026-10-31) the automatic settle the moment the hand stands. Returns { kineticRound, layoutParams?,
- * enabledAssets?, cut } — the extra fields only when her kill redealt the hand, so the stage shows the
+ * enabledAssets?, cut } — the extra fields only when his kill redealt the hand, so the stage shows the
  * hand the record claims.
  *
  * D2 (Matt 2026-10-31) lives here, in the executor: kill only — the redeal is the sweep's own lookPass over
@@ -2042,7 +2042,7 @@ export const createLayoutSlice = (set) => ({
    * move, and the glow only when the voice declares accumulation (#1768). Structure and the pool hold. One undo step.
    */
   kineticVoicePass: () => {
-    // #1856 — if LOIS spends her cut at this commit, the feed notes it AFTER the store update lands:
+    // #1856 — if LOIS spends his cut at this commit, the feed notes it AFTER the store update lands:
     // the kill's own redeal changes the composition, and the feed's seed watcher would clear a flag
     // set inside the updater as if a fresh frame had arrived. Post-commit, the CUT flag stands until
     // the next roll or seed change (loisActivity.noteCut, frameKept's lifecycle).
@@ -2064,7 +2064,7 @@ export const createLayoutSlice = (set) => ({
           })
         : state.light;
       // #1856 — the deal is complete, so the table sits in this same update (runRound): open, LOIS's
-      // slot, her spend (D2: kill, redeal from the chapter deck minus the killed look) or her pass,
+      // slot, his spend (D2: kill, redeal from the chapter deck minus the killed look) or his pass,
       // and the automatic settle (D4). A kill's redeal overrides the layout and pool below.
       const round = runRound(state, r);
       spentCut = round.cut;

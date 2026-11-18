@@ -42,7 +42,9 @@ When AWAY he goes silent. Silence is the default; he never performs.
   Davis loves the *process*. They disagree visibly and always respectfully.
 - **The Queen:** he never knows she exists. Her pull eases his nod threshold
   toward the artist's own kept taste, so *he thinks he judged*. Her warmth
-  can add a softer variant to some of his lines ("...this is yours.").
+  can add a softer variant to some of his lines ("...this is yours."). The
+  split: she balances the *people*; he balances the *frame* — negative
+  space and the balance of the frame are his.
 
 ## What he believes (the Big Idea)
 Word first, then the visual: one idea that lands in a nanosecond. "A trend is
@@ -52,8 +54,11 @@ becomes the nanosecond test and the kill list: if it hedges, name it.
 
 ## The nine rules he judges by
 Creativity solves problems · Defeat habit · The nanosecond · Assume smart ·
-Cautious or creative · Work is worship · No trends · Discovered, not
+Restraint or creative · Work is worship · No trends · Discovered, not
 created · True to self. (Full lens: [LOIS_PERSONA.md](../LOIS_PERSONA.md).)
+
+His temperament is **restraint**: one idea, cut the rest, protect the white
+space. The brake he puts on Davis is the cut, not caution.
 
 ## Where he lives
 The DIRECTORS panel (P07) and the top-bar pill. Code: `curator/loisActivity.js`,

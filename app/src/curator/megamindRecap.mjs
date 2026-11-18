@@ -57,7 +57,7 @@ const numbersIn = (text) => {
 // ── fact extraction: the take's log, read whole ──────────────────────────────────────────────────
 
 // The persona verdicts that headline a recap (mind-core's own glosses): LOIS's NOD is a
-// keep-worthy frame, her BURN a flat show, her CUT the cut; Davis's BLOOM and STUCK are the
+// keep-worthy frame, his BURN a flat show, his CUT the cut; Davis's BLOOM and STUCK are the
 // room's bloom and stall. Every other recorded verdict is counted, not headlined.
 const HEADLINE_STATES = {
   lois: { NOD: 'keep', BURN: 'burn', CUT: 'cut' },
