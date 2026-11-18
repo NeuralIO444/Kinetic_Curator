@@ -291,6 +291,7 @@ export const Events = {
   MIND_REQ: 'mind:req', // #1463: { persona, bar, seed, contextHash } a persona asks the model
   MIND_REPLY: 'mind:reply', // #1463: { persona, bar, backend, latencyMs, reply | null, error? } every answer, used or not
   TRIO_HANDBACK: 'trio:handback', // #2092 PR 3: { targets: string[], bar } the artist's double-tap reset handed these back to Davis
+  GAIT_ASSIGN: 'gait:assign', // #2329: { target, gaitId, by: queen | davis | user, locked } a wearer's gait changed (a take records it; playback re-publishes it)
   MIND_ROUTE: 'mind:route', // #1483: { status: applied | dropped, reason?, op, delta?, bar, landBar? } what became of Davis's route proposal
   MEGAMIND_LINK: 'megamind:link', // #1525: { connected, model?, tier?, badges?, context? } the linked local model's measured capabilities changed (dev panel; the registry record in composition/capabilityRegistry.mjs is the data)
   CANON_STAND: 'canon:stand', // #2049: { kind: 'style', id, chapter, via, bar } a Canon record took the stage — a decision, published once per standing (curator/canonBus.mjs, from the record's own declared binding)

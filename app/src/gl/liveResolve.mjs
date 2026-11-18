@@ -101,6 +101,7 @@ import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the po
 import { ASSETS_RISO } from '../data/assets/assets-riso.js'; // #2008: the grammar-composed riso icons
 import { ASSETS_CONSTRUCTS, HOUSE_CONSTRUCT_RECORDS } from '../data/assets/index.js'; // #2108: the house constructs (catalogue-only until the gate); #2327: and their records
 import { constructPieceItems } from '../engine/constructStage.js'; // #2327: a construct tile dealt as its live pieces
+import { gaitStageOptions } from '../engine/gaitStage.js'; // #2329: a construct's assigned gait moves its pieces
 
 // #1982 — the kana stamps are catalogue members for the census and the stage
 // atlas, but they are dealt by the FIELD director alone (Teijo's native
@@ -1695,10 +1696,16 @@ export function createLiveResolver() {
       // render is today's): a construct's flat tile deals as its pieces, parent-transformed, resting exactly where the
       // tile draws. Matt's ruling (2026-11-18): AT REST a construct stays its tile, so it deals pieces only for a `moving`
       // source — none is passed until gait M3/M4, so every construct draws as its tile. The rotation turns all alike.
+      // #2329 — gait M3: a construct whose assigned gait moves (the recorded `input.gaits` stamp) deals as pieces and
+      // its pieces wear the gait's drivers; no stamp, or only `still`, passes no `moving` (the same array as before).
       if (input.constructPieces) {
+        const gaitStage = input.gaits
+          ? gaitStageOptions(input.gaits, { driverSec, seed, canvasW: W, canvasH: H })
+          : null;
         items = constructPieceItems(items, {
           enabled: true,
           recordOf: (id) => HOUSE_CONSTRUCT_RECORDS.get(id) || null,
+          ...(gaitStage || {}),
         });
       }
       const rotation = stratumRotationOf(layer);
