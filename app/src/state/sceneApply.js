@@ -36,6 +36,7 @@ import { sanitizeMathMacros } from '../curator/mathMacros.js';
 import { sanitizeAssetAttach } from '../engine/assetAttach.js';
 import { sanitizeCreatureRecords } from '../engine/creatureAssembler.js';
 import { sanitizeConstructRecords } from '../engine/constructAssembler.js';
+import { sanitizeGaitRecords } from '../engine/gait.js'; // #2328
 import { sanitizeShapeShelf } from '../panels/shapeShelf.mjs';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
@@ -134,6 +135,7 @@ export function sceneFieldsFromDoc(doc, state, { kits = [] } = {}) {
   next.shapeShelf = sanitizeShapeShelf(doc.shapeShelf); // #2280 — a doc without a shelf has an empty one
   next.constructRecords = sanitizeConstructRecords(doc.constructRecords); // #2108 — a doc without constructs has none
   next.constructLead = doc.constructLead === true; // #2108 — the gate rides the project; absent = off
+  next.gaitRecords = sanitizeGaitRecords(doc.gaitRecords); // #2328 — a doc without gaits has none
   // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
   // rest of the params; parseProject lands a pre-fold-in document's top-level creatureCount
   // there). Homes are found again for the new dish either way.
