@@ -11,6 +11,7 @@
 import { GENE_FAMILIES, lookName, voiceName } from '../engine/creatureAssembler.js';
 import { COMPOSITION_PRESETS } from '../data/presets.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
+import { materialById, materialsForStyle, materialStyle } from '../data/canon/materials.js'; // #2341 — PAINT
 
 export const geneKey = (g) => `${g.family}.${g.id}`;
 
@@ -33,12 +34,18 @@ export function geneValueText(gene) {
     const name = voiceName(v);
     return name ? `${name} · ${v}` : String(v);
   }
-  if (gene.family === 'MATERIAL') return v == null ? 'none — no material yet' : String(v);
+  if (gene.family === 'MATERIAL') return materialText(v);
   if (gene.family === 'DRIVE') return typeof v === 'number' ? String(v) : 'none';
   if (v == null) return 'none';
   if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
   const text = JSON.stringify(v);
   return text.length > 64 ? `${text.slice(0, 61)}…` : text;
+}
+
+/** A material in words: its id and its pattern (#2341); a null material is an unpainted creature. */
+export function materialText(id) {
+  const m = materialById(id);
+  return m ? `${m.id} · ${m.pattern === 'none' ? 'plain' : m.pattern}` : 'none — unpainted';
 }
 
 /** Where a gene's value came from, in words — for assembled, bred, beast-measure and hand-edited genes alike. */
@@ -66,6 +73,7 @@ export function geneSourceText(gene) {
     if (rest.startsWith('voice:')) return `hand replace · voice ${rest.slice(6)}`;
     if (rest.startsWith('asset:')) return `hand replace · shape ${rest.slice(6)}`;
     if (rest.startsWith('donor:')) return `hand replace · donor ${rest.slice(6)}`;
+    if (rest.startsWith('material:')) return `hand replace · material ${rest.slice(9)}`;
     return `hand edit · ${rest}`;
   }
   return s;
@@ -134,9 +142,14 @@ export function geneActions(record, gene, env = {}) {
       ok: false,
       why: 'the skeleton is one linkage group — it changes whole: replace a gene below, or breed',
     };
-  else if (gene.family === 'MATERIAL')
-    mutate = { ok: false, why: 'material is a stub — there are no legal values to mutate to yet' };
-  else mutate = { ok: false, why: 'no mutation machinery for this family' };
+  else if (gene.family === 'MATERIAL') {
+    // #2339 / #2341 — another material of the material's own style; an unpainted creature takes its first from the
+    // body's style; with neither there is nothing to pick from
+    const style = gene.value == null ? env.bodyStyle : materialStyle(gene.value);
+    mutate = materialsForStyle(style).some((m) => m.id !== gene.value)
+      ? { ok: true, why: null }
+      : { ok: false, why: 'no body style to pick a material from' };
+  } else mutate = { ok: false, why: 'no mutation machinery for this family' };
 
   const replace = [];
   if (gene.family === 'LOOK')
@@ -145,16 +158,39 @@ export function geneActions(record, gene, env = {}) {
   if (gene.family === 'VOICE')
     for (const v of VOICE_DECK)
       if (v.id !== gene.value) replace.push({ kind: 'deck', value: v.id, label: `voice deck · ${v.name ?? v.id}` });
+  if (gene.family === 'MATERIAL')
+    // #2341 — the deck is the body style's materials (ruling 2026-11-17); other styles arrive by Paint Like
+    for (const m of materialsForStyle(env.bodyStyle ?? materialStyle(gene.value)))
+      if (m.id !== gene.value) replace.push({ kind: 'deck', value: m.id, label: `material · ${materialText(m.id)}` });
   if (gene.family === 'FORM' && gene.id === 'body')
     for (const id of legalBodies)
       if (id !== gene.value) replace.push({ kind: 'pool', value: id, label: `pool shape · ${id}` });
   if (gene.family === 'FORM' && SKELETON_IDS.has(gene.id) && env.hasBodyPoints)
     replace.push({ kind: 'asset', label: "this shape's own attach points" });
-  for (const donor of donors) {
+  for (const donor of gene.family === 'MATERIAL' ? [] : donors) {
+    // a MATERIAL donor is PAINT LIKE's (paintLikeOptions below), not the replace list's
     if (!donor || donor.id === record.id || !Array.isArray(donor.genome)) continue;
     const dg = donor.genome.find((g) => g.family === gene.family && g.id === gene.id);
     if (dg && !sameValue(dg.value, gene.value))
       replace.push({ kind: 'donor', donorId: donor.id, label: `donor ${donor.id} · ${geneValueText(dg)}` });
   }
   return { mutate, replace };
+}
+
+/**
+ * #2341 — PAINT LIKE: the banked creatures whose material this creature could take in one tap — every other
+ * record with a material that differs from this one's, in bank order. Each becomes a donor replace through the
+ * hand-edit door (origin { kind: 'donor', donorId }), which re-checks it.
+ * @returns {Array<{ donorId: string, material: string, label: string }>}
+ */
+export function paintLikeOptions(record, donors = []) {
+  const own = record && Array.isArray(record.genome) ? record.genome.find((g) => g.family === 'MATERIAL') : null;
+  const out = [];
+  for (const d of donors) {
+    if (!d || !record || d.id === record.id || !Array.isArray(d.genome)) continue;
+    const g = d.genome.find((x) => x.family === 'MATERIAL');
+    if (!g || !materialById(g.value) || (own && own.value === g.value)) continue;
+    out.push({ donorId: d.id, material: g.value, label: `${d.id} · ${materialText(g.value)}` });
+  }
+  return out;
 }
