@@ -1,7 +1,7 @@
 # PERSONA KERNEL — one record for every persona (spec draft)
 
 **Status:** SPEC COMPLETE for review — 18 questions ruled with Matt, 2026-11-18. No code yet.
-**Lives at:** `docs/design/persona-kernel-spec.md`, label `personas`. Epic and phase issues: see §6.
+**Lives at:** `docs/design/persona-kernel-spec.md`, label `personas`. Epic #2379; phase issues in §6.
 **Audit base:** origin/main, 2026-11-18 10:56.
 
 ---
@@ -183,16 +183,16 @@ Every phase lands byte-identical by default until its own switch is on, unless t
 
 | Phase | Slice | Label |
 |---|---|---|
-| P0 | **Docs cleanup:** LOIS he/him in ~30 code comments; character files re-pointed to the real cast (Tina Turner, 26 Nov 1939; David Bowie, 8 Jan 1947); LOIS "cautious" → restraint; balance split (QUEEN = people, LOIS = frame); DAVIS wild in moves, not marks; stale Queen OPEN items closed (gate open, MIDI) | `model:haiku` |
-| P1 | **Kernel:** `app/src/personas/` + `kc-persona/1` schema + `registry.mjs` + selfcheck; `personaTastes.js` and `doctrines.mjs` become readers; TE and TASTE records | `model:sonnet` |
-| P2 | **Tuning table:** `tuning.json` (`kc-persona-tuning/1`) with today's values, DEV-mode live tuning, never saved in a project | `model:sonnet` |
-| P3 | **Callsign sweep (R6):** every surface string → COVER / OVERLAP / BLAST / HYBRID / SWISS GRIT; a selfcheck bans real names on surfaces | `model:haiku` |
-| P4 | **Archive:** text shelves per persona (backstory with provenance, brief, inspiration, rulings); MegaMind embedding retrieval; Mind context injection inside the 4,096-token budget | `model:sonnet` |
-| P5 | **HYBRID doctrine:** `greiman` joins `doctrines.mjs` as HYBRID; bitmap bake pack; layered planes; spectrum colour; owns PATTERN GLYPH + TIDES + colour; Queen's M3 palette gravity moves to HYBRID | `model:sonnet` |
-| P6 | **Doctrines on layout:** BLAST / HYBRID / SWISS GRIT propose type-layout and page-layout moves at the render seam (records + pure functions; creatures and beasts excluded) | `model:sonnet` |
-| P7 | **The band:** phrase-clock solos, trades (agree / disagree / lay out), relation biases from the tuning table, every turn recorded in the take | `model:sonnet` |
-| P8 | **THE ROOM:** horn strip under the channel, three animated faces, chat lines (drafted, Matt-signed); COVER / OVERLAP labels | `model:sonnet` |
-| P9 | **The Queen:** whole-band timing sway; `queenView()` read-only aggregator; beat composer + audible synth (opt-in); vision exception via MegaMind (once per phrase, timing only, recorded); mark moved into STIMULI | `model:sonnet` |
-| P10 | **The Wire:** opt-in RSS shelf, fetch at launch/idle, items recorded per take, starter feeds verified | `model:sonnet` |
+| P0 (#2380) | **Docs cleanup:** LOIS he/him in ~30 code comments; character files re-pointed to the real cast (Tina Turner, 26 Nov 1939; David Bowie, 8 Jan 1947); LOIS "cautious" → restraint; balance split (QUEEN = people, LOIS = frame); DAVIS wild in moves, not marks; stale Queen OPEN items closed (gate open, MIDI) | `model:haiku` |
+| P1 (#2381) | **Kernel:** `app/src/personas/` + `kc-persona/1` schema + `registry.mjs` + selfcheck; `personaTastes.js` and `doctrines.mjs` become readers; TE and TASTE records | `model:sonnet` |
+| P2 (#2382) | **Tuning table:** `tuning.json` (`kc-persona-tuning/1`) with today's values, DEV-mode live tuning, never saved in a project | `model:sonnet` |
+| P3 (#2383) | **Callsign sweep (R6):** every surface string → COVER / OVERLAP / BLAST / HYBRID / SWISS GRIT; a selfcheck bans real names on surfaces | `model:haiku` |
+| P4 (#2384) | **Archive:** text shelves per persona (backstory with provenance, brief, inspiration, rulings); MegaMind embedding retrieval; Mind context injection inside the 4,096-token budget | `model:sonnet` |
+| P5 (#2385) | **HYBRID doctrine:** `greiman` joins `doctrines.mjs` as HYBRID; bitmap bake pack; layered planes; spectrum colour; owns PATTERN GLYPH + TIDES + colour; Queen's M3 palette gravity moves to HYBRID | `model:sonnet` |
+| P6 (#2386) | **Doctrines on layout:** BLAST / HYBRID / SWISS GRIT propose type-layout and page-layout moves at the render seam (records + pure functions; creatures and beasts excluded) | `model:sonnet` |
+| P7 (#2387) | **The band:** phrase-clock solos, trades (agree / disagree / lay out), relation biases from the tuning table, every turn recorded in the take | `model:sonnet` |
+| P8 (#2388) | **THE ROOM:** horn strip under the channel, three animated faces, chat lines (drafted, Matt-signed); COVER / OVERLAP labels | `model:sonnet` |
+| P9 (#2389) | **The Queen:** whole-band timing sway; `queenView()` read-only aggregator; beat composer + audible synth (opt-in); vision exception via MegaMind (once per phrase, timing only, recorded); mark moved into STIMULI | `model:sonnet` |
+| P10 (#2390) | **The Wire:** opt-in RSS shelf, fetch at launch/idle, items recorded per take, starter feeds verified | `model:sonnet` |
 
 Order: P0 → P1 → P2 → P3, then P4–P10 by Matt's pick (recommended next after P3: P7 the band, since every later persona slice plugs into it).
