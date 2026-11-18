@@ -7,6 +7,7 @@ import { ROLES } from '../assets/assetRoles.js';
 import { FACETS } from '../data/assetFacets.js';
 import { creatureTile } from '../engine/creatureAssembler.js';
 import { expandCreatureInstances, davisFitOf } from '../engine/creatureRig.js';
+import { applyMaterial, recordMaterial } from '../engine/creaturePaint.js'; // #2340 — PAINT
 import { sanitizeOverlay } from '../assets/overlay.js';
 
 /** FNV-1a — the house's seedable string hash (no Math.random anywhere). */
@@ -171,10 +172,12 @@ export function creatureFigureSvg(record, bodyAsset, stageIds, { library = [], .
   if (!tile) return null;
   const svgOf = new Map([...library, ...(opts.overlay || []), tile].map((a) => [a.id, a.svg]));
   const f = (n) => Math.round(n * 100) / 100;
+  const paint = recordMaterial(record);
   const pieces = out
     .filter((i) => i.key === 'preview' || i.key.startsWith('preview#'))
     .map((i) => {
-      const body = i.key === 'preview' ? tile.svg : svgOf.get(i.asset);
+      // #2340 — the tile's body is already painted; each dealt part wears the creature's material too
+      const body = i.key === 'preview' ? tile.svg : applyMaterial(svgOf.get(i.asset), paint);
       if (typeof body !== 'string' || !body) return '';
       const t = `translate(${f(50 + i.x)} ${f(50 + i.y)}) rotate(${f(i.rotation)}) scale(${f(i.scaleX)} ${f(i.scaleY)}) translate(-50 -50)`;
       return `<g transform="${t}" opacity="${f(i.opacity)}">${body}</g>`;

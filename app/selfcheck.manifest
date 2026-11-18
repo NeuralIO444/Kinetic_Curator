@@ -417,6 +417,7 @@ node src/engine/creatureRig.selfcheck.mjs
 node src/engine/creatureRole.selfcheck.mjs
 node src/engine/creatureBreed.selfcheck.mjs
 node src/engine/creatureMaterial.selfcheck.mjs
+node src/engine/creaturePaint.selfcheck.mjs
 node src/engine/kineticBirths.selfcheck.mjs
 node src/deal/dealEngines.selfcheck.mjs
 node src/deal/creatureAdapter.selfcheck.mjs
