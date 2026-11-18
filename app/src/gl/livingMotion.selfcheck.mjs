@@ -12,14 +12,14 @@ import { evaluateKineme, applyKinemeDrivers, patternAmounts, KINEME_PATTERNS, TH
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 import { ASSETS } from '../data/assets/index.js';
 import { resolvePalette } from '../data/palettes.js';
-import { encodeRecipeUrl, decodeRecipeUrl } from '../state/recipeUrls.js';
+import { encodeRecipeUrlV12 as encodeRecipeUrl, decodeRecipeUrl } from '../state/recipeUrls.js';
 import { sanitizeAssetStill } from '../data/kinemes.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
 import { useStore } from '../state/store.js';
 
 let n = 0;
-const ok = (name, fn) => {
-  fn();
+const ok = async (name, fn) => {
+  await fn(); // #2324: the link decoder is async
   n++;
   console.log(`  [ok] ${name}`);
 };
@@ -81,43 +81,50 @@ const frame = (r, over) =>
     .items.map((i) => [i.x, i.y, i.scale]);
 const OFF = { kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0 };
 
-ok('new scenes get the floor (breath 0.3, drift 0.5, spin off); a document that predates it opens as saved', () => {
-  assert.equal(DEFAULT_LAYOUT_PARAMS.kinemeBreath, 0.3);
-  assert.equal(DEFAULT_LAYOUT_PARAMS.kinemeDrift, 0.5);
-  assert.equal(DEFAULT_LAYOUT_PARAMS.rotateSpin, 0, 'spin is chosen, drift is given');
-  const old = normalizeLayoutParams({ mode: 'grid' });
-  assert.equal(old.kinemeBreath, 0);
-  assert.equal(old.kinemeDrift, 0);
-  assert.equal(old.rotateSpin, 0);
-  const given = normalizeLayoutParams({ kinemeBreath: 0.1, kinemeDrift: 0.2 });
-  assert.equal(given.kinemeBreath, 0.1);
-  assert.equal(given.kinemeDrift, 0.2);
-  const fields = {
-    seed: 7,
-    seedOffsets: {},
-    paletteId: 'bone',
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid' },
-  };
-  const link = decodeRecipeUrl(encodeRecipeUrl(fields));
-  assert.ok(link.ok);
-  assert.equal(link.recipe.layoutParams.kinemeBreath, 0.3, 'a new scene keeps its floor through a link');
-  const oldLayout = { ...DEFAULT_LAYOUT_PARAMS };
-  delete oldLayout.kinemeBreath;
-  delete oldLayout.kinemeDrift;
-  const oldLink = decodeRecipeUrl(encodeRecipeUrl({ ...fields, layoutParams: oldLayout }));
-  assert.equal(oldLink.recipe.layoutParams.kinemeBreath, 0);
-  assert.equal(oldLink.recipe.layoutParams.kinemeDrift, 0);
-  const bare = 'kc-r/1.' + Buffer.from(JSON.stringify({ v: 1, s: 5 })).toString('base64url');
-  assert.equal(decodeRecipeUrl(bare).recipe.layoutParams.kinemeBreath, 0, 'a link from before the floor loads static');
-});
+await ok(
+  'new scenes get the floor (breath 0.3, drift 0.5, spin off); a document that predates it opens as saved',
+  async () => {
+    assert.equal(DEFAULT_LAYOUT_PARAMS.kinemeBreath, 0.3);
+    assert.equal(DEFAULT_LAYOUT_PARAMS.kinemeDrift, 0.5);
+    assert.equal(DEFAULT_LAYOUT_PARAMS.rotateSpin, 0, 'spin is chosen, drift is given');
+    const old = normalizeLayoutParams({ mode: 'grid' });
+    assert.equal(old.kinemeBreath, 0);
+    assert.equal(old.kinemeDrift, 0);
+    assert.equal(old.rotateSpin, 0);
+    const given = normalizeLayoutParams({ kinemeBreath: 0.1, kinemeDrift: 0.2 });
+    assert.equal(given.kinemeBreath, 0.1);
+    assert.equal(given.kinemeDrift, 0.2);
+    const fields = {
+      seed: 7,
+      seedOffsets: {},
+      paletteId: 'bone',
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid' },
+    };
+    const link = await decodeRecipeUrl(encodeRecipeUrl(fields));
+    assert.ok(link.ok);
+    assert.equal(link.recipe.layoutParams.kinemeBreath, 0.3, 'a new scene keeps its floor through a link');
+    const oldLayout = { ...DEFAULT_LAYOUT_PARAMS };
+    delete oldLayout.kinemeBreath;
+    delete oldLayout.kinemeDrift;
+    const oldLink = await decodeRecipeUrl(encodeRecipeUrl({ ...fields, layoutParams: oldLayout }));
+    assert.equal(oldLink.recipe.layoutParams.kinemeBreath, 0);
+    assert.equal(oldLink.recipe.layoutParams.kinemeDrift, 0);
+    const bare = 'kc-r/1.' + Buffer.from(JSON.stringify({ v: 1, s: 5 })).toString('base64url');
+    assert.equal(
+      (await decodeRecipeUrl(bare)).recipe.layoutParams.kinemeBreath,
+      0,
+      'a link from before the floor loads static',
+    );
+  },
+);
 
-ok('the first frame is the placed picture: at loop time 0 the floor is byte-identical to no floor', () => {
+await ok('the first frame is the placed picture: at loop time 0 the floor is byte-identical to no floor', async () => {
   const a = frame(createLiveResolver(), { loopTimeMs: 0 });
   const b = frame(createLiveResolver(), { loopTimeMs: 0, layoutParams: OFF });
   assert.deepEqual(a, b);
 });
 
-ok('then it moves: marks leave their places, each its own way, and never far', () => {
+await ok('then it moves: marks leave their places, each its own way, and never far', async () => {
   const r = createLiveResolver();
   const still = frame(createLiveResolver(), { loopTimeMs: 0, layoutParams: OFF });
   const f1 = frame(r, { loopTimeMs: 5000 });
@@ -138,7 +145,7 @@ ok('then it moves: marks leave their places, each its own way, and never far', (
   }
 });
 
-ok(
+await ok(
   'it never stacks: the same frame, drawn again and again, is the same frame (and the drivers off afterwards gives the placed picture back)',
   () => {
     const r = createLiveResolver();
@@ -156,7 +163,7 @@ ok(
   },
 );
 
-ok('the regression at the engine: three identical frames through one placement cache do not walk', () => {
+await ok('the regression at the engine: three identical frames through one placement cache do not walk', async () => {
   const cache = {};
   const lp = { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 12 };
   const pal = resolvePalette('bone', null);
@@ -191,32 +198,35 @@ ok('the regression at the engine: three identical frames through one placement c
   assert.deepEqual(run(null), placed);
 });
 
-ok('anchored: every delta is exactly zero at driver time 0, and the old un-anchored maths is unchanged', () => {
-  const soa = { n: 8, index: Int32Array.from({ length: 8 }, (_, i) => i) };
-  const ctx = (extra) => ({
-    seed: 9,
-    driverSec: 0,
-    boilStep: 0,
-    amounts: { breath: 1, drift: 1, pulse: 1 },
-    canvasW: 1000,
-    canvasH: 700,
-    ...extra,
-  });
-  const z = evaluateKineme(soa, ctx({ anchored: true }));
-  for (let i = 0; i < 8; i++) {
-    assert.equal(z.dScale[i], 0);
-    assert.equal(z.dx[i], 0);
-    assert.equal(z.dy[i], 0);
-  }
-  const raw = evaluateKineme(soa, ctx({}));
-  assert.ok(
-    [...raw.dx].some((v) => v !== 0),
-    'un-anchored (the old contract) still starts off rest',
-  );
-  assert.equal(applyKinemeDrivers({ n: 0 }, ctx({ anchored: true })), null, 'nothing to move: no undo');
-});
+await ok(
+  'anchored: every delta is exactly zero at driver time 0, and the old un-anchored maths is unchanged',
+  async () => {
+    const soa = { n: 8, index: Int32Array.from({ length: 8 }, (_, i) => i) };
+    const ctx = (extra) => ({
+      seed: 9,
+      driverSec: 0,
+      boilStep: 0,
+      amounts: { breath: 1, drift: 1, pulse: 1 },
+      canvasW: 1000,
+      canvasH: 700,
+      ...extra,
+    });
+    const z = evaluateKineme(soa, ctx({ anchored: true }));
+    for (let i = 0; i < 8; i++) {
+      assert.equal(z.dScale[i], 0);
+      assert.equal(z.dx[i], 0);
+      assert.equal(z.dy[i], 0);
+    }
+    const raw = evaluateKineme(soa, ctx({}));
+    assert.ok(
+      [...raw.dx].some((v) => v !== 0),
+      'un-anchored (the old contract) still starts off rest',
+    );
+    assert.equal(applyKinemeDrivers({ n: 0 }, ctx({ anchored: true })), null, 'nothing to move: no undo');
+  },
+);
 
-ok(
+await ok(
   'the ladder: amount 0 is a hard gate, shed tier 3 and slowRender are identity, RATE 0 freezes the motion where it is',
   () => {
     const placed = frame(createLiveResolver(), { loopTimeMs: 9000, layoutParams: OFF });
@@ -241,7 +251,7 @@ ok(
   },
 );
 
-ok(
+await ok(
   'determinism: the same seed gives the same motion, another seed another; the placed pictures match for stills and exports',
   () => {
     const a = frame(createLiveResolver(), { loopTimeMs: 6000 });
@@ -254,7 +264,7 @@ ok(
   },
 );
 
-ok('cost: 800 marks, floor on, per frame', () => {
+await ok('cost: 800 marks, floor on, per frame', async () => {
   const r = createLiveResolver();
   const over = (t) => ({ loopTimeMs: t, layoutParams: { count: 800 } });
   frame(r, over(1000));
@@ -278,7 +288,7 @@ ok('cost: 800 marks, floor on, per frame', () => {
 });
 
 // ── #1128 PR2: the DIRECTOR's patterns re-weight the Curator's amounts; they never invent motion ──
-ok(
+await ok(
   'patterns: DRIFT is the amounts as set; SWELL leans breath-forward; THUMP follows a real beat or is DRIFT; unknown is DRIFT',
   () => {
     const b = { breath: 0.3, drift: 0.5, pulse: 0 };
@@ -302,9 +312,9 @@ ok(
   },
 );
 
-ok(
+await ok(
   'the pattern is a layout field: new scenes are DRIFT, saved ones load DRIFT, junk is DRIFT, and a link carries a choice',
-  () => {
+  async () => {
     assert.equal(DEFAULT_LAYOUT_PARAMS.kinemePattern, 'DRIFT');
     assert.equal(normalizeLayoutParams({ mode: 'grid' }).kinemePattern, 'DRIFT');
     assert.equal(normalizeLayoutParams({ kinemePattern: 'THUMP' }).kinemePattern, 'THUMP');
@@ -315,13 +325,13 @@ ok(
       paletteId: 'bone',
       layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', kinemePattern: 'SWELL' },
     };
-    const link = decodeRecipeUrl(encodeRecipeUrl(fields));
+    const link = await decodeRecipeUrl(encodeRecipeUrl(fields));
     assert.ok(link.ok);
     assert.equal(link.recipe.layoutParams.kinemePattern, 'SWELL');
   },
 );
 
-ok(
+await ok(
   'live: SWELL moves marks differently from DRIFT; THUMP is exactly DRIFT with no beat, and with one it only adds pulse',
   () => {
     const at = (pattern, beatDrive) =>
@@ -338,7 +348,7 @@ ok(
 );
 
 // ── #1128 PR3: the artist can pin an asset still ──
-ok(
+await ok(
   'pinned-still: junk is dropped, null when nothing is pinned, the store toggles, and the document carries it only when set',
   () => {
     assert.equal(sanitizeAssetStill(null), null);
@@ -372,7 +382,7 @@ ok(
   },
 );
 
-ok("live: a pinned asset's marks stay exactly where they were placed while every other mark moves", () => {
+await ok("live: a pinned asset's marks stay exactly where they were placed while every other mark moves", async () => {
   const items = (r, over) =>
     r
       .resolveLayers(base(over))
@@ -413,54 +423,63 @@ ok("live: a pinned asset's marks stay exactly where they were placed while every
 });
 
 // ── #1198: the rhythm family — ORGANIC/CADENCE switch on a placement layer over any sampler ──
-ok('rhythm: selecting ORGANIC/CADENCE activates the placement layer even with every motion amount at 0', () => {
-  const at = (pattern) =>
-    frame(createLiveResolver(), { loopTimeMs: 0, layoutParams: { ...OFF, kinemePattern: pattern } });
-  const still = at('DRIFT');
-  const organic = at('ORGANIC');
-  const cadence = at('CADENCE');
-  assert.notDeepEqual(organic, still, 'ORGANIC breaks the rigidity in the still itself');
-  assert.notDeepEqual(cadence, still, 'CADENCE breaks the rigidity in the still itself');
-  assert.notDeepEqual(organic, cadence, 'the two fields differ');
-  assert.deepEqual(at('ORGANIC'), organic, 'same seed → same field, frame after frame');
-  assert.deepEqual(at('DRIFT'), still, 'the pattern is the gate: DRIFT with zero amounts stays the placed picture');
-  assert.equal(
-    normalizeLayoutParams({ kinemePattern: 'ORGANIC' }).kinemePattern,
-    'ORGANIC',
-    'the choice survives normalization',
-  );
-  const fields = {
-    seed: 7,
-    seedOffsets: {},
-    paletteId: 'bone',
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', kinemePattern: 'CADENCE' },
-  };
-  const link = decodeRecipeUrl(encodeRecipeUrl(fields));
-  assert.ok(link.ok);
-  assert.equal(link.recipe.layoutParams.kinemePattern, 'CADENCE', 'a link carries a rhythm choice');
-});
+await ok(
+  'rhythm: selecting ORGANIC/CADENCE activates the placement layer even with every motion amount at 0',
+  async () => {
+    const at = (pattern) =>
+      frame(createLiveResolver(), { loopTimeMs: 0, layoutParams: { ...OFF, kinemePattern: pattern } });
+    const still = at('DRIFT');
+    const organic = at('ORGANIC');
+    const cadence = at('CADENCE');
+    assert.notDeepEqual(organic, still, 'ORGANIC breaks the rigidity in the still itself');
+    assert.notDeepEqual(cadence, still, 'CADENCE breaks the rigidity in the still itself');
+    assert.notDeepEqual(organic, cadence, 'the two fields differ');
+    assert.deepEqual(at('ORGANIC'), organic, 'same seed → same field, frame after frame');
+    assert.deepEqual(at('DRIFT'), still, 'the pattern is the gate: DRIFT with zero amounts stays the placed picture');
+    assert.equal(
+      normalizeLayoutParams({ kinemePattern: 'ORGANIC' }).kinemePattern,
+      'ORGANIC',
+      'the choice survives normalization',
+    );
+    const fields = {
+      seed: 7,
+      seedOffsets: {},
+      paletteId: 'bone',
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', kinemePattern: 'CADENCE' },
+    };
+    const link = await decodeRecipeUrl(encodeRecipeUrl(fields));
+    assert.ok(link.ok);
+    assert.equal(link.recipe.layoutParams.kinemePattern, 'CADENCE', 'a link carries a rhythm choice');
+  },
+);
 
 // ── #2104 Q1: the style-response blend at the floor's seam ─────────────────────────────────────
-ok('blend: a standing world pulls the dealt amounts toward its chapter’s style, through the real resolver', () => {
-  const resp = chapterStyleResponse('swiss');
-  assert.ok(resp?.kineme, 'the swiss chapter stands on a measured style');
-  createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, world: worldForChapter('swiss') }));
-  const amounts = getLastFrameMotion().kineme.amounts;
-  assert.equal(amounts.breath, 0.3 + RESPONSE_BLEND_PULL * (resp.kineme.breath - 0.3), 'breath moved halfway');
-  assert.equal(amounts.drift, 0.5 + RESPONSE_BLEND_PULL * (resp.kineme.drift - 0.5), 'drift moved halfway');
-  assert.equal(amounts.pulse, 0, 'pulse is never blended (never measured)');
-});
-
-ok('blend: no world, the house world, and a memberless chapter’s world all pass the amounts through exactly', () => {
-  for (const world of [undefined, HOUSE_WORLD, worldForChapter('techno')]) {
-    createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, ...(world ? { world } : {}) }));
+await ok(
+  'blend: a standing world pulls the dealt amounts toward its chapter’s style, through the real resolver',
+  async () => {
+    const resp = chapterStyleResponse('swiss');
+    assert.ok(resp?.kineme, 'the swiss chapter stands on a measured style');
+    createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, world: worldForChapter('swiss') }));
     const amounts = getLastFrameMotion().kineme.amounts;
-    assert.equal(amounts.breath, 0.3, `breath untouched (world: ${world?.chapter ?? 'none'})`);
-    assert.equal(amounts.drift, 0.5, `drift untouched (world: ${world?.chapter ?? 'none'})`);
-  }
-});
+    assert.equal(amounts.breath, 0.3 + RESPONSE_BLEND_PULL * (resp.kineme.breath - 0.3), 'breath moved halfway');
+    assert.equal(amounts.drift, 0.5 + RESPONSE_BLEND_PULL * (resp.kineme.drift - 0.5), 'drift moved halfway');
+    assert.equal(amounts.pulse, 0, 'pulse is never blended (never measured)');
+  },
+);
 
-ok('blend: the pull can wake a still floor — and only with a measured world standing', () => {
+await ok(
+  'blend: no world, the house world, and a memberless chapter’s world all pass the amounts through exactly',
+  async () => {
+    for (const world of [undefined, HOUSE_WORLD, worldForChapter('techno')]) {
+      createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, ...(world ? { world } : {}) }));
+      const amounts = getLastFrameMotion().kineme.amounts;
+      assert.equal(amounts.breath, 0.3, `breath untouched (world: ${world?.chapter ?? 'none'})`);
+      assert.equal(amounts.drift, 0.5, `drift untouched (world: ${world?.chapter ?? 'none'})`);
+    }
+  },
+);
+
+await ok('blend: the pull can wake a still floor — and only with a measured world standing', async () => {
   const zero = { kinemeBreath: 0, kinemeDrift: 0, kinemePulse: 0, kinemePaletteBreath: 0, kinemeBrushWobble: 0 };
   createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, layoutParams: zero }));
   assert.equal(getLastFrameMotion().kineme, null, 'every amount at 0 and no world: the floor is still');

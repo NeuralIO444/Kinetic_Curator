@@ -10,7 +10,7 @@ import {
   RECIPE_URL_VERSION,
   RECIPE_URL_PREFIX,
   RECIPE_URL_HASH_KEY,
-  encodeRecipeUrl,
+  encodeRecipeUrlV12 as encodeRecipeUrl, // #2324: pins the v1/v2 writer; the app writes v3
   decodeRecipeUrl,
   buildShareHref,
   extractRecipePayload,
@@ -41,7 +41,7 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
 {
   const url = encodeRecipeUrl(FIELDS);
   assert.ok(url.startsWith(RECIPE_URL_PREFIX), 'cleartext version prefix first');
-  const back = decodeRecipeUrl(url);
+  const back = await decodeRecipeUrl(url);
   assert.ok(back.ok, `decode ok: ${back.error || ''}`);
   const r = back.recipe;
   assert.strictEqual(r.version, RECIPE_URL_VERSION);
@@ -81,9 +81,13 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
   // a carrier that never had the field (an old keep) writes 0, and a link without the key decodes as 0
   const old = JSON.parse(JSON.stringify(FIELDS));
   delete old.layoutParams.rotateSpin;
-  assert.equal(decodeRecipeUrl(encodeRecipeUrl(old)).recipe.layoutParams.rotateSpin, 0, 'no spin in, 0 out');
+  assert.equal((await decodeRecipeUrl(encodeRecipeUrl(old))).recipe.layoutParams.rotateSpin, 0, 'no spin in, 0 out');
   const bare = 'kc-r/1.' + Buffer.from(JSON.stringify({ v: 1, s: 5 })).toString('base64url');
-  assert.equal(decodeRecipeUrl(bare).recipe.layoutParams.rotateSpin, 0, 'an old link (no layout block) loads static');
+  assert.equal(
+    (await decodeRecipeUrl(bare)).recipe.layoutParams.rotateSpin,
+    0,
+    'an old link (no layout block) loads static',
+  );
   assert.deepStrictEqual(json.o, { color: 7, noise: 123456 }, 'only nonzero offsets encoded');
   assert.ok(!('po' in json), 'null overrides omitted');
   // A near-default composition stays in the hundreds of chars.
@@ -109,7 +113,7 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
 {
   const overrides = { swatches: ['#ff0000', '#00ff00'], bg: '#000000' };
   const url = encodeRecipeUrl({ ...FIELDS, paletteOverrides: overrides });
-  const back = decodeRecipeUrl(url);
+  const back = await decodeRecipeUrl(url);
   assert.ok(back.ok);
   assert.deepStrictEqual(back.recipe.paletteOverrides, overrides);
 }
@@ -128,7 +132,7 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
     },
   };
   const url = encodeRecipeUrl(recipeFieldsFromKept(favorite));
-  const back = decodeRecipeUrl(url);
+  const back = await decodeRecipeUrl(url);
   assert.ok(back.ok);
   assert.strictEqual(back.recipe.seed, 0xdeadbeef);
   assert.strictEqual(back.recipe.paletteId, 'inkwash');
@@ -146,7 +150,7 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
     'kc-r/1.', // empty payload
     'kc-r/1.!!!', // bad alphabet
     'kc-r/1.A', // truncated (length % 4 === 1)
-    'kc-r/2.e30', // unknown version
+    'kc-r/4.e30', // unknown version
     'kc-r/9.e30',
     'kc-recipe/1.e30', // wrong codec entirely
     null,
@@ -155,7 +159,7 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
     {},
   ];
   for (const input of bad) {
-    const r = decodeRecipeUrl(input);
+    const r = await decodeRecipeUrl(input);
     assert.ok(!r.ok, `refuses ${JSON.stringify(input)}`);
     assert.ok(typeof r.error === 'string' && r.error.length > 0, 'plain-language error');
   }
@@ -164,11 +168,11 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
     RECIPE_URL_PREFIX +
     Buffer.from(json, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   for (const json of ['{', '[1,2', '"str"', '42', 'null', '{"v":1}', '{"v":1,"s":"nope"}', '{"v":2,"s":1}']) {
-    const r = decodeRecipeUrl(corrupt(json));
+    const r = await decodeRecipeUrl(corrupt(json));
     assert.ok(!r.ok, `refuses payload ${json}`);
   }
   // Unknown version with otherwise-valid payload refuses distinctly.
-  const r = decodeRecipeUrl(corrupt('{"v":99,"s":1}'));
+  const r = await decodeRecipeUrl(corrupt('{"v":99,"s":1}'));
   assert.ok(!r.ok && /version/i.test(r.error), 'unknown version refused');
 }
 
@@ -195,7 +199,7 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
   assert.strictEqual(classify('kc-recipe/1\nseed: 0x1a2b3c4d'), 'text');
 
   // End-to-end paste: the extracted payload decodes to the same recipe.
-  const back = decodeRecipeUrl(extractRecipePayload(href));
+  const back = await decodeRecipeUrl(extractRecipePayload(href));
   assert.ok(back.ok);
   assert.deepStrictEqual(back.recipe.layoutParams, FIELDS.layoutParams);
 }
@@ -206,19 +210,19 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
   const href = buildShareHref(payload, 'https://example.com/app/');
 
   // A share-URL fragment parses to the recipe.
-  const ok = parseBootHash(new URL(href).hash);
+  const ok = await parseBootHash(new URL(href).hash);
   assert.strictEqual(ok.status, 'ok');
   assert.strictEqual(ok.recipe.seed, FIELDS.seed >>> 0);
   assert.deepStrictEqual(ok.recipe.layoutParams, FIELDS.layoutParams);
 
   // No hash / wrong key -> none (normal boot proceeds).
-  assert.deepStrictEqual(parseBootHash('').status, 'none');
-  assert.deepStrictEqual(parseBootHash('#foo=bar').status, 'none');
-  assert.deepStrictEqual(parseBootHash(null).status, 'none');
+  assert.deepStrictEqual((await parseBootHash('')).status, 'none');
+  assert.deepStrictEqual((await parseBootHash('#foo=bar')).status, 'none');
+  assert.deepStrictEqual((await parseBootHash(null)).status, 'none');
 
   // Present but unreadable -> bad (clean boot + note).
   for (const h of ['#r=', '#r=!!!', '#r=kc-r/2.e30', '#r=kc-r/1.']) {
-    const r = parseBootHash(h);
+    const r = await parseBootHash(h);
     assert.strictEqual(r.status, 'bad', h);
     assert.ok(typeof r.error === 'string' && r.error.length > 0, 'plain-language error');
   }
@@ -236,7 +240,7 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
 
 // #2320 — an unknown link version names every version this build reads (it said "kc-r/1 only" after kc-r/2 shipped).
 {
-  const r = decodeRecipeUrl('kc-r/3.e30');
+  const r = await decodeRecipeUrl('kc-r/4.e30');
   assert.ok(!r.ok, 'kc-r/3 is refused');
   assert.ok(/kc-r\/1/.test(r.error) && /kc-r\/2/.test(r.error), `error names kc-r/1 and kc-r/2: ${r.error}`);
   assert.ok(!/ only\./.test(r.error), 'no stale "only" wording');

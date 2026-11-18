@@ -249,6 +249,7 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
   const allowed = new Set([
     'state/projectDocument.js',
     'state/slices/globalSlice.js',
+    'state/recipeUrls.v3.selfcheck.mjs', // #2324: the v3 recipe suite assembles one real construct to dress a scene with (a test)
     'state/sceneApply.js', // #2322: the scene half of the project load moved here from globalSlice; it only sanitizes the doc's records
     'deal/constructAdapter.mjs', // the WetLab CONSTRUCT rung's deal adapter (#2299)
     'panels/constructSettle.mjs', // the WetLab construct tile's settle drawing (#2300)

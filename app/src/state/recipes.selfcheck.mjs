@@ -17,6 +17,7 @@ import {
   copyTextToClipboard,
 } from './recipes.js';
 
+const LEGACY = { legacy: true }; // #2324: these checks pin the v1/v2 text; the writer now emits kc-recipe/3
 const LAYOUT = {
   mode: 'fibonacci',
   composition: 'praystation',
@@ -49,7 +50,7 @@ const FIELDS = {
 
 // ── 1. The version tag is the first line, always ──────────────────────────
 {
-  const text = encodeRecipe(FIELDS);
+  const text = encodeRecipe(FIELDS, LEGACY);
   const first = text.split('\n')[0];
   assert.strictEqual(first, RECIPE_VERSION, 'first line must be the version tag');
   assert.strictEqual(first, 'kc-recipe/1');
@@ -58,7 +59,7 @@ const FIELDS = {
 
 // ── 2. Full round-trip is lossless ─────────────────────────────────────────
 {
-  const text = encodeRecipe(FIELDS);
+  const text = encodeRecipe(FIELDS, LEGACY);
   const parsed = parseRecipe(text);
   assert.strictEqual(parsed.ok, true, `round-trip parse failed: ${parsed.error}`);
   const r = parsed.recipe;
@@ -81,7 +82,7 @@ const FIELDS = {
     asset: 1,
     noise: -2,
   });
-  const text = encodeRecipe({ seed: 7, paletteId: 'p', layoutParams: {} });
+  const text = encodeRecipe({ seed: 7, paletteId: 'p', layoutParams: {} }, LEGACY);
   for (const ch of RECIPE_OFFSET_CHANNELS) {
     assert.ok(text.includes(`seedOffset.${ch}: 0`), `missing zero default for ${ch}`);
   }
@@ -131,7 +132,7 @@ const FIELDS = {
 
 // ── 5. Seed formats: emitted 0x… hex round-trips; decimal accepted ─────────
 {
-  const t = encodeRecipe({ seed: 0xdeadbeef, paletteId: null, layoutParams: {} });
+  const t = encodeRecipe({ seed: 0xdeadbeef, paletteId: null, layoutParams: {} }, LEGACY);
   assert.ok(t.includes('seed: 0xdeadbeef'), 'seed must emit as 0x hex');
   assert.strictEqual(parseRecipe(t).recipe.seed, 0xdeadbeef >>> 0);
   assert.strictEqual(parseRecipe('kc-recipe/1\nseed: 1234').recipe.seed, 1234);
@@ -145,7 +146,7 @@ const FIELDS = {
     ['', 'empty'],
     ['   ', 'blank'],
     ['seed: 0x1', 'missing version tag'],
-    ['kc-recipe/3\nseed: 0x1', 'wrong version'],
+    ['kc-recipe/4\nseed: 0x1', 'wrong version'],
     ['kc-recipe/1', 'no seed line'],
     ['kc-recipe/1\nno colon here', 'line without colon'],
     ['kc-recipe/1\nseed: xyz!', 'bad seed'],
@@ -190,7 +191,7 @@ const FIELDS = {
 
 // ── 8. Project doc for the existing load path ─────────────────────────────
 {
-  const { recipe } = parseRecipe(encodeRecipe(FIELDS));
+  const { recipe } = parseRecipe(encodeRecipe(FIELDS, LEGACY));
   const doc = recipeToProjectDoc(recipe);
   assert.strictEqual(doc.version, 1);
   assert.strictEqual(doc.seed, 0x1a2b3c4d >>> 0);

@@ -320,6 +320,11 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // applyScene both call it); it sanitizes the doc's creatureRecords exactly as the load always has — a backstage
     // door, not a stage reader (the stage still reaches every creature through its pool TILE alone)
     'state/sceneApply.js',
+    // #2324: the recipe's scene-block key list names `creatureRecords` (a literal list of document keys that a link
+    // carries; it reads no record), and the v3 recipe suite assembles one real creature to dress a scene with
+    // (a test, not a stage reader)
+    'state/recipeSceneKeys.js',
+    'state/recipeUrls.v3.selfcheck.mjs',
     'state/projectDocument.js',
     'state/projectWatch.mjs',
     'panels/WetLab.jsx',
