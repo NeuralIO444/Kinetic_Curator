@@ -38,6 +38,11 @@ ok('only proven treatments: solid/outline fills, none/hatch/stipple patterns, in
     }
 });
 
+ok('a patterned material tones accent: an ink pattern vanishes on an ink-filled body (#2340)', () => {
+  for (const list of Object.values(MATERIALS_BY_STYLE))
+    for (const x of list) if (x.pattern !== 'none') assert.equal(x.tone, 'accent', x.id);
+});
+
 ok('ids are unique across styles and each names its own style', () => {
   const ids = Object.values(MATERIALS_BY_STYLE).flatMap((l) => l.map((x) => x.id));
   assert.equal(new Set(ids).size, ids.length);
@@ -49,8 +54,9 @@ ok('ids are unique across styles and each names its own style', () => {
 });
 
 ok('no colour lives in the file: no hex, rgb or hsl — the room colours a material', () => {
-  // code only: comments cite issue numbers like #2338, which read as hex
+  // code only: comments (line and block) cite issue numbers like #2338, which read as hex
   const src = readFileSync(new URL('./materials.js', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
     .filter((l) => !l.trim().startsWith('//'))
     .join('\n');

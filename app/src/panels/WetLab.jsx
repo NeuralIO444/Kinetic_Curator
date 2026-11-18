@@ -25,7 +25,8 @@ import { MUTATION_RATE, BREED_PARENTS } from '../engine/creatureBreed.js'; // #1
 import { COMPOSITION_PRESETS } from '../data/presets.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
 import { ASSETS } from '../data/assets/index.js';
-import { assetStyle } from '../data/assetStyle.js'; // #2339 — PAINT: a creature's material is its body's style
+import { assetStyle } from '../data/assetStyle.js';
+import { applyMaterial, recordMaterial } from '../engine/creaturePaint.js'; // #2340 — PAINT // #2339 — PAINT: a creature's material is its body's style
 import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
 import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
 import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
@@ -1238,7 +1239,7 @@ export function WetLab({ assetId, onClose }) {
                           width="44"
                           height="44"
                           style={{ display: 'block', margin: '0 auto' }}
-                          dangerouslySetInnerHTML={{ __html: bodyA.svg }}
+                          dangerouslySetInnerHTML={{ __html: applyMaterial(bodyA.svg, recordMaterial(r)) }} // #2340
                         />
                       ) : (
                         <span style={{ display: 'block', height: 44, lineHeight: '44px', color: 'var(--dim)' }}>—</span>

@@ -27,6 +27,7 @@ import {
   bodySvgOf,
 } from './wetLabDeal.mjs';
 import { creatureFigureSvg } from './wetLabLogic.mjs';
+import { applyMaterial, recordMaterial } from '../engine/creaturePaint.js'; // #2340 — PAINT
 import { ladderBodyPool, ladderOverlay, ladderPartIds } from './ladderPools.mjs'; // #2304
 
 const label = (scope) => (CREATURE_SCOPES.find((s) => s.id === scope) || CREATURE_SCOPES[0]).label;
@@ -184,7 +185,7 @@ export function WetLabDealStrip({ subject = null, onTap, onKeep }) {
           )}
           {(hand || []).map((rec) => {
             const figure = figures.get(rec.id);
-            const svg = figure || bodySvgOf(rec, drawable);
+            const svg = figure || applyMaterial(bodySvgOf(rec, drawable), recordMaterial(rec)); // #2340
             const on = banked.has(rec.id);
             return (
               <button

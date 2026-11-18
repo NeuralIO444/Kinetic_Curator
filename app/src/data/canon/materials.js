@@ -21,7 +21,9 @@ export const MATERIAL_TONES = Object.freeze(['ink', 'accent']);
 
 const m = (id, fill, pattern, tone) => Object.freeze({ id, fill, pattern, tone });
 
-/** Three materials per Canon style, in Canon order; the first is the style's plain default. */
+/** Three materials per Canon style, in Canon order; the first is the style's plain default.
+ *  #2340 (Matt, 2026-11-17): a patterned material tones ACCENT. Most bodies are filled in ink, so an ink pattern
+ *  over them is invisible (ink-tone hatch / stipple showed on 8–10 of 31 sampled bodies, accent on 25–29). */
 export const MATERIALS_BY_STYLE = Object.freeze({
   swiss: Object.freeze([
     m('swiss-solid', 'solid', 'none', 'ink'),
@@ -39,14 +41,14 @@ export const MATERIALS_BY_STYLE = Object.freeze({
     m('japanese-seal', 'solid', 'none', 'accent'),
   ]),
   grunge: Object.freeze([
-    m('grunge-stipple', 'solid', 'stipple', 'ink'),
-    m('grunge-scratch', 'outline', 'hatch', 'ink'),
+    m('grunge-stipple', 'solid', 'stipple', 'accent'),
+    m('grunge-scratch', 'outline', 'hatch', 'accent'),
     m('grunge-stamp', 'solid', 'none', 'accent'),
   ]),
   engraved: Object.freeze([
-    m('engraved-hatch', 'outline', 'hatch', 'ink'),
+    m('engraved-hatch', 'outline', 'hatch', 'accent'),
     m('engraved-line', 'outline', 'none', 'ink'),
-    m('engraved-stipple', 'outline', 'stipple', 'ink'),
+    m('engraved-stipple', 'outline', 'stipple', 'accent'),
   ]),
   techno: Object.freeze([
     m('techno-wire', 'outline', 'none', 'accent'),
@@ -56,26 +58,26 @@ export const MATERIALS_BY_STYLE = Object.freeze({
   pixel: Object.freeze([
     m('pixel-block', 'solid', 'none', 'ink'),
     m('pixel-lit', 'solid', 'none', 'accent'),
-    m('pixel-dither', 'solid', 'stipple', 'ink'),
+    m('pixel-dither', 'solid', 'stipple', 'accent'),
   ]),
   organic: Object.freeze([
     m('organic-flesh', 'solid', 'none', 'accent'),
-    m('organic-cell', 'outline', 'stipple', 'ink'),
+    m('organic-cell', 'outline', 'stipple', 'accent'),
     m('organic-membrane', 'outline', 'none', 'accent'),
   ]),
   op: Object.freeze([
-    m('op-hatch', 'solid', 'hatch', 'ink'),
-    m('op-dot', 'solid', 'stipple', 'ink'),
+    m('op-hatch', 'solid', 'hatch', 'accent'),
+    m('op-dot', 'solid', 'stipple', 'accent'),
     m('op-ring', 'outline', 'none', 'ink'),
   ]),
   memphis: Object.freeze([
     m('memphis-pop', 'solid', 'none', 'accent'),
     m('memphis-confetti', 'solid', 'stipple', 'accent'),
-    m('memphis-stripe', 'solid', 'hatch', 'ink'),
+    m('memphis-stripe', 'solid', 'hatch', 'accent'),
   ]),
   marks: Object.freeze([
     m('marks-pigment', 'solid', 'none', 'ink'),
-    m('marks-tally', 'outline', 'hatch', 'ink'),
+    m('marks-tally', 'outline', 'hatch', 'accent'),
     m('marks-hand', 'outline', 'none', 'ink'),
   ]),
 });

@@ -27,7 +27,8 @@ import { RISO_FIELD_LOOK_ID } from './risoField.mjs'; // #2008 — the picker-on
 import { creatureTileId } from './creatureTileId.js';
 import { creatureTileSvg, buildRig, sanitizeRig } from './creatureRig.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
-import { materialsForStyle, materialById } from '../data/canon/materials.js'; // #2339 — PAINT: the MATERIAL value space
+import { materialsForStyle, materialById } from '../data/canon/materials.js';
+import { applyMaterial, recordMaterial } from './creaturePaint.js'; // #2340 — PAINT: the material drawn on the body // #2339 — PAINT: the MATERIAL value space
 
 export const CREATURE_ASSEMBLY_KIND = 'kc-assembled/1';
 /** The gene families, in the record's canonical order (#1849 scope amendment). */
@@ -785,7 +786,8 @@ export function skeletonFounder(record, bank = []) {
  * import). Returns null when the body cannot be drawn (no such asset): no creature tile without a body.
  */
 export function creatureTile(record, bodyAsset, kin = null) {
-  const svg = creatureTileSvg(record, bodyAsset && bodyAsset.svg);
+  // #2340 — the body wears the record's material (pattern over the art, in a palette token: the room colours it)
+  const svg = creatureTileSvg(record, bodyAsset && applyMaterial(bodyAsset.svg, recordMaterial(record)));
   if (!svg) return null;
   return {
     id: creatureTileId(record.id),
