@@ -23,6 +23,7 @@ import { hashU01 } from './kernel/rng.js';
 import { sanitizeAttachPoints, ATTACH_BOX } from './assetAttach.js';
 import { COST_WARNING_THRESHOLD } from '../assets/ingest.js'; // #1871 — the cost line a kept warning is held to
 import { COMPOSITION_PRESETS } from '../data/presets.js';
+import { LOOKS_OFF_CREATURE_DICE } from '../data/styleLooks.js'; // #2107
 import { RISO_FIELD_LOOK_ID } from './risoField.mjs'; // #2008 — the picker-only Look stays off the dice
 import { creatureTileId } from './creatureTileId.js';
 import { creatureTileSvg, buildRig, sanitizeRig } from './creatureRig.js';
@@ -71,7 +72,9 @@ const VOICE_IDS = new Set(VOICE_DECK.map((v) => v.id));
 // Riso field Look (LOOK_IDS above stays the full catalogue: a record
 // carrying the Look because the performer picked it stays valid). The
 // catalogue appends it last, so filtering restores the pre-wiring order.
-const LOOK_ORDER = COMPOSITION_PRESETS.map((p) => p.id).filter((id) => id !== RISO_FIELD_LOOK_ID);
+const LOOK_ORDER = COMPOSITION_PRESETS.map((p) => p.id).filter(
+  (id) => id !== RISO_FIELD_LOOK_ID && !LOOKS_OFF_CREATURE_DICE.includes(id), // #2107: the dice keep their pre-#2107 deck
+);
 const VOICE_ORDER = VOICE_DECK.map((v) => v.id);
 
 /** True when a Look id names a real Look deck entry. */

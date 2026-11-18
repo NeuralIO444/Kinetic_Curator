@@ -266,7 +266,7 @@ const ids = (rs) => rs.map((r) => r.id);
     paths: [PATH_FAMILIES, '0f847ab0be755a83'],
     curves: [BALLISTICS_CURVES, 'e006154defd5974a'],
     defaults: [DEFAULT_LAYOUT_PARAMS, '1c2ddc28c7769673'],
-    looks: [COMPOSITION_PRESETS, '61c50037062a6337'], // #1838 re-pin: dusk-flock gained `trailFresh: 0.6` (1 of 70 records, that field only)
+    looks: [COMPOSITION_PRESETS, '6c07105fd66d9e64'], // #2107 re-pin: + 12 looks (techno, pixel, organic, 4 each); every earlier record unchanged · #1838: dusk-flock trailFresh
     deck: [VOICE_DECK, '556e0e2b3e55fe04'], // #2150 re-pin: glyph losses + wardrobe re-draws over the narrowed pool (17 of 72 voices, verified per-voice)
   };
   for (const [name, [value, hash]] of Object.entries(pins)) assert.equal(sha(value), hash, `${name}: byte-identical`);

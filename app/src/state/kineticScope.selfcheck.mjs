@@ -40,7 +40,7 @@ assert.equal(nextScope('fixed'), 'weak', "a legacy FIXED pill's next tap is WEAK
 assert.deepEqual(deckReadout('off'), { assets: 49, looks: 33, voices: 19 }, "OFF: today's smallest decks");
 assert.deepEqual(deckReadout('weak').looks, 33);
 assert.ok(deckReadout('weak').assets > 250, 'WEAK: the whole library');
-assert.deepEqual(deckReadout('med'), { ...deckReadout('weak'), looks: 69, voices: 72 }); // #1854 re-pins: MED mirrors the full libraries — looks 64 → 69 (the Marks group) and voices 64 → 72 (the Marks voice family, ruled into the same slice by Matt, 2026-10-31); the counts are observed from the decks, not caps
+assert.deepEqual(deckReadout('med'), { ...deckReadout('weak'), looks: 81, voices: 72 }); // #2107 re-pin: looks 69 → 81 (techno, pixel, organic, 4 each) · #1854 re-pins: MED mirrors the full libraries — looks 64 → 69 (the Marks group) and voices 64 → 72 (the Marks voice family, ruled into the same slice by Matt, 2026-10-31); the counts are observed from the decks, not caps
 assert.deepEqual(deckReadout('koz'), deckReadout('med'));
 assert.equal(CURATED_SETS.length, 19);
 const styleIds = new Set(STYLE_LOOKS.map((l) => l.id));

@@ -82,7 +82,7 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   assert.equal(canonStyle('nope'), null);
   // a style with no Look group or voice family is still a whole record (its members are honestly empty or paired)
   const techno = canonStyle('techno');
-  assert.deepEqual(techno.looks, []);
+  assert.deepEqual(techno.looks, ['rail-yard', 'readout', 'circuit', 'scan-sweep']); // #2107: techno has its four looks
   assert.equal(techno.chapter, null);
   assert.ok(techno.voices.includes('dark-glass'), 'techno finds the flagship that pairs with it');
 }
