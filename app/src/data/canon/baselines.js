@@ -364,6 +364,40 @@ export const CANON_BASELINES = deepFreeze([
       },
     },
   },
+  {
+    // #2106 (Matt, 2026-11-17): organic's baseline. Partly measured — organic has no Looks, one voice.
+    id: 'oxman',
+    label: 'GROWN', // the persona's standing alias (curator/personaTastes.js)
+    style: 'organic', // the Canon style it anchors (identity comes from that record — declared once, #2044)
+    identity: {
+      movement: 'Material ecology — grown, not assembled',
+      period: '2010s–',
+      place: 'Cambridge, Massachusetts', // not in the persona doc (MIT Media Lab) — Matt to confirm
+      figures: ['Neri Oxman'],
+      note: 'One structure grown in a void: fibres gather to a scaffold, colour comes from the material, endings exist.',
+    },
+    basis:
+      'Partly measured: organic has no Looks, so the motion, density, scale, alpha, jitter and rotation are taken ' +
+      'from its one voice, EDEN GARDEN (data/voiceDeck.js), which already runs on her palette. The marks pairing, ' +
+      'displacement and the choice of grid-free eden layout are authored from her render profile ' +
+      '(curator/renderProfiles.js): matte, bilateral-leaning, displacement low, no bleed.',
+    settings: {
+      marks: { categories: ['organic', 'biosynthetic'], styles: ['organic'] },
+      palette: { id: 'persona-oxman', shift: 'zone', blend: 'normal' },
+      motion: { behave: 'mold', lifeDrift: 0.15, noiseSpeed: 0.2, wind: 0.5, flap: 0.2, breath: 0.5 },
+      density: { count: 200, density: 72, scale: [0.3, 1.3], alpha: [55, 100], zTiers: 3 },
+      rules: {
+        mode: 'eden',
+        mirror: 'off',
+        overlap: true,
+        bleed: false,
+        jitter: 12,
+        displacement: 10,
+        rotate: [-90, 90],
+        extra: {},
+      },
+    },
+  },
 ]);
 
 /** The baseline ids, in declaration order. */
