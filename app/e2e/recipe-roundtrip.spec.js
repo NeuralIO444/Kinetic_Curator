@@ -124,8 +124,11 @@ test.describe('readable recipes (#307)', () => {
     expect(seedHex).not.toBe(factorySeed);
 
     await page.getByRole('button', { name: /copy link/i }).click();
+    // Copy is async (deflate), so poll the clipboard rather than reading it once.
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 10_000 })
+      .toMatch(/#r=kc-r\/3\.[A-Za-z0-9_-]+$/);
     const link = await page.evaluate(() => navigator.clipboard.readText());
-    expect(link).toMatch(/#r=kc-r\/3\.[A-Za-z0-9_-]+$/);
 
     const fresh = await context.newPage();
     await fresh.addInitScript(() => {
