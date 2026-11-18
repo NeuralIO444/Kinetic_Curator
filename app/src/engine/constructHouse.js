@@ -63,14 +63,16 @@ export function houseConstructs(findAsset, assetAttach = null) {
 export function houseConstructSet(findAsset, assetAttach = null) {
   const tiles = [];
   const records = [];
+  const byTile = new Map(); // pool tile id → the record it was baked from
   for (const rec of houseConstructs(findAsset, assetAttach)) {
     const tile = constructTile(rec, (id) => findAsset(id)?.svg);
     if (tile) {
       tiles.push(tile);
       records.push(rec);
+      byTile.set(tile.id, rec);
     }
   }
-  return { tiles, records };
+  return { tiles, records, byTile };
 }
 
 /** The house set's pool tiles: records whose every piece the pool can draw. Others are left out. */
