@@ -55,7 +55,9 @@ export function RangeRow({
     if (locked || disabled) return;
     // A caller whose reset is its own undo step (not a coalesced drag tick) supplies onReset.
     if (onReset) onReset();
-    else if (defaultValue !== undefined) onChange(defaultValue);
+    // #2092: the second argument tells the caller this was the double-tap reset, not a drag — the Trio
+    // reads it as the artist handing the dial back to Davis. Callers that ignore it are unchanged.
+    else if (defaultValue !== undefined) onChange(defaultValue, { reset: true });
   };
 
   const startEdit = () => {

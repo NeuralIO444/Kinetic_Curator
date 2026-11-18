@@ -421,10 +421,18 @@ export function startTrio({
   const owns = (key) => {
     for (const [target, keys] of Object.entries(DIAL_FOR_TARGET)) if (keys.includes(key)) conductor.touch(target, bar);
   };
+  // #2092 PR 3 (Matt, 2026-11-17): the double-tap reset IS the hand-back. A reset releases the dial's targets at once
+  // instead of owning them. A locked marks dial stays owned while locked: the lock is read from getMarks, not from here.
+  const handsBack = (key) => {
+    for (const [target, keys] of Object.entries(DIAL_FOR_TARGET)) if (keys.includes(key)) conductor.release(target);
+  };
   stops.push(
     on(Events.LAYOUT_PARAM, (p) => {
       if (!p || typeof p.key !== 'string') return;
-      owns(p.key);
+      if (p.reset === true) {
+        handsBack(p.key);
+        publish();
+      } else owns(p.key);
       // stage 2: the artist moving a marks dial Davis set undoes his move — it is theirs now, and it counts as a revert
       const k = SPECTRUM_KEY_OF[p.key];
       if (k && mineMarks.has(k)) {

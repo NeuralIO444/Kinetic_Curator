@@ -2,6 +2,7 @@ import { emit, Events } from '../../composition/eventBus.js';
 import { RangeRow } from '../../components/RangeRow.jsx';
 import { MotionTile } from '../../components/MotionTile.jsx';
 import { BALLISTICS_CURVES } from '../../gl/audioBallistics.mjs';
+import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 
 // #306: envelope ballistics deepen the existing REACTIVITY controls —
 // attack/decay time constants, a response-curve selector, and the SWELL
@@ -119,7 +120,10 @@ export function ReactivityControls({
         min={0}
         max={2}
         step={0.05}
-        onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: v })}
+        defaultValue={DEFAULT_LAYOUT_PARAMS.audioScaleMod}
+        onChange={(v, how) =>
+          emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: v, ...(how?.reset ? { reset: true } : {}) })
+        }
         hint="Bands → node size. Phrase CLOCK is a separate counter."
         disabled={!audioEnabled}
         disabledReason={disabledReason}
@@ -130,7 +134,10 @@ export function ReactivityControls({
         min={0}
         max={2}
         step={0.05}
-        onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'audioAlphaMod', value: v })}
+        defaultValue={DEFAULT_LAYOUT_PARAMS.audioAlphaMod}
+        onChange={(v, how) =>
+          emit(Events.LAYOUT_PARAM, { key: 'audioAlphaMod', value: v, ...(how?.reset ? { reset: true } : {}) })
+        }
         hint="Bands → opacity pulse."
         disabled={!audioEnabled}
         disabledReason={disabledReason}
@@ -190,7 +197,10 @@ export function ReactivityControls({
         min={0}
         max={1}
         step={0.05}
-        onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'audioSwell', value: v })}
+        defaultValue={DEFAULT_LAYOUT_PARAMS.audioSwell}
+        onChange={(v, how) =>
+          emit(Events.LAYOUT_PARAM, { key: 'audioSwell', value: v, ...(how?.reset ? { reset: true } : {}) })
+        }
         hint="How hard the music swells GLOW. 0 = the music never moves the glow — the washout control for loud passages at high glow."
         disabled={!audioEnabled}
         disabledReason={disabledReason}

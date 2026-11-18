@@ -11,7 +11,8 @@ import { stopsFor } from '../build/te/modeStops.mjs';
 import { SliderEditor } from '../build/te/editors.jsx';
 
 export function AppearanceSliders({ layoutParams, lockedParams }) {
-  const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
+  // #2092: `how.reset` (the double-tap reset) rides along so the Trio can read it as the hand-back.
+  const set = (key, value, how) => emit(Events.LAYOUT_PARAM, { key, value, ...(how?.reset ? { reset: true } : {}) });
   const lock = (key) => emit(Events.LAYOUT_LOCK, { key });
   const mode = layoutParams.mode;
   const growthGated = mode !== 'dla' && mode !== 'eden';
@@ -69,7 +70,7 @@ export function AppearanceSliders({ layoutParams, lockedParams }) {
             step={0.05}
             format={(v) => `${Math.round(v * 100)}%`}
             defaultValue={DEFAULT_LAYOUT_PARAMS.squash}
-            onChange={(v) => set('squash', v)}
+            onChange={(v, how) => set('squash', v, how)}
           />,
           { hint: 'Moving marks thin across their motion as they stretch — 1 keeps their mass, 0 is stretch only' },
         )}

@@ -24,7 +24,8 @@ import { SliderEditor } from '../build/te/editors.jsx';
 const fmt2 = (v) => (Math.round(v * 100) / 100).toString();
 
 export function HypeSliders({ layoutParams, lockedParams }) {
-  const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
+  // #2092: `how.reset` (the double-tap reset) rides along so the Trio can read it as the hand-back.
+  const set = (key, value, how) => emit(Events.LAYOUT_PARAM, { key, value, ...(how?.reset ? { reset: true } : {}) });
   const lock = (key) => emit(Events.LAYOUT_LOCK, { key });
   const mode = layoutParams.mode;
   const isSwarm = mode === 'swarm' || mode === 'murmuration';
@@ -143,7 +144,7 @@ export function HypeSliders({ layoutParams, lockedParams }) {
             step={0.05}
             format={fmt2}
             defaultValue={DEFAULT_LAYOUT_PARAMS.breath}
-            onChange={(v) => set('breath', v)}
+            onChange={(v, how) => set('breath', v, how)}
           />,
           { disabled: !(isSwarm || isHype), disabledReason: 'Swarm or hype mode only' },
         )}

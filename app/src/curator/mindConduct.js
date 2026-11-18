@@ -497,6 +497,7 @@ export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel 
  * The conductor's ledger. Pure state, no clock: every call is told the bar.
  *   touch(targets, bar)     the artist acted on these targets at `bar`: they are owned until OWN_BARS bars after the
  *                            last touch (a call with no integer bar stamps nothing: that ownership never lapses)
+ *   release(targets)         the artist handed these back (double-tap reset, #2092): owned no longer, at once
  *   owned(bar) / isOwned(t, bar)  who is owned AT `bar` (no integer bar: every stamped or unstamped target)
  *   consider(op, {bar,tier}) -> { ok: true, landBar } | { ok: false, reason: 'tier'|'owned'|'cooldown'|'malformed' }
  *                            (a second edit in a phrase is not dropped: it lands on the next boundary)
@@ -527,6 +528,13 @@ export function createConductor() {
     touch(targets, bar) {
       const at = Number.isInteger(bar) ? bar : null;
       for (const t of Array.isArray(targets) ? targets : [targets]) if (isOwnable(t)) owned.set(t, at);
+    },
+    /**
+     * #2092 PR 3 (Matt, 2026-11-17): the artist handed these targets back (the double-tap reset). Ownership ends at
+     * once, whatever the stamp. A locked marks dial is owned by its lock, which trioLive reads separately, not here.
+     */
+    release(targets) {
+      for (const t of Array.isArray(targets) ? targets : [targets]) owned.delete(t);
     },
     owned: (bar) => [...owned.keys()].filter((t) => live(t, bar)).sort(),
     isOwned: (t, bar) => live(t, bar),

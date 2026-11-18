@@ -58,7 +58,10 @@ export function SpectrumMarks({ layoutParams }) {
             step={0.05}
             readout={`${Math.round(v * 100)}%`}
             hint={a.hint}
-            onChange={(x) => emit(Events.LAYOUT_PARAM, { key: a.key, value: x })}
+            defaultValue={0}
+            onChange={(x, how) =>
+              emit(Events.LAYOUT_PARAM, { key: a.key, value: x, ...(how?.reset ? { reset: true } : {}) })
+            }
           />
         );
       })}
