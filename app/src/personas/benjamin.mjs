@@ -1,0 +1,31 @@
+// personas/benjamin.mjs — the `kc-persona/1` record for the Karl Benjamin voice persona (spec: docs/design/persona-kernel-spec.md §2).
+// Pure data; the registry (registry.mjs) validates and freezes it. The taste vector below is the one
+// curator/personaTastes.js used to carry inline — it lives here now and that file reads it back unchanged.
+
+export const record = {
+  schema: 'kc-persona/1',
+  id: 'benjamin',
+  kind: 'voice',
+  identity: {
+    name: "Karl Benjamin",
+    born: null,
+    died: null,
+    provenance:
+      'Distilled in curator/personaTastes.js from the persona source file (the persona files live outside the repo: ~/workspace/your_files/personas/karl-benjamin.md). Dates are not stated in the repo.',
+    callsign: "HARD EDGE",
+  },
+  taste: {
+    rationale:
+      "Tight ordered structure as the setting for invention; flat, calm, full fields; no gestural chaos.",
+    weights: {
+      "disorder": -0.8,
+      "calm": 0.4,
+      "coverage": 0.4,
+      "markDensity": 0.3,
+      "opacityVariety": -0.5,
+      "drift": -0.5,
+      "breathSwell": -0.2
+    },
+    canonStyle: null,
+  },
+};
