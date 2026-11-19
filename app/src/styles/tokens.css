@@ -14,6 +14,11 @@
   /* #1126 — Davis's colour: the probabilistic family (taste, presence, the generator). KC-1 DS rules 5 and 6. */
   --kc-davis: #ffcd82;
   --kc-davis-rgb: 255, 205, 130; /* the same colour as r,g,b for the canvas */
+  /* #2388 (P8) — the horns' label colours in THE ROOM: BLAST, HYBRID, SWISS GRIT. Each a hue of its own, none LOIS's
+     red, Davis's amber, live pink or the focus cyan (colorTribes + hornStrip selfcheck keep them apart). */
+  --kc-blast: #d946ff; /* BLAST — ultraviolet: the hot, torn letter */
+  --kc-hybrid: #5b8cff; /* HYBRID — screen blue: the digital spectrum */
+  --kc-grit: #b8e04a; /* SWISS GRIT — registration lime: the machine on the grid */
   --panel: #111114;
   --panel-2: #16161b;
   --line: rgba(255, 255, 255, 0.08);
