@@ -96,7 +96,8 @@ ok('bad lois still refuses with a valid queen section', () => {
   f.lois = { labels: {}, head: null };
   const r = validateTaste(f);
   assert.equal(r.ok, false, 'everything still stands on lois');
-  assert.match(r.error, /lois/);
+  // 'boldness head' is tasteHead's rendered error label — re-pointed by the callsign sweep (#2383); was /lois/ before it.
+  assert.match(r.error, /boldness head/);
 });
 
 // ─── gate tripwire ───

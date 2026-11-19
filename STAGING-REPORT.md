@@ -217,22 +217,25 @@ class with a scoped guard extension, and re-greps the whole tree exhaustively.
    banned form in any class. Suite is now 20 checks.
 4. **The exhaustive closing pass.** Every string literal in `app/src` was extracted from
    comment-stripped source (plus a JSON walk) and tested for the seven surnames in every case
-   form: **1,369 hits** — 942 in `*.selfcheck.mjs` (test fixtures quoting/pinning strings;
-   not surfaces) and **427 in production files**, classified:
-   - **281 id-shaped literals** — persona ids (`'lois'`, `'davis'`, `'carson'`…), CSS class
+   form. (Census note, corrected at QA re-verification: an earlier draft of this section
+   quoted hit totals from the extraction pass that QA could not reproduce with independent
+   counts — the totals are removed; the classification below is what QA verified, bucket by
+   bucket, and its rendered outcome — the 9 fixed + 7 exceptions — reconciles exactly.)
+   Production-file hits classified:
+   - **Id-shaped literals** — persona ids (`'lois'`, `'davis'`, `'carson'`…), CSS class
      fragments, event/key strings (`'lois.vision'`, `'narration.davisReason'`). Data (A2).
-   - **146 prose literals**: 63 CSS class-name strings (not text) · 19 persona-record lineage
+   - **Prose literals**: CSS class-name strings (not text) · persona-record lineage
      slots + record prose (records are lineage; their surface projections are pinned in
-     C1/C2/C4) · 13 internal keys/seed strings (creatureRig, davisShift) · 10 headless
+     C1/C2/C4) · internal keys/seed strings (creatureRig, davisShift) · headless
      tooling report lines (miner/prospecting/coverageReport — script output, no app surface
      consumes the text; CensusPanel renders censusReadout's reshaped data, which carries no
-     names) · 9 model prompts (never rendered — the standing exclusion) · 4 eventRegistry
+     names) · model prompts (never rendered — the standing exclusion) · eventRegistry
      note strings (round 1's documented exclusion — code-side documentation, no rendering
-     consumer) · 3 renderProfiles config records (name/rationale/gaps — no render consumer;
-     CuratorBar passes the profile as data) · 3 Canon-record lineage prose (figures/basis;
-     display fields pinned in C5) · 3 megamindRecap literals (two model prompts + one
+     consumer) · renderProfiles config records (name/rationale/gaps — no render consumer;
+     CuratorBar passes the profile as data) · Canon-record lineage prose (figures/basis;
+     display fields pinned in C5) · megamindRecap literals (two model prompts + one
      already-callsign rendered line; its fact-matching `forms` values are single-token data,
-     counted in the id-shaped 281, and its rendered phrases are pinned in C4) ·
+     and its rendered phrases are pinned in C4) ·
      1 palettes `era:` field (dropped, no consumer) · 1 GLSL shader source · 1 bundle
      LEFT_OUT storage-key documentation string (bundle metadata, never displayed) ·
      **9 rendered — the 9 strings fixed in items 1–2 above** · **7 rendered exceptions, NOT
@@ -248,6 +251,50 @@ doctrines 10/10, personaKernel 10/10, personaTuning 11/11, pipelineNotices PASS,
 5/5, directorRoom 7/7, directorTable 6/6, directorsMatrix 6/6; `npm run lint` 0 errors (11
 pre-existing warnings); `npm run format:check` clean; `npm run build` green. The two open
 questions below are still untouched, as instructed.
+
+### CI fix round 4 (the pins CI caught — one selfcheck, two e2e specs)
+
+CI on bfd82b69 (run 44490097705) failed all three test jobs; every failure was a stale pin on
+a string the sweep deliberately renamed — the app strings are correct as swept, the pins moved:
+
+1. **`queenChannel.selfcheck.mjs` (killed both selfcheck jobs).** Round 3 renamed tasteHead's
+   import-validation error prefix to `boldness head: …` (rendered copy, via DataExportRow's
+   `Taste: {error}` line); the suite still pinned the refusal with `assert.match(r.error,
+   /lois/)`, and CI's actual text is `'boldness head: has no head — train with --features'`.
+   Re-pinned to `/boldness head/` with a comment naming it as tasteHead's rendered error label
+   so the next sweep finds the pin. The check's intent is unchanged (a bad lois *section* —
+   the data key — still refuses); the lois-section assertions around it are untouched.
+2. **`e2e/raygun-wear.spec.js` (desktop + phone).** Chip text `'ray gun · carson'` →
+   `'ray gun · blast'` and `'ray gun · grit'` → `'ray gun · swiss grit'` (PoemRow's
+   MODE_CALLSIGNS; the record modes stay `carson`/`grit` data). CI evidence: expected
+   "ray gun · carson", received "ray gun · blast".
+3. **`e2e/treatment-bus.spec.js`.** The cycle loop used each record mode for both the record
+   poll (data — unchanged) and the chip text; it now iterates `[mode, label]` pairs —
+   carson→blast, greiman→hybrid, grit→swiss grit, shot→shot — polling the mode id and
+   asserting the callsign label.
+4. **`e2e/voice-personas.spec.js` — NOT a pin; no change.** Its stub-tile MIX test failed its
+   first attempt at `mixBar.toBeHidden()` (the crossfade didn't commit inside 15 s) and
+   **passed on retry in the same CI run** — Playwright's own summary files it as flaky, not
+   failed. No swept string is involved: the test asserts `/grid/i` (a mode name) and MixBar
+   renders only the mix target name; the stall is the known Mac-runner sampler-starvation
+   signature. Left exactly as it was.
+5. **Full e2e grep:** every `carson|greiman|ashworth|lois|davis` hit in `e2e/` was chased —
+   the remaining hits are `.panel-davis`/`.davis-*`/`.codec-lois` CSS selectors and generic
+   text ('EVOLVE idle', 'MIDI off', the director section labels), not rendered persona names.
+   Left alone, deliberately.
+
+**Evidence (round 4):** full manifest sweep on the fixed tree — **759 pass / 3 fail of 762
+suites** (the round-1 sweep-load flakes — accumInput, vortex, wetWarmup, livingMotion — all
+pass in-sweep this time). The 3 failures were A/B-run standalone in a fresh detached worktree
+at origin/main (db701fe8): swarmWasm, rollSafety and accum **fail identically on unmodified
+main** with matching signatures (swarmWasm: the sandbox `build-wasm.sh --verify` toolchain
+failure; rollSafety: crash to the Node banner; accum: V8 abort after the same [ok] prefix,
+identical frame `0x19f0c41` on both trees) — sandbox-environmental, not sweep-caused; neither
+tree reaches a verdict line for these three, and CI's own selfcheck jobs are the authority.
+`queenChannel.selfcheck` 13/13 after the re-pin; `npm run lint` 0 errors (11 pre-existing
+warnings); `npm run format:check` clean; `npm run build` green. The e2e re-pins are from CI
+log evidence + the specs' own text — CI is the authority for them (sandbox e2e metrics differ
+from the Mac runner). The two open questions below are still untouched.
 
 ## Open questions stopped on
 
