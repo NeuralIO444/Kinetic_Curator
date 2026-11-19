@@ -7,8 +7,10 @@ you build.
 ## Roles
 
 - **Matt** = creative director + architect. Decides what gets built and in
-  what order, makes taste calls, reviews visuals, merges. **Only Matt merges.**
-- **Agents** = production. You build to spec. You never merge, even on green.
+  what order, makes taste calls, reviews visuals, merges. **Matt merges by default**; he can grant
+  merge-if-clean to a lane (see "Merge-if-clean").
+- **Agents** = production. You build to spec. You never merge, even on green, unless Matt has granted
+  merge-if-clean to that lane (see "Merge-if-clean").
 
 ## Lanes
 
@@ -29,7 +31,7 @@ you build.
 ## How you build
 
 - Separate worktree, clean PR, never push to main.
-- One fix per PR. One PR = one commit on main (squash-merge, done by Matt).
+- One fix per PR. One PR = one commit on main (squash-merge, done by Matt, or by the agent in a merge-if-clean lane).
 - Never merge on red. Verify CI yourself with `gh pr checks` after every
   push — never report "green" from memory or someone else's word.
 - Resolve your own conflicts; re-verify CI after.
@@ -53,6 +55,35 @@ No file-level diffs in the report. No jargon without a plain translation.
   serves, and put the localhost URL in the PR body.
 - The "Review this" checklist is the reminder — it tells Matt exactly what
   to review so he never has to guess.
+
+## Merge-if-clean
+
+Matt can grant merge-if-clean to a lane, in writing, on the lane's epic or
+issue (and say so in chat). Without that grant, only Matt merges. The grant
+covers that lane only and lasts until he revokes it.
+
+Granted lanes (record each grant here when it is made):
+
+- **Persona Kernel (epic #2379), 2026-11-19.** Matt: "Persona lane: merge if
+  clean." Visual PRs in the lane are included.
+
+"Clean" means all of these, checked by the agent itself, never taken from a
+builder's word:
+
+1. An independent QA agent reviewed the PR against the issue and spec, and its
+   verdict is CLEAN (no BLOCKING findings; NITs listed in the PR body).
+2. Every CI check run is success on the current head sha
+   (`gh api .../commits/<sha>/check-runs`), and failures were never waved
+   off without an A/B against current `origin/main`.
+3. The PR is mergeable (no conflict) and has a literal `Closes #N` for its own
+   issue only.
+4. The A/B probe shows default behaviour byte-identical to `origin/main`,
+   unless the issue says otherwise.
+5. Nothing in the PR touches an open call of Matt's (unsigned lines stay
+   unsigned, unruled tuning numbers stay null, no lore or matrix rulings).
+
+Squash-merge only. If any item fails, do not merge: fix and re-run the loop,
+or stop and report. Matt can still ask for a hold on any PR.
 
 ## Standing orders
 
