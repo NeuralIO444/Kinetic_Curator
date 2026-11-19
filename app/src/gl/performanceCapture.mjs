@@ -118,7 +118,8 @@ export function startPerformance(opts = {}) {
   sections = {};
   for (const name of Object.keys(makers || {})) {
     try {
-      sections[name] = makers[name](() => r.frames);
+      const made = makers[name](() => r.frames);
+      if (made) sections[name] = made; // a maker may decline (null): the section is then absent, the file unchanged (#2387)
     } catch {
       /* a section that cannot start is simply absent */
     }

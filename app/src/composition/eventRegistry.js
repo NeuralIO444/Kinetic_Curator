@@ -144,6 +144,10 @@ export const EVENT_REGISTRY = {
     handler: ['curator/megamindSurfacesLive.js'],
     note: "every answer with its backend and latency (#1463); the thinker decides whether it is used — the one handler tallies answers for the dev panel's telemetry narration (#1526), backstage only",
   },
+  BAND_TURN: {
+    handler: null,
+    note: "telemetry: one turn of the band (#2387, P7) — a solo, a trade (call, answers, verdict), the bandleader's cut, the artist's yield, the count-in or the ending; published by personas/bandLive.js only while the band is on, recorded in the take (personas/bandRecord.mjs), re-published by playback. Nothing changes the stage on it yet",
+  },
   GAIT_ASSIGN: {
     handler: null,
     note: "telemetry: a wearer's gait changed (#2329, gait M3) — the QUEEN's per-phrase pick or the user's pick/lock, published by the store's assignGait; playback re-publishes the take's rows (curator/gaitRecord.mjs). The stage reads the recorded input stamp, never this event",
