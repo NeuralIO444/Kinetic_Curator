@@ -77,7 +77,9 @@ import { startLean } from './curator/leanLive.js'; // #1640: the dial lean, appl
 import { startGaitPick } from './curator/gaitLive.js'; // #2329: each construct's gait is picked once a phrase
 import { replayGaitFrame, endGaitReplay } from './curator/gaitRecord.mjs'; // #2329: a take re-publishes its gait picks
 import { ASSETS_CONSTRUCTS } from './data/assets/index.js'; // #2329: the house constructs (the gait wearers) and their styles
-import { startTrio } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
+import { startTrio, getTrioView } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
+import { startBand } from './personas/bandLive.js'; // #2387: the band plays on the phrase clock (opt-in, off by default)
+import { replayBandFrame, endBandReplay } from './personas/bandRecord.mjs'; // #2387: a take re-publishes the band's turns
 import { createShowSpectrum } from './curator/showSpectrum.js'; // #1483 stage 2: the spectrum the personas are told
 import { SPECTRUM_PARAMS } from './curator/mindConduct.js'; // #1483 stage 2: the marks dials Davis may re-tune
 import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
@@ -195,6 +197,27 @@ function AppInner() {
       styleOf: (id) => constructStyle.get(id) ?? null,
       getAssignments: () => useStore.getState().gaitAssignments,
       assign: (e) => useStore.getState().assignGait(e),
+      isReplaying: isPlaybackActive,
+    });
+    // #2387 — P7 the band: opt-in (window.__KC_BAND), off by default. Plays on this same phrase clock; the artist's hand
+    // wins: a keep since the last phrase silences it, the Trio's owned targets (the 32-bar ownership) lock DAVIS out,
+    // a palette lock keeps GREIMAN (HYBRID) out. With the band's tuning unruled (null) it plays nothing.
+    let keptThisPhrase = false;
+    const offBandKeep = loisActivity.onKeep(() => {
+      keptThisPhrase = true;
+    });
+    const stopBand = startBand({
+      getSeed: () => useStore.getState().seed,
+      getPressure: () => getStressState().smoothed,
+      getHold: () => {
+        const keep = keptThisPhrase;
+        keptThisPhrase = false;
+        const lock = [];
+        const view = getTrioView();
+        if (view && Array.isArray(view.owned) && view.owned.length) lock.push('davis');
+        if (Object.values(useStore.getState().paletteLocks || {}).some(Boolean)) lock.push('greiman');
+        return { keep, lock };
+      },
       isReplaying: isPlaybackActive,
     });
     const roomCodes = () => {
@@ -375,11 +398,13 @@ function AppInner() {
       replayMindFrame(frame, perf && perf.mind, o);
       replaySpectrumFrame(frame, perf && perf.spectrum, o);
       replayGaitFrame(frame, perf && perf.gaits, o);
+      replayBandFrame(frame, perf && perf.band, o);
     });
     const offPlayback = subscribePlayback(() => {
       endMindReplay();
       endSpectrumReplay();
       endGaitReplay();
+      endBandReplay();
       resetMindFaces();
       resetRoomFeed();
       resetGhost();
@@ -414,6 +439,8 @@ function AppInner() {
       stopBreak();
       stopLean();
       stopGaitPick();
+      stopBand();
+      offBandKeep();
       stopMind();
       canonBus.stop();
       stopReviewVoice();

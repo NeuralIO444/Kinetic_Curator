@@ -30,6 +30,8 @@ import { createRouteRecorder } from '../gl/routeRecord.mjs';
 import { createGestureRecorder } from '../gl/gestureRecord.mjs';
 import { createBirthRecorder, setBirthTap, birthRecordsFromSection } from '../curator/birthRecord.mjs';
 import { createGaitRecorder, setGaitTap } from '../curator/gaitRecord.mjs'; // #2329: the take logs every GAIT_ASSIGN
+import { createBandRecorder, setBandTap } from '../personas/bandRecord.mjs'; // #2387: the take logs every band turn
+import { bandOn } from '../personas/bandLive.js';
 import { createTreatmentRecorder } from '../curator/treatmentRecord.mjs'; // #2010: the take logs its treatment acts
 import { on, Events } from '../composition/eventBus.js';
 import { useApp } from '../state/AppContext.jsx';
@@ -215,6 +217,22 @@ const gaitsSection = (getFrame) => {
   };
 };
 
+// #2387 — the take carries the band's conversation (who played, who answered, the verdict), stored as `band`: playback
+// re-publishes the turns and never asks the band again. The factory DECLINES to start (returns null) while the band is
+// off, so a take made with the band off has no section and is byte-identical to before; one on which no turn was played
+// leaves the section absent too.
+const bandSection = (getFrame) => {
+  if (!bandOn()) return null;
+  const rec = createBandRecorder({ getFrame, seed: useStore.getState().seed });
+  setBandTap((t) => rec.update(t));
+  return {
+    stop() {
+      setBandTap(null);
+      return rec.finish();
+    },
+  };
+};
+
 // #1938 — saving a take is platform-specific (the desktop webview swallows the browser's <a download>): platform/saveTake.mjs
 export function PerformanceButton() {
   const { glLoopRef } = useApp();
@@ -290,6 +308,7 @@ export function PerformanceButton() {
             births: birthsSection,
             treatments: treatmentsSection,
             gaits: gaitsSection,
+            band: bandSection,
           },
         })
       ) {

@@ -225,6 +225,10 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // #2330 — a gait break-up's drift heading per piece (engine/gaitBreakup.js): a motion decision, so the noise stream
   // too; re-rolling colour or placement never changes how a construct scatters.
   'gait-scatter': 'noise',
+  // #2387 — the band's draws (personas/band.mjs): who solos, whether a call is traded, each answerer's verdict. A
+  // decision about motion, not placement or colour, so it rides the noise stream like the gait. band.mjs passes no
+  // offsets, so the group offset is the identity for its draws; the registration keeps the name accounted for (#1238).
+  band: 'noise',
 });
 
 const OFFSET_GROUP_OF = new Map([
