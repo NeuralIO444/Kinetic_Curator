@@ -1,7 +1,7 @@
 # STAGING REPORT — #2384 Persona Kernel P4: Persona Archive (text shelves + MegaMind retrieval + Mind context)
 
 Branch `kc-2384-persona-archive`, based on origin/main `33bf4474` (P3 merged). One PR, not merged by
-the builder (it wires a new path into Mind's model asks → Matt's review lane): **PR #TBD**
+the builder (it wires a new path into Mind's model asks → Matt's review lane): **PR #2418 — https://github.com/NeuralIO444/Kinetic_Curator/pull/2418**
 
 Spec: `docs/design/persona-kernel-spec.md` §3 (the Archive, Q7: text only) + §4b (the dossier).
 Issue acceptance: a persona ask includes cited Archive snippets; rules fallback unchanged when no
