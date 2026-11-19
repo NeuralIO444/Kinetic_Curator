@@ -4,7 +4,7 @@
 // Chris Ashworth, Tina Turner, David Bowie) are LINEAGE: they live in code identifiers, comments, the
 // persona records' identity slots and the design docs, and they stay there. This suite guards the line
 // between the two: it scans the surface sources (every .jsx, the components/panels/hooks/data trees,
-// the app shell, and a named list of copy-bearing curator modules) with comments stripped, and fails
+// the app shell, and a named list of copy-bearing modules) with comments stripped, and fails
 // on a banned name in display form — a full name in any case, or a bare surname (plus "George", the
 // attested form of address) in Title or UPPER case as a whole word. Lowercase ids, class names and
 // camelCase identifiers never match: they are code, not copy.
@@ -28,6 +28,10 @@
 //     runtime in check C5 instead. Plus one LINEAGE FIELD inside an otherwise-scanned data module:
 //     `era:` in data/palettes.js (no UI consumer reads it) — dropped line-wise; check A4 proves a
 //     name in any other field of a data file still bites.
+//   · the rest of composition/ — only capabilityRegistry.mjs is named into the scan, because its
+//     consumer notes render (MegaMindPanel's capability table). The other composition modules'
+//     note strings (e.g. eventRegistry's) are code-side documentation with no rendering consumer,
+//     so a directory-wide scan would guard text no surface ever shows.
 //   · ONE allowlisted string: the DIRECTORS matrix's room-3 spoken line for davis —
 //     "He found his one in my compost pile. You're welcome, George." — Matt-signed authored dialogue
 //     (docs/research/directors-copy-matrix-2026-10-07.md). The sweep does not rewrite signed copy; the
@@ -68,13 +72,152 @@ export function bannedIn(text) {
   return BANNED.filter(({ re }) => re.test(text)).map(({ label }) => label);
 }
 
-/** Strip // and block comments — the house pattern (queenDeniability): copy is what remains. */
-const code = (src) =>
-  src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
-    .map((l) => l.replace(/(^|[^:])\/\/.*$/, '$1'))
-    .join('\n');
+/** Strip // and block comments, string-aware: a comment marker inside a string or template
+ *  literal is copy, not a comment, so it survives the strip and the scan sees what follows it
+ *  ("verdict // Davis approves" must bite — check A5). Strings are kept verbatim: they are the
+ *  surface copy being guarded. Comments are dropped: lineage lives there. A quote or slash
+ *  opens a string/regex only in expression position (after an operator, opener, separator or
+ *  keyword) — an apostrophe in JSX text, a division slash, a self-closing tag's slash and a
+ *  closing tag's slash all follow a value and stay plain code. A backtick always opens a
+ *  template (it has no other use in code). Template ${ } interpolations nest back into code. */
+const code = (src) => {
+  let out = '';
+  let i = 0;
+  const n = src.length;
+  let mode = 'code'; // code | sq | dq | tpl | line | block | regex
+  let inClass = false; // inside a regex [...] class
+  const interp = []; // brace depth at each template ${ entry
+  let braces = 0;
+  const exprPosition = () => {
+    const tail = out.replace(/\s+$/, '');
+    if (!tail) return true;
+    if (tail.endsWith('++') || tail.endsWith('--')) return false; // postfix — a value precedes
+    if (tail.endsWith('=>')) return true;
+    const last = tail[tail.length - 1];
+    if ('(,=:[!&|?{;+-*%~^'.includes(last)) return true;
+    const word = tail.match(/[A-Za-z_$][\w$]*$/);
+    return !!word && /^(return|typeof|case|in|of|new|delete|void|instanceof|do|else|yield|await)$/.test(word[0]);
+  };
+  while (i < n) {
+    const c = src[i];
+    const d = i + 1 < n ? src[i + 1] : '';
+    if (mode === 'code') {
+      if (c === '/' && d === '/') {
+        mode = 'line';
+        i += 2;
+        continue;
+      }
+      if (c === '/' && d === '*') {
+        mode = 'block';
+        i += 2;
+        continue;
+      }
+      if (c === "'" && exprPosition()) {
+        mode = 'sq';
+        out += c;
+        i += 1;
+        continue;
+      }
+      if (c === '"' && exprPosition()) {
+        mode = 'dq';
+        out += c;
+        i += 1;
+        continue;
+      }
+      if (c === '`') {
+        mode = 'tpl';
+        out += c;
+        i += 1;
+        continue;
+      }
+      if (c === '/' && src[i - 1] !== '<' && exprPosition()) {
+        mode = 'regex';
+        inClass = false;
+        out += c;
+        i += 1;
+        continue;
+      }
+      if (c === '{') braces += 1;
+      if (c === '}') {
+        if (interp.length && braces === interp[interp.length - 1]) {
+          interp.pop();
+          mode = 'tpl';
+          out += c;
+          i += 1;
+          continue;
+        }
+        braces -= 1;
+      }
+      out += c;
+      i += 1;
+      continue;
+    }
+    if (mode === 'line') {
+      if (c === '\n') {
+        mode = 'code';
+        out += c;
+      }
+      i += 1;
+      continue;
+    }
+    if (mode === 'block') {
+      if (c === '*' && d === '/') {
+        mode = 'code';
+        i += 2;
+        continue;
+      }
+      if (c === '\n') out += c;
+      i += 1;
+      continue;
+    }
+    if (mode === 'sq' || mode === 'dq') {
+      const q = mode === 'sq' ? "'" : '"';
+      out += c;
+      if (c === '\\' && i + 1 < n) {
+        out += src[i + 1];
+        i += 2;
+        continue;
+      }
+      if (c === q) mode = 'code';
+      i += 1;
+      continue;
+    }
+    if (mode === 'tpl') {
+      out += c;
+      if (c === '\\' && i + 1 < n) {
+        out += src[i + 1];
+        i += 2;
+        continue;
+      }
+      if (c === '`') {
+        mode = 'code';
+        i += 1;
+        continue;
+      }
+      if (c === '$' && d === '{') {
+        out += d;
+        interp.push(braces);
+        mode = 'code';
+        i += 2;
+        continue;
+      }
+      i += 1;
+      continue;
+    }
+    // regex literal: copy verbatim until the closing slash outside a [...] class
+    out += c;
+    if (c === '\\' && i + 1 < n) {
+      out += src[i + 1];
+      i += 2;
+      continue;
+    }
+    if (c === '[') inClass = true;
+    else if (c === ']') inClass = false;
+    else if (c === '/' && !inClass) mode = 'code';
+    i += 1;
+  }
+  return out;
+};
 
 /** The scannable text of one file: comments stripped everywhere; lineage fields dropped in data/. */
 const surfaceText = (rel, raw) => {
@@ -98,6 +241,8 @@ const EXTRA_FILES = [
   'curator/doctrines.mjs', // the doctrine readout projection
   'curator/taste.js', // the voice options + curator hint names
   'curator/curate.js', // the curator hint line
+  'composition/capabilityRegistry.mjs', // consumer notes — rendered in MegaMindPanel's capability table
+  'curator/shelfFill.mjs', // fill notes — rendered in ShelfDevPanel's last-fill readout
 ];
 const ALLOWLIST = [
   {
@@ -154,6 +299,15 @@ ok('A4: the data-field exclusion is narrow — figures/era pass, any other field
   assert.deepEqual(bannedIn(surfaceText('panels/X.jsx', `era: 'after Joshua Davis',`)), ['Joshua Davis', 'Davis']);
 });
 
+ok('A5: the stripper is string-aware — comment markers inside a string are copy and bite', () => {
+  assert.deepEqual(bannedIn(code(`const s = 'verdict // Davis approves';`)), ['Davis']);
+  assert.deepEqual(bannedIn(code('const t = `line /* George Lois */ tail`;')), ['George Lois', 'Lois', 'George']);
+  assert.deepEqual(bannedIn(code(`const u = 'clean'; // Davis in a real comment still passes`)), []);
+  // …and the slashes that are NOT regexes (JSX self-close, closing tag, division) never
+  // desync the stripper — a comment after them still strips (the first-run regression).
+  assert.deepEqual(bannedIn(code('const el = <Panel opts={opts} />;\nconst t = </Panel>;\nconst r = total / count; // Davis\n{/* George Lois */}')), []);
+});
+
 // ── B. the surface scan ──────────────────────────────────────────────────────
 ok('B1: no banned name in display form anywhere in the surface sources', () => {
   const offenders = [];
@@ -172,6 +326,15 @@ ok('B3: the allowlist is exactly one signed line, still present verbatim in exac
   assert.equal(ALLOWLIST.length, 1);
   const text = readFileSync(SRC + ALLOWLIST[0].file, 'utf8');
   assert.equal(text.split(ALLOWLIST[0].exact).length - 1, 1, 'the signed line stands verbatim, once');
+});
+
+ok('B4: the registry + shelf producers are in scope — a planted name in either file fails the scan', () => {
+  const files = surfaceFiles();
+  for (const rel of ['composition/capabilityRegistry.mjs', 'curator/shelfFill.mjs']) {
+    assert.ok(files.includes(rel), `${rel} is scanned`);
+    const planted = `${readFileSync(SRC + rel, 'utf8')}\nconst plantedNote = 'Joshua Davis approves';\n`;
+    assert.deepEqual(bannedIn(surfaceText(rel, planted)), ['Joshua Davis', 'Davis'], `${rel}: the plant bites`);
+  }
 });
 
 // ── C. the projected data reads in callsigns ─────────────────────────────────

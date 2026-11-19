@@ -145,7 +145,7 @@ export function dealFill({
   const anchor = anchorInfo.state;
   const centroid = anchorInfo.centroid;
   if (anchor === 'identity')
-    notes.push("anchor: identity — too few keeps to lean on; consensus deals in Davis's novelty order");
+    notes.push("anchor: identity — too few keeps to lean on; consensus deals in OVERLAP's novelty order");
   if (anchor === 'none') notes.push('anchor: none — no counted keep carries a layout to lean toward');
   if (anchorPartial > 0)
     notes.push(

@@ -64,9 +64,9 @@ renamed consistently at every producer/consumer/comparison site so behaviour is 
 7. **`lois-render-v1`** in CandidateTray's bake line: a lowercase renderer/version id, not a name display. Left.
 8. **Comments and identifiers everywhere** (file names, `LoisPill`, `getLoisVerdict`, CSS classes like `.lois-word`, data ids `'lois'`/`'davis'`): lineage by the issue's own rule — surfaces only.
 
-## The banned-name selfcheck — `app/src/personas/callsignSweep.selfcheck.mjs` (new, 12 checks)
+## The banned-name selfcheck — `app/src/personas/callsignSweep.selfcheck.mjs` (new, 14 checks)
 
-- **Scans:** every `.jsx` under `app/src`, every `.js`/`.mjs` under `components/`, `panels/`, `hooks/`, `data/` (minus the two Canon record artifacts), a named list of copy-bearing curator modules (`mindPresenceLive.js`, `directorsMatrix.js`, `roomFeed.js`, `doctrines.mjs`, `taste.js`, `curate.js`), and `app/index.html`. Comments are stripped first (the queenDeniability pattern), so lineage in comments never bites.
+- **Scans:** every `.jsx` under `app/src`, every `.js`/`.mjs` under `components/`, `panels/`, `hooks/`, `data/` (minus the two Canon record artifacts), a named list of copy-bearing modules (`curator/mindPresenceLive.js`, `curator/directorsMatrix.js`, `curator/roomFeed.js`, `curator/doctrines.mjs`, `curator/taste.js`, `curator/curate.js`, `composition/capabilityRegistry.mjs`, `curator/shelfFill.mjs` — the last two added by the QA fix below), and `app/index.html`. Comments are stripped first with a string-aware stripper, so lineage in comments never bites but comment markers inside a string stay copy and are scanned.
 - **Banned forms:** the seven full names in any case; the bare surnames (Lois, Davis, Carson, Greiman, Ashworth, Turner, Bowie) in Title or UPPER case as whole words; `George`/`GEORGE` as a whole word (the attested form of address). Lowercase ids, class names, and camelCase identifiers never match — they are code, not copy.
 - **Runtime pins:** DOCTRINES names are BLAST / SWISS GRIT and no doctrine title carries a banned name; the records' doctrine slots carry the callsigns; every DIRECTORS verdict is name-free and the solo verdict is `OVERLAP ALONE`; the recap's rendered phrases are pinned by name (its file interleaves prompts + matching data, so it is pinned, not scanned); the Canon records' display fields (baseline labels, style names) are name-free.
 - **Exclusions (each documented in the suite header):** selfcheck files; `lore.json` (open question 1); model prompts; the recap file as a whole (pinned instead); the Canon record artifacts (display fields pinned); the `era:` field line in `data/palettes.js`; exactly ONE allowlisted string — the signed matrix line (open question 2), asserted to still match verbatim exactly once so the exception cannot silently grow.
@@ -93,8 +93,49 @@ renamed consistently at every producer/consumer/comparison site so behaviour is 
 - **Lint:** `npm run lint` — 0 errors (11 pre-existing warnings in untouched files).
 - **Format:** `npm run format:check` — all files pass Prettier.
 - **Build:** `npm run build` — green (one pre-existing dynamic-import warning).
-- **New suite:** `callsignSweep.selfcheck` — 12 checks passed, including in the full sweep.
+- **New suite:** `callsignSweep.selfcheck` — 14 checks passed (12 at first publish; the QA fix below added A5 + B4).
 - **Screenshots** (production build + vite preview, Playwright bundled chromium): `surface-proofs/directors-desktop.png`, `surface-proofs/directors-phone.png`, `surface-proofs/room-desktop.png`, `surface-proofs/room-phone.png` — committed with this change and referenced in the PR. They show the DOCTRINE row reading BLAST / SWISS GRIT, THE ROOM tiles reading `cover` / `overlap`, and the footer pill reading `COVER · VIBE`.
+
+## QA fix (post-review, same PR)
+
+Independent QA verified behaviour discipline and disclosure as PASS but returned one finding with
+three parts, plus a body-count error. All fixed on this branch:
+
+1. **Three rendered strings the sweep missed** — each chased by QA to a render site, none in the
+   guard's original scan scope:
+   - `app/src/composition/capabilityRegistry.mjs` — the consumer note "Davis reason prose,
+     narrating the taste head's splits…" → "OVERLAP reason prose…" and "LOIS judges renders
+     occasionally (E4 #1508)…" → "COVER judges renders occasionally…" (both render via
+     `MegaMindPanel.jsx`'s capability-registry table, `{c.note}`).
+   - `app/src/curator/shelfFill.mjs` — the fill note "…consensus deals in Davis's novelty order"
+     → "…in OVERLAP's novelty order" (renders via `ShelfDevPanel.jsx`'s last-fill notes).
+   Display notes only; no logic changed.
+2. **The guard couldn't see them.** `callsignSweep`'s scope missed `composition/` and curator
+   producers like `shelfFill.mjs` — QA plant-verified that appending "George Lois approves" to
+   `capabilityRegistry.mjs` still passed 12/12. Fix: both files join the suite's named
+   copy-bearing module list (the suite's existing pattern), with a header note on why the rest of
+   `composition/` stays unscanned (its other note strings are code-side documentation with no
+   rendering consumer). New check **B4** asserts both files are in the scan scope and that a
+   planted banned name in either file's real content fails the scan.
+3. **The comment stripper was string-unaware.** The old line-based stripper cut everything after
+   `//` even inside a string literal, so a display string like "verdict // Davis approves" evaded
+   the scan (QA plant-verified). The stripper is now a string-aware scanner (quote/template/regex
+   state, expression-position heuristics, template-interpolation nesting). New check **A5** pins
+   it: `//` and `/* */` inside string/template literals stay copy and bite; real comments still
+   strip. First run of the new stripper exposed a regression of its own — JSX self-closing `/>`
+   and closing-tag `</` slashes were misread as regex starts, desyncing the strip and leaking
+   three JSX block comments into the scan — fixed by tightening the expression-position rule
+   (no `}`/`<`/`>` in the opener set, `=>` and postfix handled, `<`-before-slash guard) and pinned
+   by a regression assertion inside A5. With that, B1 is green across the whole tree again.
+4. **PR body count.** The body said "eight selfchecks" were re-pinned; the true count is nine
+   (davisState, directorRoom, directorTable, directorsMatrix, loisRank, megamindRecap, unlockTree,
+   fieldLatin, fieldPlate — the list in "Re-pins made" above). Body corrected; it also now reads
+   14 checks for the new suite, matching the two checks this fix added.
+
+**Evidence:** `callsignSweep.selfcheck` 14/14 (incl. B1 full-tree scan, B4 plants, A5 stripper
+pins); affected suites green — megamindRecap 12/12, personaKernel 10/10, personaTuning 11/11,
+doctrines 10/10; `npm run lint` 0 errors (11 pre-existing warnings); `npm run format:check`
+clean; `npm run build` green. The two open questions below are untouched, as instructed.
 
 ## Open questions stopped on
 

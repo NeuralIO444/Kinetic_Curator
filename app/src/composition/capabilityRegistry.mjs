@@ -90,7 +90,7 @@ export const CAPABILITY_CONSUMERS = Object.freeze([
     id: 'narration.davisReason',
     stage: 'S2',
     needs: { tier: 'C' },
-    note: 'Davis reason prose, narrating the taste head\u2019s splits (hook note; hooks recorded on #1526)',
+    note: 'OVERLAP reason prose, narrating the taste head\u2019s splits (hook note; hooks recorded on #1526)',
   },
   {
     id: 'narration.driftRetrain',
@@ -109,7 +109,7 @@ export const CAPABILITY_CONSUMERS = Object.freeze([
     id: 'lois.vision',
     stage: 'S3',
     needs: { tier: 'B', badges: ['vision'] },
-    note: 'LOIS judges renders occasionally (E4 #1508): vision badge AND tier B or better — never per-bar',
+    note: 'COVER judges renders occasionally (E4 #1508): vision badge AND tier B or better — never per-bar',
   },
   {
     id: 'loot.ingest',
