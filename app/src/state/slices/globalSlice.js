@@ -1,4 +1,6 @@
-import { ASSETS } from '../../data/assets/index.js';
+import { ASSETS, ASSETS_CONSTRUCTS } from '../../data/assets/index.js';
+import { applyGaitAssign, restGaitIdFor } from '../../engine/gaitAssign.js'; // #2329: who wears which gait
+import { noteGaitAssign } from '../../curator/gaitRecord.mjs'; // #2329: a landed assignment rides the take
 import { getQualityCaps } from '../../data/quality.js';
 import {
   initialEnabledAssets,
@@ -277,7 +279,7 @@ const sameTile = (a, b) =>
   JSON.stringify(a.rig || null) === JSON.stringify(b.rig || null) &&
   (a.kin || null) === (b.kin || null);
 
-export const createGlobalSlice = (set) => ({
+export const createGlobalSlice = (set, get) => ({
   running: true,
   fps: 60,
   nodeCount: 0,
@@ -446,6 +448,34 @@ export const createGlobalSlice = (set) => ({
   setConstructLead: (on) => set({ constructLead: !!on }),
   constructRecords: [], // #2108 — construct records (recipes); their tiles are drawn from them, never saved
   gaitRecords: [], // #2328 — gait records (kc-gait/1); assigned only by a test until M3
+  /** #2329 (gait M3) — { target: { gaitId, by, locked } }: the gait each construct wears now. Session-only (not in the
+   * document); stamped on the frame input by the loop, so a take replays it. Empty = every construct rests as its tile. */
+  gaitAssignments: {},
+  /**
+   * #2329 — apply one GAIT_ASSIGN { target, gaitId, by: 'queen'|'davis'|'user', locked }. A locked target refuses
+   * every assignment that is not the user's. Returns { applied, reason } (engine/gaitAssign.js applyGaitAssign).
+   * An applied one is published (gait:assign) and handed to a recording take.
+   */
+  assignGait: (event) => {
+    const { assignments, applied, reason } = applyGaitAssign(get().gaitAssignments, event);
+    if (!applied) return { applied, reason };
+    set({ gaitAssignments: assignments });
+    const e = { target: event.target, ...assignments[event.target] };
+    noteGaitAssign(e);
+    emit(Events.GAIT_ASSIGN, e, { cause: e.by });
+    return { applied, reason };
+  },
+  /**
+   * #2329 — the user's lock (the micro-HUD's control, when it lands): locks the target on what it wears now (its style's
+   * `still` when nothing is assigned), or frees it with locked = false. A locked gait is never re-picked.
+   */
+  lockGait: (target, locked = true) => {
+    const cur = get().gaitAssignments[target];
+    const style = ASSETS_CONSTRUCTS.find((a) => a.id === target)?.style ?? null;
+    const gaitId = cur ? cur.gaitId : restGaitIdFor(style);
+    if (!gaitId) return { applied: false, reason: 'invalid' };
+    return get().assignGait({ target, gaitId, by: 'user', locked: !!locked });
+  },
   creatureBreedNote: null, // #1852 — what the last BREED did (the same statuses, plus need-three). Session-only.
   creatureBirthNote: null, // #2037 — what the last kept-take banking did: { id: null, status: 'banked', count }. Session-only.
   beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.

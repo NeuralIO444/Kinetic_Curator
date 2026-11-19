@@ -27,6 +27,7 @@
 
 import { beastDocFields } from '../engine/beastSettings.mjs';
 import { createLiveRenderer, accumFeedSelection } from './renderer.mjs';
+import { gaitInputStamp } from '../engine/gaitAssign.js'; // #2329: the gaits the constructs wear, stamped on the input
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import {
   createLiveResolver,
@@ -179,6 +180,14 @@ export function swellProgress(loopTimeMs, swellStartMs) {
   const p = (loopTimeMs - swellStartMs) / SWELL_DURATION_MS;
   if (p <= 0 || p >= 1) return 0;
   return Math.sin(Math.PI * p);
+}
+
+// #2329 — one stamp object per (assignments, tempo): the input log sees the same object while nothing changes.
+let gaitStampMemo = { a: undefined, bpm: undefined, stamp: null };
+function gaitStampOf(assignments, bpm) {
+  if (gaitStampMemo.a !== assignments || gaitStampMemo.bpm !== bpm)
+    gaitStampMemo = { a: assignments, bpm, stamp: gaitInputStamp(assignments, bpm) };
+  return gaitStampMemo.stamp;
 }
 
 export function createLiveLoop(
@@ -1155,6 +1164,11 @@ export function createLiveLoop(
       // collapsed them (cut 6.5). Stamped only when on, so a frame without it carries exactly the older input shape and a
       // take replays what the frame ran with.
       ...(s.constructLead === true && !s.constructCollapse ? { constructPieces: true } : {}),
+      // #2329 (gait M3) — the moving gaits the constructs wear, with the tempo: stamped only while pieces may deal and
+      // some gait moves, so a frame without it carries the older input shape. A take replays the stamp; nothing re-picks.
+      ...(s.constructLead === true && !s.constructCollapse && gaitStampOf(s.gaitAssignments, s.beatBpm)
+        ? { gaits: gaitStampOf(s.gaitAssignments, s.beatBpm) }
+        : {}),
       assetAttach: s.assetAttach, // #1355: the artist's attach points (where the wings join)
       scaleMul,
       alphaBoost,

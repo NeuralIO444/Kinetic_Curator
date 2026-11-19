@@ -34,6 +34,8 @@ const pieceKey = (key, id) => (key === undefined || key === null ? undefined : `
  *                           (2026-11-18, the #2327 still check): a construct AT REST draws as its flat tile — exact,
  *                           and its thin lines stay whole — and deals as pieces only while something moves it. None
  *                           moves a construct before gait M3/M4, so absent = every construct rests as its tile.
+ *                pose       (marks, pieces, tile, index) => marks — #2329: a moving construct's piece marks, posed
+ *                           (engine/gaitStage.js: the gait's drivers down the join tree). Absent = the rest pose.
  * @returns the items, with each planned construct's tile replaced in place by its pieces. The same array when there
  *   is nothing to change.
  */
@@ -45,7 +47,7 @@ export const constructPiecesDealtTotal = () => dealtTotal;
 
 export function constructPieceItems(
   items,
-  { enabled = false, recordOf = null, budget = HIER_GLOBAL_BUDGET, taken = 0, moving = null } = {},
+  { enabled = false, recordOf = null, budget = HIER_GLOBAL_BUDGET, taken = 0, moving = null, pose = null } = {},
 ) {
   if (
     !enabled ||
@@ -97,8 +99,12 @@ export function constructPieceItems(
     const th = ((it.rotation ?? 0) * Math.PI) / 180;
     const co = Math.cos(th);
     const si = Math.sin(th);
-    for (const p of pieces) {
-      const m = pieceMark(p);
+    // #2329: a gait poses the marks in the tile's square frame; the tile's stretch is applied after (R·S)
+    let marks = pieces.map(pieceMark);
+    if (typeof pose === 'function') marks = pose(marks, pieces, it, i) || marks;
+    for (let j = 0; j < pieces.length; j++) {
+      const p = pieces[j];
+      const m = marks[j];
       let { x, y } = m;
       if (sy !== 1) {
         // into the tile's own frame, stretch Y, back out (R·S, the renderer's order): the centre lands where the tile draws

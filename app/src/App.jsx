@@ -73,6 +73,9 @@ import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
 import { startBreak } from './curator/breakLive.js'; // #2116: the assemble trigger
 import { startLean } from './curator/leanLive.js'; // #1640: the dial lean, applied in silence
+import { startGaitPick } from './curator/gaitLive.js'; // #2329: each construct's gait is picked once a phrase
+import { replayGaitFrame, endGaitReplay } from './curator/gaitRecord.mjs'; // #2329: a take re-publishes its gait picks
+import { ASSETS_CONSTRUCTS } from './data/assets/index.js'; // #2329: the house constructs (the gait wearers) and their styles
 import { startTrio } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
 import { createShowSpectrum } from './curator/showSpectrum.js'; // #1483 stage 2: the spectrum the personas are told
 import { SPECTRUM_PARAMS } from './curator/mindConduct.js'; // #1483 stage 2: the marks dials Davis may re-tune
@@ -177,6 +180,21 @@ function AppInner() {
       getWetness: () => useStore.getState().layoutParams.accumulationWetness,
       getEvolveInterval: () => useStore.getState().evolveInterval,
       context: roomNow,
+    });
+    // #2329 — gait M3: once a phrase each standing construct's gait is picked among its style's Canon defaults
+    // (still / idle / performing) from the audio envelope; a user lock wins; muted while a take plays.
+    const constructStyle = new Map(ASSETS_CONSTRUCTS.map((a) => [a.id, a.style]));
+    const stopGaitPick = startGaitPick({
+      getTargets: () => {
+        const st = useStore.getState();
+        const pool = st.enabledAssets; // { assetId: true } (null = the whole library, which never places a construct)
+        if (st.constructLead !== true || !pool || typeof pool !== 'object') return [];
+        return Object.keys(pool).filter((id) => pool[id] && constructStyle.has(id));
+      },
+      styleOf: (id) => constructStyle.get(id) ?? null,
+      getAssignments: () => useStore.getState().gaitAssignments,
+      assign: (e) => useStore.getState().assignGait(e),
+      isReplaying: isPlaybackActive,
     });
     const roomCodes = () => {
       const f = loisActivity.snapshot();
@@ -346,13 +364,16 @@ function AppInner() {
     });
     // #1462 — a take plays back its recorded decisions, frame by frame; no backend is asked
     // #1534 — and its recorded hearing: the take's spectrum feeds the live core in the analyser's place
+    // #2329 — and its gait picks, re-published as they happened (nothing re-picks)
     setPlaybackFrameTap((frame, perf, o) => {
       replayMindFrame(frame, perf && perf.mind, o);
       replaySpectrumFrame(frame, perf && perf.spectrum, o);
+      replayGaitFrame(frame, perf && perf.gaits, o);
     });
     const offPlayback = subscribePlayback(() => {
       endMindReplay();
       endSpectrumReplay();
+      endGaitReplay();
       resetMindFaces();
       resetRoomFeed();
       resetGhost();
@@ -385,6 +406,7 @@ function AppInner() {
       stopPace();
       stopBreak();
       stopLean();
+      stopGaitPick();
       stopMind();
       canonBus.stop();
       stopReviewVoice();

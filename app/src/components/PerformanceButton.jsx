@@ -29,6 +29,7 @@ import { setConductTap, setHandbackTap } from '../curator/trioLive.js'; // #1483
 import { createRouteRecorder } from '../gl/routeRecord.mjs';
 import { createGestureRecorder } from '../gl/gestureRecord.mjs';
 import { createBirthRecorder, setBirthTap, birthRecordsFromSection } from '../curator/birthRecord.mjs';
+import { createGaitRecorder, setGaitTap } from '../curator/gaitRecord.mjs'; // #2329: the take logs every GAIT_ASSIGN
 import { createTreatmentRecorder } from '../curator/treatmentRecord.mjs'; // #2010: the take logs its treatment acts
 import { on, Events } from '../composition/eventBus.js';
 import { useApp } from '../state/AppContext.jsx';
@@ -201,6 +202,19 @@ const mindSection = (getFrame) => {
   };
 };
 
+// #2329 — the take carries every GAIT_ASSIGN that landed (the per-phrase picks, the user's picks and locks), stored as
+// `gaits`: playback re-publishes them and never picks again.
+const gaitsSection = (getFrame) => {
+  const rec = createGaitRecorder({ getFrame, initial: useStore.getState().gaitAssignments }); // review of #2402: what already stands
+  setGaitTap((e) => rec.update(e));
+  return {
+    stop() {
+      setGaitTap(null);
+      return rec.finish();
+    },
+  };
+};
+
 // #1938 — saving a take is platform-specific (the desktop webview swallows the browser's <a download>): platform/saveTake.mjs
 export function PerformanceButton() {
   const { glLoopRef } = useApp();
@@ -275,6 +289,7 @@ export function PerformanceButton() {
             gestures: gesturesSectionForTake,
             births: birthsSection,
             treatments: treatmentsSection,
+            gaits: gaitsSection,
           },
         })
       ) {

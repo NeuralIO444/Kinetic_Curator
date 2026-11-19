@@ -758,3 +758,6 @@ node src/engine/dishFluidCells.selfcheck.mjs
 node src/engine/dishCultureCells.selfcheck.mjs
 node src/engine/gait.selfcheck.mjs
 node src/hooks/constructCollapse.selfcheck.mjs
+node src/engine/gaitAssign.selfcheck.mjs
+node src/curator/gaitLive.selfcheck.mjs
+node src/gl/liveResolve.gait.selfcheck.mjs

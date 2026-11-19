@@ -144,6 +144,10 @@ export const EVENT_REGISTRY = {
     handler: ['curator/megamindSurfacesLive.js'],
     note: "every answer with its backend and latency (#1463); the thinker decides whether it is used — the one handler tallies answers for the dev panel's telemetry narration (#1526), backstage only",
   },
+  GAIT_ASSIGN: {
+    handler: null,
+    note: "telemetry: a wearer's gait changed (#2329, gait M3) — the QUEEN's per-phrase pick or the user's pick/lock, published by the store's assignGait; playback re-publishes the take's rows (curator/gaitRecord.mjs). The stage reads the recorded input stamp, never this event",
+  },
   MIND_ROUTE: {
     handler: ['curator/roomFeed.js'],
     note: "what became of Davis's route proposal (#1483): applied with its delta, or dropped with the reason (owned, tier, rate, cooldown, stale); the ROOM codec's transcript is its feed (#1560 S1), and the take records it",
