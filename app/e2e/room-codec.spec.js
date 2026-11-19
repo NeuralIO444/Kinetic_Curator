@@ -265,7 +265,7 @@ test('the horn strip sits under the channel: three tiles laid out at rest; a sta
   await boot(page);
   const tiles = page.locator('.room-horns .horn-tile');
   await expect(tiles).toHaveCount(3);
-  await expect(tiles.locator('.horn-name')).toHaveText(['blast', 'hybrid', 'swiss grit']);
+  await expect(tiles.locator('.horn-name')).toHaveText(['blast', 'hybrid', 'swissg']);
   await expect(tiles.locator('.horn-state')).toHaveText(['LAID OUT', 'LAID OUT', 'LAID OUT']);
   // directly under the channel (kc-voice/1), horizontally inside it
   const ch = await page.locator('.codec-transcript').boundingBox();
