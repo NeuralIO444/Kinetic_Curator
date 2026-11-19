@@ -1,6 +1,7 @@
 // hornStrip.selfcheck.mjs — #2388 (P8): the strip's place, order, grammar, colours and phone wrap.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { hornLabel, hornTileName } from '../../curator/hornFaces.js';
 
 let n = 0;
 const ok = (name, fn) => {
@@ -34,7 +35,9 @@ ok(
   () => {
     assert.match(strip, /horns\.map\(\(h\) =>/);
     assert.match(strip, /className="horn-face-slot"/);
-    assert.match(strip, /className="horn-name">\{h\.label\}/);
+    assert.match(strip, /className="horn-name">\{h\.tile\}/);
+    assert.equal(hornTileName('ashworth'), 'swissg');
+    assert.equal(hornLabel('ashworth'), 'swiss grit');
     assert.match(strip, /className="horn-state act">\{h\.word\}/);
     assert.match(strip, /const FACES = \{ carson: BlastFace, greiman: HybridFace, ashworth: GritFace \}/);
     assert.match(codec, /resolveHorns\(\{/);

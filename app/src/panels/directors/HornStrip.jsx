@@ -90,7 +90,7 @@ export function HornStrip({ horns }) {
               <Face s={h} />
             </div>
             <div className="horn-dressing">
-              <span className="horn-name">{h.label}</span>
+              <span className="horn-name">{h.tile}</span>
               <span className="horn-state act">{h.word}</span>
             </div>
           </div>

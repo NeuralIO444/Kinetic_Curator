@@ -40,6 +40,9 @@ export const HORN_DOCTRINE_IDS = Object.freeze(['carson', 'ashworth']);
 
 /** The tile's lowercase callsign, as the existing tiles set theirs (`cover`, `overlap`). */
 export const hornLabel = (id) => getPersona(id).identity.callsign.toLowerCase();
+/** The tile's own short name: SWISS GRIT is set as `swissg` so the name never clips in a narrow tile (Matt, 2026-11-19). Chat lines keep the full callsign. */
+export const HORN_TILE_NAMES = Object.freeze({ ashworth: 'swissg' });
+export const hornTileName = (id) => HORN_TILE_NAMES[id] ?? hornLabel(id);
 /** The callsign as it reads in a sentence (BLAST, HYBRID, SWISS GRIT). */
 export const hornCallsign = (id) => getPersona(id).identity.callsign;
 
@@ -151,11 +154,12 @@ export function resolveHornState(id, m = {}) {
   return rest;
 }
 
-/** All three horns, in strip order: [{ id, label, callsign, ...state }]. */
+/** All three horns, in strip order: [{ id, label, tile, callsign, ...state }]. */
 export function resolveHorns(m = {}) {
   return HORN_IDS.map((id) => ({
     ...resolveHornState(id, { ...m, band: m.bands ? m.bands[id] : null }),
     label: hornLabel(id),
+    tile: hornTileName(id),
     callsign: hornCallsign(id),
   }));
 }
