@@ -1,8 +1,8 @@
 // LOIS, lower left of the master bar, left of LIVE. #948, #1126, #1588.
 // It draws what the honest feed says (curator/loisActivity.js) and decides nothing itself: the feed owns
 // every signal, resolveLoisFace owns the priority, loisTicker.mjs owns the ticker's decisions, and this
-// only polls, measures, and paints. #1588: her verdict line rides in the place the kaomoji face held,
-// scrolling right to left when it overflows the slot; the face is gone, her state code stays.
+// only polls, measures, and paints. #1588: his verdict line rides in the place the kaomoji face held,
+// scrolling right to left when it overflows the slot; the face is gone, his state code stays.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Events, on } from '../composition/eventBus.js';
 import { useStore } from '../state/store.js';

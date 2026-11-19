@@ -263,7 +263,7 @@ function AppInner() {
       // line exists only while the field is degraded or a wanting
       // consumer stands shed (degradation is visible, never silent).
       getWet: () => getWetModeLine(),
-      // LOIS's keep-rate read (Matt, 2026-10-14): keeping a lot lets a steady show ride; passes piling up make her call it flat sooner
+      // LOIS's keep-rate read (Matt, 2026-10-14): keeping a lot lets a steady show ride; passes piling up make him call it flat sooner
       getActivity: () => {
         const f = loisActivity.snapshot();
         return { keeps: f.keepsLast5m, rolls: f.rollsLast5m };

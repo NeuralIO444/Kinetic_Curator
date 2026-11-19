@@ -1,5 +1,5 @@
 // creatureMoods.selfcheck.mjs — #1949 (of #1848): Lois's and Davis's live moods reach the creature rigs.
-// Matt's rulings (2026-11-03): Lois moves — her face picks the gait; Davis picks how varied his deal is — BLOOM / FLOW
+// Matt's rulings (2026-11-03): Lois moves — his face picks the gait; Davis picks how varied his deal is — BLOOM / FLOW
 // open it (every bone its own shape), STUCK / SIFT tighten it (a creature's limbs all wear one shape), anything else
 // deals as before.
 //

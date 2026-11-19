@@ -61,7 +61,7 @@ ok('bus records distill to story events; what the bus does not carry honestly do
       reply: { state: { id: 'BURN', intensity: 1, decay: 0 } },
     }),
     { kind: 'verdict', topic: 'show', delta: -0.25, burn: true, bar: 6 },
-    'she burns a flat show: a verdict on the show',
+    'he burns a flat show: a verdict on the show',
   );
   assert.equal(
     storyEventFromRecord(Events.MIND_DECISION, {
@@ -119,7 +119,7 @@ ok('verdicts move the judge’s regard — mood at full weight, standing at α; 
   assert.equal(book.trust.mood, 0);
   assert.equal(book.trust.standing, 0);
   applyStoryEvent(book, ep, { kind: 'keep', seed: 1, paletteId: 'x', bar: 2 });
-  assert.equal(book.trust.mood, 6, 'a keep is worth more to his trust in her than to her regard (6 vs 3)');
+  assert.equal(book.trust.mood, 6, 'a keep is worth more to his trust in him than to his regard (6 vs 3)');
   assert.equal(book.esteem.mood, 15);
 });
 
@@ -159,7 +159,7 @@ ok('a persona’s believed standing refreshes only when they act; the gap is cau
   const { book, ep } = rig();
   for (let i = 0; i < 12; i++) applyStoryEvent(book, ep, verdict(`t${i}`, 0.25, i + 1));
   assert.ok(Math.abs(book.esteem.standing - 14.4) < 1e-9);
-  assert.equal(book.believed.lois.esteem, book.esteem.standing, 'she takes stock as she speaks');
+  assert.equal(book.believed.lois.esteem, book.esteem.standing, 'he takes stock as he speaks');
   assert.equal(book.believed.davis.esteem, 0, 'he has not acted: his read is the session’s start');
   applyStoryEvent(book, ep, { kind: 'proposal', assetId: 'fern', bar: 20 });
   assert.ok(
@@ -196,7 +196,7 @@ ok('a verdict flip with no work between is an anomaly; with work between it is o
   applyStoryEvent(book, ep, verdict('hue', -0.2, 2));
   assert.equal(book.suspicion.anomalies.length, 1);
   assert.equal(book.suspicion.anomalies[0].kind, 'flip');
-  assert.equal(book.suspicion.anomalies[0].witness, 'davis', 'he watches her change her mind');
+  assert.equal(book.suspicion.anomalies[0].witness, 'davis', 'he watches him change his mind');
   assert.ok(ep.patterns.some((p) => p.kind === 'reversal' && p.topic === 'hue'));
   const r2 = rig();
   applyStoryEvent(r2.book, r2.ep, verdict('hue', 0.2, 1));

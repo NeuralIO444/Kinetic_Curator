@@ -98,7 +98,7 @@ await ok(
   () => {
     const fullSummer = { moonPhase: 'full', illumination: 1, season: 'summer' };
     const m = modulation('lois', fullSummer);
-    assert.ok(m.tempo > 1.2 && m.intensity === 1.1, 'Cancer, full moon, her season: quicker and stronger');
+    assert.ok(m.tempo > 1.2 && m.intensity === 1.1, 'Cancer, full moon, his season: quicker and stronger');
     assert.ok(
       modulation('queen', { ...fullSummer, season: 'spring' }).intensity < 1,
       'Libra in spring (opposite autumn) is damped',

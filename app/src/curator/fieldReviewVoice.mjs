@@ -13,8 +13,8 @@
 // room already has — the footer LoisPill crawl fed by loisRank's verdict
 // slot (loisTicker.js). DAVIS speaks CLEAN (the woohoo — the continuous
 // side of the KC-1 DS), LOIS speaks JANKY (the gates talking: the first
-// failing gate, its measured value against its limit, in her pan register)
-// and names the repair she WOULD run, as a proposal — the record says a
+// failing gate, its measured value against its limit, in his pan register)
+// and names the repair he WOULD run, as a proposal — the record says a
 // proposal, §4.2, because nothing in THIS slice acts (slice 3's ladder
 // is what acts, and its records are reported, above). EXEMPT landings
 // stay silent: the poem was never judged, so there is no verdict to speak.

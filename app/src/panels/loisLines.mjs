@@ -1,4 +1,4 @@
-// The four voice-1 lines (#1032, M7): LOIS at her bluntest, in the empty room or
+// The four voice-1 lines (#1032, M7): LOIS at his bluntest, in the empty room or
 // the naming moment. Signed by Matt 2026-10-05. Exactly one per panel, never on a
 // live control, never an error. Strings are authored: they carry `.name` so
 // text-transform leaves them alone (docs/DESIGN_SYSTEM.md §5, §7).

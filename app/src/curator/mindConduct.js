@@ -223,8 +223,9 @@ const clampUnit = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 export const boldBand = (bold, heat) =>
   Math.max(0, Math.floor(Math.abs((Number.isFinite(bold) ? bold : 1) - clampUnit(heat)) / BOLD_BAND - 1e-9));
 /**
- * LOIS's brake (Matt 2026-10-27: she is the cautious one). When the artist has been passing a lot (her keep-rate read,
- * flatBias, at or over BRAKE_AT), she holds Davis to the safe moves — bold at most BRAKE_MAX — until keeps come back.
+ * LOIS's brake (Matt 2026-10-27; restraint, not caution, per the 2026-11-18 ruling: one idea, cut the rest).
+ * When the artist has been passing a lot (his keep-rate read, flatBias, at or over BRAKE_AT), he holds Davis
+ * to the safe moves — bold at most BRAKE_MAX — until keeps come back.
  */
 export const BRAKE_AT = 0.5;
 export const BRAKE_MAX = 0.4;
@@ -372,14 +373,14 @@ export function davisSpectrum(show, seed = 0) {
 // ── LOIS: is the show flat? ─────────────────────────────────────────────────────────────────────────────────────────
 /** How hard the keep-rate may move LOIS's flat-show threshold: +/- this share of it (0.5 = from half to one and a half). */
 export const FLAT_BIAS_SWING = 0.5;
-/** A keep for about one roll in seven is the rate she reads as "happy with what is happening". */
+/** A keep for about one roll in seven is the rate he reads as "happy with what is happening". */
 const HAPPY_KEEP_RATE = 0.15;
 /** Fewer rolls than this is not enough to read a rate from: the bias eases in. */
 const BIAS_FULL_AT_ROLLS = 8;
 
 /**
- * LOIS's keep-rate read, in -1..+1. Pure. Keeping a lot (a high keep rate) is -1: she loosens, and lets a steady show
- * ride. Rolling past frame after frame without keeping (passes pile up) is +1: she tightens, and calls it flat sooner.
+ * LOIS's keep-rate read, in -1..+1. Pure. Keeping a lot (a high keep rate) is -1: he loosens, and lets a steady show
+ * ride. Rolling past frame after frame without keeping (passes pile up) is +1: he tightens, and calls it flat sooner.
  * No rolls, or only a few, is near 0: there is nothing to read yet.
  * @param keeps keeps in the recent window
  * @param rolls rolls in the same window (a pass is a roll nobody kept)

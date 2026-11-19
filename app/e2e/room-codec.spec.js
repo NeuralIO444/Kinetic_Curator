@@ -37,7 +37,7 @@ test('the room opens quiet: LOIS is VIBE, Davis has no state and is not turning,
   await expect(davis(page).locator('.codec-state')).toHaveText('—');
   await expect(davis(page).locator('.codec-name')).toHaveText('davis');
   await expect(page.locator('.codec-davis .davis-dither')).toHaveAttribute('data-motion', 'still');
-  await expect(page.locator('.codec-lois .lois-dither')).toBeVisible(); // her glyph face is already up, watching
+  await expect(page.locator('.codec-lois .lois-dither')).toBeVisible(); // his glyph face is already up, watching
   await expect(page.locator('.codec-ch')).toHaveText('CH kc-voice/1');
   await expect(page.locator('.codec-bus')).toHaveText('BUS 0'); // nothing has happened on the bus yet: silence (DS rule 4)
   await expect(page.locator('.codec-line')).toHaveCount(0);
@@ -159,7 +159,7 @@ test('the caption never sizes the frame: a 12-char state keeps the window on the
   expect(m.real, 'the window is not the face cell (plus its 1 px border each side)').toBe(m.face + 2);
 });
 
-test('LOIS’s face stays inside her window, tall windows and short ones', async ({ page }) => {
+test('LOIS’s face stays inside his window, tall windows and short ones', async ({ page }) => {
   for (const [w, h] of [
     [1440, 900],
     [1280, 720],

@@ -12,7 +12,7 @@
 //   TILT   If Davis's pick sits outside the tolerance, LOIS tilts the
 //          pick to the candidate nearest the balance point. Inside
 //          the tolerance, Davis's pick stands — LOIS throttles and
-//          demands, she does not re-deal the hand.
+//          demands, he does not re-deal the hand.
 //
 // The balance point is the QUEEN's: the mean read-shares of the kept
 // Looks (anchorFromReads over the keeps' measured reads). No keeps,

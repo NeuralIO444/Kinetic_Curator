@@ -52,7 +52,7 @@ ok('the driver folds the live bus into standing, and a replay’s republication 
   emit(Events.MIND_DECISION, decision('davis', { propose: { assetId: 'fern' } }, 1), { cause: 'mind' });
   emit(Events.MIND_DECISION, decision('lois', { critique: { target: 'density', delta: 0.25 } }, 1), { cause: 'mind' });
   const v1 = getStoryView();
-  assert.ok(Math.abs(v1.esteem.standing - 1.2) < 1e-9, 'her regard moved by the verdict');
+  assert.ok(Math.abs(v1.esteem.standing - 1.2) < 1e-9, 'his regard moved by the verdict');
   assert.ok(Math.abs(v1.trust.standing - -0.1) < 1e-9, 'his trust paid the proposal’s small exposure');
   emit(Events.MIND_DECISION, decision('lois', { critique: { target: 'density', delta: 0.25 } }, 1), {
     cause: 'replay',

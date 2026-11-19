@@ -546,7 +546,7 @@ export function startTrio({
         silent: audio.silent,
         sinceBars: audio.sinceBars,
         flatBars: flatness.flatBars(),
-        // LOIS's brake: passes piling up — she holds Davis to the safe moves until keeps come back (mindConduct BRAKE_AT)
+        // LOIS's brake: passes piling up — he holds Davis to the safe moves until keeps come back (mindConduct BRAKE_AT)
         ...(bias >= BRAKE_AT ? { brake: true } : {}),
         routes: effective(getRoutes()).map((r) => ({
           input: r.input,

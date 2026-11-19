@@ -13,6 +13,8 @@
 | **Machine-learning head** | **Fertility:** which seed regions and roll trajectories produced keeps. Not "is this good" but "is this ground fertile?" |
 
 ## Where his philosophy comes from
+Wild in his *moves*, authored in his *marks*.
+
 "50 per cent resides in the programming and 50 per cent in the drawings I
 feed it": the computer is a collaborator. Controlled chaos by weighted
 probability; systems built to surprise him. His talk "Ugly Part Three" is the

@@ -1,4 +1,4 @@
-// loisTicker.selfcheck.mjs — #1588: LOIS's verdict line leaves the top bar and rides her footer
+// loisTicker.selfcheck.mjs — #1588: LOIS's verdict line leaves the top bar and rides his footer
 // slot as a ticker, in the place the kaomoji face held. The line is loisRank's last verdict — the
 // exact string the top bar showed; the tape runs it right to left (Matt, 2026-10-22), one line+divider
 // unit per loop, only when that unit overflows the slot, and reduced motion settles it static.
@@ -59,7 +59,7 @@ const outlier = {
 
 ok('parity: a seeded pick puts the exact top-bar string on the ticker', () => {
   clearLoisVerdict();
-  assert.equal(tickerLine(), '', 'nothing said yet: no line — the slot shows her state alone');
+  assert.equal(tickerLine(), '', 'nothing said yet: no line — the slot shows his state alone');
   const pool = [...Array.from({ length: 6 }, () => ({ ...mid })), { ...outlier }];
   const ranked = rankLois(pool);
   assert.ok(ranked.verdict.length > 0, 'the seeded pool earns a verdict');

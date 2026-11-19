@@ -348,7 +348,7 @@ ok(
     assert.equal(loose.flatBars(), 0, 'keeping: the same show rides');
     assert.ok(
       Math.abs(tight.threshold() - FLUX_HELD * (1 + FLAT_BIAS_SWING)) < 1e-12,
-      'the spectrum bar is what she reports',
+      'the spectrum bar is what he reports',
     );
     // malformed spectra are a missing read, not a crash
     assert.doesNotThrow(() => createFlatness().push(lively, { flux: NaN, flatness: 'x' }));
@@ -356,13 +356,13 @@ ok(
 );
 
 ok(
-  "LOIS's keep-rate read: keeping a lot loosens her flat-show threshold, passes piling up tighten it, little evidence is neutral",
+  "LOIS's keep-rate read: keeping a lot loosens his flat-show threshold, passes piling up tighten it, little evidence is neutral",
   () => {
     assert.equal(flatBias({}), 0);
     assert.equal(flatBias({ keeps: 3, rolls: 0 }), 0, 'no rolls: nothing to read');
     assert.ok(flatBias({ keeps: 0, rolls: 12 }) > 0.99, 'twelve rolls and no keep: tight');
     assert.ok(flatBias({ keeps: 5, rolls: 12 }) < -0.99, 'a keep for every two or three rolls: loose');
-    assert.ok(Math.abs(flatBias({ keeps: 2, rolls: 13 })) < 0.1, 'about her happy rate: neutral');
+    assert.ok(Math.abs(flatBias({ keeps: 2, rolls: 13 })) < 0.1, 'about his happy rate: neutral');
     assert.ok(Math.abs(flatBias({ keeps: 0, rolls: 2 })) < 0.3, 'two rolls is not enough to lean on: it eases in');
     assert.ok(
       flatBias({ keeps: 9, rolls: 3 }) <= 0 && flatBias({ keeps: 9, rolls: 3 }) >= -1,
@@ -386,7 +386,7 @@ ok(
     assert.equal(run(0.04, 0), false, 'a lively-ish show is not flat at the neutral threshold');
     assert.equal(run(0.04, 1), true, 'but passes piling up call it flat sooner');
     assert.equal(run(0.018, 0), true, 'a held show is flat at neutral');
-    assert.equal(run(0.018, -1), false, 'but while you are keeping she lets it ride');
+    assert.equal(run(0.018, -1), false, 'but while you are keeping he lets it ride');
     const f = createFlatness();
     f.setBias(1);
     assert.ok(Math.abs(f.threshold() - base * (1 + FLAT_BIAS_SWING)) < 1e-12);

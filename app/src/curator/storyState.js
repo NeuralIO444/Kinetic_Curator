@@ -21,7 +21,7 @@ export const MOOD_DECAY_PER_BAR = 0.995;
 /** The event → regard weights (08-Q1 default, flagged in the staging report). Mood points, ±100 scale. */
 export const STORY_WEIGHTS = Object.freeze({
   verdictEsteemPerDelta: 48, // a verdict moves the judge's regard by its delta (contract caps |delta| at 0.25 → ±12)
-  burnEsteem: -14, // she burns a flat show: the strongest ordinary verdict
+  burnEsteem: -14, // he burns a flat show: the strongest ordinary verdict
   crownEsteem: 4,
   crownTrust: 3,
   bloomEsteem: 6,

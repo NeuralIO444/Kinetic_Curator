@@ -11,7 +11,7 @@
 //
 // Phases: dealt → judging → standing → settled → closed.
 //   dealt    the deal is complete (look + voice, chapter-scoped) and frozen; LOIS's slot has not opened.
-//   judging  the slot is open. The deal stays frozen; LOIS may spend her one cut or pass.
+//   judging  the slot is open. The deal stays frozen; LOIS may spend his one cut or pass.
 //   standing the slot is closed and the standing deal is final — the original hand, or the hand the
 //            cut left behind. Nothing in this phase can re-open the slot: the one-cut law is the phase
 //            graph, not a counter a caller could talk the machine out of.
@@ -88,8 +88,8 @@ export function openJudgement(round) {
 }
 
 /**
- * LOIS passes: the slot closes with the deal untouched. Her pass is a move and is logged as one —
- * the table records that she looked and let it stand.
+ * LOIS passes: the slot closes with the deal untouched. His pass is a move and is logged as one —
+ * the table records that he looked and let it stand.
  */
 export function passCut(round) {
   if (round.phase !== 'judging' || round.cut) return round;
@@ -97,8 +97,8 @@ export function passCut(round) {
 }
 
 /**
- * LOIS spends her one cut. `verdict` is the judge's word (curator/loisCut.mjs): { reason, gate, value,
- * limit } — the reason is required and non-empty, because LOIS may not cut silently (spec §4: she may
+ * LOIS spends his one cut. `verdict` is the judge's word (curator/loisCut.mjs): { reason, gate, value,
+ * limit } — the reason is required and non-empty, because LOIS may not cut silently (spec §4: he may
  * not propose, cut twice, or cut silently). `deal` is the post-cut hand the caller's executor produced
  * (D2's shape lives there, not here); it is installed frozen as the standing deal, and the cut record
  * keeps the before/after hands so the spend stays inspectable.
