@@ -6,12 +6,14 @@
 //      numbers the code ran with before the table existed
 //   B  the consumers: mindConduct / loisCut export the table's shipped values, so the constants every
 //      existing pin reads are the table's, not a copy that can drift (the sway module's cross-pin
-//      lives in its own suite, beside the module — the deniability geography)
+//      lives in its own suite, beside the module — the deniability geography); loisRank reads the
+//      table live, pinned behaviourally in D3
 //   C  the validator bites: drift, a probability out of range, half-ruled odds, odds that do not sum,
 //      and a dangling answersFirst are each named as problems
 //   D  the DEV rig: a live edit moves the mechanics without reload (the brake lets a bolder move in,
-//      the cut gates stop cutting at zero), refused edits change nothing (unruled leaves, unknown
-//      paths, invalid values), and Reset restores the shipped table
+//      the cut gates stop cutting at zero, loisRank's verdict and heuristic follow the table),
+//      refused edits change nothing (unruled leaves, unknown paths, invalid values), and Reset
+//      restores the shipped table
 //   E  rig, never scene: tuning.mjs imports only its JSON — no store, no project, no storage — so an
 //      edit cannot be saved anywhere; a fresh read of the module contract starts with no edits in force
 import assert from 'node:assert';
@@ -31,6 +33,7 @@ import {
 } from './tuning.mjs';
 import { BRAKE_AT, BRAKE_MAX, DAVIS_MAX_ROUTES, BOLD_BAND, davisRoute } from '../curator/mindConduct.js';
 import { LOIS_CUT_GATES, judgeDeal } from '../curator/loisCut.mjs';
+import { loisVerdict, scoreLoisHeuristic } from '../curator/loisRank.js';
 import { CHAPTERS, chapterLooks } from '../data/chapters.js';
 
 let passed = 0;
@@ -70,6 +73,9 @@ ok("A3 today's measured values: the table ships the numbers the code ran with", 
   const p = TUNING_DEFAULTS.personas;
   assert.deepStrictEqual(p.lois.knobs.brake, { at: 0.5, max: 0.4 });
   assert.deepStrictEqual(p.lois.knobs.cutGates, { glance: 0.28, originality: 0.22, boldness: 0.3 });
+  assert.deepStrictEqual(p.lois.knobs.rankWeights, { glance: 0.34, originality: 0.42, boldness: 0.24 });
+  assert.equal(p.lois.knobs.originalityDivisor, 0.35);
+  assert.deepStrictEqual(p.lois.knobs.praiseGates, { glance: 0.55, originality: 0.45, boldness: 0.55 });
   assert.deepStrictEqual(p.lois.knobs.flatRead, {
     biasSwing: 0.5,
     happyKeepRate: 0.15,
@@ -206,7 +212,47 @@ ok("D2 a live edit moves the mechanics without reload: LOIS's brake and his cut 
   assert.equal(JSON.stringify(davisRoute(show, 0, 0)), JSON.stringify(braked), 'and the mechanics read the shipped values again');
 });
 
-ok('D3 refused edits change nothing: unruled leaves, unknown paths, sections, invalid values', () => {
+ok("D3 loisRank reads the table: the verdict's gates and the heuristic's numbers move with a live edit", () => {
+  // The QA finding on this PR: loisVerdict hard-coded its own copy of the cut gates (and the
+  // heuristic its weights/divisor, the praise lines their thresholds). If any of those numbers
+  // ever lives in loisRank.js again instead of the table, the edits below stop moving the
+  // behaviour and this check fails — the two modules cannot diverge silently.
+  const parts = { glance: 0.5, originality: 0.5, boldness: 0.5 };
+  assert.equal(loisVerdict(parts), 'Ninety-nine percent of this is zero.', 'shipped gates: the middling parts draw the fall-through line');
+  const features = {
+    markSize: 0.7,
+    coverage: 0.3,
+    opacity: 0.6,
+    markDensity: 0.4,
+    disorder: 0.65,
+    sizeVariety: 0.35,
+    rotationSpread: 0.55,
+    flowEnergy: 0.45,
+    windPush: 0.6,
+  };
+  const mean = Object.fromEntries(Object.keys(features).map((k) => [k, 0.5]));
+  const scoredAtRest = scoreLoisHeuristic(features, mean);
+  assert.ok(scoredAtRest.originality > 0 && scoredAtRest.originality < 1, 'the probe parts sit off the divisor cap');
+  try {
+    assert.equal(setTuningValue('personas.lois.knobs.cutGates.glance', 0.9).ok, true);
+    assert.equal(loisVerdict(parts), 'No hit at a glance. Out.', "the verdict's glance gate is the table's cutGates.glance");
+    assert.equal(setTuningValue('personas.lois.knobs.cutGates.glance', 0.28).ok, true);
+    assert.equal(setTuningValue('personas.lois.knobs.praiseGates.boldness', 0.4).ok, true);
+    assert.equal(loisVerdict(parts), "That took a nanosecond. Don't flinch.", "the verdict's praise gate is the table's praiseGates.boldness");
+    assert.equal(setTuningValue('personas.lois.knobs.rankWeights.glance', 0).ok, true);
+    assert.equal(setTuningValue('personas.lois.knobs.rankWeights.originality', 0).ok, true);
+    const rescored = scoreLoisHeuristic(features, mean);
+    assert.equal(rescored.score, 0.24 * rescored.boldness, "the score's weights are the table's rankWeights");
+    assert.equal(setTuningValue('personas.lois.knobs.originalityDivisor', 0.7).ok, true);
+    assert.equal(scoreLoisHeuristic(features, mean).originality, scoredAtRest.originality / 2, "the originality divisor is the table's");
+  } finally {
+    resetTuning();
+  }
+  assert.equal(loisVerdict(parts), 'Ninety-nine percent of this is zero.', 'after reset the verdict reads the shipped gates again');
+  assert.deepStrictEqual(scoreLoisHeuristic(features, mean), scoredAtRest, 'after reset the heuristic reads the shipped numbers again');
+});
+
+ok('D4 refused edits change nothing: unruled leaves, unknown paths, sections, invalid values', () => {
   assert.equal(setTuningValue('band.tradeRate', 0.5).ok, false, 'an unruled leaf cannot be edited into a ruling');
   assert.equal(setTuningValue('relations.lois->davis', -0.5).ok, false, 'an unruled relation cannot be edited');
   assert.equal(setTuningValue('personas.lois.knobs.brake.nope', 1).ok, false, 'an unknown path is refused');
