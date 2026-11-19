@@ -193,7 +193,7 @@ assert.strictEqual(NATIVE_STAMP_IDS.size, 289, 'the native face did NOT grow: sl
 // #2150 RE-PIN (cause: type exclusivity): the caps/digits pack (36) joins the union — FIELD deals the base face alone now.
 assert.strictEqual(
   POEM_ONLY_STAMP_IDS.size,
-  289 + 43 + 52 + 4 + 52 + 208 + 36,
+  289 + 43 + 52 + 4 + 52 + 208 + 36 + 104, // #2385 RE-PIN: +104 HYBRID bitmap letters join the union on the worn letters' road
   'the poem-only union grew by exactly the slice-3 packs, by #2005’s plate pack (52), by #2010’s worn letters (208), and by #2150’s caps/digits (36)',
 );
 for (const id of [...LATIN_STAMP_IDS, ...SERIF_STAMP_IDS, ...ORNAMENT_STAMP_IDS]) {
@@ -450,7 +450,7 @@ assert.ok(
 );
 assert.strictEqual(
   ASSETS.length,
-  602 + (26 + 17 + 52 + 4) + 52 + 24 + 208 + 66, // #2108 RE-PIN: +66 house constructs, same road
+  602 + (26 + 17 + 52 + 4) + 52 + 24 + 208 + 66 + 104, // #2108 RE-PIN: +66 house constructs, same road; #2385 RE-PIN: +104 HYBRID bitmap letters
   'the catalogue arithmetic: 602 + (26 lowercase + 17 punct + 52 serif + 4 ornaments) + 52 plate stamps (#2005) + 24 riso icons (#2008) + 208 worn letters (#2010)',
 );
 for (const a of [...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS]) {

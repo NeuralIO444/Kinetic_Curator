@@ -13,6 +13,7 @@ import { ASSETS_SERIF } from './assets-serif.js';
 import { ASSETS_ORNAMENTS } from './assets-ornaments.js';
 import { ASSETS_PLATE } from './assets-plate.js';
 import { ASSETS_WEAR } from './assets-wear.js';
+import { ASSETS_BITMAP } from './assets-bitmap.js';
 import { ASSETS_RISO } from './assets-riso.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
@@ -108,5 +109,9 @@ export const ASSETS = [
   // surface, dealt only by the riso field dealer (engine/risoField.mjs).
   ...ASSETS_RISO,
   ...ASSETS_CONSTRUCTS,
+  // Persona Kernel P5 (#2385) — HYBRID's bitmap letters (scripts/gen-bitmap.mjs): catalogue members on the same terms as
+  // the worn letters above (poem-only, excluded by id on every dealing surface, named only by HYBRID's bitmap draw).
+  // Just before the citizen, which stays last.
+  ...ASSETS_BITMAP,
   CREATURE_CITIZEN,
 ];

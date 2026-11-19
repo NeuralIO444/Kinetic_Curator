@@ -126,6 +126,19 @@ export function validatePersonaRecord(record) {
         at('doctrine.modes must be a non-empty array of mode ids');
       if (new Set(d.modes).size !== d.modes.length) at('doctrine.modes must be unique');
       if (d.title !== undefined && typeof d.title !== 'string') at('doctrine.title must be a string');
+      if (d.owns !== undefined) {
+        const o = d.owns;
+        if (!isPlainObject(o)) at('doctrine.owns must be an object');
+        else {
+          if (
+            o.patternModes !== undefined &&
+            (!Array.isArray(o.patternModes) || o.patternModes.some((m) => typeof m !== 'string' || !m))
+          )
+            at('doctrine.owns.patternModes must be an array of pattern mode names');
+          if (o.principle !== undefined && (typeof o.principle !== 'string' || !o.principle))
+            at('doctrine.owns.principle must be a non-empty string');
+        }
+      }
     }
   }
   return problems;

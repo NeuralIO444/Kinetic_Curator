@@ -10,6 +10,7 @@ import {
   hornLabel,
   hornCallsign,
 } from './hornFaces.js';
+import { hybridSignals } from './hybrid.mjs';
 import { blastGeometry, hybridGeometry, gritGeometry, hash01 } from './hornFaceGeometry.js';
 import { createBandState, applyTurn } from '../personas/band.mjs';
 
@@ -118,12 +119,71 @@ ok(
       band: { owns: false, phrase: 4, answer: { verdict: 'agree', move: 'build', to: 'ashworth' } },
     });
     assert.deepEqual([built.code, built.layers, built.word, built.variant], ['BUILD', 3, 'BUILDING', 4]);
-    assert.equal(
-      resolveHornState('greiman', { standing: 'greiman' }).code,
-      'REST',
-      'she is not a doctrine until P5 (#2385)',
+    const armed = resolveHornState('greiman', { standing: 'greiman' });
+    assert.deepEqual(
+      [armed.code, armed.word, armed.armed],
+      ['ARMED', 'ARMED', true],
+      'a standing HYBRID is armed (P5, #2385)',
     );
     assert.equal(resolveHornState('greiman', { standing: 'carson' }).code, 'REST');
+  },
+);
+
+ok(
+  'HYBRID measured moves (#2385): bake / layers / spectrum read off the stage record, change the picture, never the words',
+  () => {
+    const sig = (raygun) => hybridSignals(raygun);
+    assert.equal(sig({ mode: 'carson', bitmap: 1 }), null, 'only a greiman record is HYBRID\u2019s');
+    assert.deepEqual({ ...sig({ mode: 'greiman' }) }, { bake: false, layers: false, spectrum: false });
+    const base = resolveHornState('greiman', { stageMode: 'greiman', stageSeed: 3 });
+    assert.deepEqual([base.bake, base.spectrum, base.layers], [false, false, 1], 'the float names none');
+    const bm = resolveHornState('greiman', {
+      stageMode: 'greiman',
+      stageSeed: 3,
+      hybrid: sig({ mode: 'greiman', bitmap: 1 }),
+    });
+    assert.deepEqual([bm.bake, bm.layers, bm.spectrum, bm.word, bm.code], [true, 1, false, 'SPECTRUM', 'ON']);
+    const pl = resolveHornState('greiman', {
+      stageMode: 'greiman',
+      stageSeed: 3,
+      hybrid: sig({ mode: 'greiman', planes: 1 }),
+    });
+    assert.deepEqual(
+      [pl.bake, pl.layers, pl.spectrum, pl.word],
+      [false, 3, false, 'SPECTRUM'],
+      'planes stack the layers without a band turn',
+    );
+    const sp = resolveHornState('greiman', {
+      stageMode: 'greiman',
+      stageSeed: 3,
+      hybrid: sig({ mode: 'greiman', spectrum: 1 }),
+    });
+    assert.deepEqual([sp.bake, sp.layers, sp.spectrum], [false, 1, true]);
+    assert.ok(sp.reasons.includes('spectrum') && bm.reasons.includes('bake') && pl.reasons.includes('layers'));
+    // a signal with no HYBRID stage under it is not read (the stage is the measurement)
+    const off = resolveHornState('greiman', { hybrid: sig({ mode: 'greiman', bitmap: 1 }) });
+    assert.deepEqual([off.code, off.bake], ['REST', false]);
+    // no new copy: every word is still one of the existing signed-state words
+    const words = new Set(Object.values(HORN_WORDS).flat().filter(Boolean));
+    for (const s of [base, bm, pl, sp, resolveHornState('greiman', { standing: 'greiman' })])
+      assert.ok(words.has(s.word), `${s.word} is an existing state word`);
+    // the picture moves with the measurement, and only with it
+    const plain = hybridGeometry({ layers: 1, variant: 2 });
+    assert.deepEqual(
+      hybridGeometry({ layers: 1, variant: 2, bake: false, spectrum: false }),
+      plain,
+      'no signal: the picture as it was',
+    );
+    const hues = (g) => g.layers[0].cells.map((c) => c.hue);
+    assert.ok(
+      hues(hybridGeometry({ layers: 1, variant: 2, bake: true })).every((h) => h % 60 === 0),
+      'bake snaps to hard pixel bands',
+    );
+    assert.notDeepEqual(
+      hues(hybridGeometry({ layers: 1, variant: 2, spectrum: true })),
+      hues(plain),
+      'spectrum stretches the run',
+    );
   },
 );
 

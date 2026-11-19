@@ -106,6 +106,7 @@ const { ASSETS_ORNAMENTS } = await import('../data/assets/assets-ornaments.js');
 const { ASSETS_PLATE } = await import('../data/assets/assets-plate.js');
 const { ASSETS_RISO } = await import('../data/assets/assets-riso.js');
 const { ASSETS_WEAR } = await import('../data/assets/assets-wear.js'); // #2010 P1
+const { ASSETS_BITMAP } = await import('../data/assets/assets-bitmap.js'); // #2385 P5
 const { ASSETS_LETTERS } = await import('../data/assets/assets-letterforms.js'); // #2150
 const { SOLO_TEXT_STAMP_IDS } = await import('../data/assets/assets-stamp-radial.js'); // #2150
 const { PIXEL_LETTER_ANATOMY_IDS } = await import('../data/assets/assets-pixel-glyphs.js'); // #2150 (Q4)
@@ -119,6 +120,7 @@ const kanaIds = new Set([
     ...ASSETS_PLATE,
     ...ASSETS_RISO,
     ...ASSETS_WEAR,
+    ...ASSETS_BITMAP,
     ...ASSETS_LETTERS,
     ...(await import('../data/assets/index.js')).ASSETS_CONSTRUCTS, // #2108
   ].map((k) => k.id),

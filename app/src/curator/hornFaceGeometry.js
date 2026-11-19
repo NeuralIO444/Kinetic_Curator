@@ -68,10 +68,14 @@ const H_CELL = 5.5;
 const H_SIDE = H_N * H_CELL;
 const H_X0 = (FACE_BOX - H_SIDE) / 2;
 
+const hybridHue = (s, raw) => (s.bake ? Math.floor((raw % 360) / 60) * 60 : raw % 360);
+
 /**
- * @param {{layers:number, variant?:number}} s
+ * @param {{layers:number, variant?:number, bake?:boolean, spectrum?:boolean}} s
  * @returns {{ layers: { dx:number, dy:number, o:number, cells: {x:number,y:number,s:number,hue:number}[] }[] }}
  *   back layer first. The hue of a cell is its place on the spectrum; the variant moves the whole square along it.
+ *   Measured moves (P5): `bake` snaps the hue to hard 60-degree pixel bands (the bitmap type on the stage);
+ *   `spectrum` stretches the run across the block (the gradient on the stage). Neither set: the picture as it was.
  */
 export function hybridGeometry(s) {
   const n = s.layers >= 3 ? 3 : 1;
@@ -88,7 +92,7 @@ export function hybridGeometry(s) {
           x: H_X0 + c * H_CELL,
           y: H_X0 + r * H_CELL,
           s: H_CELL - 0.6,
-          hue: (v * 40 + (c + r) * 22 + l * 50) % 360,
+          hue: hybridHue(s, v * 40 + (c + r) * (s.spectrum ? 34 : 22) + l * 50),
         });
       }
     }

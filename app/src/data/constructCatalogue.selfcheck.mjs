@@ -31,7 +31,12 @@ const ids = new Set(ASSETS_CONSTRUCTS.map((a) => a.id));
   assert.equal(inLib.length, 66, 'all 66 are catalogue members');
   assert.equal(new Set(ASSETS.map((a) => a.id)).size, ASSETS.length, 'no id collides with the library');
   const rest = ASSETS.filter((a) => !ids.has(a.id));
-  assert.equal(rest.length, 985, 'the library before the house set is 985, as it was');
+  // #2385 RE-PIN: the other 985 are untouched; HYBRID's 104 bitmap letters (poem-only, like the worn letters) join the rest.
+  assert.equal(
+    rest.length,
+    985 + 104,
+    'the library before the house set is 985 + the 104 bitmap letters (#2385), the 985 as they were',
+  );
   ok('66 construct tiles in the catalogue, unique; the other 985 are untouched');
 }
 

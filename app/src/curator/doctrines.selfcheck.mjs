@@ -50,14 +50,19 @@ const reset = (fieldForm = form, lockedParams = {}, extra = {}) => {
 };
 
 // ── A · the chooser ──────────────────────────────────────────────────────
-ok('A1 two doctrines; CARSON arms carson|shot, ASHWORTH arms grit; no greiman, no third', () => {
-  assert.deepStrictEqual([...DOCTRINE_IDS].sort(), ['ashworth', 'carson']);
-  assert.deepStrictEqual([...DOCTRINES.carson.modes], ['carson', 'shot']);
-  assert.deepStrictEqual([...DOCTRINES.ashworth.modes], ['grit']);
-  assert.equal(isDoctrine('carson') && isDoctrine('ashworth'), true);
-  for (const bad of ['', 'greiman', 'CARSON', null, undefined, 1, {}, 'toString'])
-    assert.equal(isDoctrine(bad), false, `${String(bad)} is no doctrine`);
-});
+ok(
+  'A1 three doctrines; CARSON arms carson|shot, ASHWORTH arms grit, GREIMAN (HYBRID, #2385) arms greiman; no fourth',
+  () => {
+    assert.deepStrictEqual([...DOCTRINE_IDS].sort(), ['ashworth', 'carson', 'greiman']);
+    assert.deepStrictEqual([...DOCTRINES.greiman.modes], ['greiman']);
+    assert.equal(DOCTRINES.greiman.name, 'HYBRID');
+    assert.deepStrictEqual([...DOCTRINES.carson.modes], ['carson', 'shot']);
+    assert.deepStrictEqual([...DOCTRINES.ashworth.modes], ['grit']);
+    assert.equal(isDoctrine('carson') && isDoctrine('ashworth') && isDoctrine('greiman'), true);
+    for (const bad of ['', 'CARSON', null, undefined, 1, {}, 'toString'])
+      assert.equal(isDoctrine(bad), false, `${String(bad)} is no doctrine`);
+  },
+);
 
 ok('A2 doctrineMode: the draw picks; a standing mode is never re-picked; unknown → null; out-of-range clamps', () => {
   assert.equal(doctrineMode('carson', 0), 'carson');
@@ -71,18 +76,18 @@ ok('A2 doctrineMode: the draw picks; a standing mode is never re-picked; unknown
   assert.equal(doctrineMode('carson', NaN), 'carson');
   assert.equal(doctrineOfMode('shot'), 'carson');
   assert.equal(doctrineOfMode('grit'), 'ashworth');
-  assert.equal(doctrineOfMode('greiman'), null);
+  assert.equal(doctrineOfMode('greiman'), 'greiman', 'HYBRID arms the float mode (#2385)');
 });
 
 // ── B · the record ───────────────────────────────────────────────────────
 ok('B1 the door carries `doctrine`, names nothing else, and adds no key without it', () => {
-  for (const doctrine of ['carson', 'ashworth']) {
+  for (const doctrine of ['carson', 'ashworth', 'greiman']) {
     const r = sanitizeFieldForm({ ...form, raygun: { mode: 'carson', seed: 9, wear: 1, distort: 1, doctrine } });
     assert.equal(r.raygun.doctrine, doctrine);
   }
   const plain = sanitizeFieldForm({ ...form, raygun: { mode: 'carson', seed: 9, wear: 1, distort: 1 } });
   assert.ok(!('doctrine' in plain.raygun), 'a performer’s arm names no doctrine');
-  for (const bad of ['', 'greiman', 'Carson', 1, true, null, {}])
+  for (const bad of ['', 'hybrid', 'Carson', 1, true, null, {}])
     assert.equal(
       sanitizeFieldForm({ ...form, raygun: { mode: 'carson', seed: 9, wear: 1, doctrine: bad } }),
       null,
@@ -96,8 +101,10 @@ ok('C1 setPoemDoctrine: session state — no undo step, unknown refused, no-op r
   S().setPoemDoctrine('carson');
   assert.equal(S().poemDoctrine, 'carson');
   assert.equal(S().historyUndoStack.length, 0, 'not a document edit');
-  S().setPoemDoctrine('greiman');
+  S().setPoemDoctrine('nobody');
   assert.equal(S().poemDoctrine, 'carson', 'an unknown doctrine is refused');
+  S().setPoemDoctrine('greiman');
+  assert.equal(S().poemDoctrine, 'greiman', 'HYBRID is a doctrine since P5 (#2385)');
   S().setPoemDoctrine(null);
   assert.equal(S().poemDoctrine, null);
 });
@@ -113,8 +120,13 @@ ok(
       {
         assert.ok(DOCTRINES[id].modes.includes(f.raygun.mode), `${id}: mode ${f.raygun.mode} is its own`);
         assert.equal(f.raygun.doctrine, id);
-        assert.equal(f.raygun.wear, 1);
-        assert.equal(f.raygun.distort, 1);
+        if (id === 'greiman') {
+          // HYBRID is the clean digital pole: she names her move (or the plain float), never the hot/process-first material
+          assert.ok(!('wear' in f.raygun) && !('distort' in f.raygun), 'HYBRID names no wear or distort axis');
+        } else {
+          assert.equal(f.raygun.wear, 1);
+          assert.equal(f.raygun.distort, 1);
+        }
         assert.equal(S().raygunTap, 0, 'the performer’s tap counter never moves for a deal');
       }
     }
@@ -227,7 +239,7 @@ ok('D1 callPoemDoctrine arms the standing poem: one undo step, named, announced 
 ok('D2 the surface: a bad caller or doctrine is refused; HOLD refuses a non-performer call', () => {
   reset();
   assert.equal(treatments.doctrine('poem', { call: 'carson', by: 'nobody' }), false);
-  assert.equal(treatments.doctrine('poem', { call: 'greiman', by: 'director' }), false);
+  assert.equal(treatments.doctrine('poem', { call: 'nobody', by: 'director' }), false);
   reset(form, { fieldForm: form });
   assert.equal(treatments.doctrine('poem', { call: 'carson', by: 'director' }), false, 'HOLD is sovereign');
   assert.ok(!S().layoutParams.fieldForm.raygun);

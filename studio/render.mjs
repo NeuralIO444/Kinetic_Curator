@@ -21,8 +21,9 @@ import { ASSETS_SERIF } from '../app/src/data/assets/assets-serif.js'; // #2002 
 import { ASSETS_ORNAMENTS } from '../app/src/data/assets/assets-ornaments.js'; // #2002 — the poem-only ornament stamps, same exclusion
 
 import { ASSETS_WEAR } from '../app/src/data/assets/assets-wear.js'; // #2010 P1 — the poem-only worn letters, same exclusion
+import { ASSETS_BITMAP } from '../app/src/data/assets/assets-bitmap.js'; // #2385 P5 — HYBRID's poem-only bitmap letters, same exclusion
 const KANA_IDS = new Set(
-  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS, ...ASSETS_WEAR].map((a) => a.id),
+  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS, ...ASSETS_WEAR, ...ASSETS_BITMAP].map((a) => a.id),
 );
 import { buildPlacements, clampCount } from '../app/src/engine/buildPlacements.js';
 import { bakeSwarmItems, ensureSwarmWasm } from '../app/src/engine/kernel/bake/index.js';

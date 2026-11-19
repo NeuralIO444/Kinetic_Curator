@@ -8,17 +8,20 @@
 //   stageMode  the standing poem's treatment mode (layoutParams.fieldForm.raygun.mode) — 'carson' | 'shot' are
 //              BLAST's, 'greiman' is HYBRID's (today's float mode, spec Q13 item 4), 'grit' is SWISS GRIT's. Set by
 //              the performer's tap or by a doctrine's call; either way it is what is ON THE STAGE.
-//   standing   the doctrine the Director has handed the stage to (state.poemDoctrine): 'carson' | 'ashworth' | null.
-//              Armed for the next deal. HYBRID is not a doctrine yet (P5 #2385), so no horn reads 'greiman' here.
+//   standing   the doctrine the Director has handed the stage to (state.poemDoctrine): 'carson' | 'greiman' |
+//              'ashworth' | null. Armed for the next deal (HYBRID joined with P5, #2385).
+//   hybrid     HYBRID's three measured moves, read off the standing treatment record (curator/hybrid.mjs
+//              hybridSignals): { bake, layers, spectrum } — the bitmap type, the translucent planes, the colour
+//              gradient actually on the stage. Null when the stage is not HYBRID's.
 //   heat       the KIN tap heat step the instrument is showing (panels/layout/kineticHeat.mjs heatStep, 0..3). The
 //              one measured heat in the instrument today; it sets how hard BLAST tears, and only while BLAST holds
 //              the floor.
 //   band       what the band did THIS phrase to this horn (bandRead below), from the personas/bandLive.js view.
 //              Null when the band is off — the default — and, with the shipped null tuning table, always at rest.
 //
-// Not wired yet (so the face shows its at-rest state and says nothing more): HYBRID's bitmap bake, layered planes
-// and spectrum colour (P5 #2385) and every doctrine's layout moves (P6 #2386). Until they land, HYBRID leaves rest
-// only on its stage mode or on a band turn; SWISS GRIT and BLAST also on their standing doctrine.
+// HYBRID's bake / layers / spectrum are measured now (P5 #2385): they change her picture (hornFaceGeometry.js), not her
+// state word — the words below are the only copy this module produces, and P5 adds none. Not wired yet: every
+// doctrine's layout moves (P6 #2386).
 //
 // Surface law (R6): callsigns only. The state words below are the only copy this module produces.
 
@@ -35,8 +38,8 @@ export const HORN_STAGE_MODES = Object.freeze({
   ashworth: Object.freeze(['grit']),
 });
 
-/** The doctrines the Director can hand the stage to (today BLAST and SWISS GRIT; HYBRID joins with P5). */
-export const HORN_DOCTRINE_IDS = Object.freeze(['carson', 'ashworth']);
+/** The doctrines the Director can hand the stage to: BLAST, HYBRID (P5) and SWISS GRIT. */
+export const HORN_DOCTRINE_IDS = Object.freeze(['carson', 'greiman', 'ashworth']);
 
 /** The tile's lowercase callsign, as the existing tiles set theirs (`cover`, `overlap`). */
 export const hornLabel = (id) => getPersona(id).identity.callsign.toLowerCase();
@@ -91,13 +94,15 @@ export function bandRead(id, view) {
  * One horn's face state from the measured inputs. Pure and total: junk in, rest out.
  *
  * @param {string} id  'carson' | 'greiman' | 'ashworth'
- * @param {{ stageMode?: string|null, stageSeed?: number|null, standing?: string|null, heat?: number, band?: object|null }} [m]
+ * @param {{ stageMode?: string|null, stageSeed?: number|null, standing?: string|null, heat?: number, band?: object|null,
+ *           hybrid?: { bake?: boolean, layers?: boolean, spectrum?: boolean }|null }} [m]
  * @returns {{ id:string, code:'REST'|'ARMED'|'ON'|'BUILD', word:string, degree:number, layers:number, armed:boolean,
  *             variant:number, reasons:string[] }}
  *   code     REST laid out · ARMED the doctrine stands, nothing on the stage yet · ON holding the floor · BUILD agreed
  *            with the call this phrase
  *   degree   0..3 — how torn (BLAST: the heat step) or how misregistered/gritted (SWISS GRIT); 0 for HYBRID
- *   layers   1 or 3 — HYBRID's translucent stack (3 only while she builds on someone)
+ *   layers   1 or 3 — HYBRID's translucent stack (3 while she builds on someone, or while the stage is in her planes)
+ *   bake, spectrum  HYBRID's measured bitmap type / colour gradient on the stage (false at rest, for every other horn)
  *   variant  the measured integer that picks the pattern (the band's phrase, else the stage record's seed); 0 at rest
  */
 export function resolveHornState(id, m = {}) {
@@ -109,6 +114,8 @@ export function resolveHornState(id, m = {}) {
     layers: 1,
     armed: false,
     variant: 0,
+    bake: false,
+    spectrum: false,
     reasons: Object.freeze([]),
   });
   if (!isHorn(id)) return rest;
@@ -141,8 +148,18 @@ export function resolveHornState(id, m = {}) {
     return rest;
   }
   if (id === 'greiman') {
-    if (build) return out({ code: 'BUILD', word: HORN_WORDS.BUILD, layers: 3 });
-    if (onFloor) return out({ code: 'ON', word: HORN_WORDS.SPECTRUM });
+    // the measured moves count only while the stage is actually HYBRID's (her own record is on it)
+    const hy = stage && m.hybrid ? m.hybrid : null;
+    const bake = !!hy && hy.bake === true;
+    const planes = !!hy && hy.layers === true;
+    const spectrum = !!hy && hy.spectrum === true;
+    if (bake) reasons.push('bake');
+    if (planes) reasons.push('layers');
+    if (spectrum) reasons.push('spectrum');
+    const layers = build || planes ? 3 : 1;
+    if (build) return out({ code: 'BUILD', word: HORN_WORDS.BUILD, layers, bake, spectrum });
+    if (onFloor) return out({ code: 'ON', word: HORN_WORDS.SPECTRUM, layers, bake, spectrum });
+    if (standing) return out({ code: 'ARMED', word: HORN_WORDS.ARMED, armed: true, variant: 0 });
     return rest;
   }
   // ashworth: the grid first, the destruction by rule — it grits only while it is actually destroying
