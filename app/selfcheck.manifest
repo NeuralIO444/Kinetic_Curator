@@ -732,6 +732,7 @@ node src/curator/doctrines.selfcheck.mjs
 node src/personas/personaKernel.selfcheck.mjs
 node src/personas/personaTuning.selfcheck.mjs
 node src/personas/callsignSweep.selfcheck.mjs
+node src/personas/personaArchive.selfcheck.mjs
 node src/engine/motionCore/motionCore.selfcheck.mjs
 node src/engine/motionCore/rigSources.selfcheck.mjs
 node src/engine/motionCore/kinemeSources.selfcheck.mjs
