@@ -16,6 +16,7 @@ import { ASSETS_WEAR } from './assets-wear.js';
 import { ASSETS_RISO } from './assets-riso.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
+import { ASSETS_TECHNO_DOTS } from './assets-techno-dots.js'; // #2107: the Techno dots, recipes over existing marks
 import { houseConstructSet } from '../../engine/constructHouse.js'; // #2108: the construct house set
 import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes (#725) baked for the library
 
@@ -30,6 +31,7 @@ export const ASSETS_AUTHORED = [
   ...ASSETS_LETTERS,
   ...ASSETS_PIXEL,
   ...ASSETS_MARKS, // #1854 — the Marks chapter pool, authored content (BOOK S1b)
+  ...ASSETS_TECHNO_DOTS, // #2107 — four Techno dot records composed from existing dot + HUD marks (appended last)
 ];
 
 // #1432 — every built-in carries `regions` + `regionSlots`, the exact shape overlay.js validates for user imports. An
