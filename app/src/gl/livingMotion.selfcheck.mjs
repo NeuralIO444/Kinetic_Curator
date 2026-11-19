@@ -470,7 +470,11 @@ await ok(
 await ok(
   'blend: no world, the house world, and a memberless chapter’s world all pass the amounts through exactly',
   async () => {
-    for (const world of [undefined, HOUSE_WORLD, worldForChapter('techno')]) {
+    // #2107 re-pin: techno was the memberless chapter until its chapter landed (it now blends — pinned below);
+    // every chapter is built now, so the memberless case is a world whose chapter the Book does not hold —
+    // techno's own stock entry under an unbuilt id, so only the chapter lookup differs.
+    const memberless = { ...worldForChapter('techno'), chapter: 'unbuilt' };
+    for (const world of [undefined, HOUSE_WORLD, memberless]) {
       createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, ...(world ? { world } : {}) }));
       const amounts = getLastFrameMotion().kineme.amounts;
       assert.equal(amounts.breath, 0.3, `breath untouched (world: ${world?.chapter ?? 'none'})`);
@@ -478,6 +482,15 @@ await ok(
     }
   },
 );
+
+await ok('blend: #2107 — the Techno chapter now stands on a measured style, so its world pulls', async () => {
+  const resp = chapterStyleResponse('techno');
+  assert.ok(resp?.kineme, 'the techno chapter stands on a measured style');
+  createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, world: worldForChapter('techno') }));
+  const amounts = getLastFrameMotion().kineme.amounts;
+  assert.equal(amounts.breath, 0.3 + RESPONSE_BLEND_PULL * (resp.kineme.breath - 0.3), 'breath moved halfway');
+  assert.equal(amounts.drift, 0.5 + RESPONSE_BLEND_PULL * (resp.kineme.drift - 0.5), 'drift moved halfway');
+});
 
 await ok('blend: the pull can wake a still floor — and only with a measured world standing', async () => {
   const zero = { kinemeBreath: 0, kinemeDrift: 0, kinemePulse: 0, kinemePaletteBreath: 0, kinemeBrushWobble: 0 };

@@ -3,7 +3,9 @@
 // declares, no edits to any authored record, and nothing the performer sees (silence is default; landing is S2).
 //
 // The spine is D1's ruling (Matt, 2026-10-31): the book OPENS at the primitive chapter —
-//   Marks → Engraving → Bauhaus → Swiss → Op Art → Japan → Memphis → Grunge → Now
+//   Marks → Engraving → Bauhaus → Organic → Swiss → Op Art → Japan → Memphis → Pixel → Grunge → Techno → Now
+// #2107 (Matt, 2026-11-18): Organic, Pixel and Techno joined by era, each inserted between two existing chapters
+// (Organic after Bauhaus, Pixel after Memphis, Techno after Grunge); the nine kept their relative order.
 // #2046 — a chapter is no longer only an address book: it also carries `settings` (palette / motion / feel)
 // that a system can apply, and taste reads the standing chapter back (curator/taste.js, chapterSettings below).
 // A chapter declares: its look group(s) (data/styleLooks.js + presets.js), its asset styles/families
@@ -116,6 +118,15 @@ const SPINE = [
     card: { paletteId: 'solar-max', marks: ['geo_tri_01', 'geo_square_03', 'geo_circle_01'] },
   },
   {
+    // #2107 (Matt, 2026-11-18) — biomorphic modernism, after Bauhaus. Its deck is the four GROWN looks and the
+    // organic voice family (#2407); the card palette is the Oxman baseline's GROWN (persona-oxman).
+    id: 'organic',
+    name: 'Organic',
+    style: 'organic',
+    ...canonChapterAxes('organic'),
+    card: { paletteId: 'persona-oxman', marks: ['org_blob_01', 'org_drop_01', 'org_pod_01'] },
+  },
+  {
     // Swiss is its own group — DIAGONAL GRID lives here, not in Bauhaus. The taxonomy in code is the taxonomy.
     id: 'swiss',
     name: 'Swiss',
@@ -145,11 +156,30 @@ const SPINE = [
     card: { paletteId: 'neon-brood', marks: ['geo_star4_01', 'geo_star5_01', 'geo_chev_01'] },
   },
   {
+    // #2107 (Matt, 2026-11-18) — 1980s 8-bit, after Memphis. Its deck is the four pixel looks and the pixel voice
+    // family (#2407); the card palette is the Menkman baseline's COMPRESSION (persona-menkman). The letter-anatomy
+    // emblems are undealt (#2150), so the card marks come from the dealable pxg_* set.
+    id: 'pixel',
+    name: 'Pixel',
+    style: 'pixel',
+    ...canonChapterAxes('pixel'),
+    card: { paletteId: 'persona-menkman', marks: ['pxg_window', 'pxg_key', 'pxg_spark'] },
+  },
+  {
     id: 'grunge',
     name: 'Grunge',
     style: 'grunge',
     ...canonChapterAxes('grunge'),
     card: { paletteId: 'dirty', marks: ['stamp_num_01', 'stamp_glyph_01', 'stamp_num_02'] },
+  },
+  {
+    // #2107 (Matt, 2026-11-18) — late-90s rave and club print, after Grunge. Its deck is the four techno looks and
+    // the techno voice family (#2407); the card palette is the TDR baseline's TRANSIT (shared with Swiss's card).
+    id: 'techno',
+    name: 'Techno',
+    style: 'techno',
+    ...canonChapterAxes('techno'),
+    card: { paletteId: 'transit', marks: ['mic_crosshair', 'xsh04', 'mic_dial'] },
   },
   {
     // Now — the instrument's own era: the full library. Its lists are built from the source tables

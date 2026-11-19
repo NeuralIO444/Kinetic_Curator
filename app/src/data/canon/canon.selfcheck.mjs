@@ -83,7 +83,7 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   // a style with no Look group or voice family is still a whole record (its members are honestly empty or paired)
   const techno = canonStyle('techno');
   assert.deepEqual(techno.looks, ['rail-yard', 'readout', 'circuit', 'scan-sweep']); // #2107: techno has its four looks
-  assert.equal(techno.chapter, null);
+  assert.equal(techno.chapter, 'techno'); // #2107 re-pin: was null until the Techno chapter landed
   assert.ok(techno.voices.includes('dark-glass'), 'techno finds the flagship that pairs with it');
 }
 
@@ -118,8 +118,8 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   const chaptersSrc = src('chapters.js');
   assert.equal(
     (chaptersSrc.match(/\.\.\.canonChapterAxes\('/g) || []).length,
-    8,
-    'eight movement chapters, eight spreads',
+    11, // #2107 re-pin: + Organic, Pixel, Techno (was 8)
+    'eleven movement chapters, eleven spreads',
   );
   assert.doesNotMatch(chaptersSrc, /(lookGroups|assetStyles|voiceStyles): \['/, 'no chapter retypes a style id');
   for (const f of ['assetStyle.js', 'styleLooks.js', 'voiceDeck.js', 'chapters.js'])
@@ -145,10 +145,17 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   // wardrobes re-drew over the glyph-narrowed pool) and no voice wears a glyph now.
   assert.equal(sha(VOICE_DECK.slice(0, 72)), '556e0e2b3e55fe04', 'the 72 deck voices before #2107 are byte-identical');
   assert.equal(sha(VOICE_DECK), '598906ab25e64b27', '#2107: + 19 family voices appended');
+  // #2107 re-pin (chapters): the three new chapters are filtered out, so the nine existing decks still hash
+  // to the pre-chapters value — their decks did not move; the whole twelve is pinned on its own line below
   assert.equal(
-    sha(CHAPTERS.map((c) => [c.id, chapterDeck(c)])),
+    sha(CHAPTERS.filter((c) => !['organic', 'pixel', 'techno'].includes(c.id)).map((c) => [c.id, chapterDeck(c)])),
     '6e68b51da1b48757', // #2107 re-pin: the Now deck gains the 12 looks and 19 voices; no other chapter moves · #2150 re-pin: chapter decks differ by exactly the glyph membership (swiss −36, grunge −3, now −47)
     'every chapter deck is byte-identical',
+  );
+  assert.equal(
+    sha(CHAPTERS.map((c) => [c.id, chapterDeck(c)])),
+    '245bacc3f7f34e5b',
+    '#2107: + the Organic, Pixel and Techno decks, at their spine positions',
   );
   assert.equal(sha(STYLES), '4f28f882a61c232f');
   // #2107 re-pin: techno, pixel and organic gain a look group and a voice pairing; every row before them is unchanged
@@ -161,7 +168,22 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   );
   assert.equal(sha(FAMILY_PAIRING), 'cd5d7355395908da');
   // the chapter records gained exactly one field (`style`); everything they carried before is unchanged
-  const withoutStyle = CHAPTERS.map(({ style: _style, settings: _settings, ...rest }) => rest); // #2046 added `settings`
+  // #2107 re-pin (chapters): the nine existing records are read back on the nine-chapter spine — the three new
+  // chapters filtered out and position/prev/next re-derived from that order — so the old hash still holds and
+  // proves the insertion moved only those three spine fields; the twelve as they stand are pinned below
+  const nine = CHAPTERS.filter((c) => !['organic', 'pixel', 'techno'].includes(c.id));
+  const onNineSpine = nine.map((c, i) => ({
+    ...c,
+    position: i,
+    prev: i > 0 ? nine[i - 1].id : null,
+    next: i < nine.length - 1 ? nine[i + 1].id : null,
+  }));
+  const withoutStyle = onNineSpine.map(({ style: _style, settings: _settings, ...rest }) => rest); // #2046 added `settings`
+  assert.equal(
+    sha(CHAPTERS.map(({ style: _style, settings: _settings, ...rest }) => rest)),
+    'e302ba3b076e07b7',
+    '#2107: + Organic, Pixel, Techno; the nine keep their records and move only position/prev/next',
+  );
   assert.equal(
     sha(withoutStyle),
     '09890812861018c5', // #2107 re-pin: Now's lookGroups gain techno, pixel, organic (the only field that moved, verified against main) · #2105 re-pin: engraving, swiss and grunge gain their families (haeckel, letterforms, riso); every chapter deck is unchanged

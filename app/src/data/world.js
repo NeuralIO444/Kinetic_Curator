@@ -90,10 +90,12 @@ const deepFreeze = (o) => {
  * from the chapter's measured settings, and not rolled from named ranges on
  * the die. Written for ALL TWELVE chapters now (conflict-review ruling,
  * 2026-11-13), in the ruled spine order — Organic, Pixel and Techno sit at
- * their ruled positions (after Engraving; after Memphis; after Grunge)
- * ahead of those chapters being built, so when they land later their
- * worlds are already written and waiting, and the deal is never undefined
- * for a landable chapter.
+ * their ruled positions (after Bauhaus; after Memphis; after Grunge —
+ * #2107: Organic moved from after Engraving to after Bauhaus by Matt's
+ * 2026-11-18 era ruling; its three worlds are unchanged) ahead of those
+ * chapters being built, so when they land later their worlds are already
+ * written and waiting, and the deal is never undefined for a landable
+ * chapter.
  *
  * Each world's ground is its palette's bg and its ink is that palette's
  * line ink (the stated rule in data/palettes.js — the palette named in the
@@ -116,15 +118,15 @@ export const WORLD_STOCK = deepFreeze({
     { chapter: 'engraving', ground: '#efe3cb', ink: '#2a1d10', boilFps: 6, finish: { grain: 0.25 } }, // sepia-plate
     { chapter: 'engraving', ground: '#f2ecdd', ink: '#1a1a1a', boilFps: 8, finish: { grain: 0.15 } }, // lithograph
   ],
-  organic: [
-    { chapter: 'organic', ground: '#0a2239', ink: '#2e86ab', boilFps: 6, finish: { grain: 0.2 } }, // river-delta
-    { chapter: 'organic', ground: '#f4f1ea', ink: '#5f0f40', boilFps: 7, finish: { grain: 0.3 } }, // petri-bloom
-    { chapter: 'organic', ground: '#eef4f1', ink: '#264653', boilFps: 6, finish: { grain: 0.15 } }, // tidepool
-  ],
   bauhaus: [
     { chapter: 'bauhaus', ground: '#1a0a00', ink: '#ef476f', boilFps: 8, finish: { grain: 0.1 } }, // solar-max
     { chapter: 'bauhaus', ground: '#f2f3f8', ink: '#da4a5b', boilFps: 9, finish: { grain: 0.1 } }, // vortex-rwb
     { chapter: 'bauhaus', ground: '#1a1410', ink: '#2a1a14', boilFps: 8, finish: { grain: 0.2 } }, // folktotem
+  ],
+  organic: [
+    { chapter: 'organic', ground: '#0a2239', ink: '#2e86ab', boilFps: 6, finish: { grain: 0.2 } }, // river-delta
+    { chapter: 'organic', ground: '#f4f1ea', ink: '#5f0f40', boilFps: 7, finish: { grain: 0.3 } }, // petri-bloom
+    { chapter: 'organic', ground: '#eef4f1', ink: '#264653', boilFps: 6, finish: { grain: 0.15 } }, // tidepool
   ],
   swiss: [
     { chapter: 'swiss', ground: '#f5f2ea', ink: '#111111', boilFps: 8, finish: { grain: 0.05 } }, // transit

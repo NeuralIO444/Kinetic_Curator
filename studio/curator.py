@@ -94,8 +94,9 @@ TERM_FIXTURE = HERE.parent / "app" / "src" / "curator" / "tasteTerms.fixture.jso
 # (taste["chapters"]); a file without it is a v1 file exactly as before.
 CHAPTER_MEMORY_VERSION = 1
 # The Book's spine, mirroring app/src/data/chapters.js CHAPTERS order.
-CHAPTER_IDS = ["marks", "engraving", "bauhaus", "swiss", "op-art",
-               "japan", "memphis", "grunge", "now"]
+# #2107: Organic, Pixel and Techno joined by era (Matt, 2026-11-18).
+CHAPTER_IDS = ["marks", "engraving", "bauhaus", "organic", "swiss", "op-art",
+               "japan", "memphis", "pixel", "grunge", "techno", "now"]
 # D5 — RULED (Matt, 2026-11-01): CANON. She tracks all-time taste; a dead
 # era's lean never fades (the absorption trap was shown to him with the
 # suite's numbers — ~40% of long-run landings — and he chose canon anyway).

@@ -31,7 +31,22 @@ import {
 // 1. the spine is D1's order, positions contiguous, neighbours attached from the order
 assert.deepEqual(
   CHAPTERS.map((c) => c.id),
-  ['marks', 'engraving', 'bauhaus', 'swiss', 'op-art', 'japan', 'memphis', 'grunge', 'now'],
+  // #2107 re-pin: Organic, Pixel and Techno inserted by era (Matt, 2026-11-18) — after Bauhaus, Memphis and
+  // Grunge; the nine existing chapters keep their relative order
+  [
+    'marks',
+    'engraving',
+    'bauhaus',
+    'organic',
+    'swiss',
+    'op-art',
+    'japan',
+    'memphis',
+    'pixel',
+    'grunge',
+    'techno',
+    'now',
+  ],
   'the spine is the ruled order (D1: the book opens at Marks)',
 );
 CHAPTERS.forEach((c, i) => {
@@ -66,11 +81,14 @@ const EXPECTED_COUNTS = {
   marks: { looks: 5, voices: 8, assets: 18 },
   engraving: { looks: 4, voices: 11, assets: 20 },
   bauhaus: { looks: 4, voices: 8, assets: 16 },
+  organic: { looks: 4, voices: 11, assets: 18 }, // #2107: the four GROWN looks + 11 organic voices (5 + #2407's family)
   swiss: { looks: 5, voices: 11, assets: 25 }, // #2150 RE-PIN: 61 − 36 — the typ_* pack leaves the Swiss deck (poem-only now); the chapter CARD keeps its letters (Q6)
   'op-art': { looks: 4, voices: 11, assets: 14 },
   japan: { looks: 5, voices: 11, assets: 25 },
   memphis: { looks: 4, voices: 14, assets: 25 },
+  pixel: { looks: 4, voices: 8, assets: 24 }, // #2107: the four pixel looks + 8 pixel voices (#2407); the dealable pxg_* set
   grunge: { looks: 5, voices: 8, assets: 36 }, // #2150 RE-PIN: 39 − 3 — the solo text stamps (stamp_letter_02, stamp_num_04, stamp_num_05) leave the Grunge deck
+  techno: { looks: 4, voices: 8, assets: 44 }, // #2107: the four techno looks + 8 techno voices (#2407); xsh/bio/scn + micro-hud
   now: { looks: 82, voices: 91, assets: 265 }, // #2107 RE-PIN: + 12 looks and 19 voices (techno, pixel, organic) · #2008: Now sums the grown library (69+1 looks — the picker-only Riso field Look joins the sum; chapters still cannot deal it, chapterScopeDeck ∩ the scope decks) · #2150 RE-PIN: 312 − 47 — the whole glyph set leaves the Now deck
 };
 for (const c of CHAPTERS) {
@@ -113,7 +131,11 @@ assert.equal(chapterForLookGroup('swiss')?.id, 'swiss', 'the swiss group maps to
 assert.equal(chapterForLookGroup('engraved')?.id, 'engraving', 'the engraved group maps to Engraving');
 assert.equal(chapterForStyle('engraved')?.id, 'engraving', 'the engraved style maps to Engraving');
 assert.equal(chapterForStyle('op')?.id, 'op-art', 'the op style maps to Op Art');
-assert.equal(chapterForStyle('techno'), null, 'techno has no movement chapter — it is Now material');
+// #2107 re-pin: techno was Now material (null) until its chapter landed; it now maps to its own chapter
+assert.equal(chapterForStyle('techno')?.id, 'techno', 'the techno style maps to the Techno chapter');
+assert.equal(chapterForStyle('pixel')?.id, 'pixel', 'the pixel style maps to the Pixel chapter');
+assert.equal(chapterForStyle('organic')?.id, 'organic', 'the organic style maps to the Organic chapter');
+assert.equal(chapterForLookGroup('organic')?.id, 'organic', 'the organic group maps to the Organic chapter');
 
 // 6. deck discipline: the minimums are the library's own floor (each axis is met by every movement chapter,
 //    and some movement chapter sits exactly on each axis minimum — the constants are observed, not padded);

@@ -105,11 +105,13 @@ assert.strictEqual(WORLD_GRAIN_MAX, 1, "the ceiling is the grain amount's own 0.
 }
 
 // ── step 2: the stock — authored for all twelve chapters, in ruled order ──
+// #2107 re-pin: Organic moves from after Engraving to after Bauhaus (Matt's 2026-11-18 era ruling); the stock
+// now follows the Book's own spine, pinned below against CHAPTERS.
 const RULED_SPINE = [
   'marks',
   'engraving',
-  'organic',
   'bauhaus',
+  'organic',
   'swiss',
   'op-art',
   'japan',
@@ -123,6 +125,11 @@ assert.deepStrictEqual(
   Object.keys(WORLD_STOCK),
   RULED_SPINE,
   'stock for all 12 chapters — the Book’s nine plus Organic, Pixel and Techno at their ruled positions',
+);
+assert.deepStrictEqual(
+  CHAPTERS.map((c) => c.id),
+  RULED_SPINE,
+  '#2107: all twelve chapters are built — the stock order is the Book spine',
 );
 for (const c of CHAPTERS)
   assert.ok(WORLD_STOCK[c.id]?.length, `the landable chapter ${c.id} has stock — the deal is never undefined`);

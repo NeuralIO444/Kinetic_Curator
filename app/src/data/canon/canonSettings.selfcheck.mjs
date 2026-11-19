@@ -31,7 +31,7 @@ const firstLookOf = (style) => look(canonStyle(style).looks[0]);
 {
   const paletteIds = new Set(PALETTES.map((p) => p.id));
   const movement = CHAPTERS.filter((c) => c.id !== 'now');
-  assert.equal(movement.length, 8);
+  assert.equal(movement.length, 11); // #2107 re-pin: + Organic, Pixel, Techno (was 8)
   for (const c of movement) {
     const s = c.settings;
     assert.ok(s, `${c.id}: carries settings`);
@@ -58,8 +58,9 @@ const firstLookOf = (style) => look(canonStyle(style).looks[0]);
   assert.equal(chapterSettings('now'), null);
   assert.equal(chapterSettings(null), null);
   assert.equal(chapterSettings('no-such-chapter'), null);
-  // the chapters are distinguishable by their settings — eight chapters, eight feels
-  assert.equal(new Set(movement.map((c) => sha(c.settings.feel))).size, 8);
+  // the chapters are distinguishable by their settings — eleven chapters, eleven feels
+  // #2107 re-pin: 8 → 11 (the three new movement chapters each carry their own feel)
+  assert.equal(new Set(movement.map((c) => sha(c.settings.feel))).size, 11);
 }
 
 // ── 2. drawn from the Canon style, by measurement ───────────────────────────────────────────────────────────
