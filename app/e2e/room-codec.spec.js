@@ -32,10 +32,10 @@ test('the room opens quiet: LOIS is VIBE, Davis has no state and is not turning,
   await boot(page);
   await expect(lois(page)).toHaveAttribute('data-code', 'VIBE');
   await expect(lois(page).locator('.codec-state')).toHaveText('VIBE');
-  await expect(lois(page).locator('.codec-name')).toHaveText('lois');
+  await expect(lois(page).locator('.codec-name')).toHaveText('cover');
   await expect(davis(page)).toHaveAttribute('data-code', 'none');
   await expect(davis(page).locator('.codec-state')).toHaveText('—');
-  await expect(davis(page).locator('.codec-name')).toHaveText('davis');
+  await expect(davis(page).locator('.codec-name')).toHaveText('overlap');
   await expect(page.locator('.codec-davis .davis-dither')).toHaveAttribute('data-motion', 'still');
   await expect(page.locator('.codec-lois .lois-dither')).toBeVisible(); // his glyph face is already up, watching
   await expect(page.locator('.codec-ch')).toHaveText('CH kc-voice/1');

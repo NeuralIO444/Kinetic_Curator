@@ -88,7 +88,7 @@ export function LoisPill() {
       data-tone={face.tone}
       data-code={face.code}
       data-mind={look ? look.code : undefined}
-      title={`LOIS · ${code} — ${(mind && mind.line) || (look && mind.weight >= 0.5 ? look.label : '') || face.label}`}
+      title={`COVER · ${code} — ${(mind && mind.line) || (look && mind.weight >= 0.5 ? look.label : '') || face.label}`}
     >
       {line && (
         <span className="lois-ticker" ref={slotRef} data-mode={motion.mode}>
@@ -113,7 +113,7 @@ export function LoisPill() {
           </span>
         </span>
       )}
-      <span className="lois-word">LOIS</span>
+      <span className="lois-word">COVER</span>
       <span className="lois-dot">·</span>
       <span className="lois-code">{code}</span>
     </div>

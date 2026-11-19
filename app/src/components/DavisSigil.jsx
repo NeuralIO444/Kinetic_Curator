@@ -28,7 +28,7 @@ export function DavisSigil({ seed, code }) {
       height={px}
       style={tempo ? { animationDuration: `${tempo}s` } : undefined}
       role="img"
-      aria-label={code ? `Davis, ${code}` : 'Davis, resting'}
+      aria-label={code ? `OVERLAP, ${code}` : 'OVERLAP, resting'}
       data-state={code || 'none'}
     />
   );

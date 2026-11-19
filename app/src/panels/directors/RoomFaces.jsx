@@ -64,7 +64,7 @@ function useReducedMotion() {
 function useFacePresence(persona) {
   const [view, setView] = useState(getPresenceView);
   useEffect(() => subscribePresence(() => setView(getPresenceView())), []);
-  const label = persona === 'lois' ? 'LOIS' : 'DAVIS';
+  const label = persona === 'lois' ? 'COVER' : 'OVERLAP';
   const row = view?.rows?.find((r) => r.label === label);
   return {
     tier: row?.tier ?? 1,
@@ -319,7 +319,7 @@ export function DavisFaceNow({ seed, code }) {
       data-state={code || 'none'}
       data-motion={code ? motion : 'still'}
       role="img"
-      aria-label={code ? `Davis, ${code}` : 'Davis, resting'}
+      aria-label={code ? `OVERLAP, ${code}` : 'OVERLAP, resting'}
     />
   );
 }

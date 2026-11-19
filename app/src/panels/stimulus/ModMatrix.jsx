@@ -75,7 +75,7 @@ function Row({ row, route, index, table, onEdit }) {
     <div className={`stim-route${route.by === 'davis' ? ' stim-route-davis' : ''}`} role="row">
       <span className="stim-route-pick">
         {route.by === 'davis' && (
-          <b className="stim-route-by" title="Davis made this route. Touch it and it is yours.">
+          <b className="stim-route-by" title="OVERLAP made this route. Touch it and it is yours.">
             D
           </b>
         )}

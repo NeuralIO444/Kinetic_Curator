@@ -48,7 +48,7 @@ ok('relax_seconds is DERIVED from intensity_budget: clamp(round(20 + b*25), 20, 
   }
 });
 
-ok('DAVIS ALONE: LOIS weight is 0 in every AWAY row (he is not in the room)', () => {
+ok('OVERLAP ALONE: LOIS weight is 0 in every AWAY row (he is not in the room)', () => {
   for (const key of Object.keys(DIRECTOR_TABLE).filter((k) => k.startsWith('AWAY×'))) {
     assert.equal(DIRECTOR_TABLE[key].lois_weight, 0, key);
   }

@@ -15,7 +15,7 @@ export const STORAGE_KEY = 'kc:mind:presence';
 /** Save the scores every this many bars (and when the driver stops). */
 export const SAVE_EVERY_BARS = 16;
 /** How each persona is shown in the dev readout (the third is never named on any surface, the dev panel included). */
-const LABELS = Object.freeze({ lois: 'LOIS', davis: 'DAVIS', queen: 'III' });
+const LABELS = Object.freeze({ lois: 'COVER', davis: 'OVERLAP', queen: 'III' });
 
 let view = null;
 const listeners = new Set();

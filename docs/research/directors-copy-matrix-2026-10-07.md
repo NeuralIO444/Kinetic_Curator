@@ -133,7 +133,7 @@ Verdict: THE ROOM — working. They know each other's moves.
 
 ## Room 16: LOIS ( ── ) AWAY × Davis FLOW
 
-Verdict: DAVIS ALONE — no critic in the room. The system dreams unwatched.
+Verdict: OVERLAP ALONE — no critic in the room. The system dreams unwatched.
 
 **LOIS:** *(silent — AWAY)*
 
@@ -141,7 +141,7 @@ Verdict: DAVIS ALONE — no critic in the room. The system dreams unwatched.
 
 ## Room 17: LOIS ( ── ) AWAY × Davis SEEDLING
 
-Verdict: DAVIS ALONE — no critic in the room. The system dreams unwatched.
+Verdict: OVERLAP ALONE — no critic in the room. The system dreams unwatched.
 
 **LOIS:** *(silent — AWAY)*
 
@@ -149,7 +149,7 @@ Verdict: DAVIS ALONE — no critic in the room. The system dreams unwatched.
 
 ## Room 18: LOIS ( ── ) AWAY × Davis UGLY
 
-Verdict: DAVIS ALONE — no critic in the room. The system dreams unwatched.
+Verdict: OVERLAP ALONE — no critic in the room. The system dreams unwatched.
 
 **LOIS:** *(silent — AWAY)*
 
@@ -157,7 +157,7 @@ Verdict: DAVIS ALONE — no critic in the room. The system dreams unwatched.
 
 ## Room 19: LOIS ( ── ) AWAY × Davis STUCK
 
-Verdict: DAVIS ALONE — no critic in the room. The system dreams unwatched.
+Verdict: OVERLAP ALONE — no critic in the room. The system dreams unwatched.
 
 **LOIS:** *(silent — AWAY)*
 
@@ -165,7 +165,7 @@ Verdict: DAVIS ALONE — no critic in the room. The system dreams unwatched.
 
 ## Room 20: LOIS ( ── ) AWAY × Davis BLOOM
 
-Verdict: DAVIS ALONE — no critic in the room. The system dreams unwatched.
+Verdict: OVERLAP ALONE — no critic in the room. The system dreams unwatched.
 
 **LOIS:** *(silent — AWAY)*
 

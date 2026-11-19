@@ -27,8 +27,8 @@ export { PERSONA_TASTES };
 // Selectable. Not the house default — Davis stays the working creed.
 export const LOIS_VOICE = {
   id: 'lois',
-  alias: 'LOIS',
-  title: 'LOIS',
+  alias: 'COVER',
+  title: 'COVER',
   heuristic: true,
   rationale: 'Hand-tuned rank: glance, distance from the pile, boldness. Not a trained eye.',
 };
@@ -189,7 +189,7 @@ export function personaCurator() {
   if (persona.id === 'lois') {
     return {
       name: 'persona',
-      personaName: 'LOIS',
+      personaName: 'COVER',
       personaId: 'lois',
       heuristic: true,
       status: () => 'active',

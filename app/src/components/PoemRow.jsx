@@ -17,6 +17,10 @@ import { useStore } from '../state/store.js';
 import { poemIdentity, isPoemKept } from '../poets/poemRow.mjs';
 import { treatments } from '../curator/treatmentsLive.mjs'; // #2010: the gun fires through the treatments surface
 
+// #2383 (R6 callsign sweep): the chip names the armed treatment by its surface callsign. The mode id on the
+// form record is data and does not change — this map is display only, at this seam.
+const MODE_CALLSIGNS = { carson: 'blast', greiman: 'hybrid', grit: 'swiss grit', shot: 'shot' };
+
 export function PoemRow() {
   const fieldForm = useStore((s) => s.layoutParams.fieldForm);
   const held = useStore((s) => !!s.lockedParams?.fieldForm);
@@ -73,11 +77,11 @@ export function PoemRow() {
           aria-pressed={!!raygun}
           title={
             raygun
-              ? `Ray gun · ${raygun.mode} — this poem wears the ${raygun.mode} treatment. Tap to cycle: carson, greiman, grit, shot, plain`
-              : 'Ray gun — give this poem the treatment: carson, greiman, grit, then shot. Tap to cycle'
+              ? `Ray gun · ${MODE_CALLSIGNS[raygun.mode] ?? raygun.mode} — this poem wears the ${MODE_CALLSIGNS[raygun.mode] ?? raygun.mode} treatment. Tap to cycle: blast, hybrid, swiss grit, shot, plain`
+              : 'Ray gun — give this poem the treatment: blast, hybrid, swiss grit, then shot. Tap to cycle'
           }
         >
-          {raygun ? `ray gun · ${raygun.mode}` : 'ray gun'}
+          {raygun ? `ray gun · ${MODE_CALLSIGNS[raygun.mode] ?? raygun.mode}` : 'ray gun'}
         </button>
         {raygun && !fieldForm.plate ? (
           <button

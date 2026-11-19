@@ -15,10 +15,10 @@ export const record = {
     callsign: 'BLAST',
   },
   doctrine: {
-    name: 'CARSON',
+    name: 'BLAST',
     modes: ['carson', 'shot'],
     title:
-      'CARSON — arms hot: the geometry modes with the distortion channel (carson, shot). Hand it the stage and every poem it deals lands blasted.',
+      'BLAST — arms hot: the geometry modes with the distortion channel (carson, shot). Hand it the stage and every poem it deals lands blasted.',
   },
   principle: 'hot geometry — move the letters',
   relations: [

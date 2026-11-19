@@ -18,12 +18,12 @@ function Conducting() {
       <p style={{ opacity: 0.75, margin: '0 0 4px' }}>
         Conducting: {t.on ? 'audio on' : 'audio off'} · tier {t.tier ?? 'none'}
         {t.cooling ? ' · backing off' : ''}
-        {t.brake ? ' · LOIS brakes him: safe moves only' : ''}
+        {t.brake ? ' · COVER brakes him: safe moves only' : ''}
         {t.on
           ? ` · ${t.energy ?? 'no energy yet'}${t.bpm ? ` · ${Math.round(t.bpm)} bpm` : ''}${t.silent ? ' · silent' : ''} · flat ${t.flatBars} bar${t.flatBars === 1 ? '' : 's'}`
           : ''}
         {t.on
-          ? ` · LOIS judges the ${t.flatBy === 'spectrum' ? 'spectrum (flux)' : 'bands (spread)'}${t.flatWhy ? `, reads it ${t.flatWhy}` : ''}, calls it flat under ${t.flatBelow.toFixed(3)} (${t.bias > 0.05 ? 'tight: passes piling up' : t.bias < -0.05 ? 'loose: you are keeping' : 'neutral'})`
+          ? ` · COVER judges the ${t.flatBy === 'spectrum' ? 'spectrum (flux)' : 'bands (spread)'}${t.flatWhy ? `, reads it ${t.flatWhy}` : ''}, calls it flat under ${t.flatBelow.toFixed(3)} (${t.bias > 0.05 ? 'tight: passes piling up' : t.bias < -0.05 ? 'loose: you are keeping' : 'neutral'})`
           : ''}
       </p>
       <p style={{ opacity: 0.75, margin: '0 0 4px' }}>
@@ -58,8 +58,8 @@ function Story() {
   useEffect(() => subscribeStory(() => setS(getStoryView())), []);
   if (!s) return <p style={{ opacity: 0.6 }}>Story: not running.</p>;
   const rows = [
-    ['LOIS → DAVIS', s.esteem, 'esteem'],
-    ['DAVIS → LOIS', s.trust, 'trust'],
+    ['COVER → OVERLAP', s.esteem, 'esteem'],
+    ['OVERLAP → COVER', s.trust, 'trust'],
   ];
   return (
     <div style={{ marginBottom: 12 }}>
@@ -72,7 +72,7 @@ function Story() {
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead>
           <tr>
-            {['regard', 'mood', 'standing', 'as DAVIS reads it', 'as LOIS reads it'].map((h) => (
+            {['regard', 'mood', 'standing', 'as OVERLAP reads it', 'as COVER reads it'].map((h) => (
               <th key={h} style={cell}>
                 {h}
               </th>
@@ -102,7 +102,7 @@ function Story() {
             <tr key={i}>
               <td style={cell}>bar {b.bar}</td>
               <td style={cell}>{b.kind}</td>
-              <td style={cell}>{b.persona}</td>
+              <td style={cell}>{b.persona === 'lois' ? 'cover' : b.persona === 'davis' ? 'overlap' : b.persona}</td>
               <td style={cell}>
                 {b.form || ''}
                 {b.topic ? ` · ${b.topic}` : ''}

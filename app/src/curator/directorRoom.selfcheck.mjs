@@ -24,7 +24,7 @@ const LOIS = Object.keys(DIRECTORS_MATRIX);
 const DAVIS = [...new Set(LOIS.flatMap((l) => Object.keys(DIRECTORS_MATRIX[l])))];
 
 await ok('every room of the matrix resolves to a known verdict; the five verdicts are all there', () => {
-  assert.deepEqual([...ROOM_VERDICTS].sort(), ['AGREEMENT', 'DAVIS ALONE', 'FULL BURN', 'THE CLASH', 'THE ROOM']);
+  assert.deepEqual([...ROOM_VERDICTS].sort(), ['AGREEMENT', 'FULL BURN', 'OVERLAP ALONE', 'THE CLASH', 'THE ROOM']);
   for (const l of LOIS)
     for (const d of DAVIS) {
       const g = directorGains({ loisCode: l, davisCode: d });
