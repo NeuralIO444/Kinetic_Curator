@@ -10,8 +10,10 @@
 // hand, is a cut: judgeDeal extends the machinery by pointing it at the one hand Davis put down,
 // against the mean of the chapter deck it was dealt from (the pile it has to not be too close to).
 //
-// The cut gates are loisVerdict's own thresholds, named here once (LOIS_CUT_GATES) and cross-pinned
-// against loisVerdict's behaviour by the selfcheck: if his lines ever move, this suite says so.
+// The cut gates are loisVerdict's own thresholds. They live in exactly one place — the persona
+// tuning table (#2382) — and both loisVerdict and judgeDeal read that table, so the cut and the
+// verdict cannot be two copies that drift; LOIS_CUT_GATES below is the table's shipped value,
+// cross-pinned against loisVerdict's behaviour by the selfcheck: if his lines ever move, it says so.
 // The reason a cut carries into the round log is loisVerdict's line itself, plus the gate that
 // drove it and the measured value against its limit — a reader can re-derive the cut from the
 // numbers, the way loisJudge's verdicts carry their provenance (#1508 idiom).

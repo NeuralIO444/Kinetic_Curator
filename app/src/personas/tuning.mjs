@@ -65,6 +65,9 @@ const KNOB_SHAPES = {
       pinned: 'prob',
     },
     cutGates: { glance: 'prob', originality: 'prob', boldness: 'prob' },
+    rankWeights: { glance: 'prob', originality: 'prob', boldness: 'prob' },
+    originalityDivisor: 'probPos',
+    praiseGates: { glance: 'prob', originality: 'prob', boldness: 'prob' },
   },
   davis: {
     boldBand: 'probPos',
