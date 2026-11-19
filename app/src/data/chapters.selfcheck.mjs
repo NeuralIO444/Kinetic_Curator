@@ -71,7 +71,7 @@ const EXPECTED_COUNTS = {
   japan: { looks: 5, voices: 11, assets: 25 },
   memphis: { looks: 4, voices: 14, assets: 25 },
   grunge: { looks: 5, voices: 8, assets: 36 }, // #2150 RE-PIN: 39 − 3 — the solo text stamps (stamp_letter_02, stamp_num_04, stamp_num_05) leave the Grunge deck
-  now: { looks: 70, voices: 72, assets: 265 }, // #2008: Now sums the grown library (69+1 looks — the picker-only Riso field Look joins the sum; chapters still cannot deal it, chapterScopeDeck ∩ the scope decks) · #2150 RE-PIN: 312 − 47 — the whole glyph set leaves the Now deck
+  now: { looks: 82, voices: 91, assets: 265 }, // #2107 RE-PIN: + 12 looks and 19 voices (techno, pixel, organic) · #2008: Now sums the grown library (69+1 looks — the picker-only Riso field Look joins the sum; chapters still cannot deal it, chapterScopeDeck ∩ the scope decks) · #2150 RE-PIN: 312 − 47 — the whole glyph set leaves the Now deck
 };
 for (const c of CHAPTERS) {
   const d = chapterDeck(c);
@@ -100,7 +100,7 @@ for (const c of CHAPTERS) {
   for (const id of NEVER_DEALT) assert.ok(!union.has(id), `${id}: never in a chapter deck`);
   assert.deepEqual(CHAPTER_UNDEALT, NEVER_DEALT, 'the registry exclusion is the roll pool exclusion');
   assert.equal(chapterLooks('now').length, COMPOSITION_PRESETS.length, 'Now holds every look');
-  assert.equal(chapterVoices('now').length, 72, 'Now holds every voice');
+  assert.equal(chapterVoices('now').length, 91, 'Now holds every voice'); // #2107: + 19
 }
 
 // 5. the taxonomy in code is the taxonomy: DIAGONAL GRID is a swiss look, not a bauhaus one

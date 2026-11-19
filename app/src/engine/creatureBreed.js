@@ -35,8 +35,9 @@ import {
 } from './creatureAssembler.js';
 import { sanitizeAttachPoints } from './assetAttach.js';
 import { COMPOSITION_PRESETS } from '../data/presets.js';
+import { LOOKS_OFF_CREATURE_DICE } from '../data/styleLooks.js'; // #2107
 import { RISO_FIELD_LOOK_ID } from './risoField.mjs'; // #2008 — the picker-only Look stays off the dice
-import { VOICE_DECK } from '../data/voiceDeck.js';
+import { VOICE_DECK, VOICES_OFF_CREATURE_DICE } from '../data/voiceDeck.js';
 import { materialsForStyle, materialStyle, materialById } from '../data/canon/materials.js'; // #2339 — PAINT
 
 /** Matt's ruling (2026-10-29): lively mutation, ~1 gene in 8. Named so the suite can assert it (rider to ruling 2). */
@@ -232,8 +233,10 @@ export function breedCreature(parents, seed = 0) {
 // #2008 — the mutation dice never deal the picker-only Riso field Look:
 // it enters a record only when the performer picks it. The catalogue
 // appends it last, so filtering restores the pre-wiring order exactly.
-const LOOK_ORDER = COMPOSITION_PRESETS.map((p) => p.id).filter((id) => id !== RISO_FIELD_LOOK_ID);
-const VOICE_ORDER = VOICE_DECK.map((v) => v.id);
+const LOOK_ORDER = COMPOSITION_PRESETS.map((p) => p.id).filter(
+  (id) => id !== RISO_FIELD_LOOK_ID && !LOOKS_OFF_CREATURE_DICE.includes(id), // #2107: the dice keep their pre-#2107 deck
+);
+const VOICE_ORDER = VOICE_DECK.map((v) => v.id).filter((id) => !VOICES_OFF_CREATURE_DICE.includes(id)); // #2107
 const SKELETON_IDS = new Set(['head', 'limbs', 'joints']);
 const copy = (v) => JSON.parse(JSON.stringify(v));
 const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);

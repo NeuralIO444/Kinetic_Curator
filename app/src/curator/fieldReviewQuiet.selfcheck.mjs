@@ -16,7 +16,7 @@
 //   3. the ladder — rung 3 in its canonical slot, applicable only
 //      against the markCover gate at its point in the walk, and never
 //      offered after a re-deal (§3.6: a re-dealt form receives rungs
-//      1–2 only) — proven on seed 227's drowned landing, the same form
+//      1–2 only) — proven on seed 217's drowned landing (#2107 re-pin: was 227), the same form
 //      the quiet rescues fresh and the exclusion cuts re-dealt;
 //   4. the render seam — the plate's one suppression path, borrowed:
 //      in-zone marks at PLATE_ROOM_ALPHA (unmirrored and mirrored),
@@ -31,7 +31,7 @@
 //      the room."), the act fence, and proposals that may now name
 //      the quiet among the rungs;
 //   7. calibration + replay — censuses A/B re-run with rung 3 live
-//      (full before/after in STAGING-REPORT-2006-S4), and seed 227's
+//      (full before/after in STAGING-REPORT-2006-S4), and seed 217's
 //      banked adjustment re-derives bit-for-bit from its landing.
 import assert from 'node:assert/strict';
 import { useStore } from '../state/store.js';
@@ -57,7 +57,7 @@ const ok = (name, fn) => {
 
 // ---------------------------------------------------------------------------
 // Harness — slice 1's census machinery, exact-pinned (the ladder suite's
-// copies, plus a capture hook for seed 227's drowned commit).
+// copies, plus a capture hook for seed 217's drowned commit — #2107 re-pin, was 227).
 // ---------------------------------------------------------------------------
 const CENSUS_EPOCH = 1_800_000_000_000;
 const withPinnedTime = (fn) => {
@@ -96,7 +96,13 @@ const setup = (seed, extraParams = {}) => {
     fieldGateRefusal: null,
   });
 };
-let captured227 = null;
+// #2107 re-pin: the drowned fixture moves from seed 227's look-pass commit (poem:0) to seed 217's first voice-pass
+// commit (poem:1). On the grown deck (12 looks + 19 voices) seed 227's look pass deals a look that commits no poem, and
+// 252 likewise; seed 217 poem:1 is the first drowned landing census A now produces (markCover, m2 0.9851, walk
+// [1, 2, 3], rescued at rung 3) — the same kind of landing, re-derived seed by seed against origin/main.
+const DROWNED_SEED = 217;
+const DROWNED_STREAM = 'poem:1';
+let capturedDrowned = null;
 const collectTagged = (seeds, actions, extraParams = {}) =>
   withPinnedTime((step) => {
     const records = [];
@@ -111,8 +117,8 @@ const collectTagged = (seeds, actions, extraParams = {}) =>
         if (rec && rec !== last)
           records.push({ seed, rec, poemDeal: S().poemDeal, hasForm: !!S().layoutParams.fieldForm });
         last = rec;
-        if (seed === 227 && rec?.stream === 'poem:0' && S().layoutParams.fieldForm) {
-          captured227 = {
+        if (seed === DROWNED_SEED && rec?.stream === DROWNED_STREAM && S().layoutParams.fieldForm) {
+          capturedDrowned = {
             state: { ...S() },
             params: S().layoutParams,
             form: S().layoutParams.fieldForm,
@@ -157,20 +163,20 @@ const outcomes = (tagged) => {
 };
 
 // The calibration run happens ONCE, up front: §3's ladder proofs and
-// §6's voice pin consume seed 227's harvested commit, §7 pins the
+// §6's voice pin consume seed 217's harvested commit, §7 pins the
 // distributions of this same run.
 const taggedA = censusA();
-assert.ok(captured227, 'seed 227’s drowned commit was captured from the census run');
+assert.ok(capturedDrowned, 'seed 217’s drowned commit was captured from the census run');
 const harvest = (() => {
-  const rawForm = { ...captured227.form };
+  const rawForm = { ...capturedDrowned.form };
   delete rawForm.review;
-  const params = { ...captured227.params, fieldForm: rawForm };
-  const landing = reviewLanding(captured227.state, params, { stream: captured227.rec.stream });
+  const params = { ...capturedDrowned.params, fieldForm: rawForm };
+  const landing = reviewLanding(capturedDrowned.state, params, { stream: capturedDrowned.rec.stream });
   return { rawForm, params, landing };
 })();
 assert.deepEqual(
   harvest.landing.measures,
-  captured227.rec.measures,
+  capturedDrowned.rec.measures,
   'the harvested raw form re-derives the banked landing measures bit-for-bit',
 );
 
@@ -304,7 +310,7 @@ ok('measure: the §3.2 gate constants do not move for the quiet rung', () => {
 // 3. THE LADDER — rung 3 in its slot, markCover only, never post-re-deal.
 // ---------------------------------------------------------------------------
 ok('ladder: rung 3 stands in the canonical slot of the plan, and rescues the drowned landing fresh', () => {
-  const { state } = captured227;
+  const { state } = capturedDrowned;
   const acted = runReviewLadder(state, harvest.params, harvest.landing, { redeal: () => null });
   assert.deepEqual(acted.record.adjustment.plan, [1, 2, 3, 4, 5], 'markCover leads shrink; the quiet stands third');
   assert.deepEqual(
@@ -328,7 +334,7 @@ ok('ladder: rung 3 stands in the canonical slot of the plan, and rescues the dro
 });
 
 ok('ladder: QUIET addresses markCover only — a walk whose failing gate never becomes markCover never offers it', () => {
-  const { state } = captured227;
+  const { state } = capturedDrowned;
   // A coverageLow lead on the same landing form: rung 3 IS in the plan
   // (the plan is the whole ladder in canonical order) but applicability
   // is judged at the walk — with the re-deal failing, the gate never
@@ -345,11 +351,12 @@ ok('ladder: QUIET addresses markCover only — a walk whose failing gate never b
 });
 
 ok('ladder: post-re-deal exclusion — a re-dealt form receives rungs 1–2 only, and the exclusion is what cuts', () => {
-  const { state } = captured227;
+  const { state } = capturedDrowned;
   // The SAME drowned form the quiet rescues fresh (§3 above), received
   // as a re-deal under a coverageLow lead: shrink and shift fail it
   // again, and its walk ends at the cut — rung 3, which would have
-  // cleared it (m2 0.31 against the 0.5 gate), is never offered.
+  // cleared it (m2 0.24 against the 0.5 gate), is never offered.
+  // #2107 re-pin: 0.31 -> 0.24, the rung-3 trial m2 of the new fixture (seed 217 poem:1), re-derived from the run.
   const fab = { ...harvest.landing, gate: 'coverageLow' };
   const acted = runReviewLadder(state, harvest.params, fab, {
     redeal: () => ({ form: harvest.rawForm, stream: 'poem:99' }),
@@ -608,12 +615,13 @@ ok('morph: the room deepens over the settle — raw 0 is the stage as it stood, 
 // 6. THE VOICE — LOIS names the quiet, past tense, on acted records only.
 // ---------------------------------------------------------------------------
 ok('voice: an acted quiet resolution speaks its act — and only its act', () => {
-  const rec = captured227.rec; // verdict 'janky', rung 3, the landing's own figures
+  const rec = capturedDrowned.rec; // verdict 'janky', rung 3, the landing's own figures
   const rv = rulesVoice(rec);
   assert.equal(rv.persona, 'lois');
+  // #2107 re-pin: 94% -> 99% — the fixture's landing m2 is now seed 217 poem:1's 0.9851 (was 227 poem:0's 0.9375).
   assert.equal(
     rv.line,
-    'The marks are eating the poem. 94% of its ink is covered — 50% is the limit. Quieted the room.',
+    'The marks are eating the poem. 99% of its ink is covered — 50% is the limit. Quieted the room.',
     'the §3.5 idiom: the gate, the figure against its limit, the act in past tense',
   );
   assert.deepEqual(rv.rungOrder, [1, 2, 3, 4, 5], 'the spoken order is the plan that ran, rung 3 in its slot');
@@ -634,7 +642,8 @@ ok('voice: an acted quiet resolution speaks its act — and only its act', () =>
 
 ok('voice: an unacted proposal may name the quiet among the rungs; a clean proposal may not name it at all', () => {
   const landing = harvest.landing; // janky markCover, rung null — nothing acted yet
-  const line = 'Buried at 94% — over the 50% line. Would quiet the room.';
+  // #2107 re-pin: 94% -> 99%, the new fixture's own landing figure (m2 0.9851).
+  const line = 'Buried at 99% — over the 50% line. Would quiet the room.';
   assert.deepEqual(validateReviewProposal({ line, rungOrder: [3, 1] }, landing), {
     line,
     rungOrder: [3, 1],
@@ -667,16 +676,24 @@ ok('census A (slice 4): the quiet rescues every drowned room; no landing’s out
     `  census A ladder outcomes: ${taggedA.length} landings — ${o.clean} clean (unacted), ${o.repaired} repaired ` +
       `(by rung ${JSON.stringify(o.byRung)}), ${o.cut} cut, ${o.unactedJanky} janky unacted`,
   );
-  assert.equal(taggedA.length, 144);
-  assert.equal(o.clean, 133, 'slice 3’s 133 cleans are untouched');
+  // #2107 re-pin: 144 -> 156 landings and 133 -> 145 cleans (12 looks + 19 voices joined the deck). The janky count
+  // stays 11, all repaired, none cut — but the janky SET moved: byRung { 2: 2, 3: 9 } -> { 2: 7, 3: 4 }, because the
+  // drowned rooms are now seed 217's three (227/252's eight land no poem on the grown deck) and five new partly-covered
+  // landings (204 x2, 216, 232, 254; m2 0.58-0.72) repair at rung 2. Compared seed by seed with origin/main.
+  assert.equal(taggedA.length, 156);
+  assert.equal(o.clean, 145, 'the cleans are untouched');
   assert.equal(o.unactedJanky, 0);
   assert.equal(o.repaired, 11);
-  assert.deepEqual(o.byRung, { 2: 2, 3: 9 });
+  assert.deepEqual(o.byRung, { 2: 7, 3: 4 });
   assert.equal(o.cut, 0, 'slice 3 cut 8; the quiet leaves none');
-  // The eight formerly-cut landings, named: seeds 227 and 252, four
-  // streams each — every one now repaired at rung 3, poem standing.
-  const drowned = taggedA.filter((e) => (e.seed === 227 || e.seed === 252) && e.rec.adjustment);
-  assert.equal(drowned.length, 8);
+  // The drowned landings, named — every one repaired at rung 3, poem standing.
+  // #2107 re-pin: seeds 227 and 252 (four streams each, 8) -> seed 217's poem:1/poem:2/poem:3 (3; its look-pass
+  // poem:0 lands clean), the only drowned room census A now deals.
+  const drowned = taggedA.filter((e) => e.seed === DROWNED_SEED && e.rec.adjustment);
+  assert.deepEqual(
+    drowned.map((e) => e.rec.stream),
+    ['poem:1', 'poem:2', 'poem:3'],
+  );
   for (const e of drowned) {
     assert.equal(e.rec.rung, 3, `seed ${e.seed} ${e.rec.stream} resolves at the quiet`);
     assert.equal(e.rec.adjustment.outcome, 'repaired');
@@ -717,14 +734,14 @@ ok('census B (slice 4): the mirrored distribution is slice 3’s, unchanged — 
   }
 });
 
-ok('replay: seed 227’s banked adjustment re-derives bit-for-bit from its landing (§3.8)', () => {
-  const acted = runReviewLadder(captured227.state, harvest.params, harvest.landing, { redeal: () => null });
+ok('replay: seed 217’s banked adjustment re-derives bit-for-bit from its landing (§3.8)', () => {
+  const acted = runReviewLadder(capturedDrowned.state, harvest.params, harvest.landing, { redeal: () => null });
   assert.deepEqual(
     acted.record,
-    captured227.rec,
+    capturedDrowned.rec,
     'the ladder is a pure function of the commit — same landing, same walk, same record',
   );
-  const again = runReviewLadder(captured227.state, harvest.params, harvest.landing, { redeal: () => null });
+  const again = runReviewLadder(capturedDrowned.state, harvest.params, harvest.landing, { redeal: () => null });
   assert.deepEqual(again, acted, 'and again — no clock, no dice in the acting path');
 });
 

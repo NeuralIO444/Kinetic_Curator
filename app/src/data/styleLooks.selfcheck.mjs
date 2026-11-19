@@ -19,13 +19,13 @@ import { createLiveResolver } from '../gl/liveResolve.mjs';
 import { ASSETS_RISO } from './assets/assets-riso.js'; // #2008 — the canon riso catalogue (the field Look's one lawful source)
 
 // 1. the count, from data
-assert.equal(COMPOSITION_PRESETS.length, 70, `the dealable Look count reads 70, got ${COMPOSITION_PRESETS.length}`); // #2008: 69 + 1 Riso field Look (picker-only — registered, never dealt)
-assert.equal(STYLE_LOOKS.length, 36, '33 + 36 style looks'); // #1854: 31 + 5 Marks looks (#2008's Riso field Look is an authored preset, not a style look — the style groups are 4+ recipe families)
-assert.equal(PRESET_GROUPS.length, 16, '7 original groups + 8 style groups + the Riso group'); // #2008: + Riso group (authored, in presets.js)
+assert.equal(COMPOSITION_PRESETS.length, 82, `the dealable Look count reads 82, got ${COMPOSITION_PRESETS.length}`); // #2107: + 12 (techno, pixel, organic) · #2008: 69 + 1 Riso field Look (picker-only — registered, never dealt)
+assert.equal(STYLE_LOOKS.length, 48, '36 + 12 style looks'); // #2107: + techno, pixel, organic (4 each) · #1854: 31 + 5 Marks looks (#2008's Riso field Look is an authored preset, not a style look — the style groups are 4+ recipe families)
+assert.equal(PRESET_GROUPS.length, 19, '7 original groups + 11 style groups + the Riso group'); // #2107: + 3 style groups · #2008: + Riso group (authored, in presets.js)
 const ids = COMPOSITION_PRESETS.map((p) => p.id);
 assert.equal(new Set(ids).size, ids.length, 'look ids stay unique');
 const menuCount = getPresetsByGroup().reduce((n, g) => n + g.presets.length, 0);
-assert.equal(menuCount, 70, 'the LOOKS menu lists all 70 (no look orphaned from its group)'); // #2008: 69 + the Riso field Look in its own group
+assert.equal(menuCount, 82, 'the LOOKS menu lists all 82 (no look orphaned from its group)'); // #2107: + 12 · #2008: 69 + the Riso field Look in its own group
 assert.ok(
   getPresetsByGroup().every((g) => g.presets.length > 0),
   'the LOOKS menu shows no empty group',

@@ -93,7 +93,9 @@ const firstLookOf = (style) => look(canonStyle(style).looks[0]);
       canonStyleSettings(id) === null,
       canonStyle(id).looks.length === 0 && !VOICE_DECK.some((v) => v.def.family === id),
     );
-  assert.equal(canonStyleSettings('techno'), null);
+  // #2107: techno, pixel and organic have four looks each now, so they are measured, not blank
+  for (const id of ['techno', 'pixel', 'organic'])
+    assert.equal(canonStyleSettings(id).basis.looks, 4, `${id}: measured from its four looks`);
   assert.equal(canonStyleSettings('vaporwave'), null);
   assert.equal(feelAffinity({}, null), null);
   assert.equal(
@@ -200,11 +202,11 @@ const firstLookOf = (style) => look(canonStyle(style).looks[0]);
 {
   assert.equal(
     sha(CHAPTERS.map((c) => [c.id, chapterDeck(c)])),
-    '44abd0199a5dc9c8', // #2150 re-pin: chapter decks differ by exactly the glyph membership (swiss −36, grunge −3, now −47)
+    '6e68b51da1b48757', // #2107 re-pin: the Now deck gains the 12 looks and 19 voices (techno, pixel, organic); no other chapter moves (verified per chapter against main) · #2150: chapter decks differ by exactly the glyph membership (swiss −36, grunge −3, now −47)
     'every chapter deck is byte-identical',
   );
-  assert.equal(sha(COMPOSITION_PRESETS), '61c50037062a6337'); // #1838 re-pin: dusk-flock gained `trailFresh: 0.6` (1 of 70 records, that field only)
-  assert.equal(sha(VOICE_DECK), '556e0e2b3e55fe04'); // #2150 re-pin: 17 of 72 voices differ (glyph losses + wardrobe re-draws over the narrowed pool); no voice wears a glyph
+  assert.equal(sha(COMPOSITION_PRESETS), '6c07105fd66d9e64'); // #2107 re-pin: + 12 looks, every earlier record unchanged · #1838: dusk-flock gained `trailFresh: 0.6` (1 of 70 records, that field only)
+  assert.equal(sha(VOICE_DECK), '598906ab25e64b27'); // #2107 re-pin: + 19 family voices appended, the first 72 unchanged (556e0e2b3e55fe04) · #2150 re-pin: 17 of 72 voices differ (glyph losses + wardrobe re-draws over the narrowed pool); no voice wears a glyph
   // extractFeatures moved to a leaf — taste.js still exports the same function
   assert.equal(taste.extractFeatures, extractFeatures);
 }
