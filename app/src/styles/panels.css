@@ -2933,6 +2933,139 @@
   font-size: 10px;
   line-height: 1.35;
 }
+/* #2388 (P8) — the horns join THE ROOM: a strip of three smaller tiles directly under the kc-voice/1 channel (grid
+   column 2, row 2), COVER and OVERLAP staying the big flanking tiles. Same tile grammar: face, lowercase callsign,
+   state word. Each label wears its own colour (tokens.css --kc-blast / --kc-hybrid / --kc-grit). The faces are SVG
+   pictures of a measured state: no animation here but the eased change when the state changes (never a loop). When
+   the room is narrow (a phone) the strip drops to its own row under the whole channel row and wraps. */
+.room-codec {
+  container-type: inline-size;
+}
+.room-codec > .codec-lois {
+  grid-column: 1;
+  grid-row: 1;
+}
+.room-codec > .codec-transcript {
+  grid-column: 2;
+  grid-row: 1;
+}
+.room-codec > .codec-davis {
+  grid-column: 3;
+  grid-row: 1;
+}
+.room-codec > .codec-footer {
+  grid-row: 3;
+}
+.room-horns {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+.horn-tile {
+  display: flex;
+  flex-direction: column;
+  width: 72px;
+  border: 1px solid var(--line-2);
+}
+.horn-face-slot {
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.horn-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.horn-dressing {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 2px 4px 3px;
+  border-top: 1px solid var(--line-2);
+}
+.horn-name {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.horn-state {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.horn-blast .horn-name,
+.codec-line .codec-who.blast {
+  color: var(--kc-blast);
+}
+.horn-hybrid .horn-name,
+.codec-line .codec-who.hybrid {
+  color: var(--kc-hybrid);
+}
+.horn-grit .horn-name,
+.codec-line .codec-who.grit {
+  color: var(--kc-grit);
+}
+.blast-face .horn-cell {
+  fill: var(--kc-blast);
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    x 0.3s ease-out,
+    y 0.3s ease-out,
+    transform 0.3s ease-out,
+    opacity 0.3s ease-out;
+}
+.grit-face .horn-frame {
+  fill: none;
+  stroke: var(--kc-grit);
+  stroke-width: 1.2;
+}
+.grit-face .horn-rule line,
+.grit-face .horn-marks line {
+  stroke: var(--kc-grit);
+  stroke-width: 0.6;
+  opacity: 0.55;
+}
+.grit-face .horn-marks line {
+  stroke-width: 1;
+  opacity: 1;
+}
+.grit-face .horn-fill {
+  fill: var(--kc-grit);
+  opacity: 0.35;
+  transition:
+    x 0.3s ease-out,
+    y 0.3s ease-out;
+}
+.grit-face .horn-grit {
+  fill: var(--kc-grit);
+}
+@container (max-width: 420px) {
+  .room-horns {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+@media (max-height: 760px) {
+  .horn-tile {
+    width: 60px;
+  }
+}
 /* #1560 S2 — the generative dither faces (curator/roomDither.js): the backing store is cells × 6 px and the
    window shows it at the face size with the matrix kept square (pixelated, never smoothed), so the tier's
    resolution IS the picture's resolution. At rest Davis is dim, as the sigil was; stillness under reduced

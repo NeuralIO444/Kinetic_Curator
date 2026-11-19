@@ -145,8 +145,8 @@ export const EVENT_REGISTRY = {
     note: "every answer with its backend and latency (#1463); the thinker decides whether it is used — the one handler tallies answers for the dev panel's telemetry narration (#1526), backstage only",
   },
   BAND_TURN: {
-    handler: null,
-    note: "telemetry: one turn of the band (#2387, P7) — a solo, a trade (call, answers, verdict), the bandleader's cut, the artist's yield, the count-in or the ending; published by personas/bandLive.js only while the band is on, recorded in the take (personas/bandRecord.mjs), re-published by playback. Nothing changes the stage on it yet",
+    handler: ['curator/roomFeed.js'],
+    note: "one turn of the band (#2387, P7) — a solo, a trade (call, answers, verdict), the bandleader's cut, the artist's yield, the count-in or the ending; published by personas/bandLive.js only while the band is on, recorded in the take (personas/bandRecord.mjs), re-published by playback. Nothing changes the stage on it yet; the ROOM codec's transcript reads it for the horns' chat lines (#2388, P8), which render only once Matt has signed them",
   },
   GAIT_ASSIGN: {
     handler: null,

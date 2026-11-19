@@ -256,3 +256,27 @@ test('with the room talking the panel still scrolls and the codec stays reachabl
     expect(reach.ok, `${w}x${h}: ${reach.why}`).toBe(true);
   }
 });
+
+// #2388 (P8) — the horns join THE ROOM: BLAST, HYBRID, SWISS GRIT under the channel, each face a picture of a
+// measured state (the standing treatment / doctrine here), never a timer. Laid out until something is measured.
+test('the horn strip sits under the channel: three tiles laid out at rest; a standing treatment or doctrine changes a face', async ({
+  page,
+}) => {
+  await boot(page);
+  const tiles = page.locator('.room-horns .horn-tile');
+  await expect(tiles).toHaveCount(3);
+  await expect(tiles.locator('.horn-name')).toHaveText(['blast', 'hybrid', 'swiss grit']);
+  await expect(tiles.locator('.horn-state')).toHaveText(['LAID OUT', 'LAID OUT', 'LAID OUT']);
+  // directly under the channel (kc-voice/1), horizontally inside it
+  const ch = await page.locator('.codec-transcript').boundingBox();
+  const strip = await page.locator('.room-horns').boundingBox();
+  expect(strip.y).toBeGreaterThanOrEqual(ch.y + ch.height - 1);
+  // the faces change only with measured state: a doctrine handed the stage arms its horn, a standing mode lights its face
+  await page.evaluate(() => window.__kcStore.getState().setPoemDoctrine('ashworth'));
+  await expect(page.locator('.horn-tile[data-horn="grit"]')).toHaveAttribute('data-code', 'ARMED');
+  await expect(page.locator('.horn-tile[data-horn="blast"]')).toHaveAttribute('data-code', 'REST');
+  await page.evaluate(() => window.__kcStore.getState().setPoemDoctrine(null));
+  await expect(page.locator('.horn-tile[data-horn="grit"]')).toHaveAttribute('data-code', 'REST');
+  // unsigned lines never render: nothing from the horns in the transcript
+  await expect(page.locator('.codec-line')).toHaveCount(0);
+});

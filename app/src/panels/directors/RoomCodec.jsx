@@ -23,12 +23,31 @@ import { tasteBlocks, ROOM_FEED_MAX } from '../../curator/roomFeed.js';
 import { useMindFaces } from '../../hooks/useMindFaces.js';
 import { useRoomFeed } from '../../hooks/useRoomFeed.js';
 import { LoisFaceNow, DavisFaceNow } from './RoomFaces.jsx';
+import { HornStrip } from './HornStrip.jsx';
+import { resolveHorns, bandRead, HORN_IDS, hornLabel } from '../../curator/hornFaces.js';
+import { shownHeat, heatStep } from '../layout/kineticHeat.mjs';
+import { getBandView, subscribeBand } from '../../personas/bandLive.js';
 
 const POLL_MS = 500;
 // The transcript column's height is the face windows' height; it shows the tail of the window (08-Q5 default:
 // the live tail — the retained 60 stay in the feed, the column shows the most recent lines that fit).
 const VISIBLE_LINES = 6;
 const TASTE_SLOTS = 10;
+
+/** The persona a transcript line is from, as its tile names it (callsigns only, R6): cover / overlap / a horn's. */
+const whoLabel = (persona) => (persona === 'lois' ? 'cover' : persona === 'davis' ? 'overlap' : hornLabel(persona));
+/** The class the line's name takes: lois/davis as ever; a horn's own key (blast / hybrid / grit). */
+const whoClass = (persona) =>
+  persona === 'lois' || persona === 'davis'
+    ? persona
+    : { carson: 'blast', greiman: 'hybrid', ashworth: 'grit' }[persona];
+
+/** The band's view as React state (null while the band is off, the default). Subscribes; no timer. */
+function useBandView() {
+  const [view, setView] = useState(getBandView);
+  useEffect(() => subscribeBand(() => setView(getBandView())), []);
+  return view;
+}
 
 export function RoomCodec() {
   const seed = useStore((s) => s.seed);
@@ -37,8 +56,10 @@ export function RoomCodec() {
     const feed = loisActivity.snapshot();
     return { lois: resolveLoisFace(feed), davis: resolveDavisState(feed) };
   });
+  const [heat, setHeat] = useState(() => heatStep(shownHeat()));
   useEffect(() => {
     const read = () => {
+      setHeat(heatStep(shownHeat())); // #2388: the KIN heat step, change-gated (a step, never the raw decaying value)
       const feed = loisActivity.snapshot();
       const lois = resolveLoisFace(feed);
       const davis = resolveDavisState(feed);
@@ -51,6 +72,19 @@ export function RoomCodec() {
     return () => clearInterval(timer);
   }, []);
   const { lois, davis } = faces;
+  // #2388 — the horns read measured state only: the standing treatment and doctrine (the store), the KIN heat step
+  // (read by the same change-gated poll as the faces above), and this phrase's band turns (the band's own view).
+  const standing = useStore((s) => s.poemDoctrine ?? null);
+  const stageMode = useStore((s) => s.layoutParams?.fieldForm?.raygun?.mode ?? null);
+  const stageSeed = useStore((s) => s.layoutParams?.fieldForm?.raygun?.seed ?? null);
+  const bandView = useBandView();
+  const horns = resolveHorns({
+    stageMode,
+    stageSeed,
+    standing,
+    heat,
+    bands: Object.fromEntries(HORN_IDS.map((id) => [id, bandRead(id, bandView)])),
+  });
   // #1462 — a mind request blends a state over the honest face, holds it for its decay, then eases back
   const mind = useMindFaces();
   const lLook = mind.lois?.id ? loisLook(mind.lois.id) : null;
@@ -97,7 +131,7 @@ export function RoomCodec() {
             r.kind === 'persona' ? (
               <div className="codec-line persona" key={r.seq}>
                 {r.bar !== null && <span className="codec-bar">bar {r.bar} </span>}
-                <span className={`codec-who ${r.persona}`}>{r.persona === 'lois' ? 'cover' : 'overlap'}</span>{' '}
+                <span className={`codec-who ${whoClass(r.persona)}`}>{whoLabel(r.persona)}</span>{' '}
                 <span className="codec-text">{r.text}</span>
               </div>
             ) : (
@@ -108,6 +142,8 @@ export function RoomCodec() {
           )}
         </div>
       </div>
+
+      <HornStrip horns={horns} />
 
       <div
         className="codec-window codec-davis"

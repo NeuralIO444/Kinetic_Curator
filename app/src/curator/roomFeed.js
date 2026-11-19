@@ -12,6 +12,7 @@
 import { on, off, Events } from '../composition/eventBus.js';
 import { describeOp } from './mindConduct.js';
 import { HEAD_MIN_FIDELITY } from './tasteHead.js';
+import { linesForTurn } from './hornLines.mjs';
 
 export const ROOM_FEED_MAX = 60;
 
@@ -22,6 +23,15 @@ export function personaLineFrom(d) {
   const text = raw.trim();
   if (!text) return null;
   return { kind: 'persona', persona: d.persona, bar: Number.isInteger(d.bar) ? d.bar : null, text };
+}
+
+/**
+ * #2388 (P8) — a band turn → the horn lines it earns, as persona records. Only SIGNED lines (hornLines.mjs): the
+ * shipped drafts are all unsigned, so this is [] and the transcript is exactly what it was. QUEEN and GOVERNOR never
+ * become records.
+ */
+export function bandLinesFrom(turn) {
+  return linesForTurn(turn).map((l) => ({ kind: 'persona', persona: l.persona, bar: null, text: l.text }));
 }
 
 /** The room's verdict as the transcript's tail line (the frozen mockup's "— the room, working —"). */
@@ -130,6 +140,7 @@ export function startRoomFeed() {
   on(Events.DICE_CAST, onCast);
   on(Events.MIND_ROUTE, onRoute);
   on(Events.BLOOM, onBloom);
+  on(Events.BAND_TURN, onBand);
   return stopRoomFeed;
 }
 function stopRoomFeed() {
@@ -140,6 +151,7 @@ function stopRoomFeed() {
   off(Events.DICE_CAST, onCast);
   off(Events.MIND_ROUTE, onRoute);
   off(Events.BLOOM, onBloom);
+  off(Events.BAND_TURN, onBand);
 }
 const onDecision = (d) => {
   feed.push(personaLineFrom(d));
@@ -152,6 +164,9 @@ const onCast = (p) => {
 };
 const onRoute = (p) => {
   feed.push(roomLineFrom(Events.MIND_ROUTE, p));
+};
+const onBand = (turn) => {
+  for (const r of bandLinesFrom(turn)) feed.push(r);
 };
 const onBloom = (p) => {
   feed.push(roomLineFrom(Events.BLOOM, p));

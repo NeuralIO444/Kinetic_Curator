@@ -412,6 +412,8 @@ const EXTRA_FILES = [
   'composition/capabilityRegistry.mjs', // consumer notes — rendered in MegaMindPanel's capability table
   'curator/shelfFill.mjs', // fill notes — rendered in ShelfDevPanel's last-fill readout
   'curator/loisGrudge.mjs', // grudgeSummary — rendered in DataExportRow's Pipeline readout
+  'curator/hornFaces.js', // #2388: the horn tiles' labels and state words — rendered in THE ROOM's strip
+  'curator/hornLines.mjs', // #2388: the horns' chat lines (unsigned drafts) — rendered in THE ROOM's transcript once signed
 ];
 // The round-3 lowercase-word rule's scope: files whose string literals are display copy by
 // construction, each with the render path that makes it so. Whole-file scanning stays B1's job;
@@ -422,6 +424,8 @@ const LITERAL_PRODUCER_FILES = [
   'curator/megamindSurfacesLive.js', // driver error lines → MegaMindPanel's {sv.error} readout
   'state/slices/davisSlice.js', // shelfNotice producers → ShelfView's notice band
   'data/helpCopy.js', // help titles + texts → hover title attributes and the ? overlay
+  'curator/hornFaces.js', // #2388: horn tile labels and state words → the strip (HornStrip.jsx)
+  'curator/hornLines.mjs', // #2388: horn chat lines → the transcript (roomFeed bandLinesFrom)
 ];
 const ALLOWLIST = [
   {
