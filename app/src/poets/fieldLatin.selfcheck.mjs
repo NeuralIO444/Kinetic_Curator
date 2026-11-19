@@ -533,11 +533,11 @@ assert.ok(!('face' in soloTeijo), 'the serif face is Whittier-only at the pick, 
 
 // step: the contexts are the room's — the verdict as the step resolves it
 // and the dealt look's family, derived exactly as japaneseContext is.
-const soloStep = step({ ...INITIAL_STATE }, { intensity: 0.3, verdict: 'DAVIS ALONE', lookFamily: 'swiss' }, () => 0);
-assert.strictEqual(soloStep.decision.face, 'serif', 'step: a DAVIS ALONE room affirms serif through the real step');
+const soloStep = step({ ...INITIAL_STATE }, { intensity: 0.3, verdict: 'OVERLAP ALONE', lookFamily: 'swiss' }, () => 0);
+assert.strictEqual(soloStep.decision.face, 'serif', 'step: a OVERLAP ALONE room affirms serif through the real step');
 assert.ok(!('plate' in soloStep.decision), '#2005: at 0.3 the step deals the serif reading, not a plate');
 const soloStanding = step(
-  { ...INITIAL_STATE, room: 'DAVIS ALONE' },
+  { ...INITIAL_STATE, room: 'OVERLAP ALONE' },
   { intensity: 0.3, lookFamily: 'swiss' },
   () => 0,
 );
@@ -559,7 +559,7 @@ assert.ok(
 // The Director itself: dealPoet is the store's poem-deal entry (landPoem).
 // The room is set the production way — ticks that name the look's family
 // and, for the solo room, the honest feed as it stands when the room IS
-// DAVIS ALONE: LOIS away and the generator rolling unattended (the AWAY
+// OVERLAP ALONE: LOIS away and the generator rolling unattended (the AWAY
 // rows of the matrix need a Davis state too — rollsLastMinute is the
 // feed's own field for his fires).
 const directorInRoom = ({ feed, lookFamily }) => {
@@ -573,7 +573,7 @@ const directorInRoom = ({ feed, lookFamily }) => {
 };
 {
   const { d, verdict } = directorInRoom({ feed: { away: true, rollsLastMinute: 3 }, lookFamily: 'swiss' });
-  assert.strictEqual(verdict, 'DAVIS ALONE', 'setup: LOIS away, generator rolling — the Director stands in the solo room');
+  assert.strictEqual(verdict, 'OVERLAP ALONE', 'setup: LOIS away, generator rolling — the Director stands in the solo room');
   // #2005 RE-PIN (cause: the clean plate): this room stands at the
   // Director's stillest intensity, inside the plate's band — the live solo
   // deal is a PLATE deal now, and the serif call is superseded on it (the
@@ -616,7 +616,7 @@ const directorInRoom = ({ feed, lookFamily }) => {
 }
 {
   const { d, verdict } = directorInRoom({ feed: {}, lookFamily: 'swiss' });
-  assert.notStrictEqual(verdict, 'DAVIS ALONE', 'setup: LOIS present — not the solo room');
+  assert.notStrictEqual(verdict, 'OVERLAP ALONE', 'setup: LOIS present — not the solo room');
   const decision = d.dealPoet({ fieldRng: () => 0, lookFamily: 'swiss' });
   assert.ok(decision && decision.poetId === 'greenleaf', 'live path: the plain room still deals Whittier');
   assert.ok(

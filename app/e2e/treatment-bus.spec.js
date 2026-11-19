@@ -32,10 +32,16 @@ test('the ray gun tap lands through the treatments surface: plain → carson →
   const gun = page.locator('.poem-row').getByRole('button', { name: /^ray gun/ });
   await expect(gun).toHaveText('ray gun');
   const mode = () => page.evaluate(() => window.__kcStore.getState().layoutParams.fieldForm?.raygun?.mode ?? null);
-  for (const m of ['carson', 'greiman', 'grit', 'shot']) {
+  // record modes keep their data ids; the chip shows callsigns (PoemRow MODE_CALLSIGNS, #2383)
+  for (const [m, label] of [
+    ['carson', 'blast'],
+    ['greiman', 'hybrid'],
+    ['grit', 'swiss grit'],
+    ['shot', 'shot'],
+  ]) {
     await gun.click();
     await expect.poll(mode).toBe(m);
-    await expect(gun).toHaveText(`ray gun · ${m}`);
+    await expect(gun).toHaveText(`ray gun · ${label}`);
   }
   await gun.click();
   await expect.poll(mode).toBe(null);

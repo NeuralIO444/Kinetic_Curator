@@ -257,7 +257,7 @@ await ok('facts derive from every section + the input log, stamped from the log'
   assert.equal(hold.frame, 360);
   assert.ok(hold.text.includes('about 2s'), `the hold's length measured from the log: ${hold.text}`);
   const spoken = byKind('spoken')[0];
-  assert.ok(spoken.text.includes('5 times') && spoken.text.includes('Davis 3') && spoken.text.includes('LOIS 2'));
+  assert.ok(spoken.text.includes('5 times') && spoken.text.includes('OVERLAP 3') && spoken.text.includes('COVER 2'));
 });
 
 await ok('window scoping: facts outside the window are never derived', () => {
@@ -275,7 +275,7 @@ await ok('window scoping: facts outside the window are never derived', () => {
   );
   const winSpoken = win.find((x) => x.kind === 'spoken');
   assert.ok(
-    winSpoken && winSpoken.text.includes('2 times') && winSpoken.text.includes('Davis 2'),
+    winSpoken && winSpoken.text.includes('2 times') && winSpoken.text.includes('OVERLAP 2'),
     `aggregates count the window only: ${winSpoken && winSpoken.text}`,
   );
 });

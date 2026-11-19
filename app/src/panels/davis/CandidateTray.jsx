@@ -227,7 +227,7 @@ export function CandidateTray() {
       {run && (
         <div className="cand-run-line">
           <button type="button" className="micro-btn" disabled={!visionOn || !!vision?.judging} onClick={judgeStills}>
-            judge stills — LOIS vision
+            judge stills — COVER vision
           </button>
           {vision?.judging ? (
             <span>
@@ -286,8 +286,8 @@ export function CandidateTray() {
                 {vision?.verdicts[card.key] ? (
                   <div className="cand-meta">
                     {vision.verdicts[card.key].kind === 'variant'
-                      ? 'LOIS vision pre-judgement (E5)'
-                      : 'LOIS vision (E4)'}
+                      ? 'COVER vision pre-judgement (E5)'
+                      : 'COVER vision (E4)'}
                     : {vision.verdicts[card.key].verdict} — presence {vision.verdicts[card.key].readings.presence} ·
                     contrast {vision.verdicts[card.key].readings.contrast} · exposure{' '}
                     {vision.verdicts[card.key].readings.exposure} · promise {vision.verdicts[card.key].readings.promise}

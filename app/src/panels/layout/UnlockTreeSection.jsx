@@ -28,7 +28,7 @@ export function UnlockTreeSection({ layoutParams }) {
   const hasWeather = useStore((st) => !!nearestWeatherAbove(st.layers, st.activeLayerId));
   const voiceCount = useStore((s) => s.userVoices).filter((v) => !isEarned(v)).length;
 
-  const davisRow = view && Array.isArray(view.rows) ? view.rows.find((r) => r.label === 'DAVIS') : null;
+  const davisRow = view && Array.isArray(view.rows) ? view.rows.find((r) => r.label === 'OVERLAP') : null;
   const groups = buildUnlockTree({
     mode: layoutParams.mode,
     symmetry: layoutParams.symmetry,

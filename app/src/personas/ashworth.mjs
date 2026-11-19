@@ -15,10 +15,10 @@ export const record = {
     callsign: 'SWISS GRIT',
   },
   doctrine: {
-    name: 'ASHWORTH',
+    name: 'SWISS GRIT',
     modes: ['grit'],
     title:
-      'ASHWORTH — arms process-first: Swiss Grit, the grid first and the destruction by rule. Hand it the stage and every poem it deals is set perfectly, then run through the machine.',
+      'SWISS GRIT — arms process-first: Swiss Grit, the grid first and the destruction by rule. Hand it the stage and every poem it deals is set perfectly, then run through the machine.',
   },
   principle: 'process-first — set it perfectly, then run a destructive process over it, by rule',
   relations: [

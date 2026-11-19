@@ -32,10 +32,10 @@ export const isTypeNativeFamily = (family) => typeof family === 'string' && TYPE
 /** Preferred next rooms (adjacency). Data only. Used at pick time. */
 export const ROOM_TRANSITIONS = Object.freeze({
   'THE CLASH': ['THE ROOM', 'AGREEMENT'],
-  'THE ROOM': ['AGREEMENT', 'THE CLASH', 'DAVIS ALONE'],
+  'THE ROOM': ['AGREEMENT', 'THE CLASH', 'OVERLAP ALONE'],
   'FULL BURN': ['THE ROOM', 'THE CLASH'],
-  AGREEMENT: ['THE ROOM', 'DAVIS ALONE'],
-  'DAVIS ALONE': ['THE ROOM', 'AGREEMENT'],
+  AGREEMENT: ['THE ROOM', 'OVERLAP ALONE'],
+  'OVERLAP ALONE': ['THE ROOM', 'AGREEMENT'],
 });
 
 /** Slow pacing debt: hot rooms in the last N keeps. Cap 6. Window 24 (#1907 fix):
@@ -58,7 +58,7 @@ export const SLOW_DEBT_WINDOW = 24;
 export const KEEP_PRESSURE_HIGH = 0.5;
 
 /**
- * #2005 — the plate call's stillness line. In the solo room (DAVIS ALONE),
+ * #2005 — the plate call's stillness line. In the solo room (OVERLAP ALONE),
  * a Whittier pick at or below this intensity deals as a clean PLATE
  * instead of in the serif face — the plate supersedes the serif call on
  * that deal (fieldForm.js documents the deal-side law). A plate is a
@@ -151,7 +151,7 @@ export function choosePoet({
     //   plate face under the plate discipline. It supersedes the serif
     //   call on that deal: the face spread below stands down when it fires.
     ...(plateCall ? { plate: true } : {}),
-    // - face: the solo room (DAVIS ALONE — one artist in the room, nobody
+    // - face: the solo room (OVERLAP ALONE — one artist in the room, nobody
     //   directing) is the reading room: a Whittier pick there stands in her
     //   book face, the print register. Hers alone, like Teijo's script.
     ...(poetId === 'greenleaf' && soloContext && !plateCall ? { face: 'serif' } : {}),

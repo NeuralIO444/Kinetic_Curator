@@ -145,7 +145,7 @@ export function dealFill({
   const anchor = anchorInfo.state;
   const centroid = anchorInfo.centroid;
   if (anchor === 'identity')
-    notes.push("anchor: identity — too few keeps to lean on; consensus deals in Davis's novelty order");
+    notes.push("anchor: identity — too few keeps to lean on; consensus deals in OVERLAP's novelty order");
   if (anchor === 'none') notes.push('anchor: none — no counted keep carries a layout to lean toward');
   if (anchorPartial > 0)
     notes.push(
@@ -317,7 +317,7 @@ export function dealFill({
   take('lois', loisOrdered, table.lois);
   const loisIds = dealt.filter((d) => d.rule === 'lois').map((d) => d.keepId);
   if (loisIds.some((id) => margins.get(id) === null)) {
-    notes.push("lois's choice: dealt unjudged keeps — no gate margins on file for them");
+    notes.push("COVER's choice: dealt unjudged keeps — no gate margins on file for them");
   }
 
   // Contrarian ← most unlike the other dealt (pinned included).

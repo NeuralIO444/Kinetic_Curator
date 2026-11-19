@@ -407,8 +407,8 @@ const micro = async (loc) => (await loc.locator('.tb-micro').textContent())?.tri
 test('TASTE: the readout names the standing taster, and DICE when off', async ({ page }) => {
   await boot(page);
   const taste = btn(page, /^Taste/);
-  await expect(taste).toHaveAttribute('aria-label', /^Taste: davis — who tastes the CURATOR candidates/);
-  expect(await micro(taste), 'the default taster stands on the button').toBe('davis');
+  await expect(taste).toHaveAttribute('aria-label', /^Taste: overlap — who tastes the CURATOR candidates/);
+  expect(await micro(taste), 'the default taster stands on the button').toBe('overlap');
 
   await taste.click();
   const menu = group(page).locator('.curator-voice-menu');
@@ -418,9 +418,9 @@ test('TASTE: the readout names the standing taster, and DICE when off', async ({
   await expect(taste).toHaveAttribute('aria-label', /^Taste: dice — /);
 
   await taste.click();
-  await menu.getByRole('menuitem', { name: /^taste: lois$/i }).click();
-  expect(await micro(taste), 'the picked taster stands in their place').toBe('lois');
-  await expect(taste).toHaveAttribute('aria-label', /^Taste: lois — /);
+  await menu.getByRole('menuitem', { name: /^taste: cover$/i }).click();
+  expect(await micro(taste), 'the picked taster stands in their place').toBe('cover');
+  await expect(taste).toHaveAttribute('aria-label', /^Taste: cover — /);
 });
 
 test('KIN detent: the next pass stands at rest, steps with the run, and never promises CHAOS below KOZ', async ({

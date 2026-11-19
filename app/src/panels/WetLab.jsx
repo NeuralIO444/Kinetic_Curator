@@ -647,7 +647,7 @@ export function WetLab({ assetId, onClose }) {
                     </div>
                     {pileOnly && !stageIds.some((id) => pileOnly.has(id)) && (
                       <div style={{ fontSize: 10, color: 'var(--dim)' }} data-testid="part-preview-note">
-                        nothing on this stage is in that kit — Davis deals from the stage as it is
+                        nothing on this stage is in that kit — OVERLAP deals from the stage as it is
                       </div>
                     )}
                     <div style={stripRow} data-testid="part-strip">

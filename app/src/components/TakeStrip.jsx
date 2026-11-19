@@ -20,7 +20,7 @@ function RecapBlock({ title, recap }) {
       {recap.lines.map((line, i) => (
         <span key={i} className="take-recap-line">
           {line.persona ? (
-            <span className="take-recap-who">{line.persona === 'davis' ? 'DAVIS ' : 'LOIS '}</span>
+            <span className="take-recap-who">{line.persona === 'davis' ? 'OVERLAP ' : 'COVER '}</span>
           ) : null}
           {line.text}
         </span>

@@ -64,8 +64,8 @@ ok("the five verdicts are the matrix's, and they sit on the rooms the issue name
   const v = (l, d) => roomFor(l, d).verdict;
   assert.deepEqual([...new Set(parsed.map((p) => p[5]))].sort(), [
     'AGREEMENT',
-    'DAVIS ALONE',
     'FULL BURN',
+    'OVERLAP ALONE',
     'THE CLASH',
     'THE ROOM',
   ]);
@@ -73,7 +73,7 @@ ok("the five verdicts are the matrix's, and they sit on the rooms the issue name
   assert.equal(v('NOD', 'BLOOM'), 'AGREEMENT');
   assert.equal(v('BURN', 'FLOW'), 'FULL BURN');
   for (const d of Object.keys(DAVIS_STATES)) {
-    assert.equal(v('AWAY', d), 'DAVIS ALONE');
+    assert.equal(v('AWAY', d), 'OVERLAP ALONE');
     assert.equal(roomFor('AWAY', d).lois, null, 'LOIS is silent when away');
     assert.equal(v('VIBE', d), 'THE ROOM');
   }

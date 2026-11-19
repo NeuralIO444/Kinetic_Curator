@@ -218,7 +218,7 @@ function Vision({ record }) {
       <summary>S3 — vision (occasional, deliberate press only; nothing is judged per-bar)</summary>
       <p style={{ opacity: 0.75, margin: '8px 0 4px' }}>
         Render judging: {judgeOn ? 'enabled' : 'off'} — the &ldquo;judge stills&rdquo; press on the DIRECTORS candidate
-        tray sends each finalist&rsquo;s displayed still to LOIS&rsquo;s vision (variant stills are the E5
+        tray sends each finalist&rsquo;s displayed still to COVER&rsquo;s vision (variant stills are the E5
         pre-judgements). Verdicts sit beside the bake-time rules verdict and steer nothing; each accrues in the judge
         ledger, never in the taste ledgers.
       </p>
@@ -291,7 +291,7 @@ function Surfaces({ record }) {
         {act('devpanel.narration', 'narrate telemetry', () => driver.narrateTelemetry())}
         {act('devpanel.narration', 'narrate census', () => driver.narrateCensus())}
         {act('narration.driftRetrain', 'narrate drift', () => driver.narrateDrift())}
-        {act('narration.davisReason', "write Davis's reason", () => driver.writeReason())}
+        {act('narration.davisReason', "write OVERLAP's reason", () => driver.writeReason())}
       </div>
       {sv.busy && <p style={{ opacity: 0.85 }}>asking the model — {sv.busy}…</p>}
       {sv.error && <p style={{ opacity: 0.9, color: '#e88' }}>discarded / unavailable — {sv.error}</p>}

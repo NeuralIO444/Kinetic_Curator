@@ -117,7 +117,7 @@ export function validateTaste(raw) {
   // Probe weights stay on disk in taste.json; the browser only keeps the head.
   if (raw.lois != null) {
     const loisHead = validateHead(raw.lois.head, numKeys);
-    if (!loisHead.ok) return { ok: false, error: `lois: ${loisHead.error}` };
+    if (!loisHead.ok) return { ok: false, error: `boldness head: ${loisHead.error}` };
     const ll = raw.lois.labels && typeof raw.lois.labels === 'object' ? raw.lois.labels : {};
     taste.lois = {
       labels: { favorites: Number(ll.favorites) || 0, keeps: Number(ll.keeps) || 0 },
@@ -549,7 +549,7 @@ export function scoreBoldness(taste, layoutParams, { experimental = false } = {}
 
 /** Pipeline line for the boldness probe. Absent lois is an honest "not trained". */
 export function loisSummary(taste, { experimental = false } = {}) {
-  if (!taste || !taste.lois) return 'lois · not trained — favorites vs keeps still waiting on labels';
+  if (!taste || !taste.lois) return 'COVER · not trained — favorites vs keeps still waiting on labels';
   const { favorites, keeps } = taste.lois.labels;
   const f = taste.lois.head.fidelity;
   const live =
@@ -558,7 +558,7 @@ export function loisSummary(taste, { experimental = false } = {}) {
       : headUsable(taste.lois.head, experimental)
         ? 'EXPERIMENTAL: boldness below the bar'
         : 'fidelity too low — CRIT stays parked';
-  return `lois · ${favorites} favorites / ${keeps} kept-not-favorited · fidelity ${f.toFixed(2)} · ${live}`;
+  return `COVER · ${favorites} favorites / ${keeps} kept-not-favorited · fidelity ${f.toFixed(2)} · ${live}`;
 }
 
 /** #925 — the retrain nudge: a hint, never a warning. Taste goes softly

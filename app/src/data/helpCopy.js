@@ -66,7 +66,7 @@ export const HELP_TOPICS = [
     id: 'davis-keep',
     group: 'Directors',
     title: 'keep',
-    text: 'Keep the current plate without starring it (J). Keeps feed the Lois boldness probe; un-favoriting leaves the keep.',
+    text: 'Keep the current plate without starring it (J). Keeps feed the COVER boldness probe; un-favoriting leaves the keep.',
   },
   { id: 'davis-new-seed', group: 'Directors', title: 'new seed', text: 'Jump to a fresh random seed (N).' },
   {
@@ -427,8 +427,8 @@ export const HELP_TOPICS = [
   {
     id: 'davis-role-deal',
     group: 'Directors',
-    title: 'davis · role deal',
-    text: 'On: Davis deals a creature’s parts by fit — the best body-shaped shapes in the pile become the body, the best limb-shaped become limbs. Off: the older deal, parts by seed alone.',
+    title: 'overlap · role deal',
+    text: 'On: OVERLAP deals a creature’s parts by fit — the best body-shaped shapes in the pile become the body, the best limb-shaped become limbs. Off: the older deal, parts by seed alone.',
   },
 ];
 

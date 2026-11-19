@@ -36,7 +36,8 @@ for (const vp of [
     await expect.poll(() => page.evaluate(() => !!window.__kcStore.getState().layoutParams.fieldForm)).toBe(true);
     const gun = page.locator('.poem-row').getByRole('button', { name: /^ray gun/ });
     await gun.click(); // carson
-    await expect(gun).toHaveText('ray gun · carson');
+    // chip labels are callsigns (PoemRow MODE_CALLSIGNS, #2383); the record mode stays 'carson'
+    await expect(gun).toHaveText('ray gun · blast');
     const rec = await page.evaluate(() => window.__kcStore.getState().layoutParams.fieldForm.raygun);
     expect(rec.wear).toBe(1);
     // the seam's own treated list (the same pure module the stage draws through, on the live form + record)
@@ -49,7 +50,7 @@ for (const vp of [
     await page.screenshot({ path: `test-results/raygun-wear-carson-${vp.name}.png` });
     await gun.click(); // greiman
     await gun.click(); // grit (#2010 P2)
-    await expect(gun).toHaveText('ray gun · grit');
+    await expect(gun).toHaveText('ray gun · swiss grit');
     await gun.click(); // shot
     await expect(gun).toHaveText('ray gun · shot');
     await page.waitForTimeout(1500);

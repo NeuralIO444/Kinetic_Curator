@@ -150,7 +150,7 @@ ok('material knobs light per material, exactly as MaterialSliders gates them', (
   }
   for (const m of ['glass', 'plate', 'wash', 'stipple'])
     assert.equal(stateIn({ material: 'flat' }, `mat-${m}`), 'dark');
-  assert.match(lineIn({ material: 'flat' }, 'mat-wash'), /Davis sets the material/);
+  assert.match(lineIn({ material: 'flat' }, 'mat-wash'), /OVERLAP sets the material/);
 });
 
 ok('mode gates match the components\u2019 predicates (swarm family, hype, growth, phyllotaxis)', () => {

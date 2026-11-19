@@ -168,10 +168,10 @@ const genreLabel = (r) => {
 /** One backstage line for the Pipeline (loisSummary's pattern): the bans
  * as character, or the honest absence of one. */
 export function grudgeSummary(snap) {
-  if (!snap || snap.totalCuts === 0) return 'lois grudge · none — he has cut nothing yet';
+  if (!snap || snap.totalCuts === 0) return 'COVER grudge · none — he has cut nothing yet';
   if (!snap.permabans.length)
-    return `lois grudge · ${snap.totalEffective} cut${snap.totalEffective === 1 ? '' : 's'} tallied · no permaban`;
+    return `COVER grudge · ${snap.totalEffective} cut${snap.totalEffective === 1 ? '' : 's'} tallied · no permaban`;
   const names = snap.permabans.slice(0, 2).map(genreLabel).join(', ');
   const more = snap.permabans.length > 2 ? ` +${snap.permabans.length - 2} more` : '';
-  return `lois grudge · permaban: ${names}${more}`;
+  return `COVER grudge · permaban: ${names}${more}`;
 }

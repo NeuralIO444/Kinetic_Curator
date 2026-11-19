@@ -148,7 +148,9 @@ export function CuratorBar() {
   // #2050 — the TASTE readout: the standing taster's id, resolved from the
   // same persona standing the pick itself uses (taste.js, above) — or DICE
   // when off, because off honestly means a uniform dice pick.
-  const taster = tasterReadout(voice);
+  // #2383 (R6 callsign sweep): the readout names the taster by callsign, never by id — the id is data.
+  const tasterId = tasterReadout(voice);
+  const taster = tasterId === 'lois' ? 'cover' : tasterId === 'davis' ? 'overlap' : tasterId;
   const tasterFull = voice === 'off' ? 'dice' : activeAlias;
   // #1588 — LOIS's verdict line no longer renders here; it rides the footer ticker in his slot
   // (components/LoisPill.jsx). The pick record stays in the Curator button's tooltip, via the hint.

@@ -74,7 +74,7 @@ export function RoomCodec() {
           <LoisFaceNow face={lois.face} overlay={mind.lois} barS={mind.barS} />
         </div>
         <div className="codec-dressing">
-          <span className="codec-name">lois</span>
+          <span className="codec-name">cover</span>
           <span className="codec-state act">{loisWord}</span>
         </div>
       </div>
@@ -97,7 +97,7 @@ export function RoomCodec() {
             r.kind === 'persona' ? (
               <div className="codec-line persona" key={r.seq}>
                 {r.bar !== null && <span className="codec-bar">bar {r.bar} </span>}
-                <span className={`codec-who ${r.persona}`}>{r.persona}</span>{' '}
+                <span className={`codec-who ${r.persona}`}>{r.persona === 'lois' ? 'cover' : 'overlap'}</span>{' '}
                 <span className="codec-text">{r.text}</span>
               </div>
             ) : (
@@ -118,7 +118,7 @@ export function RoomCodec() {
           <DavisFaceNow seed={seed} code={dCode} />
         </div>
         <div className="codec-dressing">
-          <span className="codec-name">davis</span>
+          <span className="codec-name">overlap</span>
           <span className="codec-state act">{davisWord}</span>
         </div>
       </div>

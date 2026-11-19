@@ -118,7 +118,7 @@ const pool = [davisFav, ...Array.from({ length: 6 }, () => ({ ...mid })), outlie
   const eng = personaCurator();
   assert.strictEqual(eng.heuristic, true);
   assert.strictEqual(eng.status(), 'active');
-  assert.strictEqual(curatorHint(eng), `heuristic pick: LOIS · ${getLoisVerdict() || 'Walk in. Show me something.'}`);
+  assert.strictEqual(curatorHint(eng), `heuristic pick: COVER · ${getLoisVerdict() || 'Walk in. Show me something.'}`);
   const picked = pickCurated(
     pool.map((c) => ({ ...c })),
     eng,
@@ -126,7 +126,7 @@ const pool = [davisFav, ...Array.from({ length: 6 }, () => ({ ...mid })), outlie
   );
   assert.strictEqual(picked.curated, true);
   assert.strictEqual(picked.index, pool.length - 1);
-  assert.match(curatorHint(eng), /^heuristic pick: LOIS · /);
+  assert.match(curatorHint(eng), /^heuristic pick: COVER · /);
   assert.doesNotMatch(curatorHint(eng), /persona pick/);
   setActivePersona('davis');
   assert.strictEqual(getActivePersonaId(), 'davis');

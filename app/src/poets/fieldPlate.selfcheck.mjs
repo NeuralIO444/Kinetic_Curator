@@ -688,10 +688,10 @@ const countedPick = (args) => {
 }
 // step: the contexts are the room's, derived exactly as the slice-3 ones.
 {
-  const stillStep = step({ ...INITIAL_STATE }, { intensity: 0.2, verdict: 'DAVIS ALONE', lookFamily: 'swiss' }, () => 0);
-  assert.strictEqual(stillStep.decision.plate, true, 'step: a still DAVIS ALONE room affirms the plate through the real step');
-  const warmStep = step({ ...INITIAL_STATE }, { intensity: 0.5, verdict: 'DAVIS ALONE', lookFamily: 'swiss' }, () => 0);
-  assert.ok(warmStep.decision.face === 'serif' && !('plate' in warmStep.decision), 'step: a warm DAVIS ALONE room affirms serif, not the plate');
+  const stillStep = step({ ...INITIAL_STATE }, { intensity: 0.2, verdict: 'OVERLAP ALONE', lookFamily: 'swiss' }, () => 0);
+  assert.strictEqual(stillStep.decision.plate, true, 'step: a still OVERLAP ALONE room affirms the plate through the real step');
+  const warmStep = step({ ...INITIAL_STATE }, { intensity: 0.5, verdict: 'OVERLAP ALONE', lookFamily: 'swiss' }, () => 0);
+  assert.ok(warmStep.decision.face === 'serif' && !('plate' in warmStep.decision), 'step: a warm OVERLAP ALONE room affirms serif, not the plate');
   const roomStep = step({ ...INITIAL_STATE }, { intensity: 0.2, verdict: 'THE ROOM', lookFamily: 'swiss' }, () => 0);
   assert.ok(!('plate' in roomStep.decision) && !('face' in roomStep.decision), 'step: an ordinary room at the same intensity affirms nothing');
 }
@@ -739,7 +739,7 @@ const directorInRoom = ({ feed, lookFamily }) => {
 };
 {
   const { d, verdict } = directorInRoom({ feed: { away: true, rollsLastMinute: 3 }, lookFamily: 'swiss' });
-  assert.strictEqual(verdict, 'DAVIS ALONE', 'setup: LOIS away, generator rolling — the Director stands in the solo room');
+  assert.strictEqual(verdict, 'OVERLAP ALONE', 'setup: LOIS away, generator rolling — the Director stands in the solo room');
   const decision = d.dealPoet({ fieldRng: () => 0, lookFamily: 'swiss' });
   assert.ok(decision && decision.poetId === 'greenleaf' && decision.plate === true, 'live path: the still solo room deals Whittier with the plate call');
   assert.ok(!('face' in decision), 'live path: the plate deal carries no serif call');
@@ -751,7 +751,7 @@ const directorInRoom = ({ feed, lookFamily }) => {
 }
 {
   const { d, verdict } = directorInRoom({ feed: {}, lookFamily: 'swiss' });
-  assert.notStrictEqual(verdict, 'DAVIS ALONE', 'setup: LOIS present — not the solo room');
+  assert.notStrictEqual(verdict, 'OVERLAP ALONE', 'setup: LOIS present — not the solo room');
   const decision = d.dealPoet({ fieldRng: () => 0, lookFamily: 'swiss' });
   assert.ok(decision && decision.poetId === 'greenleaf', 'live path: the plain room still deals Whittier');
   assert.ok(

@@ -16,7 +16,7 @@ export const record = {
     callsign: 'HYBRID',
   },
   doctrine: {
-    name: 'GREIMAN',
+    name: 'HYBRID',
     modes: ['greiman'],
   },
   principle: 'colour — the digital pole: bitmap type, layered planes, the spectrum across a word, the float',

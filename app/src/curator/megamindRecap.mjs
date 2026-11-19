@@ -64,11 +64,11 @@ const HEADLINE_STATES = {
   davis: { BLOOM: 'bloom', STUCK: 'stuck' },
 };
 const STATE_PHRASE = {
-  keep: (line) => `LOIS called a keep${line ? `: "${line}"` : ''}`,
-  burn: (line) => `LOIS burned the show${line ? `: "${line}"` : ''}`,
-  cut: (line) => `LOIS cut${line ? `: "${line}"` : ''}`,
-  bloom: (line) => `Davis called a bloom${line ? `: "${line}"` : ''}`,
-  stuck: (line) => `Davis called the room stuck${line ? `: "${line}"` : ''}`,
+  keep: (line) => `COVER called a keep${line ? `: "${line}"` : ''}`,
+  burn: (line) => `COVER burned the show${line ? `: "${line}"` : ''}`,
+  cut: (line) => `COVER cut${line ? `: "${line}"` : ''}`,
+  bloom: (line) => `OVERLAP called a bloom${line ? `: "${line}"` : ''}`,
+  stuck: (line) => `OVERLAP called the room stuck${line ? `: "${line}"` : ''}`,
 };
 
 /**
@@ -195,7 +195,7 @@ export function takeFacts(perf, { from = 0, to = Infinity } = {}) {
         lo,
         'spoken',
         null,
-        `the room spoke ${spoken} times in the take (Davis ${byPersona.davis} · LOIS ${byPersona.lois})`,
+        `the room spoke ${spoken} times in the take (OVERLAP ${byPersona.davis} · COVER ${byPersona.lois})`,
         [String(spoken), 'room spoke'],
       );
     let applied = 0;
@@ -209,7 +209,7 @@ export function takeFacts(perf, { from = 0, to = Infinity } = {}) {
           isObj(op) && typeof op.op === 'string'
             ? `${op.op}${typeof op.target === 'string' ? ` → ${op.target}` : ''}`
             : 'a route';
-        push(frame, 'conduct', 'davis', `${stamp(frame)} — Davis moved the room: ${move}`, [
+        push(frame, 'conduct', 'davis', `${stamp(frame)} — OVERLAP moved the room: ${move}`, [
           move,
           'Davis',
           'moved the room',
@@ -217,7 +217,7 @@ export function takeFacts(perf, { from = 0, to = Infinity } = {}) {
       } else if (status === 'dropped') dropped += 1;
     }
     if (dropped)
-      push(lo, 'conduct-missed', null, `${dropped} of Davis's proposed moves were dropped by the room's own gates`, [
+      push(lo, 'conduct-missed', null, `${dropped} of OVERLAP's proposed moves were dropped by the room's own gates`, [
         String(dropped),
         'dropped',
       ]);

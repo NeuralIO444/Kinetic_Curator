@@ -202,7 +202,7 @@ ok('EVOLVE is Davis alone: its fires are rolls and passes, and they never wake L
   assert.equal(snap.away, true, 'unattended generation does not count as the artist being back');
   assert.equal(snap.evolveCount, DAVIS_FLOW_ROLLS);
   assert.equal(snap.rollsLastMinute, DAVIS_FLOW_ROLLS);
-  assert.equal(code(snap), 'FLOW', 'LOIS away, Davis in FLOW: DAVIS ALONE is now a reachable room');
+  assert.equal(code(snap), 'FLOW', 'LOIS away, Davis in FLOW: OVERLAP ALONE is now a reachable room');
   r.act.beat();
   assert.equal(r.act.snapshot().away, false);
   r.act.stop();

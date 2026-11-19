@@ -254,7 +254,7 @@ export function createSurfacesDriver({
     writeReason() {
       return run('reason', async () => {
         const clause = getDavisCitation();
-        if (!clause) throw new Error('no Davis citation stands (the tree head has not picked, or a linear head)');
+        if (!clause) throw new Error('no OVERLAP citation stands (the tree head has not picked, or a linear head)');
         const out = await ask('narration.davisReason', buildReasonRequest(clause), (raw) =>
           validateReasonLine(raw, clause),
         );

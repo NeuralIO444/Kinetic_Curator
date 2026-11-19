@@ -147,7 +147,7 @@ export function curatorHint(curator, { chainFallback = false } = {}) {
   if (curator.status() !== 'active') return `curator untrained · dice roll${duelLine}${chain}`;
   if (curator.heuristic) {
     const line = getLoisVerdict() || 'Walk in. Show me something.';
-    return `heuristic pick: LOIS · ${line}${duelLine}${chain}`;
+    return `heuristic pick: COVER · ${line}${duelLine}${chain}`;
   }
   if (curator.personaName) return `persona pick: ${curator.personaName}${duelLine}${chain}`;
   if (curator.name === 'mlx') {

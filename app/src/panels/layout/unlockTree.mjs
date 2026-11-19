@@ -88,7 +88,7 @@ export function buildUnlockTree(input = {}) {
     const added = opsAddedAt(t);
     let line;
     if (!davis) line = 'His standing is not readable yet — the trio has not started.';
-    else if (t === 1) line = 'The trio is in the room: faces, lines, presence. Davis makes no route edits at tier 1.';
+    else if (t === 1) line = 'The trio is in the room: faces, lines, presence. OVERLAP makes no route edits at tier 1.';
     else line = `${cap(added.map((op) => OP_LINES[op] || op).join('; '))}.`;
     if (davis && davis.tier === t && davis.cool) {
       line += ' In cool-down — quieter until his score climbs back to the tier floor.';
@@ -132,7 +132,7 @@ export function buildUnlockTree(input = {}) {
       name,
       material === m,
       `This Look's material — the ${MATERIAL_NAMES[m].toLowerCase()} knobs above are live.`,
-      `Lights when the Look's material is ${MATERIAL_NAMES[m].toLowerCase()} — Davis sets the material.`,
+      `Lights when the Look's material is ${MATERIAL_NAMES[m].toLowerCase()} — OVERLAP sets the material.`,
     );
   const materials = [
     matGate('glass', 'GLASS — ALPHA'),
@@ -224,11 +224,11 @@ export function buildUnlockTree(input = {}) {
   return [
     {
       id: 'davis-ladder',
-      title: 'DAVIS — THE LADDER',
+      title: 'OVERLAP — THE LADDER',
       note: 'Tiers are earned by playing: keeps, lingering on a frame, returning to kept seeds, evolving. A tier never demotes — a quiet spell is a cool-down, not a step back.',
       nodes: ladder,
     },
-    { id: 'davis-settings', title: 'DAVIS — HIS SETTINGS', nodes: his },
+    { id: 'davis-settings', title: 'OVERLAP — HIS SETTINGS', nodes: his },
     { id: 'materials', title: 'MATERIALS — KNOBS BY BODY', nodes: materials },
     { id: 'modes', title: 'MODES — THE GATES', nodes: modes },
     { id: 'shelf', title: 'THE SHELF', nodes: shelf },
