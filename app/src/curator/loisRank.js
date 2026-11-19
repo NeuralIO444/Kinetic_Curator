@@ -7,6 +7,13 @@
 // a ruler. It does not train, and it does not touch taste.json.
 
 import { extractFeatures } from './taste.js';
+import { personaTuning } from '../personas/tuning.mjs';
+
+// #2382: every number in this file lives in the persona tuning table (personas/tuning.json,
+// `kc-persona-tuning/1`) — the score weights, the originality divisor, the cut gates and the
+// praise gates — read live through LOIS_TUNING so a DEV edit moves the verdict without a
+// reload, and so loisCut's gates and this verdict are one source, never two copies.
+const LOIS_TUNING = () => personaTuning().personas.lois.knobs;
 
 const GLANCE_KEYS = ['markSize', 'coverage', 'opacity', 'markDensity', 'disorder'];
 const BOLD_KEYS = ['disorder', 'sizeVariety', 'rotationSpread', 'flowEnergy', 'windPush', 'markSize'];
@@ -63,20 +70,26 @@ export function scoreLoisHeuristic(features, mean) {
     const d = features[k] - (mean[k] ?? 0.5);
     dist += d * d;
   }
-  const originality = Math.min(1, Math.sqrt(dist / keys.length) / 0.35);
+  const knobs = LOIS_TUNING();
+  const originality = Math.min(1, Math.sqrt(dist / keys.length) / knobs.originalityDivisor);
   const boldness = BOLD_KEYS.reduce((s, k) => s + Math.abs((features[k] ?? 0.5) - 0.5) * 2, 0) / BOLD_KEYS.length;
-  const score = 0.34 * glance + 0.42 * originality + 0.24 * boldness;
+  const score =
+    knobs.rankWeights.glance * glance +
+    knobs.rankWeights.originality * originality +
+    knobs.rankWeights.boldness * boldness;
   return { score, glance, originality, boldness };
 }
 
 /** Short, provocative, never praise-for-praise. */
 export function loisVerdict(parts) {
   const { glance, originality, boldness } = parts;
-  if (glance < 0.28) return 'No hit at a glance. Out.';
-  if (originality < 0.22) return 'Too close to the pile. Habit.';
-  if (boldness < 0.3) return 'Cautious or creative, kid. Pick one.';
-  if (glance >= 0.55 && originality >= 0.45) return "Now you're thinking with your own brains, kid.";
-  if (boldness >= 0.55) return "That took a nanosecond. Don't flinch.";
+  const { cutGates, praiseGates } = LOIS_TUNING();
+  if (glance < cutGates.glance) return 'No hit at a glance. Out.';
+  if (originality < cutGates.originality) return 'Too close to the pile. Habit.';
+  if (boldness < cutGates.boldness) return 'Cautious or creative, kid. Pick one.';
+  if (glance >= praiseGates.glance && originality >= praiseGates.originality)
+    return "Now you're thinking with your own brains, kid.";
+  if (boldness >= praiseGates.boldness) return "That took a nanosecond. Don't flinch.";
   return 'Ninety-nine percent of this is zero.';
 }
 
