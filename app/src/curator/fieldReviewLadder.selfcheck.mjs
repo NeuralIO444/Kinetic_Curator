@@ -210,7 +210,8 @@ ok('intermediate steps are honest states: rung 1’s janky step re-derives befor
 });
 
 // NOTE — the drowned-room pin (seed 227: slice 3's exhaustion trace and
-// cut; slice 4's rung-3 rescue of the same landing) lives with the
+// cut; slice 4's rung-3 rescue of the same landing; #2107 re-pin: now
+// seed 217's poem:1, since 227 lands no poem on the grown deck) lives with the
 // calibration census in §7: the pinned corpus machinery is single-run
 // per process (a second pinned run sees module state stamped by the
 // first run's fake clock — slice 1's suite never re-runs a corpus
@@ -813,7 +814,12 @@ ok('CALIBRATION — census A (ordinary rooms): repairs by rung, cuts, and the la
     `  census A ladder outcomes: ${tagged.length} landings — ${o.clean} clean (unacted), ${o.repaired} repaired ` +
       `(by rung ${JSON.stringify(o.byRung)}), ${o.cut} cut, ${o.unactedJanky} janky unacted`,
   );
-  assert.equal(tagged.length, 156); // #2107 re-pin: +12 clean landings (the deck grew); the janky set is unchanged
+  // #2107 re-pin: the deck grew by 12 looks + 19 voices — 144 -> 156 landings, 133 -> 145 clean. The janky COUNT
+  // stays 11 (all markCover, all repaired, none cut), but the look pass deals different looks per seed, so the janky
+  // SET moved (compared seed by seed with origin/main): 227 and 252 now land no poem; the 11 are now 204 poem:1/poem:3,
+  // 216 poem:1, 232 poem:1, 254 poem:0 (rung 2), 217 poem:1/2/3 (drowned, m2 0.962-1.000, rung 3) and 239's three
+  // (unchanged: poem:1/2 at rung 2, poem:3 at rung 3).
+  assert.equal(tagged.length, 156);
   assert.equal(o.clean, 145, 'clean landings are never acted on');
   assert.equal(o.unactedJanky, 0, 'every janky landing is acted on');
   // #2006 slice 4 re-pin (proven in STAGING-REPORT-2006-S4): rung 3
@@ -823,8 +829,13 @@ ok('CALIBRATION — census A (ordinary rooms): repairs by rung, cuts, and the la
   // one rung earlier, at the quiet. No landing's outcome worsens: the
   // cleans are untouched and both rung-2 repairs stand as they were.
   assert.equal(o.repaired, 11);
-  assert.deepEqual(o.byRung, { 2: 2, 3: 9 });
+  // #2107 re-pin: { 2: 2, 3: 9 } -> { 2: 7, 3: 4 } — the drowned rooms are now seed 217's three (not 227/252's
+  // eight), plus 239 poem:3; five new partly-covered landings (m2 0.58-0.72) repair at rung 2.
+  assert.deepEqual(o.byRung, { 2: 7, 3: 4 });
   assert.equal(o.cut, 0, 'slice 4: the quiet rung leaves no drowned room to cut in census A');
+  // #2107 re-pin: the pin moves from seed 227's look-pass commit (poem:0, m2 0.9375 — no poem lands there on the grown
+  // deck) to seed 217's first voice-pass commit (poem:1, m2 0.9851), the first drowned landing census A now produces;
+  // same kind of landing, same walk [1, 2, 3], same rescue. Its poemDeal is 2 (it is the session's second deal).
   // The drowned-room pin, on seed 227's look-pass commit as captured by
   // the census run itself (see the note in §1: one pinned run only).
   // Slice 3 pinned this landing as the exhaustion trace ([1, 2, 4, 5],
@@ -832,9 +843,9 @@ ok('CALIBRATION — census A (ordinary rooms): repairs by rung, cuts, and the la
   // pins the same landing's rescue — identical landing measures
   // (m2 0.9375, the record's provenance is untouched), the walk now
   // stopping at rung 3 with the poem standing, quieted.
-  const cut227 = tagged.find((e) => e.seed === 227 && e.rec.stream === 'poem:0');
-  assert.ok(cut227, 'seed 227’s drowned landing is in the corpus');
-  const rec = cut227.rec;
+  const drowned217 = tagged.find((e) => e.seed === 217 && e.rec.stream === 'poem:1');
+  assert.ok(drowned217, 'seed 217’s drowned landing is in the corpus');
+  const rec = drowned217.rec;
   assert.equal(
     rec.verdict,
     'janky',
@@ -853,9 +864,9 @@ ok('CALIBRATION — census A (ordinary rooms): repairs by rung, cuts, and the la
   );
   assert.equal(rec.adjustment.final.quietZone, true, 'the standing repair carries the quiet');
   assert.equal(rec.adjustment.redeal, null, 'no re-deal was needed — the counter stayed honest');
-  assert.equal(cut227.hasForm, true, 'the poem stands, in a quieted room');
-  assert.equal(cut227.gateRefusal, null, 'the refusal record stands untouched');
-  assert.equal(cut227.poemDeal, 1, 'only the landing deal counts — no re-deal drew (§3.8: the counter is the log)');
+  assert.equal(drowned217.hasForm, true, 'the poem stands, in a quieted room');
+  assert.equal(drowned217.gateRefusal, null, 'the refusal record stands untouched');
+  assert.equal(drowned217.poemDeal, 2, 'only the landing deals count — no re-deal drew (§3.8: the counter is the log)');
 });
 
 ok('CALIBRATION — census B (mirror rooms): the ladder does NOT hate mirrors', () => {

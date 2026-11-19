@@ -430,8 +430,10 @@ ok('CENSUS A — ordinary rooms: seeded press/look/voice/curator deals, every ve
   );
   // Exact pins (the corpus is pinned — see withPinnedTime): any drift
   // here is a changed deal path or a changed measure, never weather.
-  // #2107 re-pin: the deck grew by 12 looks and 19 voices; census A gains 12 landings, all clean. The 11 janky landings,
-  // their gate and every margin are unchanged.
+  // #2107 re-pin: the deck grew by 12 looks and 19 voices; census A grows 144 -> 156 landings (clean 133 -> 145). The
+  // janky COUNT (11), their gate (all markCover) and every pinned margin are unchanged, but the look pass now deals
+  // different looks per seed, so the janky landings are not the same ones: 227/252 land no poem any more, and the 11
+  // are now seeds 204 x2, 216, 217 x3, 232, 239 x3 (as on main), 254 — re-derived per seed against origin/main.
   assert.equal(c.total, 156, 'census A size, pinned exactly');
   assert.equal(c.judged, 156, 'every ordinary landing judged, none exempt');
   // #2006 slice 3 re-pin (proven in STAGING-REPORT-2006-S3): the ladder
