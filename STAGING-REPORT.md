@@ -1,7 +1,7 @@
 # STAGING REPORT — #2383 Persona Kernel P3: Callsign sweep (no real names on any surface)
 
 Branch `kc-2383-callsign-sweep`, based on origin/main `db701fe8`. One PR, not merged by the builder
-(this changes user-visible surfaces → Matt's review lane): **PR number/URL added in the follow-up commit.**
+(this changes user-visible surfaces → Matt's review lane): **PR #2410 — https://github.com/NeuralIO444/Kinetic_Curator/pull/2410**
 
 Spec: `docs/design/persona-kernel-spec.md` ruling R6 — surfaces use callsigns only. Callsigns:
 LOIS → **COVER** (tile `cover`), DAVIS → **OVERLAP** (tile `overlap`), CARSON → **BLAST**,
