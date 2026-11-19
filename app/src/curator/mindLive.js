@@ -19,6 +19,7 @@ import { buildContext } from './mindContext.js';
 import { createThinker } from './mindThinker.js';
 import { PERSONAS, wantsStage, validateReply } from './mindContract.js';
 import { createMindReplay, decisionOf } from './mindRecord.js';
+import { withArchiveSnippets } from '../personas/personaArchive.mjs';
 
 let tap = null;
 /** Observe every live decision: fn(decision, requested). One listener (or null); the take recorder uses it. */
@@ -69,6 +70,10 @@ const requestOf = (d) => ({
  * @param isReplaying () => boolean: a take is playing back (the personas are muted)
  * @param presence    optional { beforeBar(bar), contextFor(persona) => { tier, zodiac? }, shape(decision, context) => decision }
  *                    (#1464 Mind 3). Absent = no personality layer.
+ * @param archive     optional { snippetsFor(persona, context) => Promise<[{ cite, text }]> } (#2384 Persona Archive):
+ *                    cited snippets from the persona's own shelf, attached to the MODEL-bound context only — the
+ *                    thinker and the rules keep the untouched context, and an empty snippet list hands the model
+ *                    the identical object, so the no-model instrument is byte-identical. Absent = no Archive.
  * @returns stop()
  */
 export function startMind({
@@ -79,6 +84,7 @@ export function startMind({
   presence = null,
   log = () => {},
   conductHeat = null,
+  archive = null,
 }) {
   const name = model && ['demo', 'ollama'].includes(model.name) ? model.name : 'apple';
   const available = () => {
@@ -112,7 +118,19 @@ export function startMind({
       );
     };
     return Promise.resolve()
-      .then(() => model.ask(persona, context, meta))
+      .then(async () => {
+        // #2384 — the Archive rides the model-bound copy only: retrieval is awaited off the bar,
+        // a failure or an empty shelf hands the model the context object itself, untouched.
+        let ctx = context;
+        if (archive && typeof archive.snippetsFor === 'function') {
+          try {
+            ctx = withArchiveSnippets(context, await archive.snippetsFor(persona, context));
+          } catch {
+            ctx = context;
+          }
+        }
+        return model.ask(persona, ctx, meta);
+      })
       .then(
         (raw) => {
           // #1526 — a chain may stamp its answer { backend, reply } (who actually answered); the reply

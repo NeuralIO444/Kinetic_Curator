@@ -53,6 +53,7 @@ import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
 import { setRoomCodesProvider } from './curator/roomCodes.js'; // #1949
 import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js'; // #1462: Mind 1
+import { ensureArchiveRetriever, scheduleArchiveIndexing } from './personas/personaArchiveLive.js'; // #2384: Persona Archive
 import { startReviewVoice } from './curator/fieldReviewVoiceLive.mjs'; // #2006 slice 2: the review loop's voice on the tape
 import { startTreatments } from './curator/treatmentsLive.mjs'; // #2010: the treatments surface + its bus announcer
 import { replaySpectrumFrame, endSpectrumReplay } from './curator/spectrumRecord.js'; // #1534: a take replays its hearing
@@ -309,11 +310,16 @@ function AppInner() {
     // announces) and keeps the Canon state the minds are handed each bar. It only watches and announces — it
     // asks the stage for nothing — and is muted while a take plays back.
     const canonBus = startCanonBus({ getState: useStore.getState, isReplaying: isPlaybackActive });
+    // #2384 — the Persona Archive: cited snippets from a persona's own shelf ride its model asks
+    // (MegaMind embeddings slot; nothing is retrieved until a slot is measured, and the shelf is
+    // indexed at idle, never per frame). The rules path never sees it.
+    const archiveRetriever = ensureArchiveRetriever();
     const stopMind = startMind({
       presence,
       conductHeat, // #1483: how bold Davis's conducting picks may run (engine-side only)
       isReplaying: isPlaybackActive,
       model: DEBUG_MIND ? demoModel : mindModel,
+      archive: archiveRetriever,
       getSeed: () => useStore.getState().seed,
       getSnapshot: () => {
         const st = useStore.getState();
@@ -391,6 +397,7 @@ function AppInner() {
       getBand: () => getStressState().band,
       getSeed: () => useStore.getState().seed,
     });
+    scheduleArchiveIndexing(archiveRetriever); // #2384: embed the shelves at idle, never per frame
     setSourceFeed(set.feed);
     const unKeep = loisActivity.onKeep(noteKeep); // #1356 step 5: remember the living moths' traits at a keep
     const stop = initStress({
