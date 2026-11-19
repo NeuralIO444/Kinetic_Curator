@@ -42,9 +42,6 @@ import { createBeatTracker } from './beatConfidence.mjs';
 import { audioEnergyNow } from './keepContext.js';
 import {
   swayBiases,
-  M2_FLOOR,
-  M2_CAP,
-  MIN_KEEPS,
   keptCentroid,
   rankBiases,
   applyRankBias,
@@ -52,9 +49,13 @@ import {
   tempoEase,
   wetnessLean,
   evolveLean,
-  M8_EVOLVE_RANGE,
   surgeCall,
 } from './queenLean.mjs';
+import { personaTuning } from '../personas/tuning.mjs';
+
+// #2382: the Queen's numbers this module used to import as constants (her keeps floor, the M2 span, the
+// M8 evolve range) live in the persona tuning table now — read the table in force so a DEV edit is live.
+const queenKnobs = () => personaTuning().personas.queen.knobs;
 import { GATE_OPEN } from './queenChannel.js';
 import { createRoomPublisher } from './directorRoom.js';
 import { step as fieldStep, INITIAL_STATE as FIELD_INITIAL } from './fieldEval.js';
@@ -123,7 +124,7 @@ function centroidOf(kept) {
 export function keptAnchor(keeps) {
   try {
     const kept = pullKeeps(keeps);
-    if (kept.length < MIN_KEEPS) return { state: 'identity', centroid: null };
+    if (kept.length < queenKnobs().minKeeps) return { state: 'identity', centroid: null };
     const centroid = centroidOf(kept);
     return centroid ? { state: 'live', centroid } : { state: 'none', centroid: null };
   } catch {
@@ -149,7 +150,7 @@ export function makeRankChooser({ keeps = [], allowance = 0, tilt = 0, open = GA
     const t = Number.isFinite(tilt) ? Math.max(0, Math.min(0.05, tilt)) : 0;
     if (!open || !(a > 0 || t > 0)) return null;
     const kept = pullKeeps(keeps);
-    if (kept.length < MIN_KEEPS) return null;
+    if (kept.length < queenKnobs().minKeeps) return null;
     const centroid = centroidOf(kept);
     if (!centroid) return null;
     return (scores, candidates) => {
@@ -182,10 +183,10 @@ export function deriveSway({ keeps = [], richness = 0, allowance = 0 } = {}, swa
   try {
     const a = clamp01(allowance);
     const kept = pullKeeps(keeps);
-    if (a === 0 || kept.length < MIN_KEEPS) return NEUTRAL_VIEW;
+    if (a === 0 || kept.length < queenKnobs().minKeeps) return NEUTRAL_VIEW;
     const out = sway(kept, { richness: clamp01(richness) });
     const t = Number(out && out.temperature);
-    return { temperatureDelta: Number.isFinite(t) ? Math.max(0, (t - M2_FLOOR) * a) : 0 };
+    return { temperatureDelta: Number.isFinite(t) ? Math.max(0, (t - queenKnobs().m2.floor) * a) : 0 };
   } catch {
     return NEUTRAL_VIEW;
   }
@@ -750,7 +751,7 @@ export function leanDialSteps({ lean, wetness, evolveInterval, keeps, allowance 
       pull = Math.max(pull, Math.abs(lean.wetness - wetness));
     }
     if (nextEvolve !== null && Number.isFinite(lean.evolve) && Number.isFinite(evolveInterval)) {
-      const [lo, hi] = M8_EVOLVE_RANGE;
+      const [lo, hi] = queenKnobs().m8.evolveRange;
       const goal = hi - Math.min(1, Math.max(0, lean.evolve)) * (hi - lo);
       pull = Math.max(pull, Math.abs(goal - evolveInterval) / (hi - lo));
     }
@@ -767,6 +768,6 @@ export function leanDialSteps({ lean, wetness, evolveInterval, keeps, allowance 
  */
 export function conductHeat() {
   const d = Number(getDirector().lastSway && getDirector().lastSway.temperatureDelta);
-  const span = M2_CAP - M2_FLOOR;
+  const span = queenKnobs().m2.cap - queenKnobs().m2.floor;
   return Number.isFinite(d) && span > 0 ? Math.min(1, Math.max(0, d / span)) : 0;
 }

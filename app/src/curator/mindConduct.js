@@ -13,6 +13,16 @@
 // davisRoute / flatShow; the live driver (a later PR) applies what passes the gate and records the delta.
 import { ROUTE_INPUTS, ROUTE_TARGETS, MAX_ROUTES } from '../gl/audioRoutes.mjs';
 import { routeDepthRange } from '../data/audioRoutes.js';
+import { personaTuning, TUNING_DEFAULTS } from '../personas/tuning.mjs';
+
+// #2382: the persona numbers in this module (LOIS's brake and flat read, Davis's caps, openers and
+// backoff) live in the persona tuning table (personas/tuning.json, `kc-persona-tuning/1`, spec §3c).
+// The exported constants are the SHIPPED values; the mechanics read the table in force through
+// LOIS_TUNING / DAVIS_TUNING, so a DEV-mode edit moves the live value without a reload.
+const LOIS_TUNING = () => personaTuning().personas.lois.knobs;
+const DAVIS_TUNING = () => personaTuning().personas.davis.knobs;
+const LOIS_DEFAULTS = TUNING_DEFAULTS.personas.lois.knobs;
+const DAVIS_DEFAULTS = TUNING_DEFAULTS.personas.davis.knobs;
 
 export const PHRASE_BARS = 4;
 
@@ -54,10 +64,10 @@ const spectrumValue = (key, v) => {
   return v >= 0 && v <= 1 ? Math.round(v * 1000) / 1000 : null;
 };
 /** A persona backs off for this many bars once the artist has reverted its edits BACKOFF_REVERTS times. */
-export const BACKOFF_REVERTS = 3;
-export const BACKOFF_BARS = 32;
+export const BACKOFF_REVERTS = DAVIS_DEFAULTS.backoff.reverts;
+export const BACKOFF_BARS = DAVIS_DEFAULTS.backoff.bars;
 /** The rules backend keeps at most this many routes of its own in the table. */
-export const DAVIS_MAX_ROUTES = 3;
+export const DAVIS_MAX_ROUTES = DAVIS_DEFAULTS.maxRoutes;
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasTarget = (t) => typeof t === 'string' && Object.prototype.hasOwnProperty.call(ROUTE_TARGETS, t);
@@ -217,18 +227,21 @@ export const ENERGY_LEVELS = Object.freeze(['low', 'mid', 'high']);
  * the temperature only ORDERS his tries — cool, the safer moves of his level come first; hot, the daring ones do. The
  * order is by bands of distance from the heat (BOLD_BAND wide); the seed rotates inside a band.
  */
-export const BOLD_BAND = 0.5;
+export const BOLD_BAND = DAVIS_DEFAULTS.boldBand;
 const clampUnit = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 /** How far down his order a candidate sits for a heat (0 = tried first). An unrated candidate counts as daring. */
 export const boldBand = (bold, heat) =>
-  Math.max(0, Math.floor(Math.abs((Number.isFinite(bold) ? bold : 1) - clampUnit(heat)) / BOLD_BAND - 1e-9));
+  Math.max(
+    0,
+    Math.floor(Math.abs((Number.isFinite(bold) ? bold : 1) - clampUnit(heat)) / DAVIS_TUNING().boldBand - 1e-9),
+  );
 /**
  * LOIS's brake (Matt 2026-10-27; restraint, not caution, per the 2026-11-18 ruling: one idea, cut the rest).
  * When the artist has been passing a lot (his keep-rate read, flatBias, at or over BRAKE_AT), he holds Davis
  * to the safe moves — bold at most BRAKE_MAX — until keeps come back.
  */
-export const BRAKE_AT = 0.5;
-export const BRAKE_MAX = 0.4;
+export const BRAKE_AT = LOIS_DEFAULTS.brake.at;
+export const BRAKE_MAX = LOIS_DEFAULTS.brake.max;
 
 /**
  * Davis's rules-backend conducting. Pure.
@@ -303,7 +316,7 @@ export function davisRoute(show, seed = 0, heat = 0, trace = null) {
       rot: (i - start + pool.length) % pool.length,
     }))
     .filter((t) => {
-      const inReach = !braked || (Number.isFinite(t.c.bold) ? t.c.bold : 1) <= BRAKE_MAX;
+      const inReach = !braked || (Number.isFinite(t.c.bold) ? t.c.bold : 1) <= LOIS_TUNING().brake.max;
       if (!inReach) skip(SKIP.brake, t.c);
       return inReach;
     })
@@ -323,7 +336,7 @@ export function davisRoute(show, seed = 0, heat = 0, trace = null) {
     }
     return null;
   }
-  if (mine.length >= DAVIS_MAX_ROUTES) {
+  if (mine.length >= DAVIS_TUNING().maxRoutes) {
     skip(SKIP.holdsFew);
     return null; // he conducts with a few, he does not fill the table
   }
@@ -337,11 +350,7 @@ export function davisRoute(show, seed = 0, heat = 0, trace = null) {
 
 // ── stage 2: Davis re-tunes the spectrum marks ──────────────────────────────────────────────────────────────────
 /** The amount he turns on first, by the energy of the show: quiet shows colour, busy ones push the marks around. */
-export const SPECTRUM_OPENERS = Object.freeze({
-  low: Object.freeze({ key: 'colour', value: 0.35 }),
-  mid: Object.freeze({ key: 'scale', value: 0.3 }),
-  high: Object.freeze({ key: 'displace', value: 0.4 }),
-});
+export const SPECTRUM_OPENERS = DAVIS_DEFAULTS.spectrumOpeners;
 /**
  * Davis's rules-backend move on the spectrum marks. Pure. Only asked when the route table has nothing for him (davisRoute
  * returned null), so stage 1's conducting is unchanged; one edit a phrase either way (the conductor's ledger).
@@ -359,7 +368,7 @@ export function davisSpectrum(show, seed = 0) {
   const on = amounts.some((k) => Number(m[k]) > 0);
   if (!on) {
     const level = ENERGY_LEVELS.includes(show.energy) ? show.energy : 'mid';
-    const pick = SPECTRUM_OPENERS[level];
+    const pick = DAVIS_TUNING().spectrumOpeners[level];
     return owned.has(spectrumTarget(pick.key)) ? null : { op: 'spectrum', key: pick.key, value: pick.value };
   }
   const flat = Number(show.flatBars) > 0;
@@ -372,11 +381,7 @@ export function davisSpectrum(show, seed = 0) {
 
 // ── LOIS: is the show flat? ─────────────────────────────────────────────────────────────────────────────────────────
 /** How hard the keep-rate may move LOIS's flat-show threshold: +/- this share of it (0.5 = from half to one and a half). */
-export const FLAT_BIAS_SWING = 0.5;
-/** A keep for about one roll in seven is the rate he reads as "happy with what is happening". */
-const HAPPY_KEEP_RATE = 0.15;
-/** Fewer rolls than this is not enough to read a rate from: the bias eases in. */
-const BIAS_FULL_AT_ROLLS = 8;
+export const FLAT_BIAS_SWING = LOIS_DEFAULTS.flatRead.biasSwing;
 
 /**
  * LOIS's keep-rate read, in -1..+1. Pure. Keeping a lot (a high keep rate) is -1: he loosens, and lets a steady show
@@ -386,12 +391,15 @@ const BIAS_FULL_AT_ROLLS = 8;
  * @param rolls rolls in the same window (a pass is a roll nobody kept)
  */
 export function flatBias({ keeps, rolls } = {}) {
+  // the rate he reads as "happy with what is happening" (a keep for about one roll in seven), and the
+  // roll count the bias needs before it reads at full strength — both are his tuning (flatRead).
+  const { happyKeepRate, biasFullAtRolls } = LOIS_TUNING().flatRead;
   const r = Number.isFinite(rolls) && rolls > 0 ? rolls : 0;
   if (r === 0) return 0;
   const k = Number.isFinite(keeps) && keeps > 0 ? Math.min(keeps, r) : 0;
   const rate = k / r;
-  const lean = Math.max(-1, Math.min(1, (HAPPY_KEEP_RATE - rate) / HAPPY_KEEP_RATE)); // 0 keeps: +1; at 0.3 or more: -1
-  return lean * Math.min(1, r / BIAS_FULL_AT_ROLLS);
+  const lean = Math.max(-1, Math.min(1, (happyKeepRate - rate) / happyKeepRate)); // 0 keeps: +1; at 0.3 or more: -1
+  return lean * Math.min(1, r / biasFullAtRolls);
 }
 
 /**
@@ -405,11 +413,16 @@ export function flatBias({ keeps, rolls } = {}) {
  * still" thresholds the same way (setBias), never the noise wall.
  */
 /** Mean bar-to-bar spectrum flux (showSpectrum's 0..1 unit) under which a phrase reads as held. A first value. */
-export const FLUX_HELD = 0.05;
+export const FLUX_HELD = LOIS_DEFAULTS.flatRead.fluxHeld;
 /** Mean spectral flatness (1 = white noise) over which a phrase reads as a wall of noise. A first value. */
-export const NOISE_FLAT = 0.9;
+export const NOISE_FLAT = LOIS_DEFAULTS.flatRead.noiseFlat;
 
-export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel = 0.05, pinned = 0.92 } = {}) {
+export function createFlatness({ windowBars = PHRASE_BARS, eps, minLevel, pinned } = {}) {
+  // the "still" thresholds default to LOIS's tuning (flatRead), read live so a DEV edit moves them;
+  // a caller passing a value explicitly keeps it.
+  const epsNow = () => eps ?? LOIS_TUNING().flatRead.eps;
+  const minLevelNow = () => minLevel ?? LOIS_TUNING().flatRead.minLevel;
+  const pinnedNow = () => pinned ?? LOIS_TUNING().flatRead.pinned;
   const rows = [];
   const specs = []; // one per row: { flux, flatness } or null (that bar carried no spectrum)
   let flatBars = 0;
@@ -462,13 +475,14 @@ export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel 
         specs.shift();
       }
       const r = reading();
+      const flat = LOIS_TUNING().flatRead;
       let why = null;
-      if (r.full && r.level >= minLevel) {
+      if (r.full && r.level >= minLevelNow()) {
         if (r.source === 'spectrum') {
-          if (r.flux < FLUX_HELD * scale) why = 'held';
-          else if (r.flatness > NOISE_FLAT) why = 'noise';
-        } else if (r.spread < eps * scale) why = 'still';
-        else if (r.level > pinned) why = 'pinned';
+          if (r.flux < flat.fluxHeld * scale) why = 'held';
+          else if (r.flatness > flat.noiseFlat) why = 'noise';
+        } else if (r.spread < epsNow() * scale) why = 'still';
+        else if (r.level > pinnedNow()) why = 'pinned';
       }
       lastWhy = why;
       flatBars = why ? flatBars + 1 : 0;
@@ -479,10 +493,10 @@ export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel 
     why: () => lastWhy,
     /** LOIS's keep-rate read (flatBias): -1 loosens (how still it must be falls), +1 tightens (a livelier show is called flat). */
     setBias(b) {
-      scale = 1 + FLAT_BIAS_SWING * (Number.isFinite(b) ? Math.max(-1, Math.min(1, b)) : 0);
+      scale = 1 + LOIS_TUNING().flatRead.biasSwing * (Number.isFinite(b) ? Math.max(-1, Math.min(1, b)) : 0);
     },
     /** The "still" threshold now, as moved by the bias: the spectrum's flux bar when it is judging, else the bands' spread. */
-    threshold: () => (reading().source === 'spectrum' ? FLUX_HELD : eps) * scale,
+    threshold: () => (reading().source === 'spectrum' ? LOIS_TUNING().flatRead.fluxHeld : epsNow()) * scale,
     reading,
     reset() {
       rows.length = 0;
@@ -559,8 +573,9 @@ export function createConductor() {
     },
     revert(bar) {
       reverts++;
-      if (reverts >= BACKOFF_REVERTS && Number.isInteger(bar)) {
-        coolUntil = bar + BACKOFF_BARS;
+      const backoff = DAVIS_TUNING().backoff;
+      if (reverts >= backoff.reverts && Number.isInteger(bar)) {
+        coolUntil = bar + backoff.bars;
         reverts = 0;
       }
     },

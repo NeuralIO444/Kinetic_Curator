@@ -52,8 +52,9 @@ const CensusPanel = lazy(() => import('./CensusPanel.jsx').then((m) => ({ defaul
 const TasteTreePanel = lazy(() => import('./TasteTreePanel.jsx').then((m) => ({ default: m.TasteTreePanel })));
 const ShelfDevPanel = lazy(() => import('./ShelfDevPanel.jsx').then((m) => ({ default: m.ShelfDevPanel })));
 const MegaMindPanel = lazy(() => import('./MegaMindPanel.jsx').then((m) => ({ default: m.MegaMindPanel })));
+const PersonaTunePanel = lazy(() => import('./PersonaTunePanel.jsx').then((m) => ({ default: m.PersonaTunePanel })));
 
-/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233), Mind (#1464), Census (#1507), Taste Trees (XGBoost T3), Shelf (#1590), MegaMind (#1525). */
+/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233), Mind (#1464), Census (#1507), Taste Trees (XGBoost T3), Shelf (#1590), MegaMind (#1525), Persona Tune (#2382). */
 export const DEV_TABS = [
   { id: 'xray', title: 'X-RAY', icon: '◉', component: GovernorXrayPanel },
   { id: 'govtune', title: 'GOV TUNE', icon: '◐', component: GovernorTunePanel },
@@ -75,6 +76,9 @@ export const DEV_TABS = [
   // Ollama, run the detection handshake, read the capability registry.
   // Dev panel first (Matt's ruling, 2026-11-10); user Settings is a later move.
   { id: 'megamind', title: 'MEGAMIND', icon: '⌬', component: MegaMindPanel },
+  // #2382: the persona tuning table (kc-persona-tuning/1) — every persona
+  // number, live-editable for the session; rig, never saved in a project.
+  { id: 'personatune', title: 'PERSONA TUNE', icon: '♠', component: PersonaTunePanel },
 ];
 
 export const devTabById = (id) => DEV_TABS.find((t) => t.id === id) ?? DEV_TABS[0];
