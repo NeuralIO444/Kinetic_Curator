@@ -1,6 +1,7 @@
 # STAGING REPORT — #2381 Persona Kernel P1: `kc-persona/1` records + registry
 
-Branch `kc-2381-persona-kernel`, based on origin/main `2f706d51`. One PR, not merged by the builder.
+Branch `kc-2381-persona-kernel`, based on origin/main `2f706d51`. One PR, not merged by the builder:
+**PR #2404 — https://github.com/NeuralIO444/Kinetic_Curator/pull/2404**
 
 ## What was built
 
