@@ -813,8 +813,8 @@ ok('CALIBRATION — census A (ordinary rooms): repairs by rung, cuts, and the la
     `  census A ladder outcomes: ${tagged.length} landings — ${o.clean} clean (unacted), ${o.repaired} repaired ` +
       `(by rung ${JSON.stringify(o.byRung)}), ${o.cut} cut, ${o.unactedJanky} janky unacted`,
   );
-  assert.equal(tagged.length, 144);
-  assert.equal(o.clean, 133, 'clean landings are never acted on');
+  assert.equal(tagged.length, 156); // #2107 re-pin: +12 clean landings (the deck grew); the janky set is unchanged
+  assert.equal(o.clean, 145, 'clean landings are never acted on');
   assert.equal(o.unactedJanky, 0, 'every janky landing is acted on');
   // #2006 slice 4 re-pin (proven in STAGING-REPORT-2006-S4): rung 3
   // (QUIET) rescues every drowned room slice 3 cut — the 8 cuts (seeds

@@ -25,9 +25,10 @@ import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams } from './layout-modes.js';
 import { createLiveResolver } from '../gl/liveResolve.mjs';
 
 // 1. the count, from data
-assert.equal(VOICE_DECK_COUNT, 72, `the dealable voice count reads 72, got ${VOICE_DECK_COUNT}`);
+// #2107 re-pin: + 19 family voices (techno 6, pixel 7, organic 6)
+assert.equal(VOICE_DECK_COUNT, 91, `the dealable voice count reads 91, got ${VOICE_DECK_COUNT}`);
 const kinds = VOICE_DECK.reduce((m, v) => ({ ...m, [v.kind]: (m[v.kind] || 0) + 1 }), {});
-assert.deepEqual(kinds, { flagship: 4, promoted: 15, family: 53 });
+assert.deepEqual(kinds, { flagship: 4, promoted: 15, family: 72 });
 const ids = VOICE_DECK.map((v) => v.id);
 assert.equal(new Set(ids).size, ids.length, 'voice ids are unique');
 assert.equal(deckVoice('kintsugi').def.title, 'Kintsugi');

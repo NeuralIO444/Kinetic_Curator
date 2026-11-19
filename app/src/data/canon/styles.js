@@ -185,7 +185,7 @@ export const CANON_STYLES = Object.freeze(
         primitives: ['mic_bracket_tl', 'mic_plus', 'xsh04', 'mic_needle'],
       },
       lookGroup: { rank: 8 }, // #2107 (Matt, 2026-11-18): four looks
-      pairing: null,
+      pairing: ['geometric', 'scanlines', 'stamps'], // #2107 (Matt, 2026-11-18): the family voices' wardrobe
     },
     {
       id: 'pixel',
@@ -203,7 +203,7 @@ export const CANON_STYLES = Object.freeze(
         primitives: ['pxg_speck', 'pxg_speck_ne', 'pxg_spark', 'pxg_dust'],
       },
       lookGroup: { rank: 9 }, // #2107 (Matt, 2026-11-18): four looks
-      pairing: null,
+      pairing: ['stamps', 'dots'], // #2107 (Matt, 2026-11-18): the family voices' wardrobe
     },
     {
       id: 'organic',
@@ -224,7 +224,7 @@ export const CANON_STYLES = Object.freeze(
         turns: 'free',
       },
       lookGroup: { rank: 10 }, // #2107 (Matt, 2026-11-18): four looks
-      pairing: null,
+      pairing: ['organic', 'biosynthetic'], // #2107 (Matt, 2026-11-18): the family voices' wardrobe
     },
     {
       id: 'op',

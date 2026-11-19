@@ -430,8 +430,10 @@ ok('CENSUS A — ordinary rooms: seeded press/look/voice/curator deals, every ve
   );
   // Exact pins (the corpus is pinned — see withPinnedTime): any drift
   // here is a changed deal path or a changed measure, never weather.
-  assert.equal(c.total, 144, 'census A size, pinned exactly');
-  assert.equal(c.judged, 144, 'every ordinary landing judged, none exempt');
+  // #2107 re-pin: the deck grew by 12 looks and 19 voices; census A gains 12 landings, all clean. The 11 janky landings,
+  // their gate and every margin are unchanged.
+  assert.equal(c.total, 156, 'census A size, pinned exactly');
+  assert.equal(c.judged, 156, 'every ordinary landing judged, none exempt');
   // #2006 slice 3 re-pin (proven in STAGING-REPORT-2006-S3): the ladder
   // now ACTS on the 11 janky landings — 3 repaired (their records keep
   // the 'janky' judgment) and 8 cut (verdict 'cut') — so the banked
@@ -444,7 +446,7 @@ ok('CENSUS A — ordinary rooms: seeded press/look/voice/curator deals, every ve
   // repairs, so every acted record now keeps the 'janky' judgment and
   // no record banks 'cut' — the outcome distribution is the landing
   // distribution again, by rescue rather than by inaction.
-  assert.deepEqual(c.dist, { clean: 133, janky: 11 }, 'census A outcomes, pinned exactly (slice 4)');
+  assert.deepEqual(c.dist, { clean: 145, janky: 11 }, 'census A outcomes, pinned exactly (slice 4; #2107: +12 clean)');
   assert.equal(
     records.filter((r) => r.verdict === 'janky' || r.verdict === 'cut').length,
     11,

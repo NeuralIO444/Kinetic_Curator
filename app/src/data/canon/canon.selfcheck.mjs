@@ -92,7 +92,7 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   assert.equal(STYLES, CANON_STYLE_IDS, 'assetStyle STYLES is the Canon array itself');
   assert.equal(STYLES.length, 11);
   assert.deepEqual(STYLE_LOOK_GROUPS, canonLookGroups(), 'styleLooks groups are the Canon rows');
-  assert.equal(STYLE_LOOK_GROUPS.length, 8);
+  assert.equal(STYLE_LOOK_GROUPS.length, 11); // #2107: + techno, pixel, organic
   assert.deepEqual(FAMILY_PAIRING, canonFamilyPairing(), 'voiceDeck pairing is the Canon rows');
   assert.deepEqual(
     Object.keys(FAMILY_PAIRING),
@@ -130,29 +130,41 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
 
 // ── 3. the dealt catalogues are byte-identical to before the Canon (hashes taken on main @ 6d37f9b) ────────────
 {
-  assert.equal(COMPOSITION_PRESETS.length, 70);
+  assert.equal(COMPOSITION_PRESETS.length, 82); // #2107: + 12 looks, inserted before the Riso field Look
   // #1838 re-pin: the hash moved exactly one field — dusk-flock gained `trailFresh: 0.6`
   // (the trail drive's declared fresh pole). Verified per-record: 1 of 70 differs, that field only.
-  assert.equal(sha(COMPOSITION_PRESETS), '61c50037062a6337', 'the 70 looks are byte-identical');
-  assert.equal(sha(PRESET_GROUPS), '309f106f646c7efe', 'the 16 look groups are byte-identical');
-  assert.equal(VOICE_DECK.length, 72);
+  const before2107 = [...COMPOSITION_PRESETS.slice(0, 69), COMPOSITION_PRESETS.at(-1)];
+  assert.equal(sha(before2107), '61c50037062a6337', 'the 70 looks are byte-identical');
+  assert.equal(sha(COMPOSITION_PRESETS), '6c07105fd66d9e64', '#2107: + 12 looks (techno, pixel, organic)');
+  const groupsBefore2107 = PRESET_GROUPS.filter((g) => !['techno', 'pixel', 'organic'].includes(g.id));
+  assert.equal(sha(groupsBefore2107), '309f106f646c7efe', 'the 16 look groups are byte-identical');
+  assert.equal(PRESET_GROUPS.length, 19, '#2107: + techno, pixel, organic');
+  assert.equal(VOICE_DECK.length, 91); // #2107: + 19 family voices appended
   // #2150 re-pin: the deck hash moved on the type-exclusivity ruling — verified per-voice:
   // 17 of 72 voices differ (the 4 layout tiles lost only their glyph ids; 13 family
   // wardrobes re-drew over the glyph-narrowed pool) and no voice wears a glyph now.
-  assert.equal(sha(VOICE_DECK), '556e0e2b3e55fe04', 'the 72 deck voices are byte-identical');
+  assert.equal(sha(VOICE_DECK.slice(0, 72)), '556e0e2b3e55fe04', 'the 72 deck voices before #2107 are byte-identical');
+  assert.equal(sha(VOICE_DECK), '598906ab25e64b27', '#2107: + 19 family voices appended');
   assert.equal(
     sha(CHAPTERS.map((c) => [c.id, chapterDeck(c)])),
-    '44abd0199a5dc9c8', // #2150 re-pin: chapter decks differ by exactly the glyph membership (swiss −36, grunge −3, now −47)
+    '6e68b51da1b48757', // #2107 re-pin: the Now deck gains the 12 looks and 19 voices; no other chapter moves · #2150 re-pin: chapter decks differ by exactly the glyph membership (swiss −36, grunge −3, now −47)
     'every chapter deck is byte-identical',
   );
   assert.equal(sha(STYLES), '4f28f882a61c232f');
-  assert.equal(sha(STYLE_LOOK_GROUPS), '6b270a3882dffa1f');
-  assert.equal(sha(FAMILY_PAIRING), 'c2a789a96df0fd20');
+  // #2107 re-pin: techno, pixel and organic gain a look group and a voice pairing; every row before them is unchanged
+  const NEW_2107 = ['techno', 'pixel', 'organic'];
+  assert.equal(sha(STYLE_LOOK_GROUPS.filter((g) => !NEW_2107.includes(g.id))), '6b270a3882dffa1f');
+  assert.equal(sha(STYLE_LOOK_GROUPS), '977488f4f6aef446');
+  assert.equal(
+    sha(Object.fromEntries(Object.entries(FAMILY_PAIRING).filter(([k]) => !NEW_2107.includes(k)))),
+    'c2a789a96df0fd20',
+  );
+  assert.equal(sha(FAMILY_PAIRING), 'cd5d7355395908da');
   // the chapter records gained exactly one field (`style`); everything they carried before is unchanged
   const withoutStyle = CHAPTERS.map(({ style: _style, settings: _settings, ...rest }) => rest); // #2046 added `settings`
   assert.equal(
     sha(withoutStyle),
-    '36705638d852fd08', // #2105 re-pin: engraving, swiss and grunge gain their families (haeckel, letterforms, riso); every chapter deck is unchanged
+    '09890812861018c5', // #2107 re-pin: Now's lookGroups gain techno, pixel, organic (the only field that moved, verified against main) · #2105 re-pin: engraving, swiss and grunge gain their families (haeckel, letterforms, riso); every chapter deck is unchanged
     'chapter records are the old records plus `style` (#2044), `settings` (#2046) and the #2105 families',
   );
 }
@@ -163,8 +175,8 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   const ranks = CANON_STYLES.filter((s) => s.lookGroup).map((s) => s.lookGroup.rank);
   assert.deepEqual(
     [...ranks].sort((a, b) => a - b),
-    [0, 1, 2, 3, 4, 5, 6, 7],
-    'menu ranks are a clean 0..7',
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], // #2107: techno 8, pixel 9, organic 10
+    'menu ranks are a clean 0..10',
   );
   for (const s of CANON_STYLES) {
     assert.ok(Object.isFrozen(s) && Object.isFrozen(s.identity), `${s.id}: frozen`);
@@ -298,5 +310,5 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
 }
 
 console.log(
-  `canon.selfcheck: ok — ${CANON_STYLES.length} styles declared once; 70 looks / 72 voices / chapter decks byte-identical; keeps count by style`,
+  `canon.selfcheck: ok — ${CANON_STYLES.length} styles declared once; the pre-#2107 70 looks / 72 voices / chapter decks byte-identical (+12 looks, +19 voices); keeps count by style`,
 );
