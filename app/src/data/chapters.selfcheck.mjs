@@ -183,8 +183,8 @@ assert.deepEqual(
   assert.ok(!/liveLoop|liveResolve|particles/.test(src), 'the registry stands clear of the one-writer files');
   assert.equal(
     ASSETS.length,
-    777 + 208 + 66,
-    'the library is 1051 (#2108 RE-PIN: +66 house constructs, CHAPTER_UNDEALT keeps them out of every deck): the 985 were: the old 313 (no existing record edited) + #1982’s 163 poem-only kana stamps + #1998’s 126 curated kanji stamps + #2002’s 99 slice-3 stamps (43 Latin lowercase/punctuation + 52 serif + 4 ornaments) + #2005’s 52 plate stamps (Fraunces) + #2008’s 24 composed riso icons + #2010’s 208 worn letters (RAY GUN P1), which CHAPTER_UNDEALT keeps out of every deck',
+    777 + 208 + 66 + 104,
+    'the library is 1155 (#2385 RE-PIN: +104 HYBRID bitmap letters, poem-only like the worn letters, CHAPTER_UNDEALT keeps them out of every deck) (was 1051, #2108 RE-PIN: +66 house constructs, CHAPTER_UNDEALT keeps them out of every deck): the 985 were: the old 313 (no existing record edited) + #1982’s 163 poem-only kana stamps + #1998’s 126 curated kanji stamps + #2002’s 99 slice-3 stamps (43 Latin lowercase/punctuation + 52 serif + 4 ornaments) + #2005’s 52 plate stamps (Fraunces) + #2008’s 24 composed riso icons + #2010’s 208 worn letters (RAY GUN P1), which CHAPTER_UNDEALT keeps out of every deck',
   );
 }
 

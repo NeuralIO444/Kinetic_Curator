@@ -98,7 +98,12 @@ assert.strictEqual(PIXEL_LETTER_ANATOMY_IDS.length, 8, 'eight letter-anatomy emb
 // ── FIELD is not starved ──────────────────────────────────────────────────
 // The caps/digits joined the poem-only union; the poem's resolver is intact.
 for (const id of LETTER_STAMP_IDS) assert.ok(POEM_ONLY_STAMP_IDS.has(id), `${id}: poem-only now`);
-assert.strictEqual(POEM_ONLY_STAMP_IDS.size, 648 + 36, 'the union grew by exactly the letter pack');
+// #2385 RE-PIN (cause: HYBRID's bitmap letters): the 104 coarse-pixel variants join the catalogue and the poem-only union on the worn letters' road.
+assert.strictEqual(
+  POEM_ONLY_STAMP_IDS.size,
+  648 + 36 + 104,
+  'the union grew by exactly the letter pack (and #2385\u2019s bitmap letters)',
+);
 assert.strictEqual(stampIdForChar('A'), 'typ_A', 'FIELD still resolves its base face');
 assert.strictEqual(stampIdForChar('7'), 'typ_7', 'FIELD still resolves its digits');
 

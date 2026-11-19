@@ -1,4 +1,5 @@
 import { doctrineMode, isDoctrine } from '../../curator/doctrines.mjs';
+import { hybridAxes } from '../../curator/hybrid.mjs'; // #2385 P5: HYBRID's call names its move in the record
 import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams, BLEND_MODES } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import {
@@ -427,7 +428,15 @@ function doctrineArm(state, lp, form, streamIndex, reviewOpts) {
     const mode = doctrineMode(id, rng(), null);
     if (!mode) return null;
     const seed = Math.floor(rng() * 0x100000000) >>> 0;
-    const armed = { ...form, raygun: { mode, seed, wear: 1, distort: 1, doctrine: id } };
+    // #2385 P5 — HYBRID's call names its move (bitmap / planes / spectrum, or the float) off the record's own seed; the
+    // wear and distortion axes are the hot and process-first poles' material and HYBRID is the clean digital pole.
+    const armed = {
+      ...form,
+      raygun:
+        id === 'greiman'
+          ? { mode, seed, doctrine: id, ...hybridAxes(seed) }
+          : { mode, seed, wear: 1, distort: 1, doctrine: id },
+    };
     delete armed.review;
     // A raygun-treated form is exempt from the review (Matt, 2026-11-06), so the veto reads the PLAIN landing: a
     // landing the review would call janky is not handed to a doctrine — it lands plain and the ladder repairs it.
@@ -1512,8 +1521,8 @@ export const createLayoutSlice = (set) => ({
         raygun: {
           mode,
           seed,
-          wear: 1,
-          distort: 1,
+          // #2385 P5 — HYBRID names her move, not the hot/process-first material axes (see doctrineArm).
+          ...(which === 'greiman' ? hybridAxes(seed) : { wear: 1, distort: 1 }),
           doctrine: which,
           ...(form.raygun?.life ? { life: form.raygun.life } : {}),
         },
@@ -1700,6 +1709,7 @@ export const createLayoutSlice = (set) => ({
         state.layers,
         'curate',
         rngForIndex(state.seed, CH.curate, press + 0x10000, state.seedOffsets),
+        { owner: state.poemDoctrine === 'greiman' ? 'greiman' : null }, // #2385 P5: a standing HYBRID owns GLYPH and TIDES
       );
       // #1365 Q2 — REFINE varies colour gently around the palette that was kept: a fresh small hue + warmth deal from
       // the ANCHOR on every press (never a walk), on the colour channel keyed by (seed, press #), locked swatches held.
@@ -1935,6 +1945,7 @@ export const createLayoutSlice = (set) => ({
       layers = rollPatternLayers(layers, 'chaos', mkRng((seed ^ 0x51ed270b) >>> 0 || 1), {
         canAdd: !isTapeFull({ ...state, layers }),
         makeId: () => `pt-${seed.toString(36)}`,
+        owner: state.poemDoctrine === 'greiman' ? 'greiman' : null, // #2385 P5: a standing HYBRID owns GLYPH and TIDES
       }).layers;
 
       // #1918 ruling 1 — every KINETIC press re-deals the poem (HOLD passes it by).

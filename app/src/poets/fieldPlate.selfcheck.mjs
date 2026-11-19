@@ -158,7 +158,8 @@ assert.strictEqual(stampWidthEm('typ_A', 'A'), glyphWidthEm('A'), 'a base stamp 
 assert.strictEqual(NATIVE_STAMP_IDS.size, 289, 'the native face did NOT grow: the plate is Latin-side');
 // #2010 RE-PIN (cause: RAY GUN P1 · TORN & XEROXED): the worn letters (208) join the union on the same road.
 // #2150 RE-PIN (cause: type exclusivity): the caps/digits pack (36) joins the union — FIELD deals the base face alone now.
-assert.strictEqual(POEM_ONLY_STAMP_IDS.size, 388 + 52 + 208 + 36, 'the poem-only union grew by exactly the plate pack, #2010’s worn letters, and #2150’s caps/digits (36)');
+// #2385 RE-PIN (cause: HYBRID's bitmap letters): +104, the same road.
+assert.strictEqual(POEM_ONLY_STAMP_IDS.size, 388 + 52 + 208 + 36 + 104, 'the poem-only union grew by exactly the plate pack, #2010’s worn letters, and #2150’s caps/digits (36)');
 for (const id of PLATE_STAMP_IDS) {
   assert.ok(POEM_ONLY_STAMP_IDS.has(id), `${id}: in the poem-only union`);
   assert.ok(!NATIVE_STAMP_IDS.has(id), `${id}: not in the native face`);
@@ -609,7 +610,7 @@ assert.ok(!ASSETS_PLATE.some((a) => ASSETS_AUTHORED.includes(a)), 'no plate stam
 // #2010 RE-PIN (cause: RAY GUN P1 · TORN & XEROXED): the worn letters (208) join on the same road.
 assert.strictEqual(
   ASSETS.length,
-  701 + 52 + 24 + 208 + 66, // #2108 RE-PIN: +66 house constructs, same road
+  701 + 52 + 24 + 208 + 66 + 104, // #2108 RE-PIN: +66 house constructs, same road; #2385 RE-PIN: +104 HYBRID bitmap letters
   'the catalogue arithmetic: 701 + 52 plate stamps + 24 riso icons (#2008) + 208 worn letters (#2010)',
 );
 for (const a of ASSETS_PLATE) {

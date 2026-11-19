@@ -20,8 +20,8 @@
 //                     slot swap max, never demotes (biases are ≥ 0)
 //   M2 temperature    T' = 0.4 + 0.15 × richness, cap 0.55, floor 0.40,
 //                     relaxes over 2.5s loop time
-//   M3 palette drift  +0.10 mix toward the kept palette at beat confidence
-//                     (≥ 0.62 across two attacks), relaxes over 1 phrase
+//   M3 palette drift  MOVED to HYBRID (curator/hybrid.mjs, #2385): +0.10 mix toward the kept palette at beat
+//                     confidence (≥ 0.62 across two attacks), relaxes over 1 phrase
 //   M4 beat-sway      phrase arm ≤ 40ms early, hold +8% (cap +1 beat),
 //                     loop-time only, relaxes over 1 phrase
 //   M5 lean-in        reactivity gain 1.18 → 1.00 over one phrase on
@@ -151,41 +151,10 @@ export function warmedTemperature(richness) {
   return Math.min(cap, Math.max(floor, t0 + slope * r));
 }
 
-// ─── M3: palette gravity ─────────────────────────────────────────────────
-export const M3_DRIFT = QK_DEFAULTS.m3.drift;
-
-/**
- * Most-kept palette id (mode; first max wins ties — deterministic).
- * Null when no keep names a palette.
- */
-export function keptPaletteId(keeps) {
-  const counts = new Map();
-  for (const k of keeps || []) {
-    const id = k && k.config && k.config.palette && k.config.palette.id;
-    if (typeof id === 'string' && id) counts.set(id, (counts.get(id) || 0) + 1);
-  }
-  let best = null;
-  let bestN = 0;
-  for (const [id, c] of counts) {
-    if (c > bestN) {
-      best = id;
-      bestN = c;
-    }
-  }
-  return best;
-}
-
-/**
- * Palette drift target at beat confidence: mix toward the kept palette at
- * up to M3_DRIFT. Null when not confident or no kept palette — no drift.
- * The consumer caps the hold at its own beat interval; the weight here is
- * the only number this module owns.
- */
-export function paletteDriftTarget(keeps, beatConfident) {
-  if (!beatConfident) return null;
-  const id = keptPaletteId(keeps);
-  return id ? { paletteId: id, weight: qk().m3.drift } : null;
-}
+// ─── M3: palette gravity — MOVED to HYBRID (Persona Kernel P5, #2385; spec §4 Q14) ───────────────────────────
+// The kept-palette lean is a colour move, and colour is HYBRID's: curator/hybrid.mjs carries keptPaletteId and
+// paletteGravity with the same numbers and caps (+0.10 mix, relaxes over a phrase, beat-confidence gate), read from
+// the tuning table's greiman.knobs.gravity. The Queen keeps timing only: M1, M2, M4, M5 below.
 
 // ─── M4: beat-sway (phrase timing) ───────────────────────────────────────
 export const M4_ARM_MS = QK_DEFAULTS.m4.armMs;
@@ -234,13 +203,11 @@ export function beatConfidentFromPeaks(peaks) {
 /** All-zero sway: she is not leaning. (The shipped snapshot; the live neutral is built from the table in force.) */
 export const NEUTRAL_SWAY = Object.freeze({
   temperature: M2_T0,
-  palette: null,
   phrase: Object.freeze({ armEarlyMs: 0, holdPct: 0 }),
   reactivity: 1.0,
 });
 const neutralSway = () => ({
   temperature: qk().m2.t0,
-  palette: null,
   phrase: Object.freeze({ armEarlyMs: 0, holdPct: 0 }),
   reactivity: 1.0,
 });
@@ -259,7 +226,6 @@ export function swayOpen(keeps, signals) {
   const returned = !!s.audioReturned && (s.source === 'mic' || s.source === 'midi');
   return {
     temperature: warmedTemperature(s.richness),
-    palette: paletteDriftTarget(list, beatConfident),
     phrase: phraseTiming(beatConfident),
     reactivity: reactivityGain(returned, s.phraseProgress),
   };

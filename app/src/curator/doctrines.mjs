@@ -15,8 +15,12 @@
 //
 // #2381 (Persona Kernel P1): this file is now a READER of the `kc-persona/1` records — each doctrine's
 // name, modes and title live in its record's `doctrine` slot (app/src/personas/) and are projected here
-// into exactly the frozen shape this module has always exported. GREIMAN's record exists but is NOT
-// projected: she joins DOCTRINES in P5 (the HYBRID slice), so nothing below changes until then.
+// into exactly the frozen shape this module has always exported.
+// #2385 (Persona Kernel P5): GREIMAN joins as HYBRID, the digital pole. Her mode is today's `greiman` (the float);
+// what she adds (bitmap, planes, spectrum, GLYPH/TIDES, colour) lives in curator/hybrid.mjs. Standing doctrine is
+// null by default, so nothing changes until a performer hands her the stage.
+//
+//   HYBRID    arms the DIGITAL pole: the greiman mode, in one of four moves a call names in its record.
 
 import { getPersona } from '../personas/registry.mjs';
 
@@ -33,6 +37,7 @@ const doctrineEntry = (id) => {
 export const DOCTRINES = Object.freeze({
   carson: doctrineEntry('carson'),
   ashworth: doctrineEntry('ashworth'),
+  greiman: doctrineEntry('greiman'),
 });
 
 export const DOCTRINE_IDS = Object.freeze(Object.keys(DOCTRINES));
@@ -53,7 +58,7 @@ export function doctrineMode(id, draw, standing = null) {
   return modes[i];
 }
 
-/** Which doctrine a mode belongs to (for the readout), or null (greiman is nobody's). */
+/** Which doctrine a mode belongs to (for the readout), or null for a mode no doctrine arms. */
 export function doctrineOfMode(mode) {
   for (const id of DOCTRINE_IDS) if (DOCTRINES[id].modes.includes(mode)) return id;
   return null;

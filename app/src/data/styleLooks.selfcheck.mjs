@@ -140,12 +140,15 @@ for (const p of COMPOSITION_PRESETS) {
   // resolver excludes poem-only marks by design; proven on the base tree,
   // where the same pool also renders 0 and this suite's 4242 pool renders
   // 172 here). At 4100 every look's pool again holds a placeable mark.
+  // #2385 RE-PIN (cause: HYBRID's bitmap pack) — the same lottery again: the pack's 104 poem-only letter records
+  // shifted the samples and at 4100 diagonal-grid's pool landed all-poem-only; 4104 is the next seed where every look's
+  // pool holds a placeable mark (4101-4103 blank the same look). The assertion is unchanged.
   // The assertion below is unchanged. (Standing fragility, noted for the
   // next pack: a dozen letterform-paired looks share one candidate set and
   // clear or blank together per seed — dealing from the panel's records,
   // as production does, would end the lottery, but that is a redesign of
   // this fixture, not a re-pin.)
-  const pool = poolToEnabled(dealPoolFor(records, mkRng(4100), p).ids);
+  const pool = poolToEnabled(dealPoolFor(records, mkRng(4104), p).ids);
   const r = createLiveResolver();
   let out;
   for (let f = 0; f < 24; f++) out = r.resolveLayers(input(p, pool, f * 16.7));

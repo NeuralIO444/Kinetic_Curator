@@ -98,7 +98,8 @@ ok("A3 today's measured values: the table ships the numbers the code ran with", 
   assert.equal(p.queen.knobs.beatConfidence, 0.62);
   assert.deepStrictEqual(p.queen.knobs.m1, { bias: 0.06, proximity: 0.72 });
   assert.deepStrictEqual(p.queen.knobs.m2, { t0: 0.4, slope: 0.15, cap: 0.55, floor: 0.4 });
-  assert.deepStrictEqual(p.queen.knobs.m3, { drift: 0.1 });
+  assert.equal(p.queen.knobs.m3, undefined, 'M3 left the Queen (#2385)');
+  assert.deepStrictEqual(p.greiman.knobs.gravity, { drift: 0.1 }, 'HYBRID carries the palette gravity (#2385)');
   assert.deepStrictEqual(p.queen.knobs.m4, { armMs: 40, holdPct: 0.08 });
   assert.deepStrictEqual(p.queen.knobs.m5, { gainPeak: 1.18 });
   assert.deepStrictEqual(p.queen.knobs.m6, { keeps: 3, strength: 0.35 });

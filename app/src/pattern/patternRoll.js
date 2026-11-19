@@ -16,6 +16,7 @@ import {
   sanitizePattern,
 } from '../state/patternTrack.js';
 import { QUILT_MAX_GROUT } from './engine.js';
+import { hybridPatternMode } from '../curator/hybrid.mjs'; // #2385 P5: HYBRID owns PATTERN GLYPH and TIDES
 import { isFxLayer } from '../fx/fxFilters.js';
 import { isMathLayer } from '../fx/mathFilters.js';
 import { MAX_LAYERS } from '../state/projectNormalize.js';
@@ -37,9 +38,13 @@ const between = (rng, lo, hi) => lo + (hi - lo) * rng();
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /** A freshly dealt block. DROP is a performance setting, so a deal keeps it. About half the deals are still. */
-export function dealPattern(prev, rng) {
+export function dealPattern(prev, rng, owner = null) {
   const p = sanitizePattern(prev);
-  const mode = PATTERN_DEAL_MODES[Math.floor(rng() * PATTERN_DEAL_MODES.length)]; // #1797: TIDES is hand-picked only
+  // #1797: TIDES is hand-picked only — unless a standing HYBRID owns the deal (#2385 P5: she owns GLYPH and TIDES).
+  // One draw either way, so the rest of the stream is exactly what it was.
+  const draw = rng();
+  const mode =
+    owner === 'greiman' ? hybridPatternMode(draw) : PATTERN_DEAL_MODES[Math.floor(draw * PATTERN_DEAL_MODES.length)];
   return sanitizePattern({
     ...p,
     mode,
@@ -86,7 +91,7 @@ export function rollPatternLayers(
   layers,
   kind,
   rng,
-  { canAdd = true, makeId = () => 'pt-roll', addChance = CHAOS_ADD_CHANCE } = {},
+  { canAdd = true, makeId = () => 'pt-roll', addChance = CHAOS_ADD_CHANCE, owner = null } = {},
 ) {
   const fn = BY_KIND[kind];
   if (!fn || !Array.isArray(layers)) return { layers, changed: false };
@@ -94,7 +99,7 @@ export function rollPatternLayers(
   let out = layers.map((l) => {
     if (!isPattern(l)) return l;
     changed = true;
-    return { ...l, pattern: fn(l.pattern, rng) };
+    return { ...l, pattern: fn(l.pattern, rng, owner) };
   });
   if (kind === 'chaos' && canAdd && !out.some(isPattern)) {
     // #1609 (D4) — a pattern is ground and spends no skeleton slot, so the
@@ -103,7 +108,7 @@ export function rollPatternLayers(
     // is a single stratum now; the gate is unchanged.)
     // draw the dice unconditionally, so the rest of the stream does not depend on the cap
     const roll = rng();
-    const born = dealPattern(undefined, rng);
+    const born = dealPattern(undefined, rng, owner);
     const id = makeId();
     if (roll < addChance && out.length < MAX_LAYERS) {
       // one rule everywhere: a pattern is ground, directly below the lowest KC track (bottom -> top)

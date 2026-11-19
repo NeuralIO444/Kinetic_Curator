@@ -22,7 +22,7 @@ import { applyKinemeDrivers, applyRhythm, applyTransport, isFamilyAnchored } fro
 import { applySurge } from './surge.js'; // #1576 P3 — SURGE (its own module: the kill-criterion split line)
 import { applyParallaxDrift } from './parallaxDrift.js'; // #1576 P3 — parallax drift (surge's sibling, independently removable)
 import { assignColor, resolveStrategy, applyLean, ACCENT_OFFSET } from './kernel/color/index.js';
-import { hexToRgb255 } from './colorHex.mjs'; // #2018 — the plate ink rule measures distance in the palette's own RGB
+import { hexToRgb255, rgb255ToHex } from './colorHex.mjs'; // #2018 — the plate ink rule measures distance in the palette's own RGB
 import { fillDishPoints } from './kernel/dish.js';
 import { applyCultureScale, applyCultureLife } from './dishLifeCouple.mjs'; // #1923 Phase 2 — the culture coupling's scale fold
 import { applyFluidDrift, applyPoemLean } from './dishFluidDrift.mjs'; // one force seam slice 1 — the ferrofluid leans the stage's own marks
@@ -257,6 +257,18 @@ export function mirrorItems(items, mirrorState, W, H) {
     for (const item of items) out.push(mirrored(item, true, true));
   }
   return out;
+}
+
+/**
+ * HYBRID's spectrum colour (#2385): the colour at place `t` along a word that runs from swatch `a` to swatch `b`
+ * (indices folded by the palette's own length, so any drawn pair lands on two real swatches). Linear in RGB between
+ * the two swatches — every colour it can return lies on the line between two colours the palette holds.
+ */
+function spectrumColor(swatches, [a, b, t]) {
+  const n = swatches.length;
+  const from = hexToRgb255(swatches[((a % n) + n) % n]);
+  const to = hexToRgb255(swatches[((b % n) + n) % n]);
+  return rgb255ToHex(from.map((c, k) => c + (to[k] - c) * t));
 }
 
 /**
@@ -989,15 +1001,23 @@ export function buildPlacements({
     const fieldItems = new Array(drawnForm.stamps.length);
     for (let j = 0; j < drawnForm.stamps.length; j++) {
       const s = drawnForm.stamps[j];
-      const { color, accent } =
-        plateInk ?? assignColor({ seed, index: soa.n + j, t: 0.5, seedOffsets }, palette, strategy);
+      const assigned = plateInk ?? assignColor({ seed, index: soa.n + j, t: 0.5, seedOffsets }, palette, strategy);
+      const { accent } = assigned;
+      // Persona Kernel P5 (#2385) — HYBRID's spectrum: a stamp the record's `spectrum` axis gave a `spec` runs between
+      // two of the palette's own swatches along its word. Inside the palette only (never a colour it does not hold);
+      // a plate keeps its ink; no spec, no swatches: the colour is exactly what it was.
+      const color =
+        s.spec && !fieldForm.plate && Array.isArray(palette?.swatches) && palette.swatches.length > 1
+          ? spectrumColor(palette.swatches, s.spec)
+          : assigned.color;
       fieldItems[j] = {
         x: (s.x / fieldForm.aspect) * canvasW,
         y: s.y * canvasH,
         scale: s.em * FIELD_EM_SCALE,
         scaleY: s.em * FIELD_EM_SCALE,
         rotation: s.rotation,
-        alpha: fieldAlpha,
+        // HYBRID's planes (#2385): a stamp in a deeper plane carries `alpha`, a share of the form's own alpha.
+        alpha: s.alpha === undefined ? fieldAlpha : fieldAlpha * s.alpha,
         index: soa.n + j,
         t: 0.5,
         zTier: 0,

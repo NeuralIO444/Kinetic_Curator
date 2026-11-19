@@ -441,12 +441,24 @@ export function sanitizeFieldForm(raw) {
     if (raygun.life !== undefined && raygun.life !== 'bedrock' && raygun.life !== 'seed') return null;
     // #2010 P5 — the doctrine that armed it (CARSON / ASHWORTH), named in the record when the Director's call put it
     // there (a performer's tap names none). Naming only: the draw never reads it.
-    if (raygun.doctrine !== undefined && raygun.doctrine !== 'carson' && raygun.doctrine !== 'ashworth') return null;
+    // Persona Kernel P5 (#2385): GREIMAN (HYBRID) joins, with her three named moves — bitmap / planes / spectrum, each
+    // `1` or absent, each read only at mode 'greiman'. Absent, the float is drawn exactly as it always was.
+    if (
+      raygun.doctrine !== undefined &&
+      raygun.doctrine !== 'carson' &&
+      raygun.doctrine !== 'ashworth' &&
+      raygun.doctrine !== 'greiman'
+    )
+      return null;
+    for (const axis of ['bitmap', 'planes', 'spectrum']) if (raygun[axis] !== undefined && raygun[axis] !== 1) return null;
     raygunMark = {
       mode: raygun.mode,
       seed: raygun.seed,
       ...(raygun.wear === 1 ? { wear: 1 } : {}),
       ...(raygun.distort === 1 ? { distort: 1 } : {}),
+      ...(raygun.bitmap === 1 ? { bitmap: 1 } : {}),
+      ...(raygun.planes === 1 ? { planes: 1 } : {}),
+      ...(raygun.spectrum === 1 ? { spectrum: 1 } : {}),
       ...(raygun.life ? { life: raygun.life } : {}),
       ...(raygun.doctrine ? { doctrine: raygun.doctrine } : {}),
     };

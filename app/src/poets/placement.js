@@ -41,6 +41,7 @@ import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js';
+import { ASSETS_BITMAP } from '../data/assets/assets-bitmap.js';
 
 /** The 36 letter stamps that exist. Any other character has no stamp. */
 export const LETTER_STAMP_IDS = Object.freeze(new Set(ASSETS_LETTERS.map((a) => a.id)));
@@ -213,6 +214,24 @@ export function wearStampIdFor(assetId, kind) {
 }
 
 /**
+ * Persona Kernel P5 (#2385) — HYBRID's bitmap letters: one coarse-pixel variant of every treatable Latin letter, baked
+ * from those packs' own outlines (scripts/gen-bitmap.mjs). Same standing as the worn letters: not a face of their own,
+ * each variant names its source stamp (`bitmapOf`), measures with its source's ruler, and is only ever reached by
+ * HYBRID's bitmap draw moving a treated stamp to ITS OWN letter's variant (poets/rayGunForm.js). No placement and no
+ * gate ever resolves one; a stored form never carries one.
+ */
+export const BITMAP_STAMP_IDS = Object.freeze(new Set(ASSETS_BITMAP.map((a) => a.id)));
+/** Bitmap id -> the source stamp it sets in pixels ('typ_bm_s_A' -> 'typ_s_A'). */
+export const BITMAP_SOURCE_BY_ID = new Map(ASSETS_BITMAP.map((a) => [a.id, a.bitmapOf]));
+const BITMAP_ID_BY_SOURCE = new Map(ASSETS_BITMAP.map((a) => [a.bitmapOf, a.id]));
+/** The bitmap variant of a source stamp ('typ_A' -> 'typ_bm_A'), or null when that stamp has none. */
+export function bitmapStampIdFor(assetId) {
+  return BITMAP_ID_BY_SOURCE.get(assetId) ?? null;
+}
+/** A stamp's SOURCE id: a worn or bitmap variant measures as the letter it is made from. */
+const sourceStampId = (assetId) => WEAR_SOURCE_BY_ID.get(assetId) ?? BITMAP_SOURCE_BY_ID.get(assetId) ?? assetId;
+
+/**
  * The poem-only union — EVERY stamp pack the FIELD director deals alone:
  * the native face (kana ∪ kanji), the Latin growth (lowercase + punctuation),
  * the serif face, the ornaments, and (#2005) the plate face. This is the set
@@ -238,6 +257,7 @@ export const POEM_ONLY_STAMP_IDS = Object.freeze(
     ...ORNAMENT_STAMP_IDS,
     ...PLATE_STAMP_IDS,
     ...WEAR_STAMP_IDS,
+    ...BITMAP_STAMP_IDS,
   ]),
 );
 
@@ -348,7 +368,7 @@ const INK_STAMP_PACKS = [ASSETS_LETTERS, ASSETS_KANA, ASSETS_KANJI, ASSETS_LATIN
 const INK_SVG_BY_ID = new Map(INK_STAMP_PACKS.flatMap((pack) => pack.map((a) => [a.id, a.svg])));
 const INK_BOX_CACHE = new Map();
 export function stampInkBox(assetId) {
-  const id = WEAR_SOURCE_BY_ID.get(assetId) ?? assetId;
+  const id = sourceStampId(assetId);
   if (INK_BOX_CACHE.has(id)) return INK_BOX_CACHE.get(id);
   const svg = INK_SVG_BY_ID.get(id);
   let box = null;
@@ -372,7 +392,7 @@ export function stampInkBox(assetId) {
 }
 
 export const stampWidthEm = (assetId, ch) => {
-  const id = WEAR_SOURCE_BY_ID.get(assetId) ?? assetId;
+  const id = sourceStampId(assetId);
   return SERIF_STAMP_IDS.has(id) ? serifGlyphWidthEm(ch) : PLATE_STAMP_IDS.has(id) ? plateGlyphWidthEm(ch) : glyphWidthEm(ch);
 };
 const TRACK = 0.16; // letterspacing between glyphs, em units — air a plate reads through

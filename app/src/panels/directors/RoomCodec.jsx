@@ -25,6 +25,7 @@ import { useRoomFeed } from '../../hooks/useRoomFeed.js';
 import { LoisFaceNow, DavisFaceNow } from './RoomFaces.jsx';
 import { HornStrip } from './HornStrip.jsx';
 import { resolveHorns, bandRead, HORN_IDS, hornLabel } from '../../curator/hornFaces.js';
+import { hybridSignals } from '../../curator/hybrid.mjs'; // #2385 P5: HYBRID's measured moves
 import { shownHeat, heatStep } from '../layout/kineticHeat.mjs';
 import { getBandView, subscribeBand } from '../../personas/bandLive.js';
 
@@ -77,12 +78,22 @@ export function RoomCodec() {
   const standing = useStore((s) => s.poemDoctrine ?? null);
   const stageMode = useStore((s) => s.layoutParams?.fieldForm?.raygun?.mode ?? null);
   const stageSeed = useStore((s) => s.layoutParams?.fieldForm?.raygun?.seed ?? null);
+  // #2385 (P5) — HYBRID's three measured moves, read off the standing record as primitives (stable selectors).
+  const stageBitmap = useStore((s) => s.layoutParams?.fieldForm?.raygun?.bitmap === 1);
+  const stagePlanes = useStore((s) => s.layoutParams?.fieldForm?.raygun?.planes === 1);
+  const stageSpectrum = useStore((s) => s.layoutParams?.fieldForm?.raygun?.spectrum === 1);
   const bandView = useBandView();
   const horns = resolveHorns({
     stageMode,
     stageSeed,
     standing,
     heat,
+    hybrid: hybridSignals({
+      mode: stageMode,
+      bitmap: stageBitmap ? 1 : 0,
+      planes: stagePlanes ? 1 : 0,
+      spectrum: stageSpectrum ? 1 : 0,
+    }),
     bands: Object.fromEntries(HORN_IDS.map((id) => [id, bandRead(id, bandView)])),
   });
   // #1462 — a mind request blends a state over the honest face, holds it for its decay, then eases back

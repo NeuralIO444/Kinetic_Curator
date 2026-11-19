@@ -98,6 +98,7 @@ import { ASSETS_SERIF } from '../data/assets/assets-serif.js'; // #2002: the poe
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js'; // #2002: the poem-only ornament stamps
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js'; // #2005: the poem-only plate stamps
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
+import { ASSETS_BITMAP } from '../data/assets/assets-bitmap.js'; // #2385 P5: HYBRID's poem-only bitmap letters
 import { ASSETS_RISO } from '../data/assets/assets-riso.js'; // #2008: the grammar-composed riso icons
 import { ASSETS_CONSTRUCTS, HOUSE_CONSTRUCT_RECORDS } from '../data/assets/index.js'; // #2108: the house constructs (catalogue-only until the gate); #2327: and their records
 import { constructPieceItems } from '../engine/constructStage.js'; // #2327: a construct tile dealt as its live pieces
@@ -122,6 +123,7 @@ const POEM_ONLY_IDS = new Set(
     ...ASSETS_ORNAMENTS,
     ...ASSETS_PLATE,
     ...ASSETS_WEAR,
+    ...ASSETS_BITMAP,
     ...ASSETS_RISO,
   ].map((a) => a.id),
 );

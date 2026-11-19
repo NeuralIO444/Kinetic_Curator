@@ -12,6 +12,7 @@ import { ASSETS_LATIN } from './assets/assets-latin.js';
 import { ASSETS_SERIF } from './assets/assets-serif.js';
 import { ASSETS_PLATE } from './assets/assets-plate.js';
 import { ASSETS_WEAR } from './assets/assets-wear.js';
+import { ASSETS_BITMAP } from './assets/assets-bitmap.js';
 import { ASSETS_ORNAMENTS } from './assets/assets-ornaments.js';
 
 // ── the structure function, on synthetic SVGs ────────────────────────────
@@ -43,9 +44,10 @@ assert.strictEqual(
 // ── the census, pinned (measured on this head) ───────────────────────────
 // #2108 RE-PIN: the 66 house constructs are catalogue members, so the census grows by exactly them
 // (985 → 1051: +7 stroke, +12 fill, +41 mixed, +6 no ink slot; the original 985 are unchanged).
+// #2385 RE-PIN: HYBRID's 104 bitmap letters are catalogue members (fill-only, like the worn letters): 1051 → 1155, fill +104.
 assert.deepStrictEqual(
   INK_PAINT_CENSUS,
-  { total: 1051, stroke: 114, fill: 825, mixed: 87, none: 25 },
+  { total: 1155, stroke: 114, fill: 929, mixed: 87, none: 25 },
   'the library census: 107 stroke-only / 813 fill-only / 46 mixed / 19 no ink slot',
 );
 
@@ -81,6 +83,7 @@ const faces = [
   ['serif stamps', ASSETS_SERIF],
   ['plate face', ASSETS_PLATE],
   ['worn letters', ASSETS_WEAR],
+  ['bitmap letters', ASSETS_BITMAP],
   ['ornaments', ASSETS_ORNAMENTS],
 ];
 for (const [name, arr] of faces) {

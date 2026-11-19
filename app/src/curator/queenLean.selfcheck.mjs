@@ -14,7 +14,6 @@ import {
   M2_T0,
   M2_CAP,
   M2_FLOOR,
-  M3_DRIFT,
   M4_ARM_MS,
   M4_HOLD_PCT,
   M5_GAIN_PEAK,
@@ -25,8 +24,6 @@ import {
   rankBiases,
   applyRankBias,
   warmedTemperature,
-  keptPaletteId,
-  paletteDriftTarget,
   phraseTiming,
   reactivityGain,
   beatConfidentFromPeaks,
@@ -162,15 +159,14 @@ ok('M2: T in [0.40, 0.55], FILE-quiet lands on the floor', () => {
   assert.equal(M2_T0, 0.4);
 });
 
-// ─── M3: palette drift ───
-ok('M3: drift toward the most-kept palette at confidence, else null', () => {
-  assert.equal(keptPaletteId(eightKeeps), 'tidepool', 'mode of kept palettes');
-  assert.equal(keptPaletteId([]), null);
-  const t = paletteDriftTarget(eightKeeps, true);
-  assert.deepEqual(t, { paletteId: 'tidepool', weight: M3_DRIFT });
-  assert.equal(M3_DRIFT, 0.1, 'weight ≤ 0.10');
-  assert.equal(paletteDriftTarget(eightKeeps, false), null, 'no confidence → no drift');
-  assert.equal(paletteDriftTarget([], true), null, 'no kept palette → no drift');
+// ─── M3: palette drift — MOVED to HYBRID (#2385); its suite is curator/hybrid.selfcheck.mjs ───
+ok('M3 left the Queen: no palette in her sway, no M3 export — she keeps timing only', async () => {
+  const mod = await import('./queenLean.mjs');
+  for (const gone of ['M3_DRIFT', 'keptPaletteId', 'paletteDriftTarget'])
+    assert.ok(!(gone in mod), `${gone} moved to HYBRID`);
+  assert.ok(!('palette' in NEUTRAL_SWAY), 'the neutral sway carries no palette');
+  assert.ok(!('palette' in swayOpen(eightKeeps, { attackPeaks: [0.9, 0.9] })), 'the live sway carries no palette');
+  assert.ok(!('m3' in TUNING_DEFAULTS.personas.queen.knobs), 'her table section carries no m3 knob');
 });
 
 // ─── M4: phrase timing ───
@@ -209,7 +205,6 @@ ok(`identity below ${MIN_KEEPS} keeps (proven on the ungated path)`, () => {
   const live = swayOpen(eightKeeps, signals);
   assert.notDeepEqual(live, NEUTRAL_SWAY, '8 keeps → she leans');
   assert.ok(live.temperature > M2_T0, 'M2 warms');
-  assert.ok(live.palette && live.palette.weight === M3_DRIFT, 'M3 drifts');
   assert.ok(live.phrase.armEarlyMs === 40, 'M4 arms');
   assert.ok(live.reactivity > 1.0, 'M5 leans in');
 });
@@ -243,7 +238,6 @@ ok('her exported constants are the tuning table’s shipped values, and a DEV ed
   assert.equal(M2_T0, k.m2.t0);
   assert.equal(M2_CAP, k.m2.cap);
   assert.equal(M2_FLOOR, k.m2.floor);
-  assert.equal(M3_DRIFT, k.m3.drift);
   assert.equal(M4_ARM_MS, k.m4.armMs);
   assert.equal(M4_HOLD_PCT, k.m4.holdPct);
   assert.equal(M5_GAIN_PEAK, k.m5.gainPeak);

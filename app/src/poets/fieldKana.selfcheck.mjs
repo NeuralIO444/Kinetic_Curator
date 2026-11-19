@@ -222,8 +222,8 @@ assert.ok(!ASSETS_AUTHORED.some((a) => KANA_STAMP_IDS.has(a.id)), 'no kana in th
 // #2108 RE-PIN (cause: constructs slice 5b): the 66 house constructs join the catalogue on the same road.
 assert.strictEqual(
   ASSETS.length,
-  312 + 1 + 163 + 126 + 43 + 52 + 4 + 52 + 24 + 208 + 66,
-  'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments + plate + riso + wear + constructs',
+  312 + 1 + 163 + 126 + 43 + 52 + 4 + 52 + 24 + 208 + 66 + 104, // #2385 RE-PIN: +104 HYBRID bitmap letters, same road
+  'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments + plate + riso + wear + constructs + bitmap',
 );
 assert.ok(ASSETS_KANA.every((a) => ASSETS.some((x) => x.id === a.id)), 'every kana stamp resolves in the catalogue');
 const recs = poolDescriptors(ASSETS);

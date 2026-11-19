@@ -19,6 +19,7 @@ import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
+import { ASSETS_BITMAP } from '../data/assets/assets-bitmap.js'; // #2385 P5: HYBRID's poem-only bitmap letters
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
 import { ASSETS_CONSTRUCTS } from '../data/assets/index.js';
 import { assetStyle } from '../data/assetStyle.js';
@@ -52,6 +53,7 @@ const KANA_IDS = new Set([
     ...ASSETS_ORNAMENTS,
     ...ASSETS_PLATE,
     ...ASSETS_WEAR,
+    ...ASSETS_BITMAP,
     ...ASSETS_RISO,
     ...ASSETS_CONSTRUCTS, // #2108
     ...ASSETS_LETTERS,

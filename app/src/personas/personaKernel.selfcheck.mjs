@@ -5,8 +5,7 @@
 //      is exactly the 18 records in cast order, records are deep-frozen, and the validator itself bites
 //   B  the tastes: curator/personaTastes.js is a pure reader — every PERSONA_TASTES row is its record's
 //      identity/taste slots projected back, weight keys stay inside the 19 features, Canon style ids resolve
-//   C  the doctrines: curator/doctrines.mjs projects CARSON and ASHWORTH only; GREIMAN's record exists but
-//      is nobody's doctrine until P5, so DOCTRINE_IDS and doctrineOfMode('greiman') are unchanged
+//   C  the doctrines: curator/doctrines.mjs projects CARSON, ASHWORTH and (P5, #2385) GREIMAN as HYBRID
 //   D  the docs: docs/characters/*.md names and dates match the records (the human-readable view cannot
 //      drift from the kernel)
 import assert from 'node:assert';
@@ -135,8 +134,8 @@ ok('B2 every weight key is one of the 19 features; every Canon style id resolves
 });
 
 // ── C · the doctrines ────────────────────────────────────────────────────
-ok('C1 DOCTRINES projects the carson + ashworth records — and nothing else', () => {
-  assert.deepStrictEqual([...DOCTRINE_IDS], ['carson', 'ashworth']);
+ok('C1 DOCTRINES projects the carson + ashworth + greiman (HYBRID, #2385) records — and nothing else', () => {
+  assert.deepStrictEqual([...DOCTRINE_IDS], ['carson', 'ashworth', 'greiman']);
   for (const id of DOCTRINE_IDS) {
     const d = getPersona(id).doctrine;
     assert.deepStrictEqual(
@@ -147,10 +146,10 @@ ok('C1 DOCTRINES projects the carson + ashworth records — and nothing else', (
   }
 });
 
-ok('C2 GREIMAN has a record and a doctrine slot, but is nobody\u2019s doctrine until P5', () => {
+ok('C2 GREIMAN has a record and a doctrine slot, and since P5 (#2385) is HYBRID, a doctrine', () => {
   assert.deepStrictEqual(getPersona('greiman').doctrine.modes, ['greiman']);
-  assert.equal(isDoctrine('greiman'), false);
-  assert.equal(doctrineOfMode('greiman'), null);
+  assert.equal(isDoctrine('greiman'), true);
+  assert.equal(doctrineOfMode('greiman'), 'greiman');
 });
 
 // ── D · the docs ─────────────────────────────────────────────────────────

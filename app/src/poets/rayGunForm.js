@@ -61,7 +61,7 @@
 // those constants — no statistics, no guessing.
 
 import { mkRng } from '../engine/prng.js';
-import { stampWidthEm, stampInkBox, wearStampIdFor, ORNAMENT_STAMP_IDS } from './placement.js';
+import { stampWidthEm, stampInkBox, wearStampIdFor, bitmapStampIdFor, ORNAMENT_STAMP_IDS } from './placement.js';
 
 /** The cycle, in tap order. Plain is the absence of the record. */
 export const RAYGUN_MODES = Object.freeze(['carson', 'greiman', 'grit', 'shot']);
@@ -191,6 +191,23 @@ const DISTORT_CARSON = Object.freeze({
   heroEm: 1.9, // a glyph at or above this × the form's median em is a hero: it always drips
 });
 const DISTORT_SHOT = Object.freeze({ tearAt: 0.25, tear: 0.7, meltAt: 0.3, melt: 0.9, shear: 0.45 });
+
+// HYBRID's three moves beyond the float (Persona Kernel P5 · #2385), each NAMED in the record (`bitmap: 1`,
+// `planes: 1`, `spectrum: 1`) and read only at mode 'greiman' — an older record, and every performer's tap (which
+// names none), draws the float exactly as it always did. Each rides a stream of its own off the record's seed, so the
+// float's geometry spends exactly the draws it always did.
+//   bitmap   every treatable letter moves to ITS OWN letter's baked coarse-pixel variant (placement.js BITMAP_*); no draw.
+//   planes   each word sits in one of three translucent depth planes (a stamp `alpha`); the float's echoes are the
+//            deepest plane. The list order and every position are untouched (the transform, not a reorder).
+//   spectrum each word carries a gradient across its letters — `spec: [a, b, t]`: the palette swatch pair the word runs
+//            between and the letter's place along it. The draw seam (engine/buildPlacements.js) turns it into a colour
+//            inside the palette, never outside it.
+const PLANES_SALT = 0x504c4e53; // 'PLNS'
+const SPECTRUM_SALT = 0x53504543; // 'SPEC'
+/** The three planes' opacities, front to back. */
+export const HYBRID_PLANE_ALPHA = Object.freeze([1, 0.62, 0.34]);
+/** Swatch pair indices are drawn in 0..HYBRID_SPECTRUM_SPAN-1 and folded by the palette's own length at the seam. */
+export const HYBRID_SPECTRUM_SPAN = 8;
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 /** A stamp's ink half-width, in unit dish space (its own face's ruler). */
@@ -662,7 +679,8 @@ export function rayGunForm(form, record) {
           ? grit(form.stamps, rows, rng, aspect)
           : shot(form.stamps, rng, aspect);
   const worn = record.wear === 1 ? wear(stamps, mode, seed) : stamps;
-  return { ...form, stamps: record.distort === 1 ? distort(worn, form.stamps, mode, seed, aspect) : worn };
+  const dist = record.distort === 1 ? distort(worn, form.stamps, mode, seed, aspect) : worn;
+  return { ...form, stamps: mode === 'greiman' ? hybrid(dist, form.stamps.length, rows, record, seed) : dist };
 }
 
 /**
@@ -720,4 +738,45 @@ function wear(stamps, mode, seed) {
     const id = kind ? wearStampIdFor(s.assetId, kind) : null;
     return id ? { ...s, assetId: id } : s;
   });
+}
+
+/**
+ * HYBRID's three moves (see the block above the clamp). `n` is the plain stamp count: output indices below it are the
+ * plain stamps in order, indices from it up are the float's echo ghosts. `rows` are the plain form's words.
+ */
+function hybrid(stamps, n, rows, record, seed) {
+  let out = stamps;
+  if (record.bitmap === 1)
+    out = out.map((s) => {
+      const id = bitmapStampIdFor(s.assetId);
+      return id ? { ...s, assetId: id } : s;
+    });
+  if (record.planes === 1) {
+    const rng = mkRng((seed ^ PLANES_SALT) >>> 0);
+    const planeOf = new Map();
+    for (const row of rows)
+      for (const word of row.words) {
+        const plane = Math.min(HYBRID_PLANE_ALPHA.length - 1, Math.floor(rng() * HYBRID_PLANE_ALPHA.length));
+        for (const idx of word) planeOf.set(idx, plane);
+      }
+    out = out.map((s, i) => {
+      const plane = i < n ? (planeOf.get(i) ?? 0) : HYBRID_PLANE_ALPHA.length - 1;
+      return plane === 0 ? s : { ...s, alpha: HYBRID_PLANE_ALPHA[plane] };
+    });
+  }
+  if (record.spectrum === 1) {
+    const rng = mkRng((seed ^ SPECTRUM_SALT) >>> 0);
+    const specOf = new Map();
+    for (const row of rows)
+      for (const word of row.words) {
+        const a = Math.floor(rng() * HYBRID_SPECTRUM_SPAN);
+        const b = (a + 1 + Math.floor(rng() * (HYBRID_SPECTRUM_SPAN - 1))) % HYBRID_SPECTRUM_SPAN;
+        word.forEach((idx, k) => {
+          const t = word.length > 1 ? k / (word.length - 1) : 0.5;
+          specOf.set(idx, [a, b, Math.round(t * 1000) / 1000]);
+        });
+      }
+    out = out.map((s, i) => (i < n && specOf.has(i) ? { ...s, spec: specOf.get(i) } : s));
+  }
+  return out;
 }

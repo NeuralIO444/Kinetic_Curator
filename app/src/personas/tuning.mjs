@@ -75,12 +75,15 @@ const KNOB_SHAPES = {
     backoff: { reverts: 'count', bars: 'count' },
     spectrumOpeners: { low: 'opener', mid: 'opener', high: 'opener' },
   },
+  // Persona Kernel P5 (#2385): the Queen's M3 palette gravity moved here — HYBRID leans her colour toward the kept palette.
+  greiman: {
+    gravity: { drift: 'prob' },
+  },
   queen: {
     minKeeps: 'count',
     beatConfidence: 'prob',
     m1: { bias: 'prob', proximity: 'prob' },
     m2: { t0: 'prob', slope: 'prob', cap: 'prob', floor: 'prob' },
-    m3: { drift: 'prob' },
     m4: { armMs: 'num', holdPct: 'prob' },
     m5: { gainPeak: 'num' },
     m6: { keeps: 'count', strength: 'prob' },
