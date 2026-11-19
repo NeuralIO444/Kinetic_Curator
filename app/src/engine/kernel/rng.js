@@ -222,6 +222,9 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // #2328 — a gait wearer's phase (engine/gait.js gaitPhase): one draw per wearer, a motion decision, so it rides
   // the noise stream; re-rolling colour or placement never moves a gait.
   gait: 'noise',
+  // #2330 — a gait break-up's drift heading per piece (engine/gaitBreakup.js): a motion decision, so the noise stream
+  // too; re-rolling colour or placement never changes how a construct scatters.
+  'gait-scatter': 'noise',
 });
 
 const OFFSET_GROUP_OF = new Map([
