@@ -1,4 +1,4 @@
-# The Dish: a physics-creature foundation for KC-1 (draft spec)
+# CULTURE — a physics-creature foundation for KC-1 (draft spec)
 
 > **Status: DRAFT — design conversation, 2026-11-19. Building is paused. Nothing in this document is built.**
 >
@@ -6,7 +6,7 @@
 
 ## 1. The idea
 
-KC-1's next motion foundation is one shared, top-down 2-D physics world: the dish. Everything in that world is creature-based. A physics engine supplies contact, collision, momentum, and jointed movement; a behaviour architecture in the spirit of Joshua Davis's HYPE framework attaches reusable behaviours and drives to objects; and Disney's 12 principles of animation supply the feel layer — especially squash and stretch, anticipation, follow-through and overlapping action, slow in and slow out, arcs, secondary action, timing, and exaggeration. Creatures are assembled bodies whose behaviour can include flocking, hunger, breeding, clumping, and growing. The point is not to add another isolated animation system. It is to give the stage one living world in which bodies sense, affect, feed, reproduce, change, decay, and are reused.
+KC-1's next motion foundation is **CULTURE**: one shared, top-down 2-D physics world in a dish. The name holds both meanings at once — a living culture grown in a dish, and a society of creatures. Everything in that world is creature-based. A physics engine supplies contact, collision, momentum, and jointed movement; a behaviour architecture in the spirit of Joshua Davis's HYPE framework attaches reusable behaviours and drives to objects; and Disney's 12 principles of animation supply the feel layer — especially squash and stretch, anticipation, follow-through and overlapping action, slow in and slow out, arcs, secondary action, timing, and exaggeration. Creatures are assembled bodies whose behaviour can include flocking, hunger, breeding, clumping, and growing. The point is not to add another isolated animation system. It is to give the stage one living world in which bodies sense, affect, feed, reproduce, change, decay, and are reused.
 
 ## 2. Ruled
 
