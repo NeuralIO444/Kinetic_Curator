@@ -1,127 +1,76 @@
-# #1894 — ACCUM: LEAVE takes the longer fade (ACCUM FADE works in LEAVE)
+# STAGING REPORT — #2381 Persona Kernel P1: `kc-persona/1` records + registry
 
-**Matt's ruling (2026-10-31), implemented verbatim:** in LEAVE mode the
-effective keep is `max(1 − trailFade, 0.5^(1 / accumFadeFrames))` — the
-longer fade wins. ACCUM FADE units untouched (half-life frames; default
-5.4; stops [1, 3, 5.4, 20]); non-LEAVE modes byte-unchanged.
+Branch `kc-2381-persona-kernel`, based on origin/main `2f706d51`. One PR, not merged by the builder.
 
-## Premises verified before building
+## What was built
 
-- The #560 LEAVE override was exactly where the audit said:
-  `accumRecipeParams` in `app/src/gl/accum.mjs` set LEAVE's `keepFinal` to
-  `clamp01(1 − leaveFade)`, ignoring the ACCUM FADE keep entirely.
-- The recipe's `fade` input IS the ACCUM FADE keep: `liveLoop.mjs` passes
-  `fade: halfLifeToKeep(accumulationFade …)` (with the #268 swell envelope
-  applied to the frame count first), so composing against the recipe's
-  clamped `keep` is composing against `0.5^(1/accumFadeFrames)`.
-- The composition point is entirely in `accum.mjs` — **no one-writer file
-  touched** (liveLoop.mjs / liveResolve.mjs / particles.js untouched;
-  liveLoop only supplies params, as before). `applyAudioEnvelope` and the
-  spectrum warp modulate the composed scalar downstream; neither
-  re-composes it per mode.
+- **`app/src/personas/` — 19 pure record modules**, one per persona, each exporting a single `record`
+  in the `kc-persona/1` shape (spec §2): `lois`, `davis`, `queen`, `governor` (the cast), `carson`,
+  `greiman`, `ashworth` (doctrines), `te` (kind `voice`, the third Mind persona), `taste` (kind `judge`,
+  owns hierarchy), and the ten voice personas whose tastes `personaTastes.js` used to carry inline
+  (`davis` + `molnar`, `mohr`, `benjamin`, `reas`, `haeckel`, `oxman`, `stock`, `anadol`, `menkman`).
+  Slots filled only where the tree already states the fact: identity (real name, ISO dates, provenance,
+  surface callsign — `null` for the QUEEN and the GOVERNOR, who are never named), lens, taste (the
+  19-feature weights + rationale + Canon style id where one exists in the Canon: HAECKEL → `engraved`;
+  personas without a Canon style carry `null` — no mapping was invented), principle, lexicon (a pointer
+  to signed copy — no new lines), states, power, head, relations, and a `doctrine` slot for the three
+  doctrines.
+- **`app/src/personas/registry.mjs`** — gathers the records, deep-freezes them, and validates every
+  record against the schema (`validatePersonaRecord` / `validatePersonaRegistry`, exported). Validation
+  problems are data (`PERSONA_PROBLEMS`), not a throw at import: the selfcheck pins the list empty, so
+  drift fails the suite and CI rather than breaking the live instrument.
+- **`curator/personaTastes.js` and `curator/doctrines.mjs` are now readers of the registry.** Their
+  exports keep the same names, shapes, values and freezing as before (see the deep-equal proof below).
+  GREIMAN's record carries her doctrine slot from day one, but `doctrines.mjs` deliberately projects
+  only CARSON and ASHWORTH — she joins `DOCTRINES` in P5, so `DOCTRINE_IDS`, `isDoctrine('greiman')`
+  and `doctrineOfMode('greiman')` are exactly what they were.
+- **`app/src/personas/personaKernel.selfcheck.mjs`** (new suite, added to `app/selfcheck.manifest`):
+  schema/drift validation incl. a "validator bites" test, the cast and kinds, the callsign law, the
+  tastes/doctrines reader projections, weight keys ⊆ the 19 features, Canon style ids resolve, and
+  **`docs/characters/*.md` names/dates match the records** (dates parsed out of the four character
+  files and compared against the records' ISO dates). 10 checks, all passing.
 
-## The change (one expression, `app/src/gl/accum.mjs`)
+## Deep-equal proof (acceptance)
 
-```js
-const keepFinal = held
-  ? Math.max(Math.min(1, Math.max(0, 1 - (Number(leaveFade) || 0))), keep)
-  : … // ribbon / comet / plain branches untouched
-```
+Method: a scratch harness in /tmp (not in the tree) imports `curator/personaTastes.js` and
+`curator/doctrines.mjs` from a tree root and dumps canonical JSON of `TASTE_FEATURES`, `PERSONA_TASTES`,
+`personaTasteIds()`, `getPersonaTaste()` for every id (+ a missing id), `DOCTRINES`, `DOCTRINE_IDS`,
+`isDoctrine` over a probe set, `doctrineMode` over representative draws (incl. standing-mode and
+unknown-doctrine cases), `doctrineOfMode` over all modes, and the frozen-ness of `DOCTRINES`, its
+entries, its mode arrays and `DOCTRINE_IDS`.
 
-`keepVec` still derives from `keepFinal` in the one place (#1800), so the
-spectral channels follow the winning fade automatically. A comment at the
-site names the ruling and the date.
+- Before: dumped from the pristine worktree at origin/main `2f706d51` before any edit.
+- After: dumped from the finished branch (and re-dumped after prettier formatting).
+- Result: **`diff` of before/after dumps is empty — byte-identical**, both times.
 
-## Measurements — real renderer + recipe, before vs after
+## Verification (publish ritual, all in the worktree's `app/`)
 
-Method: the audit's probe approach (headless Chromium, real
-`createLiveRenderer` + `ensureAccum` + `accumRecipeParams` + `accum.step`;
-one disc stamped, then empty steps; disc-centre peak read back through the
-ACES resolve per step). Readback adds the audit's documented ~+0.02
-shoulder bias toward 1, so fitted ratios sit above the raw keep, ordering
-exact; the param keep is exact. Probe scripts preserved in
-`~/workspace/kc-1894-shots/probes/` (they ran from /tmp, which a VM
-restart wiped mid-verification; the scripts and all numbers here are
-reproduced verbatim in that folder).
+- `npm install`: done (the one-line `package-lock.json` churn it produced was reverted — not this change).
+- Full selfcheck sweep (continue-on-error over the whole manifest, Playwright chromium installed first):
+  **752 pass / 3 fail**. The same sweep on the pre-change base was 751 pass / 3 fail (the +1 is the new
+  personaKernel suite). The 3 failures are the known sandbox-environmental signatures, each **re-run and
+  confirmed failing identically on a clean detached checkout of origin/main `2f706d51`**:
+  `swarmWasm` (no Rust toolchain/cargo in the sandbox, exit 1), `rollSafety` (headless Playwright crash,
+  exit 1), `accum` (V8 heap OOM abort, exit 134, identical stack frames). None is from this change.
+- `npm run lint`: **0 errors** (11 warnings, all pre-existing, none in touched files).
+- `npm run format:check`: **pass** (the new files were prettier-formatted; deep-equal re-proven after).
+- `npm run build`: **pass** (only the pre-existing ineffective-dynamic-import warnings).
+- Manifest validation via `scripts/runSelfcheck.mjs`'s own `manifestProblems`: **no problems**; the new
+  suite is listed exactly once.
 
-| Case | Param keep BEFORE | Param keep AFTER | Measured/step BEFORE | Measured/step AFTER |
-|---|---|---|---|---|
-| A · Matt's exact state (LEAVE, trail 0.05, ACCUM FADE 12f, echoes 2) | 0.9500 | 0.9500 | 0.9654 | 0.9654 |
-| B · LEAVE, trail 0.20, ACCUM FADE 12f | 0.8000 | **0.9439** | 0.8558 | **0.9597** |
-| C · LEAVE, trail 0.05, ACCUM FADE 34f | 0.9500 | **0.9798** | 0.9654 | **0.9894** |
-| D · LEAVE, trail 0, ACCUM FADE fastest (1f) | 1.0000 | 1.0000 | 1.0000 (flat 144 ×12) | 1.0000 (flat 144 ×12) |
-| E · non-LEAVE control, plain fade 12f | 0.9439 | 0.9439 | 0.9589 | 0.9589 |
+## Not done (by design)
 
-Reading the acceptance bullets against this table, honestly:
+- No behaviour change anywhere: no surface strings re-pointed (the callsign sweep is P3), no tuning
+  table (P2), GREIMAN not wired into `DOCTRINES` (P5), no Archive (P4).
+- No character files were edited; TE and TASTE got records only, per spec §5 (no new character files,
+  no copy).
 
-- **Case B is the acceptance case in discriminating form.** The issue's
-  bullet pairs TRAIL FADE 0.05 with ACCUM FADE 12f — but at those values
-  the trail fade is itself the longer fade (keep 0.95 ≈ 13.5-frame
-  half-life vs the 12-frame ACCUM FADE), so the ruled max() keeps 0.95 and
-  Case A is byte-identical peaks before/after (142,141,138,134,…). With
-  TRAIL FADE 0.20 (keep 0.8, ~3.1f half-life) against the same ACCUM FADE
-  12f, the composition is decisive: before, the mark decays on the trail
-  curve (param 0.8000, gone by step ~20); after, it decays on the
-  **12-frame half-life** (param 0.9439, measured/step 0.9597 — matching
-  the non-LEAVE 12f control's 0.9589 within readback noise). Case C shows
-  the other direction of the same law: dial ACCUM FADE to 34f and it wins
-  over trail 0.05.
-- **Case D:** ACCUM FADE at its fastest + TRAIL FADE 0 → hold stays
-  exactly 1.0000, peaks flat — the max() never shortens a hold. ✓
-- **Case E + A:** non-LEAVE renders and Matt's exact state are unchanged
-  (identical param keeps, identical peak sequences). No golden re-records
-  anywhere in the sweep; no e2e spec drives LEAVE (no LEAVE/leaveFade
-  selectors exist in e2e/), so no golden legitimately covers this change.
+## Open questions / notes for the coordinator
 
-Visual proof (case B state, steps 0/5/10/20/40 montaged):
-`~/workspace/kc-1894-shots/before-leave-trail020-fade12-strip.png` (marks
-nearly gone by step 20) and
-`~/workspace/kc-1894-shots/after-leave-trail020-fade12-strip.png` (marks
-readable at 20, still present at 40).
-
-## Selfchecks
-
-- **New assertions:** `trailMode.selfcheck` gains '#1894 LEAVE takes the
-  longer fade' (ACCUM wins at 12f vs trail 0.2; ACCUM wins dialed to 34f
-  vs trail 0.05; trail wins at Matt's values; fastest-ACCUM + trail 0
-  holds exactly 1). `accum.selfcheck` gains 'LEAVE composes the longer
-  fade (#1894)' including the keepVec derivation from the composed keep.
-  accum suite: **OK (84 cases)** — 83 baseline + 1 new.
-- **Re-pin (one, cause named in the assertion's comment):**
-  `trailMode.selfcheck` '#560 Leave fade is optional' —
-  `accumRecipeParams({ leave: true, leaveFade: 0.2 }).keep` was 0.8, now
-  **0.88**: the call leaves `fade` at its 0.88 default, and under the
-  ruling that ACCUM FADE keep is the longer fade, so it wins. The comment
-  at the assertion reads "Matt ruling 2026-10-31, #1894". The original
-  intent (trail fade drives the keep when it is the longer fade) is kept
-  as an explicit case with `fade: 0.5` → 0.8. No check was weakened or
-  deleted; the other #560 pins (hold at trail 0, non-LEAVE ignoring
-  leaveFade, tunnel/prism/flow fades, ribbon/comet) pass unchanged.
-- Suites run individually and green: trailMode (7/7), accum (84),
-  accum.seam, accumGuard, accumFeed, accumInput (7), modeStops.
-- `npm run format:check` — clean.
-- Full manifest sweep: **551 of 551 suites pass** (the manifest run to
-  its final line, `trailStats`, zero FAILED; kineticSweep passed — the
-  #1822 flake did not fire; accumInput passed inside the sweep on the
-  re-run). Two suites were carved out of the sweep and proven
-  environmental, base-identical on pristine origin/main:
-  `swarmWasm` (fails identically on both trees — `cargo` not on PATH in
-  this sandbox) and `fx/rollSafety` (the sandbox browser target crashes
-  mid-probe on pristine main — `page.evaluate: Target crashed` — and on
-  this tree the same way; no assertion is reached in either). One
-  mid-verification VM restart wiped the first sweep attempt's /tmp logs;
-  the sweep was re-run end-to-end afterwards with logs kept in
-  `~/workspace/kc-1894-shots/sweep-full.log`. CI remains authoritative
-  for the two carved-out suites.
-
-## Files
-
-- `app/src/gl/accum.mjs` — the composed keep (+ ruling comment).
-- `app/src/gl/accum.selfcheck.mjs` — LEAVE composition block.
-- `app/src/gl/trailMode.selfcheck.mjs` — composition test + the one
-  re-pin above.
-
-NOT done: no panel/shelf change (the ACCUM FADE row now simply works in
-LEAVE; signalling/greying was the other ruling option and was not chosen),
-no units change, no change to ribbon/comet/plain composition, no
-one-writer file edits.
+- **GREIMAN's full name and dates appear nowhere in the repo.** Her record names her `Greiman` with a
+  provenance saying exactly that; the Archive phase (spec §4b: backstories are sourced fact, never
+  invented) is the place to source them. Dates for CARSON and ASHWORTH are likewise unstated in the
+  repo and are `null` in their records. Not a blocker for P1 — the schema requires `identity`, and
+  `born`/`died` are nullable by design — but flagging it rather than filling it in from memory.
+- The voice personas' records carry `born`/`died` as `null` for the same reason: neither
+  `personaTastes.js` nor the persona source files state dates.

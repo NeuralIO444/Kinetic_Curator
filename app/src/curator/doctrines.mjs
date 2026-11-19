@@ -12,22 +12,27 @@
 //             running as a machine setting. The one mode that is a system, not a gesture.
 //
 // Pure: no store, no bus, no clock. The store (state/slices/layoutSlice.js) draws and writes; this names.
+//
+// #2381 (Persona Kernel P1): this file is now a READER of the `kc-persona/1` records — each doctrine's
+// name, modes and title live in its record's `doctrine` slot (app/src/personas/) and are projected here
+// into exactly the frozen shape this module has always exported. GREIMAN's record exists but is NOT
+// projected: she joins DOCTRINES in P5 (the HYBRID slice), so nothing below changes until then.
+
+import { getPersona } from '../personas/registry.mjs';
+
+const doctrineEntry = (id) => {
+  const d = getPersona(id).doctrine;
+  return Object.freeze({
+    id,
+    name: d.name,
+    modes: Object.freeze([...d.modes]),
+    title: d.title,
+  });
+};
 
 export const DOCTRINES = Object.freeze({
-  carson: Object.freeze({
-    id: 'carson',
-    name: 'CARSON',
-    modes: Object.freeze(['carson', 'shot']),
-    title:
-      'CARSON — arms hot: the geometry modes with the distortion channel (carson, shot). Hand it the stage and every poem it deals lands blasted.',
-  }),
-  ashworth: Object.freeze({
-    id: 'ashworth',
-    name: 'ASHWORTH',
-    modes: Object.freeze(['grit']),
-    title:
-      'ASHWORTH — arms process-first: Swiss Grit, the grid first and the destruction by rule. Hand it the stage and every poem it deals is set perfectly, then run through the machine.',
-  }),
+  carson: doctrineEntry('carson'),
+  ashworth: doctrineEntry('ashworth'),
 });
 
 export const DOCTRINE_IDS = Object.freeze(Object.keys(DOCTRINES));

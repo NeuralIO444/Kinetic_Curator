@@ -1,0 +1,32 @@
+// personas/molnar.mjs — the `kc-persona/1` record for the Vera Molnár voice persona (spec: docs/design/persona-kernel-spec.md §2).
+// Pure data; the registry (registry.mjs) validates and freezes it. The taste vector below is the one
+// curator/personaTastes.js used to carry inline — it lives here now and that file reads it back unchanged.
+
+export const record = {
+  schema: 'kc-persona/1',
+  id: 'molnar',
+  kind: 'voice',
+  identity: {
+    name: "Vera Molnár",
+    born: null,
+    died: null,
+    provenance:
+      'Distilled in curator/personaTastes.js from the persona source file (the persona files live outside the repo: ~/workspace/your_files/personas/vera-molnar.md). Dates are not stated in the repo.',
+    callsign: "NEAR GRID",
+  },
+  taste: {
+    rationale:
+      "Organized structure with ~1% disorder: vast seas of tiny marks, near-zero chaos, pared-down vocabulary.",
+    weights: {
+      "markDensity": 0.6,
+      "markSize": -0.8,
+      "disorder": -1,
+      "calm": 0.6,
+      "sizeVariety": -0.4,
+      "opacityVariety": -0.4,
+      "windPush": -0.3,
+      "drift": -0.5
+    },
+    canonStyle: null,
+  },
+};
