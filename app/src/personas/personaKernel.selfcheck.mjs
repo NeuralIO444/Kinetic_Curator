@@ -2,7 +2,7 @@
 //
 // Pins the slice's contract (docs/design/persona-kernel-spec.md §2, §5):
 //   A  the registry: every record validates against the schema (drift is a failure, not a warning), the cast
-//      is exactly the 19 records in cast order, records are deep-frozen, and the validator itself bites
+//      is exactly the 18 records in cast order, records are deep-frozen, and the validator itself bites
 //   B  the tastes: curator/personaTastes.js is a pure reader — every PERSONA_TASTES row is its record's
 //      identity/taste slots projected back, weight keys stay inside the 19 features, Canon style ids resolve
 //   C  the doctrines: curator/doctrines.mjs projects CARSON and ASHWORTH only; GREIMAN's record exists but
@@ -37,7 +37,7 @@ ok('A1 no drift: every record validates against kc-persona/1', () => {
   for (const r of PERSONAS) assert.equal(r.schema, PERSONA_SCHEMA);
 });
 
-ok('A2 the cast is exactly the 19 records, in cast order', () => {
+ok('A2 the cast is exactly the 18 records, in cast order', () => {
   assert.deepStrictEqual(personaIds(), [
     'lois',
     'davis',

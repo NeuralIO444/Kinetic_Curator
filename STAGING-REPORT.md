@@ -5,7 +5,7 @@ Branch `kc-2381-persona-kernel`, based on origin/main `2f706d51`. One PR, not me
 
 ## What was built
 
-- **`app/src/personas/` — 19 pure record modules**, one per persona, each exporting a single `record`
+- **`app/src/personas/` — 18 pure record modules**, one per persona, each exporting a single `record`
   in the `kc-persona/1` shape (spec §2): `lois`, `davis`, `queen`, `governor` (the cast), `carson`,
   `greiman`, `ashworth` (doctrines), `te` (kind `voice`, the third Mind persona), `taste` (kind `judge`,
   owns hierarchy), and the ten voice personas whose tastes `personaTastes.js` used to carry inline
