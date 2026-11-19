@@ -766,3 +766,8 @@ node src/engine/gaitBreakup.selfcheck.mjs
 node src/curator/gaitLive.selfcheck.mjs
 node src/gl/liveResolve.gait.selfcheck.mjs
 node src/gl/liveResolve.gaitBreakup.selfcheck.mjs
+node src/data/canon/gaits.selfcheck.mjs
+node src/engine/gaitBlend.selfcheck.mjs
+node src/state/gaitLocks.selfcheck.mjs
+node src/gl/liveResolve.gaitEase.selfcheck.mjs
+node src/gl/liveResolve.constructCap.selfcheck.mjs

@@ -172,10 +172,13 @@ const pick = (keys) => Object.fromEntries(keys.map((k) => [k, clone(st()[k] ?? n
   const state = st();
   const doc = clone(sceneOf(state)); // layers included, so the snapshot-installed fields appear
   const SNAPSHOT_ONLY = new Set(['lockedParams', 'caGrid']);
+  // #2329 follow-up — the one scene field whose store name differs: the document saves only the LOCKS (gaitLocks) of
+  // the store's gaitAssignments (a QUEEN pick is session-only)
+  const SCENE_STORE_NAME = { gaitAssignments: 'gaitLocks' };
   const sceneKeys = Object.keys(sceneFieldsFromDoc(doc, state));
   for (const k of sceneKeys)
     assert.ok(
-      DOC_FIELD_CLASS[k] === 'scene' || SNAPSHOT_ONLY.has(k),
+      DOC_FIELD_CLASS[SCENE_STORE_NAME[k] || k] === 'scene' || SNAPSHOT_ONLY.has(k),
       `${k} is set by the scene half, so it must be a scene key`,
     );
   const STORE_NAME = { projectTitle: 'title' }; // the one rig field whose store name differs from its document key

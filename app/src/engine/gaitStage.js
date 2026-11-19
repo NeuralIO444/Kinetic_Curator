@@ -127,20 +127,30 @@ export function poseConstruct(marks, pieces, gait, o) {
  * @param stamp   the frame input's `gaits` (engine/gaitAssign.js gaitInputStamp)
  * @param frame   { driverSec, seed, canvasW, canvasH } — the kineme clock and the layer's seed
  */
-export function gaitStageOptions(stamp, { driverSec = 0, seed = 0, canvasW = 0, canvasH = 0 } = {}) {
+export function gaitStageOptions(stamp, frame = {}) {
   const gaits = gaitsOfStamp(stamp);
   if (!gaits) return null;
-  const bpm = stamp.bpm;
-  const beatTime = gaitBeatTime({ bpm, driverSec });
+  const worn = new Map();
+  for (const [target, gait] of gaits) worn.set(target, { gait, bpm: stamp.bpm });
+  return gaitStageOptionsFor(worn, frame);
+}
+
+/**
+ * #2329 follow-up — the same options from what each wearer wears this frame (engine/gaitBlend.js step(): a Map
+ * target → { gait, bpm }, a cross-fade mid-swap or the stamped record itself). Each wearer's beat counts at its own
+ * tempo, so a wearer easing to still after the stamp is gone keeps the beat it was moving on.
+ */
+export function gaitStageOptionsFor(worn, { driverSec = 0, seed = 0, canvasW = 0, canvasH = 0 } = {}) {
+  if (!(worn instanceof Map) || !worn.size) return null;
   return {
-    moving: (item) => !!item && gaits.has(item.assetId),
+    moving: (item) => !!item && worn.has(item.assetId),
     pose: (marks, pieces, tile, slot) => {
-      const gait = gaits.get(tile.assetId);
-      if (!gait) return marks;
+      const w = worn.get(tile.assetId);
+      if (!w) return marks;
       const who = `${tile.assetId}|${tile.key ?? slot}`;
-      return poseConstruct(marks, pieces, gait, {
-        beatTime,
-        bpm,
+      return poseConstruct(marks, pieces, w.gait, {
+        beatTime: gaitBeatTime({ bpm: w.bpm, driverSec }),
+        bpm: w.bpm,
         wearerSeed: (seed ^ hash32(who)) >>> 0,
         seed,
         slot,

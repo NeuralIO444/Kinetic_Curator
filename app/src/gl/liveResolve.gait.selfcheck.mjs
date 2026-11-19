@@ -105,13 +105,16 @@ ok('hard gate: no stamp = a still-only stamp = the switch off, every frame, same
 });
 
 // the QUEEN, phrase by phrase, as the loop would stamp her picks: none → performing → idle → still
-const ROOM = ['low', 'high', 'mid', 'low'];
+// (#2329 follow-up: low energy is idle now; only true silence is still)
+const ROOM = [{ silent: true }, { energy: 'high' }, { energy: 'mid' }, { silent: true }];
+/** #2329 follow-up — the drop to still eases over one beat: at 120 BPM and 60 fps, 30 frames of pieces settling home. */
+const EASE_FRAMES = 30;
 const PHRASE_FRAMES = FRAMES / ROOM.length;
 const swaps = (() => {
   let map = {};
   const stamps = [];
-  for (const energy of ROOM) {
-    for (const e of queenPicks({ assignments: map, targets: [TILE], styleOf: () => 'organic', energy }))
+  for (const room of ROOM) {
+    for (const e of queenPicks({ assignments: map, targets: [TILE], styleOf: () => 'organic', ...room }))
       map = applyGaitAssign(map, e).assignments;
     stamps.push(gaitInputStamp(map, 120));
   }
@@ -125,9 +128,12 @@ ok('the QUEEN’s swaps deal pieces only while a gait moves; still frames hash l
   assert.equal(swaps[3], null, 'back to still: no stamp');
   const s = session({ stampAt: swapAt });
   for (let f = 0; f < FRAMES; f++) {
-    const moving = !!swapAt(f);
-    assert.equal(s.pieceCounts[f] > 0, moving, `frame ${f}: pieces iff a gait moves`);
+    // a gait moves, or the last one is still easing home (one beat after the drop to still)
+    const moving = !!swapAt(f) || (f >= 3 * PHRASE_FRAMES && f < 3 * PHRASE_FRAMES + EASE_FRAMES);
+    assert.equal(s.pieceCounts[f] > 0, moving, `frame ${f}: pieces iff a gait moves (or eases home)`);
   }
+  for (let f = 3 * PHRASE_FRAMES + EASE_FRAMES; f < FRAMES; f++)
+    assert.equal(s.pieceCounts[f], 0, `frame ${f}: home, the flat tile again`);
   for (let f = 0; f < PHRASE_FRAMES; f++) assert.equal(s.hashes[f], rest.hashes[f], 'phrase 1 is today');
   assert.notEqual(s.hashes[PHRASE_FRAMES + 30], rest.hashes[PHRASE_FRAMES + 30]);
 });

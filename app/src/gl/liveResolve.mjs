@@ -87,8 +87,8 @@ import { readMeterBandLevels } from '../hooks/audioMeterTap.js'; // #720 — def
 import { ensureAggregate, GrowthHooks } from '../engine/kernel/sample/growth.js'; // #793 — biology regrow
 import { assessAggregate, decideLifecycle, recordLifecycleState } from '../biology/lifecycle.js';
 import { getBiologyPolicy } from '../biology/policy.js';
-import { createCreatureBuilder } from '../engine/creature.js'; // #1355 step 4: the moth, on formed pins
-import { createDishCreatureBuilder } from '../engine/dishCreature.js'; // #1634 slice 2: the dish creature, on the hosted pin
+import { createCreatureBuilder, mothItemBound } from '../engine/creature.js'; // #1355 step 4: the moth, on formed pins
+import { createDishCreatureBuilder, dishCreatureItemBound } from '../engine/dishCreature.js'; // #1634 slice 2: the dish creature, on the hosted pin
 import { createCreatureSpawnState, registerSpawnState } from '../curator/spawnState.js'; // #1694 slice 1: the spawn channel, resolver-owned
 import { CREATURE_ASSET_ID, mothsAllowed, dishAllowed } from '../curator/creatureCitizen.js'; // #1694 slice 2: the pool citizen's reads
 import { ASSETS_KANA } from '../data/assets/assets-kana.js'; // #1982: the poem-only kana stamps
@@ -101,8 +101,8 @@ import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the po
 import { ASSETS_RISO } from '../data/assets/assets-riso.js'; // #2008: the grammar-composed riso icons
 import { ASSETS_CONSTRUCTS, HOUSE_CONSTRUCT_RECORDS } from '../data/assets/index.js'; // #2108: the house constructs (catalogue-only until the gate); #2327: and their records
 import { constructPieceItems } from '../engine/constructStage.js'; // #2327: a construct tile dealt as its live pieces
-import { gaitStageOptions } from '../engine/gaitStage.js'; // #2329: a construct's assigned gait moves its pieces
-import { gaitsOfStamp } from '../engine/gaitAssign.js'; // #2330: the gait a breaking construct wears
+import { gaitStageOptionsFor } from '../engine/gaitStage.js'; // #2329: a construct's assigned gait moves its pieces
+import { createGaitBlend, checkBlendSnapshot } from '../engine/gaitBlend.js'; // #2329 follow-up: a gait swap eases over one beat
 import { createGaitBreakup, checkBreakSnapshot } from '../engine/gaitBreakup.js'; // #2330: the field breaks a construct up; its gait says how
 
 // #1982 — the kana stamps are catalogue members for the census and the stage
@@ -504,6 +504,9 @@ export function createLiveResolver() {
   // #2330 (gait M4) — the break-up fold: which constructs the ferrofluid has broken up (or is letting rejoin), since which
   // beat. The one stateful piece of the break-up; it rides the snapshot (an OPTIONAL key), so a take replays it exactly.
   const gaitBreak = createGaitBreakup();
+  // #2329 follow-up (Matt, 2026-11-18 18:53 PT) — the gait cross-fade fold: a swap, and the drop back to still, ease the
+  // driver amounts over one beat. Stateful like the break-up, so it rides the snapshot (an OPTIONAL key) too.
+  const gaitBlend = createGaitBlend();
   // K1 slice 4b — input.dishFluidCells (the recorded, sparse, 8-bit field) unpacked once per distinct object (the input log
   // keeps identity, so an unchanged field is not re-unpacked); it wins over a raw dishFluidExternal (a dense host array).
   let cellsIn = null;
@@ -1186,6 +1189,19 @@ export function createLiveResolver() {
       return patternGrid;
     };
 
+    // #2329 follow-up — what each construct wears THIS frame (the stamp, eased over one beat at every swap), stepped
+    // once per frame before any layer deals; no stamp and nothing easing = null (the hard gate). CONSTRUCTS off /
+    // collapsed: every construct is its tile, nothing eases.
+    let gaitWorn = null;
+    if (input.constructPieces) gaitWorn = gaitBlend.step(input.gaits, driverSec);
+    else if (gaitBlend.size) gaitBlend.reset();
+    // #2330 follow-up — every break-up wearer that stood on stage this frame (any layer): the rest are swept below
+    const breakSeen = new Set();
+    // #2327 — the shared piece cap: the creatures are appended AFTER the layers deal (below), so their count is taken
+    // here, as the pure upper bound their builders give for this input, and counted against the constructs' budget.
+    const creatureTaken = input.constructPieces
+      ? (mothsAllowed(input) ? mothItemBound(input) : 0) + (dishAllowed(input) ? dishCreatureItemBound(input, pool) : 0)
+      : 0;
     for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
       aliveIds.add(layer.id);
       // #1097/#1098 — a PATTERN track is not a KC track: it has no snapshot (the content path below
@@ -1714,15 +1730,13 @@ export function createLiveResolver() {
       // field over the matter floor, a magnet standing, PULL up, under dishFluidMarks), its pieces release in the gait's
       // order and scatter; when the field leaves they rejoin by the gait's ease and path. Breaking or rejoining counts as
       // `moving`. No field and nothing breaking → the very same options as before (the hard gate).
+      // #2329 follow-up — the gait each construct wears is the frame's eased one (gaitWorn); #2327 — the creatures'
+      // items count against the same piece budget (`taken`).
       if (input.constructPieces) {
-        const gaitStage = input.gaits
-          ? gaitStageOptions(input.gaits, { driverSec, seed, canvasW: W, canvasH: H })
-          : null;
+        const gaitStage = gaitWorn ? gaitStageOptionsFor(gaitWorn, { driverSec, seed, canvasW: W, canvasH: H }) : null;
         let stageOpts = gaitStage || {};
         const breakPrefix = `${layer.id}|`;
-        const breakSeen = new Set();
         if (breakField || gaitBreak.size) {
-          const worn = input.gaits ? gaitsOfStamp(input.gaits) : null;
           const keyOf = (it) => (it && it.key != null ? `${breakPrefix}${it.key}` : null);
           stageOpts = {
             moving: (it) => {
@@ -1740,8 +1754,8 @@ export function createLiveResolver() {
                 depths: pieces.map((p) => p.depth | 0),
                 tile,
                 field: breakField,
-                gait: worn ? worn.get(tile.assetId) || null : null,
-                bpm: input.gaits ? input.gaits.bpm : null,
+                gait: gaitWorn && gaitWorn.has(tile.assetId) ? gaitWorn.get(tile.assetId).gait : null,
+                bpm: gaitWorn && gaitWorn.has(tile.assetId) ? gaitWorn.get(tile.assetId).bpm : null,
                 driverSec,
                 seed,
               }).marks;
@@ -1751,9 +1765,9 @@ export function createLiveResolver() {
         items = constructPieceItems(items, {
           enabled: true,
           recordOf: (id) => HOUSE_CONSTRUCT_RECORDS.get(id) || null,
+          taken: creatureTaken,
           ...stageOpts,
         });
-        if (gaitBreak.size) gaitBreak.sweep(breakPrefix, breakSeen); // a construct gone from the stage forgets its break
       } else if (gaitBreak.size) gaitBreak.reset(); // CONSTRUCTS off / collapsed: every construct is its tile again
       const rotation = stratumRotationOf(layer);
       out.push({
@@ -1773,6 +1787,9 @@ export function createLiveResolver() {
           : {}),
       });
     }
+    // #2330 follow-up — a break-up wearer that did not stand on stage this frame (its construct gone, its layer deleted
+    // or hidden) leaves the fold, every frame, so the snapshot never carries a dead key
+    if (gaitBreak.size) gaitBreak.sweep('', breakSeen);
     const content = out.filter((e) => !e.isFx);
     const toNorm = (it) => ({ x: (Number(it.x) || 0) / W, y: (Number(it.y) || 0) / H });
     // #343 / Spine F: MOD reads the source's motion (position + velocity).
@@ -2263,6 +2280,7 @@ export function createLiveResolver() {
     dishFieldStage.reset(); // #1923 Phase 2
     dishFluid.reset(); // #1997
     gaitBreak.reset(); // #2330
+    gaitBlend.reset(); // #2329 follow-up
   }
 
   // ── #1367 — mid-session state snapshot ─────────────────────────────────────
@@ -2290,6 +2308,7 @@ export function createLiveResolver() {
     const dishFieldSnap = dishFieldStage.snapshot(); // #1923 Phase 2
     const dishFluidSnap = dishFluid.snapshot(); // #1997
     const gaitBreakSnap = gaitBreak.snapshot(); // #2330
+    const gaitBlendSnap = gaitBlend.snapshot(); // #2329 follow-up
     return {
       v: 1,
       W,
@@ -2321,6 +2340,7 @@ export function createLiveResolver() {
       ...(dishFieldSnap ? { dishField: dishFieldSnap } : {}), // #1923 Phase 2 — OPTIONAL key on the same terms: present only while a field culture runs
       ...(dishFluidSnap ? { dishFluid: dishFluidSnap } : {}), // #1997 — OPTIONAL key on the same terms: present only while the ferrofluid runs
       ...(gaitBreakSnap ? { gaitBreak: gaitBreakSnap } : {}), // #2330 — OPTIONAL key on the same terms: present only while a construct is broken up
+      ...(gaitBlendSnap ? { gaitBlend: gaitBlendSnap } : {}), // #2329 follow-up — OPTIONAL key on the same terms: present only while a construct wears a moving gait or eases
       // #2006 slice 3 — OPTIONAL key on the same terms: present only while a
       // review settle is in flight or remembered, so every other snapshot
       // is exactly what it was. The settle is presentation state; a
@@ -2425,6 +2445,7 @@ export function createLiveResolver() {
     dishLife.restore(snap.dishLife); // #1923 — absent (every pre-DISH-LIFE snapshot) = no culture, as a fresh resolver's
     dishFieldStage.restore(snap.dishField); // #1923 Phase 2 — absent (every pre-Phase-2 snapshot) = no field culture, as a fresh resolver's
     gaitBreak.restore(snap.gaitBreak); // #2330 — absent (every pre-M4 snapshot) = nothing broken up, as a fresh resolver's
+    gaitBlend.restore(snap.gaitBlend); // #2329 follow-up — absent = nothing worn, nothing easing, as a fresh resolver's
     // travel kinemes — a pre-travel snapshot carries no roam: every mark home, the clock unanchored (a fresh resolver's state)
     if (snap.travel !== undefined) {
       restoreTravelStore(travelStore, snap.travel.store);
@@ -2620,6 +2641,8 @@ export function checkResolverSnapshot(snap) {
   if (!snap.dishCreatures || typeof snap.dishCreatures !== 'object') return false;
   // #2330 — `gaitBreak` is optional; when present it must be a well-formed break-up fold.
   if (snap.gaitBreak !== undefined && !checkBreakSnapshot(snap.gaitBreak)) return false;
+  // #2329 follow-up — `gaitBlend` is optional; when present it must be a well-formed cross-fade fold.
+  if (snap.gaitBlend !== undefined && !checkBlendSnapshot(snap.gaitBlend)) return false;
   // #1694 slice 1 — `spawn` is optional (absent in every pre-repipe snapshot); when present it must be an object.
   if (snap.spawn !== undefined && (!snap.spawn || typeof snap.spawn !== 'object' || Array.isArray(snap.spawn)))
     return false;

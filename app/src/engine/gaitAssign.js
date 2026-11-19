@@ -15,7 +15,7 @@
 // decision is recorded at the moment it is made).
 //
 // Pure: no clock, no random, no store.
-import { canonGaits, canonGaitById, CANON_GAIT_KINDS } from '../data/canon/gaits.js';
+import { canonGaits, canonGaitById, canonicalGaitId, CANON_GAIT_KINDS } from '../data/canon/gaits.js';
 import { GAIT_DEFAULT_BPM } from './gait.js';
 
 export const GAIT_ASSIGN_BY = Object.freeze(['queen', 'davis', 'user']);
@@ -29,7 +29,9 @@ export function sanitizeGaitAssign(raw) {
   if (typeof raw.target !== 'string' || !raw.target || raw.target.length > TARGET_MAX) return null;
   if (typeof raw.gaitId !== 'string' || !GAIT_ID_RE.test(raw.gaitId)) return null;
   if (!GAIT_ASSIGN_BY.includes(raw.by)) return null;
-  return { target: raw.target, gaitId: raw.gaitId, by: raw.by, locked: raw.by === 'user' && raw.locked === true };
+  // a pre-M4 Canon id (a take or a document written before #2405) is kept as the current id of the same gait
+  const gaitId = canonicalGaitId(raw.gaitId);
+  return { target: raw.target, gaitId, by: raw.by, locked: raw.by === 'user' && raw.locked === true };
 }
 
 /**
@@ -57,13 +59,14 @@ export function applyGaitAssign(assignments, raw) {
 
 /**
  * Which of a style's defaults the QUEEN wants for the room (the audio envelope, curator's `audio:energy` with
- * hysteresis): silence or low energy → still, mid → idle, high → performing. No reading yet (no audio) → still,
- * so a room that is not listening keeps today's render.
+ * hysteresis): low or mid energy → idle, high → performing. Only true silence stays still (Matt, 2026-11-18 18:53 PT:
+ * "low energy → idle; true silence stays still"): the silence detector says so, or there is no reading at all (no
+ * audio), so a room that is not listening keeps today's render.
  */
 export function queenGaitKind({ energy = null, silent = false } = {}) {
   if (silent) return 'still';
   if (energy === 'high') return 'performing';
-  if (energy === 'mid') return 'idle';
+  if (energy === 'mid' || energy === 'low') return 'idle';
   return 'still';
 }
 
@@ -105,6 +108,47 @@ export function queenPicks({ assignments = {}, targets = [], styleOf = () => nul
 export function restGaitIdFor(style) {
   const set = canonGaits(style);
   return set ? set.still.id : null;
+}
+
+// ── the user's locks, saved with the project (#2329 follow-up, Matt 2026-11-18 18:53 PT) ─────────────────────────────
+// Only a user lock is saved (a QUEEN pick is the room's, re-earned each phrase: session-only). In the document a lock
+// is `gaitLocks: { target: gaitId }`, a SCENE field (projectDocument.js), so it travels with recipes.
+
+/** The most locks a document keeps (a stage has far fewer constructs; this only bounds a hostile file). */
+export const GAIT_LOCKS_MAX = 256;
+
+/** A document's `gaitLocks` through the door: { target: gaitId } sorted by target, pre-M4 ids made current. Never null. */
+export function sanitizeGaitLocks(raw) {
+  const out = {};
+  if (!isObj(raw)) return out;
+  let n = 0;
+  for (const target of Object.keys(raw).sort()) {
+    if (n >= GAIT_LOCKS_MAX) break;
+    const e = sanitizeGaitAssign({ target, gaitId: raw[target], by: 'user', locked: true });
+    if (!e) continue;
+    out[target] = e.gaitId;
+    n++;
+  }
+  return out;
+}
+
+/** The locks standing in an assignment map, as the document saves them ({ target: gaitId }; {} when none). */
+export function gaitLocksOf(assignments) {
+  const raw = {};
+  if (isObj(assignments))
+    for (const target of Object.keys(assignments)) {
+      const e = assignments[target];
+      if (e && e.locked === true && e.by === 'user') raw[target] = e.gaitId;
+    }
+  return sanitizeGaitLocks(raw);
+}
+
+/** An assignment map holding exactly these locks (what a load stands up: a QUEEN pick is never loaded). */
+export function assignmentsFromLocks(locks) {
+  const out = {};
+  const clean = sanitizeGaitLocks(locks);
+  for (const target of Object.keys(clean)) out[target] = { gaitId: clean[target], by: 'user', locked: true };
+  return out;
 }
 
 /** True when a gait moves anything (any driver amount above 0). `still` is not moving. */
