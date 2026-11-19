@@ -67,7 +67,7 @@ renamed consistently at every producer/consumer/comparison site so behaviour is 
 ## The banned-name selfcheck — `app/src/personas/callsignSweep.selfcheck.mjs` (new, 14 checks)
 
 - **Scans:** every `.jsx` under `app/src`, every `.js`/`.mjs` under `components/`, `panels/`, `hooks/`, `data/` (minus the two Canon record artifacts), a named list of copy-bearing modules (`curator/mindPresenceLive.js`, `curator/directorsMatrix.js`, `curator/roomFeed.js`, `curator/doctrines.mjs`, `curator/taste.js`, `curator/curate.js`, `composition/capabilityRegistry.mjs`, `curator/shelfFill.mjs` — the last two added by the QA fix below), and `app/index.html`. Comments are stripped first with a string-aware stripper, so lineage in comments never bites but comment markers inside a string stay copy and are scanned.
-- **Banned forms:** the seven full names in any case; the bare surnames (Lois, Davis, Carson, Greiman, Ashworth, Turner, Bowie) in Title or UPPER case as whole words; `George`/`GEORGE` as a whole word (the attested form of address). Lowercase ids, class names, and camelCase identifiers never match — they are code, not copy.
+- **Banned forms:** the seven full names in any case; the bare surnames (Lois, Davis, Carson, Greiman, Ashworth, Turner, Bowie) in Title or UPPER case as whole words; `George`/`GEORGE` as a whole word (the attested form of address); and (round 2) a surname's lowercase possessive (`lois's`, `davis's`, …) — an apostrophe-s can never be part of an identifier, so it is copy wherever it survives the comment strip. Lowercase ids, class names, and camelCase identifiers never match — they are code, not copy.
 - **Runtime pins:** DOCTRINES names are BLAST / SWISS GRIT and no doctrine title carries a banned name; the records' doctrine slots carry the callsigns; every DIRECTORS verdict is name-free and the solo verdict is `OVERLAP ALONE`; the recap's rendered phrases are pinned by name (its file interleaves prompts + matching data, so it is pinned, not scanned); the Canon records' display fields (baseline labels, style names) are name-free.
 - **Exclusions (each documented in the suite header):** selfcheck files; `lore.json` (open question 1); model prompts; the recap file as a whole (pinned instead); the Canon record artifacts (display fields pinned); the `era:` field line in `data/palettes.js`; exactly ONE allowlisted string — the signed matrix line (open question 2), asserted to still match verbatim exactly once so the exception cannot silently grow.
 - **Validator-bites tests (A1–A4):** synthetic strings prove display forms bite, code forms pass, comments pass, and the data-field exclusion is narrow.
@@ -93,7 +93,7 @@ renamed consistently at every producer/consumer/comparison site so behaviour is 
 - **Lint:** `npm run lint` — 0 errors (11 pre-existing warnings in untouched files).
 - **Format:** `npm run format:check` — all files pass Prettier.
 - **Build:** `npm run build` — green (one pre-existing dynamic-import warning).
-- **New suite:** `callsignSweep.selfcheck` — 14 checks passed (12 at first publish; the QA fix below added A5 + B4).
+- **New suite:** `callsignSweep.selfcheck` — 16 checks passed (12 at first publish; the QA fix below added A5 + B4, round 2 added A6 + B5).
 - **Screenshots** (production build + vite preview, Playwright bundled chromium): `surface-proofs/directors-desktop.png`, `surface-proofs/directors-phone.png`, `surface-proofs/room-desktop.png`, `surface-proofs/room-phone.png` — committed with this change and referenced in the PR. They show the DOCTRINE row reading BLAST / SWISS GRIT, THE ROOM tiles reading `cover` / `overlap`, and the footer pill reading `COVER · VIBE`.
 
 ## QA fix (post-review, same PR)
@@ -136,6 +136,44 @@ three parts, plus a body-count error. All fixed on this branch:
 pins); affected suites green — megamindRecap 12/12, personaKernel 10/10, personaTuning 11/11,
 doctrines 10/10; `npm run lint` 0 errors (11 pre-existing warnings); `npm run format:check`
 clean; `npm run build` green. The two open questions below are untouched, as instructed.
+
+### QA fix round 2 (re-verification residual)
+
+QA re-verification closed all four round-1 findings but caught one residual of the same class:
+
+1. **One more rendered string.** `app/src/curator/shelfFill.mjs` carried a second fill note —
+   "lois's choice: dealt unjudged keeps — no gate margins on file for them" — rendered by the
+   same ShelfDevPanel last-fill readout as the round-1 string. It survived because the guard
+   banned surnames only in Title/UPPER display form, and the lowercase possessive is neither.
+   QA plant-verified the gap: appending the string to `shelfFill.mjs` left the suite green at
+   14/14. The string was undisclosed in the PR body and in round 1 of this report. Fixed:
+   re-pointed to "COVER's choice: …" with the rest of the wording byte-identical; display only,
+   no logic changed.
+2. **The guard now bites the possessive class, scoped so code stays green.** A surname's
+   lowercase possessive (`lois's`, `davis's`, … — straight or curly apostrophe) can never be
+   part of an identifier, class name or data id, so the suite scans for it in the same
+   comment-stripped text as the other banned forms (new `possessiveIn`, folded into B1's scan).
+   The A2 lowercase exemption is untouched: ids, class names and camelCase still pass, and
+   callsign possessives ("COVER's choice") are the correct form and never bite. New checks:
+   **A6** (possessives bite in copy incl. the curly-apostrophe form; callsign possessives, A2
+   code forms and comment possessives pass) and **B5** (a planted "lois's choice" in
+   `shelfFill.mjs` and "davis's pick" in `capabilityRegistry.mjs` each fail against the files'
+   real content, and both unmodified files are possessive-clean). Suite is now 16 checks.
+3. **Re-grep of the class.** String literals across the tree were searched for every lowercase
+   possessive surname and for bare lowercase surnames in display contexts in the named
+   copy-bearing files. No other rendered instance exists: every remaining hit is a code id or
+   key (persona ids like `'lois'`/`'davis'`, map keys, `id: 'lois.vision'`, `rule === 'lois'`)
+   — the A2 class, left as code. Title-case possessives elsewhere are all in comments
+   (lineage, stripped before the scan) except one string in `composition/eventRegistry.js`,
+   which round 1's documented exclusion already covers (code-side documentation, no rendering
+   consumer) — left, per that exclusion.
+
+**Evidence (round 2):** `callsignSweep.selfcheck` 16/16 on the fixed tree; on-disk plant test —
+appending `"lois's choice: planted"` to `shelfFill.mjs` fails the suite, restoring the file
+returns 16/16; affected suites green — shelfFill PASS, shelfDisk PASS, megamindRecap 12/12,
+personaKernel 10/10, personaTuning 11/11, doctrines 10/10; `npm run lint` 0 errors;
+`npm run format:check` clean; `npm run build` green. The two open questions below are still
+untouched, as instructed.
 
 ## Open questions stopped on
 

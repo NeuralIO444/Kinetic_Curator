@@ -317,7 +317,7 @@ export function dealFill({
   take('lois', loisOrdered, table.lois);
   const loisIds = dealt.filter((d) => d.rule === 'lois').map((d) => d.keepId);
   if (loisIds.some((id) => margins.get(id) === null)) {
-    notes.push("lois's choice: dealt unjudged keeps — no gate margins on file for them");
+    notes.push("COVER's choice: dealt unjudged keeps — no gate margins on file for them");
   }
 
   // Contrarian ← most unlike the other dealt (pinned included).

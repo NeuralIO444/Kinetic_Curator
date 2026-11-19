@@ -7,7 +7,9 @@
 // the app shell, and a named list of copy-bearing modules) with comments stripped, and fails
 // on a banned name in display form — a full name in any case, or a bare surname (plus "George", the
 // attested form of address) in Title or UPPER case as a whole word. Lowercase ids, class names and
-// camelCase identifiers never match: they are code, not copy.
+// camelCase identifiers never match: they are code, not copy. ONE lowercase form does bite: a
+// surname's possessive ("lois's choice") — an apostrophe-s can never be part of an identifier, a
+// class name or a data id, so wherever it survives the comment strip it is copy (check A6, B5).
 //
 // Deliberate exclusions, each a ruling not an oversight:
 //   · *.selfcheck.mjs — tests quote the strings they pin; they are not surfaces.
@@ -70,6 +72,21 @@ const BANNED = [
 /** Banned display tokens in a text (comments must already be stripped). */
 export function bannedIn(text) {
   return BANNED.filter(({ re }) => re.test(text)).map(({ label }) => label);
+}
+
+// ── the possessive set ───────────────────────────────────────────────────────
+// A surname's lowercase possessive ("lois's") is copy, never code: no identifier, class name or
+// data id can contain an apostrophe, so the A2 lowercase exemption cannot cover it. Title/UPPER
+// possessives ("Davis's") already bite through the bare-surname patterns above; this set closes
+// the lowercase form, applied to the same comment-stripped scan text as BANNED.
+const POSSESSIVES = SURNAMES.map((s) => {
+  const p = `${s.toLowerCase()}'s`;
+  return { label: p, re: new RegExp(`\\b${s.toLowerCase()}['’]s\\b`) };
+});
+
+/** Banned lowercase-possessive tokens in a text (comments must already be stripped). */
+export function possessiveIn(text) {
+  return POSSESSIVES.filter(({ re }) => re.test(text)).map(({ label }) => label);
 }
 
 /** Strip // and block comments, string-aware: a comment marker inside a string or template
@@ -307,6 +324,18 @@ ok('A5: the stripper is string-aware — comment markers inside a string are cop
   // desync the stripper — a comment after them still strips (the first-run regression).
   assert.deepEqual(bannedIn(code('const el = <Panel opts={opts} />;\nconst t = </Panel>;\nconst r = total / count; // Davis\n{/* George Lois */}')), []);
 });
+ok('A6: lowercase possessives bite — they cannot be code; callsign possessives and code forms pass', () => {
+  assert.deepEqual(possessiveIn(`"lois's choice: dealt unjudged keeps"`), ["lois's"]);
+  assert.deepEqual(possessiveIn(`'davis's novelty order'`), ["davis's"]);
+  assert.deepEqual(possessiveIn('`after ashworth’s hybrid`'), ["ashworth's"]); // curly apostrophe too
+  // callsign possessives are the CORRECT surface form — they never bite:
+  assert.deepEqual(possessiveIn(`"COVER's choice" · 'OVERLAP's proposed moves'`), []);
+  // the A2 code forms carry no possessive, so the exemption stands untouched:
+  assert.deepEqual(possessiveIn(`import { LoisPill } from './LoisPill.jsx'; const loisVerdict = getLoisVerdict();`), []);
+  assert.deepEqual(possessiveIn(`data-persona="davis" data-code={face.code}`), []);
+  // a possessive inside a comment is lineage — stripped before the scan, it passes:
+  assert.deepEqual(possessiveIn(code(`const x = 1; // lois's gait, in a comment only`)), []);
+});
 
 // ── B. the surface scan ──────────────────────────────────────────────────────
 ok('B1: no banned name in display form anywhere in the surface sources', () => {
@@ -314,7 +343,7 @@ ok('B1: no banned name in display form anywhere in the surface sources', () => {
   for (const rel of surfaceFiles()) {
     let text = surfaceText(rel, readFileSync(SRC + rel, 'utf8'));
     for (const a of ALLOWLIST.filter((x) => x.file === rel)) text = text.split(a.exact).join('');
-    const hits = bannedIn(text);
+    const hits = [...bannedIn(text), ...possessiveIn(text)];
     if (hits.length) offenders.push(`${rel}: ${hits.join(', ')}`);
   }
   assert.deepEqual(offenders, [], `banned names on surfaces:\n${offenders.join('\n')}`);
@@ -334,6 +363,18 @@ ok('B4: the registry + shelf producers are in scope — a planted name in either
     assert.ok(files.includes(rel), `${rel} is scanned`);
     const planted = `${readFileSync(SRC + rel, 'utf8')}\nconst plantedNote = 'Joshua Davis approves';\n`;
     assert.deepEqual(bannedIn(surfaceText(rel, planted)), ['Joshua Davis', 'Davis'], `${rel}: the plant bites`);
+  }
+});
+
+ok('B5: a planted lowercase possessive in a named copy-bearing file fails — and the real files are clean', () => {
+  const plants = [
+    ['curator/shelfFill.mjs', `\nconst plantedNote = "lois's choice: planted";\n`, ["lois's"]],
+    ['composition/capabilityRegistry.mjs', `\nconst plantedNote = "davis's pick: planted";\n`, ["davis's"]],
+  ];
+  for (const [rel, plant, want] of plants) {
+    const raw = readFileSync(SRC + rel, 'utf8');
+    assert.deepEqual(possessiveIn(surfaceText(rel, raw)), [], `${rel}: the unmodified file is possessive-clean`);
+    assert.deepEqual(possessiveIn(surfaceText(rel, raw + plant)), want, `${rel}: the plant bites`);
   }
 });
 
