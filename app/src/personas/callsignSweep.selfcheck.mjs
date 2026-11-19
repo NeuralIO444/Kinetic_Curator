@@ -11,6 +11,18 @@
 // surname's possessive ("lois's choice") — an apostrophe-s can never be part of an identifier, a
 // class name or a data id, so wherever it survives the comment strip it is copy (check A6, B5).
 //
+// Round 3 closes the class that escaped twice more: a bare LOWERCASE surname standing as a word
+// in rendered copy ("lois grudge · …", "davis · role deal", "… 3 lois · …"). Lowercase is also
+// the A2 code register (persona ids, keys, class fragments), so a tree-wide lowercase ban would
+// false-positive on data. The scoping: the rule applies to STRING LITERALS ONLY, and only
+// inside a named set of copy-producer files (LITERAL_PRODUCER_FILES, check B6) — modules whose
+// literals are display copy by construction, each annotated with its render path. Inside a
+// literal, a surname counts only when it stands as a prose word: not fused into an id token (a
+// neighbouring word char or one of - . / : exempts it — "davis-role-deal", "lois.vision" and
+// "narration.davisReason" stay data), and a literal that is id-shaped overall is data outright.
+// The rendered producers' actual outputs are pinned too (check C6), so the lines themselves —
+// not just their source files — are held to the standard.
+//
 // Deliberate exclusions, each a ruling not an oversight:
 //   · *.selfcheck.mjs — tests quote the strings they pin; they are not surfaces.
 //   · src/curator/lore.json — an offline-curated provenance artifact (studio/curate-lore.py); its
@@ -47,6 +59,9 @@ import { DOCTRINES } from '../curator/doctrines.mjs';
 import { DIRECTORS_MATRIX } from '../curator/directorsMatrix.js';
 import { CANON_BASELINES } from '../data/canon/baselines.js';
 import { CANON_STYLES } from '../data/canon/styles.js';
+import { CHAPTERS, chapterLooks } from '../data/chapters.js';
+import { GRUDGE_PERMABAN_MIN_CUTS, createGrudgeTally, genreOfLook, grudgeSummary } from '../curator/loisGrudge.mjs';
+import { loisSummary } from '../curator/tasteHead.js';
 import { getPersona } from './registry.mjs';
 
 let checks = 0;
@@ -88,6 +103,142 @@ const POSSESSIVES = SURNAMES.map((s) => {
 export function possessiveIn(text) {
   return POSSESSIVES.filter(({ re }) => re.test(text)).map(({ label }) => label);
 }
+
+// ── the lowercase-word rule (round 3) ────────────────────────────────────────
+/** The static text of every string literal in a comment-stripped source, one entry per
+ *  literal (a template's static segments are joined with '\n', so a word at a segment edge
+ *  still counts as standing). Same state machine shape as code() above: quotes open only in
+ *  expression position, template ${ } interpolations nest back into code (a nested literal
+ *  inside an interpolation is its own entry), regex contents are not literals and are
+ *  skipped. Run it on code()'s output, never on raw source. */
+const literalsOf = (text) => {
+  const lits = [];
+  let i = 0;
+  const n = text.length;
+  let mode = 'code'; // code | sq | dq | tpl | regex
+  let inClass = false;
+  const interp = [];
+  let braces = 0;
+  const stack = []; // open literals: { kind, buf }
+  const exprPosition = () => {
+    const tail = text.slice(0, i).replace(/\s+$/, '');
+    if (!tail) return true;
+    if (tail.endsWith('++') || tail.endsWith('--')) return false;
+    if (tail.endsWith('=>')) return true;
+    const last = tail[tail.length - 1];
+    if ('(,=:[!&|?{;+-*%~^'.includes(last)) return true;
+    const word = tail.match(/[A-Za-z_$][\w$]*$/);
+    return !!word && /^(return|typeof|case|in|of|new|delete|void|instanceof|do|else|yield|await)$/.test(word[0]);
+  };
+  while (i < n) {
+    const c = text[i];
+    const d = i + 1 < n ? text[i + 1] : '';
+    if (mode === 'code') {
+      if (c === "'" && exprPosition()) {
+        stack.push({ kind: 'sq', buf: '' });
+        mode = 'sq';
+        i += 1;
+        continue;
+      }
+      if (c === '"' && exprPosition()) {
+        stack.push({ kind: 'dq', buf: '' });
+        mode = 'dq';
+        i += 1;
+        continue;
+      }
+      if (c === '`') {
+        stack.push({ kind: 'tpl', buf: '' });
+        mode = 'tpl';
+        i += 1;
+        continue;
+      }
+      if (c === '/' && text[i - 1] !== '<' && exprPosition()) {
+        mode = 'regex';
+        inClass = false;
+        i += 1;
+        continue;
+      }
+      if (c === '{') braces += 1;
+      if (c === '}') {
+        if (interp.length && braces === interp[interp.length - 1]) {
+          interp.pop();
+          mode = 'tpl';
+          i += 1;
+          continue;
+        }
+        braces -= 1;
+      }
+      i += 1;
+      continue;
+    }
+    if (mode === 'sq' || mode === 'dq') {
+      const q = mode === 'sq' ? "'" : '"';
+      if (c === '\\' && i + 1 < n) {
+        stack[stack.length - 1].buf += c + text[i + 1];
+        i += 2;
+        continue;
+      }
+      if (c === q) {
+        lits.push(stack.pop().buf);
+        mode = 'code';
+        i += 1;
+        continue;
+      }
+      stack[stack.length - 1].buf += c;
+      i += 1;
+      continue;
+    }
+    if (mode === 'tpl') {
+      if (c === '\\' && i + 1 < n) {
+        stack[stack.length - 1].buf += c + text[i + 1];
+        i += 2;
+        continue;
+      }
+      if (c === '`') {
+        lits.push(stack.pop().buf);
+        mode = 'code';
+        i += 1;
+        continue;
+      }
+      if (c === '$' && d === '{') {
+        stack[stack.length - 1].buf += '\n';
+        interp.push(braces);
+        mode = 'code';
+        i += 2;
+        continue;
+      }
+      stack[stack.length - 1].buf += c;
+      i += 1;
+      continue;
+    }
+    // regex literal: skip until the closing slash outside a [...] class
+    if (c === '\\' && i + 1 < n) {
+      i += 2;
+      continue;
+    }
+    if (c === '[') inClass = true;
+    else if (c === ']') inClass = false;
+    else if (c === '/' && !inClass) mode = 'code';
+    i += 1;
+  }
+  return lits;
+};
+
+const ID_SHAPED = /^[\w.\-/:]+$/; // id charset, no spaces: an id, key, class fragment or event name
+/** Bare lowercase surnames standing as prose words inside ONE string literal. A literal
+ *  that is id-shaped overall is data outright (the A2 hard case: 'lois' as a persona id or
+ *  key). Inside a prose literal, a surname fused into a token — a neighbouring word char or
+ *  one of - . / : — is still data ("davis-role-deal", "narration.davisReason"); bounded by
+ *  whitespace or copy punctuation it is a name on a surface and it bites. */
+export function lowercaseWordIn(literal) {
+  if (ID_SHAPED.test(literal)) return [];
+  return SURNAMES.map((s) => s.toLowerCase()).filter((s) =>
+    new RegExp(`(?<![\\w\\-./:])${s}(?![\\w\\-./:])`).test(literal),
+  );
+}
+
+/** Every banned form inside one literal, all case classes (for the named producer files). */
+const literalHits = (literal) => [...bannedIn(literal), ...possessiveIn(literal), ...lowercaseWordIn(literal)];
 
 /** Strip // and block comments, string-aware: a comment marker inside a string or template
  *  literal is copy, not a comment, so it survives the strip and the scan sees what follows it
@@ -260,6 +411,17 @@ const EXTRA_FILES = [
   'curator/curate.js', // the curator hint line
   'composition/capabilityRegistry.mjs', // consumer notes — rendered in MegaMindPanel's capability table
   'curator/shelfFill.mjs', // fill notes — rendered in ShelfDevPanel's last-fill readout
+  'curator/loisGrudge.mjs', // grudgeSummary — rendered in DataExportRow's Pipeline readout
+];
+// The round-3 lowercase-word rule's scope: files whose string literals are display copy by
+// construction, each with the render path that makes it so. Whole-file scanning stays B1's job;
+// these files additionally have every string literal held to the copy standard (check B6).
+const LITERAL_PRODUCER_FILES = [
+  'curator/loisGrudge.mjs', // grudgeSummary() → DataExportRow's Pipeline readout ({grudgeLine})
+  'curator/tasteHead.js', // loisSummary() → the store's loisStatus → DataExportRow; its import errors → DataExportRow's message line
+  'curator/megamindSurfacesLive.js', // driver error lines → MegaMindPanel's {sv.error} readout
+  'state/slices/davisSlice.js', // shelfNotice producers → ShelfView's notice band
+  'data/helpCopy.js', // help titles + texts → hover title attributes and the ? overlay
 ];
 const ALLOWLIST = [
   {
@@ -336,6 +498,28 @@ ok('A6: lowercase possessives bite — they cannot be code; callsign possessives
   // a possessive inside a comment is lineage — stripped before the scan, it passes:
   assert.deepEqual(possessiveIn(code(`const x = 1; // lois's gait, in a comment only`)), []);
 });
+ok('A7: the lowercase-word rule bites prose words in literals — id-shaped and fused forms stay data', () => {
+  // the three shapes that escaped in the wild:
+  assert.deepEqual(lowercaseWordIn('lois grudge · none — he has cut nothing yet'), ['lois']);
+  assert.deepEqual(lowercaseWordIn('davis · role deal'), ['davis']);
+  assert.deepEqual(lowercaseWordIn('the trio dealt a new stage — 2 consensus · 3 lois · 1 contrarian'), ['lois']);
+  assert.deepEqual(lowercaseWordIn('no davis citation stands'), ['davis']);
+  // the A2 hard cases — persona ids and fused tokens are data, never copy:
+  assert.deepEqual(lowercaseWordIn('lois'), []);
+  assert.deepEqual(lowercaseWordIn('davis'), []);
+  assert.deepEqual(lowercaseWordIn('davis-role-deal'), []);
+  assert.deepEqual(lowercaseWordIn('lois.vision'), []);
+  assert.deepEqual(lowercaseWordIn('narration.davisReason'), []);
+  assert.deepEqual(lowercaseWordIn('davis-label lbl'), []); // a class list: fused, not a name
+  // callsign copy is the correct form and never bites:
+  assert.deepEqual(lowercaseWordIn('COVER grudge · none — he has cut nothing yet'), []);
+  assert.deepEqual(lowercaseWordIn('overlap · role deal'), []);
+  // the extractor sees literals, not code: identifiers and comments contribute nothing.
+  const src = `const lois = getPersona('lois');\nconst line = 'lois grudge · planted'; // davis in a comment\nconst key = \`davis:\${slot}:x\`;`;
+  const lits = literalsOf(code(src));
+  assert.ok(lits.includes('lois grudge · planted'), 'the prose literal is extracted');
+  assert.deepEqual(lits.flatMap((l) => lowercaseWordIn(l)), ['lois'], 'only the prose literal bites');
+});
 
 // ── B. the surface scan ──────────────────────────────────────────────────────
 ok('B1: no banned name in display form anywhere in the surface sources', () => {
@@ -378,6 +562,38 @@ ok('B5: a planted lowercase possessive in a named copy-bearing file fails — an
   }
 });
 
+ok('B6: the named copy-producer files — every string literal is held to the copy standard, all case classes', () => {
+  const offenders = [];
+  for (const rel of LITERAL_PRODUCER_FILES) {
+    for (const lit of literalsOf(code(readFileSync(SRC + rel, 'utf8')))) {
+      const hits = literalHits(lit);
+      if (hits.length) offenders.push(`${rel}: ${hits.join(', ')} in ${JSON.stringify(lit.slice(0, 60))}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `banned names in producer literals:\n${offenders.join('\n')}`);
+});
+ok('B7: loisGrudge is in the surface scan — and planted lowercase copy in a producer file fails', () => {
+  assert.ok(surfaceFiles().includes('curator/loisGrudge.mjs'), 'loisGrudge.mjs is scanned');
+  const plants = [
+    ['curator/loisGrudge.mjs', `\nconst plantedLine = 'lois grudge · planted';\n`, ['lois']],
+    ['state/slices/davisSlice.js', `\nconst plantedLine = 'the trio dealt · 3 lois · planted';\n`, ['lois']],
+    ['data/helpCopy.js', `\nconst plantedTitle = 'davis · planted role';\n`, ['davis']],
+  ];
+  for (const [rel, plant, want] of plants) {
+    const raw = readFileSync(SRC + rel, 'utf8');
+    assert.deepEqual(
+      literalsOf(code(raw)).flatMap((l) => lowercaseWordIn(l)),
+      [],
+      `${rel}: the unmodified file is lowercase-word clean`,
+    );
+    assert.deepEqual(
+      literalsOf(code(raw + plant)).flatMap((l) => lowercaseWordIn(l)),
+      want,
+      `${rel}: the plant bites`,
+    );
+  }
+});
+
 // ── C. the projected data reads in callsigns ─────────────────────────────────
 ok('C1: doctrine readouts — names are callsigns, titles carry no banned name', () => {
   assert.equal(DOCTRINES.carson.name, 'BLAST');
@@ -415,6 +631,39 @@ ok('C5: the Canon records’ display fields (baseline labels, style names) carry
       assert.deepEqual(bannedIn(s.name || ''), [], `style ${s.id} name`);
       assert.deepEqual(bannedIn(s.label || ''), [], `style ${s.id} label`);
     }
+  }
+});
+
+ok('C6: the rendered producers’ actual outputs read in callsigns (grudgeSummary, loisSummary — every branch)', () => {
+  const clean = (line) => {
+    assert.deepEqual(bannedIn(line), [], `banned form in: ${line}`);
+    assert.deepEqual(possessiveIn(line), [], `possessive in: ${line}`);
+    assert.deepEqual(lowercaseWordIn(line), [], `lowercase name in: ${line}`);
+  };
+  // grudgeSummary's three branches, built from the real book like loisGrudge's own suite:
+  let genred = null;
+  for (const c of CHAPTERS) {
+    for (const look of chapterLooks(c.id)) {
+      if (genreOfLook(c.id, look.id) && !genred) genred = { chapterId: c.id, lookId: look.id };
+    }
+  }
+  assert.ok(genred, 'a genred look exists in the real book');
+  const tally = createGrudgeTally({ now: () => 5_000_000 });
+  const none = grudgeSummary(tally.snapshot());
+  tally.noteCut(genred);
+  const tallied = grudgeSummary(tally.snapshot());
+  for (let k = 1; k < GRUDGE_PERMABAN_MIN_CUTS; k++) tally.noteCut(genred);
+  const banned = grudgeSummary(tally.snapshot());
+  for (const line of [none, tallied, banned]) {
+    assert.ok(line.startsWith('COVER grudge · '), `grudge line reads COVER: ${line}`);
+    clean(line);
+  }
+  // loisSummary's branches (the Pipeline status line in the same readout):
+  const untrained = loisSummary(null);
+  const trained = loisSummary({ lois: { labels: { favorites: 12, keeps: 28 }, head: { fidelity: 0.62 } } });
+  for (const line of [untrained, trained]) {
+    assert.ok(line.startsWith('COVER · '), `taste line reads COVER: ${line}`);
+    clean(line);
   }
 });
 

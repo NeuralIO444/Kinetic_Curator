@@ -175,6 +175,80 @@ personaKernel 10/10, personaTuning 11/11, doctrines 10/10; `npm run lint` 0 erro
 `npm run format:check` clean; `npm run build` green. The two open questions below are still
 untouched, as instructed.
 
+### QA fix round 3 (final sweep — the bare-lowercase class, closed exhaustively)
+
+Round 2's re-grep covered possessives and the named files, but the class had one more shape:
+a bare lowercase surname standing as a word in rendered copy, in files the guard never named.
+QA flagged `curator/loisGrudge.mjs` — `grudgeSummary()`'s three lines ("lois grudge · none —
+…") render in `DataExportRow.jsx`'s Pipeline readout. This round fixes that file, closes the
+class with a scoped guard extension, and re-greps the whole tree exhaustively.
+
+1. **The flagged file.** `grudgeSummary()`'s three branches now read "COVER grudge · …"
+   (wording otherwise byte-identical; display only, no logic changed). `loisGrudge.mjs` joins
+   the guard's named scan set (EXTRA_FILES) with its render path annotated.
+2. **Four more rendered instances the exhaustive pass found** — same class, each chased to a
+   render site:
+   - `curator/tasteHead.js` — `loisSummary()`'s two lines ("lois · not trained — …", "lois ·
+     N favorites / …") render as the store's `loisStatus` in the same DataExportRow readout
+     → "COVER · …". Its import-validation error prefix ("lois: …") also renders, via
+     DataExportRow's `Taste: {error}` message, on a malformed taste file → renamed by
+     function, "boldness head: …" (the head is the boldness probe; the taste file's `lois`
+     section key itself is data and stays).
+   - `data/helpCopy.js` — the help title "davis · role deal" (hover titles + the ? overlay;
+     its `text` was already swept in round 1) → "overlap · role deal", the lowercase
+     callsign register the ROOM tiles use. The entry id `davis-role-deal` stays (data).
+   - `state/slices/davisSlice.js` — the trio-deal summary that lands in `shelfNotice`
+     (ShelfView's notice band): "… · 3 lois · …" → "… · 3 cover · …". The `dealtByRule.lois`
+     count key is data and stays.
+   - `curator/megamindSurfacesLive.js` — the thrown error "no Davis citation stands (…)"
+     renders in MegaMindPanel's `{sv.error}` line ("discarded / unavailable — reason: …")
+     → "no OVERLAP citation stands (…)".
+3. **The guard now bites the class, scoped so code stays green.** New rule (`lowercaseWordIn`,
+   checks A7/B6/B7): string literals only, and only inside a named set of copy-producer files
+   (LITERAL_PRODUCER_FILES — loisGrudge, tasteHead, megamindSurfacesLive, davisSlice,
+   helpCopy — each annotated with its render path). Inside a literal, a surname bites only
+   standing as a prose word: a literal that is id-shaped overall is data outright, and a
+   surname fused into a token (neighbouring word char or `- . / :` — "davis-role-deal",
+   "lois.vision", "narration.davisReason") stays data. That is the A2 hard case — persona ids
+   as keys/values — and A7 pins both directions. B6 holds every literal of the five files to
+   all case classes; B7 plant-proves the bite in three of them against their real content;
+   C6 pins the rendered producers' actual outputs (grudgeSummary's three branches built from
+   the real book, loisSummary's two) — every output starts with the callsign and carries no
+   banned form in any class. Suite is now 20 checks.
+4. **The exhaustive closing pass.** Every string literal in `app/src` was extracted from
+   comment-stripped source (plus a JSON walk) and tested for the seven surnames in every case
+   form: **1,369 hits** — 942 in `*.selfcheck.mjs` (test fixtures quoting/pinning strings;
+   not surfaces) and **427 in production files**, classified:
+   - **281 id-shaped literals** — persona ids (`'lois'`, `'davis'`, `'carson'`…), CSS class
+     fragments, event/key strings (`'lois.vision'`, `'narration.davisReason'`). Data (A2).
+   - **146 prose literals**: 63 CSS class-name strings (not text) · 19 persona-record lineage
+     slots + record prose (records are lineage; their surface projections are pinned in
+     C1/C2/C4) · 13 internal keys/seed strings (creatureRig, davisShift) · 10 headless
+     tooling report lines (miner/prospecting/coverageReport — script output, no app surface
+     consumes the text; CensusPanel renders censusReadout's reshaped data, which carries no
+     names) · 9 model prompts (never rendered — the standing exclusion) · 4 eventRegistry
+     note strings (round 1's documented exclusion — code-side documentation, no rendering
+     consumer) · 3 renderProfiles config records (name/rationale/gaps — no render consumer;
+     CuratorBar passes the profile as data) · 3 Canon-record lineage prose (figures/basis;
+     display fields pinned in C5) · 3 megamindRecap literals (two model prompts + one
+     already-callsign rendered line; its fact-matching `forms` values are single-token data,
+     counted in the id-shaped 281, and its rendered phrases are pinned in C4) ·
+     1 palettes `era:` field (dropped, no consumer) · 1 GLSL shader source · 1 bundle
+     LEFT_OUT storage-key documentation string (bundle metadata, never displayed) ·
+     **9 rendered — the 9 strings fixed in items 1–2 above** · **7 rendered exceptions, NOT
+     touched**: lore.json's 6 fact strings and the signed "You're welcome, George." (the two
+     open questions below).
+
+**Evidence (round 3):** `callsignSweep.selfcheck` 20/20 on the fixed tree; on-disk plant
+test — appending `'lois grudge · planted'` to `loisGrudge.mjs` fails the suite at B6 naming
+the file and token, restoring the file returns 20/20; affected suites green — loisGrudge ok,
+tasteHead OK, helpCopy OK, shelfFill/shelfDisk/shelf/shelfCensus PASS, shelfView PASS (11
+groups), shelfPersist ok, megamindRecap 12/12, megamindVoice 17/17, megamindLink 21/21,
+doctrines 10/10, personaKernel 10/10, personaTuning 11/11, pipelineNotices PASS, bundleFile
+5/5, directorRoom 7/7, directorTable 6/6, directorsMatrix 6/6; `npm run lint` 0 errors (11
+pre-existing warnings); `npm run format:check` clean; `npm run build` green. The two open
+questions below are still untouched, as instructed.
+
 ## Open questions stopped on
 
 1. lore.json's rendered facts naming George Lois / Lois / Davis (item 1 above) — needs Matt's ruling; not rewritten.

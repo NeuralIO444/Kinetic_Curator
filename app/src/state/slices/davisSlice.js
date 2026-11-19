@@ -1357,7 +1357,7 @@ export const createDavisSlice = (set) => {
         persistStage(res.stageIds);
         const c = res.receipt.dealtByRule;
         const summary =
-          `the trio dealt a new stage — ${c.consensus} consensus · ${c.neglected} neglected · ${c.wild} wild · ${c.lois} lois · ${c.contrarian} contrarian` +
+          `the trio dealt a new stage — ${c.consensus} consensus · ${c.neglected} neglected · ${c.wild} wild · ${c.lois} cover · ${c.contrarian} contrarian` +
           (importRecs.length ? ` · ${importRecs.length} from disk` : '');
         return {
           ...pushToUndo(state, true, UNDO_KIND_SHELF),

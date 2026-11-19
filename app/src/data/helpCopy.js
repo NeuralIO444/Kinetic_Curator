@@ -427,7 +427,7 @@ export const HELP_TOPICS = [
   {
     id: 'davis-role-deal',
     group: 'Directors',
-    title: 'davis · role deal',
+    title: 'overlap · role deal',
     text: 'On: OVERLAP deals a creature’s parts by fit — the best body-shaped shapes in the pile become the body, the best limb-shaped become limbs. Off: the older deal, parts by seed alone.',
   },
 ];
