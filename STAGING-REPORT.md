@@ -1,6 +1,6 @@
 # STAGING REPORT — #2382 Persona Kernel P2: Persona tuning table — `kc-persona-tuning/1`
 
-Branch `kc-2382-persona-tuning`, based on origin/main `1bc67ad9` (includes the merged P1 kernel, PR #2404). One PR, not merged by the builder. (PR number/URL appended in a follow-up commit once the PR is open.)
+Branch `kc-2382-persona-tuning`, based on origin/main `1bc67ad9` (includes the merged P1 kernel, PR #2404). One PR, not merged by the builder: **PR #2406 — https://github.com/NeuralIO444/Kinetic_Curator/pull/2406**
 
 ## ⚠ OPEN QUESTION — flagged, not decided (needs Matt / P7)
 
