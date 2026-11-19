@@ -25,9 +25,12 @@
 
 import { extractFeatures } from './taste.js';
 import { scoreLoisHeuristic, loisVerdict } from './loisRank.js';
+import { personaTuning, TUNING_DEFAULTS } from '../personas/tuning.mjs';
 
-/** The gates, in loisVerdict's own order and at its own thresholds (#1856: the cut is the pan, spent). */
-export const LOIS_CUT_GATES = Object.freeze({ glance: 0.28, originality: 0.22, boldness: 0.3 });
+/** The gates, in loisVerdict's own order and at its own thresholds (#1856: the cut is the pan, spent).
+ * #2382: the thresholds live in the persona tuning table (personas/tuning.json, `kc-persona-tuning/1`);
+ * this export is the shipped value, and judgeDeal reads the table in force so a DEV edit is live. */
+export const LOIS_CUT_GATES = TUNING_DEFAULTS.personas.lois.knobs.cutGates;
 
 const GATE_ORDER = Object.freeze(['glance', 'originality', 'boldness']);
 
@@ -58,12 +61,13 @@ export function judgeDeal(dealParams, deckParams) {
   if (!dealParams || deck.length === 0) return { cut: false, parts: null, gate: null, reason: '' };
   const mean = meanOf(deck.map((p) => extractFeatures(p)));
   const parts = scoreLoisHeuristic(extractFeatures(dealParams), mean);
+  const gates = personaTuning().personas.lois.knobs.cutGates;
   for (const key of GATE_ORDER) {
-    if (parts[key] < LOIS_CUT_GATES[key]) {
+    if (parts[key] < gates[key]) {
       return {
         cut: true,
         parts,
-        gate: { key, value: parts[key], limit: LOIS_CUT_GATES[key] },
+        gate: { key, value: parts[key], limit: gates[key] },
         reason: loisVerdict(parts),
       };
     }

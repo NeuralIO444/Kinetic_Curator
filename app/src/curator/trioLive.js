@@ -20,8 +20,8 @@ import {
   SPECTRUM_PARAMS,
   spectrumTarget,
   ownableTargets,
-  BRAKE_AT,
 } from './mindConduct.js';
+import { personaTuning } from '../personas/tuning.mjs';
 import { DEFAULT_ROUTES } from '../gl/audioRoutes.mjs';
 
 /** Which dial of the artist's belongs to which route target: moving it by hand owns the target (decision 3). */
@@ -164,7 +164,7 @@ export function startTrio({
       flatBy: flatness.reading().source, // 'spectrum' | 'bands' | null — what LOIS is judging the show on
       flatWhy: flatness.why(),
       bias,
-      brake: bias >= BRAKE_AT,
+      brake: bias >= personaTuning().personas.lois.knobs.brake.at,
       tier,
       cooling: conductor.cooling(bar),
       owned: conductor.owned(bar),
@@ -546,8 +546,8 @@ export function startTrio({
         silent: audio.silent,
         sinceBars: audio.sinceBars,
         flatBars: flatness.flatBars(),
-        // LOIS's brake: passes piling up — he holds Davis to the safe moves until keeps come back (mindConduct BRAKE_AT)
-        ...(bias >= BRAKE_AT ? { brake: true } : {}),
+        // LOIS's brake: passes piling up — he holds Davis to the safe moves until keeps come back (the tuning table's brake.at, #2382)
+        ...(bias >= personaTuning().personas.lois.knobs.brake.at ? { brake: true } : {}),
         routes: effective(getRoutes()).map((r) => ({
           input: r.input,
           target: r.target,

@@ -1,77 +1,53 @@
-# STAGING REPORT — #2381 Persona Kernel P1: `kc-persona/1` records + registry
+# STAGING REPORT — #2382 Persona Kernel P2: Persona tuning table — `kc-persona-tuning/1`
 
-Branch `kc-2381-persona-kernel`, based on origin/main `2f706d51`. One PR, not merged by the builder:
-**PR #2404 — https://github.com/NeuralIO444/Kinetic_Curator/pull/2404**
+Branch `kc-2382-persona-tuning`, based on origin/main `1bc67ad9` (includes the merged P1 kernel, PR #2404). One PR, not merged by the builder. (PR number/URL appended in a follow-up commit once the PR is open.)
+
+## ⚠ OPEN QUESTION — flagged, not decided (needs Matt / P7)
+
+**The band fields have no measured values anywhere in the repo.** The issue's table shape names per-persona band fields (solo length in phrases, step cap, agree/disagree/lay-out odds, heat, answer order), per-relation agreement biases, and band fields (trade rate, max horns per call, bandleader cut rule) — but the band itself is P7 (issue 2387), unbuilt, and no numbers for any of these exist in code, docs, or the epic (2379). Inventing values would have been deciding an open question silently, so:
+
+- The table ships those fields as **`null` — explicitly unruled, not zero**. The validator requires odds to be either all-null or all-numbers summing to 1, relations null or in [-1, 1].
+- The DEV panel lists unruled fields as text, **not editable**; `setTuningValue` refuses edits to null leaves ("the rig tunes ruled numbers only").
+- Everything that *does* have a measured value today is in the table with that exact value (below), and behaviour is byte-identical (proof below).
+
+P7 or Matt must rule the band numbers before anything reads them. Nothing in this PR reads a null field.
 
 ## What was built
 
-- **`app/src/personas/` — 18 pure record modules**, one per persona, each exporting a single `record`
-  in the `kc-persona/1` shape (spec §2): `lois`, `davis`, `queen`, `governor` (the cast), `carson`,
-  `greiman`, `ashworth` (doctrines), `te` (kind `voice`, the third Mind persona), `taste` (kind `judge`,
-  owns hierarchy), and the ten voice personas whose tastes `personaTastes.js` used to carry inline
-  (`davis` + `molnar`, `mohr`, `benjamin`, `reas`, `haeckel`, `oxman`, `stock`, `anadol`, `menkman`).
-  Slots filled only where the tree already states the fact: identity (real name, ISO dates, provenance,
-  surface callsign — `null` for the QUEEN and the GOVERNOR, who are never named), lens, taste (the
-  19-feature weights + rationale + Canon style id where one exists in the Canon: HAECKEL → `engraved`;
-  personas without a Canon style carry `null` — no mapping was invented), principle, lexicon (a pointer
-  to signed copy — no new lines), states, power, head, relations, and a `doctrine` slot for the three
-  doctrines.
-- **`app/src/personas/registry.mjs`** — gathers the records, deep-freezes them, and validates every
-  record against the schema (`validatePersonaRecord` / `validatePersonaRegistry`, exported). Validation
-  problems are data (`PERSONA_PROBLEMS`), not a throw at import: the selfcheck pins the list empty, so
-  drift fails the suite and CI rather than breaking the live instrument.
-- **`curator/personaTastes.js` and `curator/doctrines.mjs` are now readers of the registry.** Their
-  exports keep the same names, shapes, values and freezing as before (see the deep-equal proof below).
-  GREIMAN's record carries her doctrine slot from day one, but `doctrines.mjs` deliberately projects
-  only CARSON and ASHWORTH — she joins `DOCTRINES` in P5, so `DOCTRINE_IDS`, `isDoctrine('greiman')`
-  and `doctrineOfMode('greiman')` are exactly what they were.
-- **`app/src/personas/personaKernel.selfcheck.mjs`** (new suite, added to `app/selfcheck.manifest`):
-  schema/drift validation incl. a "validator bites" test, the cast and kinds, the callsign law, the
-  tastes/doctrines reader projections, weight keys ⊆ the 19 features, Canon style ids resolve, and
-  **`docs/characters/*.md` names/dates match the records** (dates parsed out of the four character
-  files and compared against the records' ISO dates). 10 checks, all passing.
+- **`app/src/personas/tuning.json`** — the table, schema `kc-persona-tuning/1`. Per-persona sections for the seven band seats (lois, davis, queen, governor, carson, greiman, ashworth): the five band fields (all null, above) plus a `knobs` sub-object where the persona has live measured numbers today (lois, davis, queen only). `relations`: all 42 directed seat pairs (`"a->b"`, all null). `band`: `tradeRate`, `maxHornsPerCall`, `bandleaderCut` (all null).
+- **`app/src/personas/tuning.mjs`** — loader + validator + the DEV live-edit rig. `TUNING_DEFAULTS` (the shipped table, deep-frozen), `personaTuning()` (the effective table: shipped defaults with session overrides applied, cached, deep-frozen), `tuningValue(path)`, `tuningDefault(path)`, `tuningOverrides()`, `setTuningValue(path, value)`, `resetTuning()`, `onTuningChange(fn)`. Validator tags: `prob` [0,1], `probPos` (0,1] for divisor leaves, `count` integer ≥ 0, `num` finite ≥ 0, `range` [lo,hi] with 0 ≤ lo < hi, `opener` {key ∈ scale|displace|colour, value prob}; an edit lands only if the whole effective table still validates. Overrides live in a memory-only Map: **never persisted, never written into a project, reload restores shipped defaults** (the module imports only `./tuning.json` — no store, no storage; pinned by the selfcheck).
+- **`app/src/panels/PersonaTunePanel.jsx` + `personatune` DEV tab** (`src/panels/devTabs.mjs`, React.lazy like the other tabs) — "PERSONA TUNE". One row per numeric knob leaf (numbers, [lo,hi] ranges as two inputs, opener amounts), an edited marker (●), a Reset button, and the unruled band/relation fields shown as text. Seat headings use band roles from `TUNING_SEAT_ROLES` (ARRANGER · COVER, LEAD SOLOIST · OVERLAP, RHYTHM SECTION, BANDLEADER, HORN · BLAST/HYBRID/SWISS GRIT) — callsigns/roles only, per the deniability law.
+- **`app/src/personas/personaTuning.selfcheck.mjs`** (10 checks, added to `app/selfcheck.manifest`): shipped table validates and is frozen; exact shape; today's measured values pinned literally; band fields null; module exports equal table values; the validator bites on 8 malformed tables; live-edit behaviour (below); refused edits change nothing; no-persistence pin.
 
-## Deep-equal proof (acceptance)
+## Every hard-coded site routed through the table
 
-Method: a scratch harness in /tmp (not in the tree) imports `curator/personaTastes.js` and
-`curator/doctrines.mjs` from a tree root and dumps canonical JSON of `TASTE_FEATURES`, `PERSONA_TASTES`,
-`personaTasteIds()`, `getPersonaTaste()` for every id (+ a missing id), `DOCTRINES`, `DOCTRINE_IDS`,
-`isDoctrine` over a probe set, `doctrineMode` over representative draws (incl. standing-mode and
-unknown-doctrine cases), `doctrineOfMode` over all modes, and the frozen-ness of `DOCTRINES`, its
-entries, its mode arrays and `DOCTRINE_IDS`.
+Exported constants are now **defined from `TUNING_DEFAULTS`**, so existing importers and source pins see identical values; live consumers read `personaTuning()` per call so a DEV edit lands without reload.
 
-- Before: dumped from the pristine worktree at origin/main `2f706d51` before any edit.
-- After: dumped from the finished branch (and re-dumped after prettier formatting).
-- Result: **`diff` of before/after dumps is empty — byte-identical**, both times.
+- **`curator/mindConduct.js`** — LOIS brake `BRAKE_AT` 0.5 / `BRAKE_MAX` 0.4; flat read `FLAT_BIAS_SWING` 0.5, `FLUX_HELD` 0.05, `NOISE_FLAT` 0.9, plus flatBias's happy-keep rate and full-strength roll count read live from `flatRead`; Davis `BACKOFF_REVERTS` 3, `BACKOFF_BARS` 32, `DAVIS_MAX_ROUTES` 3, `BOLD_BAND` 0.5, `SPECTRUM_OPENERS` {low/mid/high}.
+- **`curator/loisCut.mjs`** — `LOIS_CUT_GATES` {glance 0.28, originality 0.22, boldness 0.30}; `judgeDeal` reads the gates from the table in force.
+- **`curator/queenLean.mjs`** — `MIN_KEEPS` 8 and the M1–M8 magnitudes: M1 bias 0.06 / proximity 0.72; M2 t0 0.4 / slope 0.15 / cap 0.55 / floor 0.4; M3 drift 0.1; M4 arm 40 ms / hold 0.08; M5 gain peak 1.18; beat confidence 0.62; M6 keeps 3 / strength 0.35; M7 confidence 0.6 / step 3 / deadband 2 / range [60, 180]; M8 wet step 0.05 / wet deadband 0.02 / evolve range [200, 10000] / evolve step 250 / evolve deadband 100.
+- **`curator/trioLive.js`** — the two `bias >= BRAKE_AT` comparisons now read `personaTuning().personas.lois.knobs.brake.at` live (the `BRAKE_AT` import is gone).
+- **`curator/director.js`** — five sites read the Queen knobs live via `queenKnobs()`: `MIN_KEEPS` ×3, the M2 floor in `deriveSway`, the M8 evolve range in `leanDialSteps`, the M2 span in `conductHeat`.
+
+Deliberately **not** in the table (structural law / content, not tuning): `PHRASE_BARS` 4 (the chart), `OWN_PHRASES` 8 (artist sovereignty), the one-cut law, Davis's `PRESETS` (repertoire = content), `TIER_OPS`, the 16-route table cap. The perf-governor frame budgets already have GOV TUNE as their live surface and are untouched; `chapterMemory`'s own `CHAPTER_MEMORY_MIN_KEEPS = 8` is a deliberate cross-pinned copy, left untouched.
+
+## Byte-identical proof
+
+Method: a probe (`persona-probe2.mjs`) that dumps canonical JSON of **every exported constant** of mindConduct / loisCut / queenLean / director, plus behaviour grids — davisRoute over 19 shows × 7 seeds × 5 heats, davisSpectrum over 9 shows × 7 seeds, flatBias and boldBand grids, createFlatness sequences (default + custom), judgeDeal over **every look of every chapter deck**, the Queen mechanics (M1–M9) over input grids, and the director sites (deriveSway, leanDialSteps, conductHeat, directorGains, nextDebt, presenceScale, pullKeeps, keptAnchor).
+
+Result: run against a pristine detached checkout of the base (`1bc67ad9`) and against this branch — **127,088 bytes of canonical JSON, `diff` clean: IDENTICAL.** (An earlier probe run pre-format was also identical; the proof was re-run end-to-end on the final tree after a sandbox restart lost the first probe files, with the probe rebuilt to the same grids.)
+
+## DEV live-edit — how it works, how it was verified
+
+`setTuningValue(path, value)` validates the candidate effective table as a whole; on success it stores the override in the session Map, invalidates the cached effective table, and notifies `onTuningChange` listeners. Consumers that read through `personaTuning()` per call (judgeDeal, flatBias, the trioLive brake comparisons, the director's Queen sites) pick the edit up on their next call — no reload. The panel edits through the same function and re-renders from `personaTuning()`.
+
+Verified in `personaTuning.selfcheck` D2/D3: raising `lois.knobs.brake.max` 0.4 → 1 changes the davisRoute pick on the same show/seed; setting the cut gates to 0 removes all cuts across every chapter deck; `resetTuning()` restores the shipped behaviour exactly; edits to unruled (null) leaves, unknown paths, and invalid values are refused and change nothing. The Queen cross-pin (exports == table values, a live m2.t0 edit, reset) lives in `queenLean.selfcheck` (30 checks), placed there because the deniability scan forbids other suites from naming her module.
 
 ## Verification (publish ritual, all in the worktree's `app/`)
 
-- `npm install`: done (the one-line `package-lock.json` churn it produced was reverted — not this change).
-- Full selfcheck sweep (continue-on-error over the whole manifest, Playwright chromium installed first):
-  **752 pass / 3 fail**. The same sweep on the pre-change base was 751 pass / 3 fail (the +1 is the new
-  personaKernel suite). The 3 failures are the known sandbox-environmental signatures, each **re-run and
-  confirmed failing identically on a clean detached checkout of origin/main `2f706d51`**:
-  `swarmWasm` (no Rust toolchain/cargo in the sandbox, exit 1), `rollSafety` (headless Playwright crash,
-  exit 1), `accum` (V8 heap OOM abort, exit 134, identical stack frames). None is from this change.
-- `npm run lint`: **0 errors** (11 warnings, all pre-existing, none in touched files).
-- `npm run format:check`: **pass** (the new files were prettier-formatted; deep-equal re-proven after).
-- `npm run build`: **pass** (only the pre-existing ineffective-dynamic-import warnings).
-- Manifest validation via `scripts/runSelfcheck.mjs`'s own `manifestProblems`: **no problems**; the new
-  suite is listed exactly once.
-
-## Not done (by design)
-
-- No behaviour change anywhere: no surface strings re-pointed (the callsign sweep is P3), no tuning
-  table (P2), GREIMAN not wired into `DOCTRINES` (P5), no Archive (P4).
-- No character files were edited; TE and TASTE got records only, per spec §5 (no new character files,
-  no copy).
-
-## Open questions / notes for the coordinator
-
-- **GREIMAN's full name and dates appear nowhere in the repo.** Her record names her `Greiman` with a
-  provenance saying exactly that; the Archive phase (spec §4b: backstories are sourced fact, never
-  invented) is the place to source them. Dates for CARSON and ASHWORTH are likewise unstated in the
-  repo and are `null` in their records. Not a blocker for P1 — the schema requires `identity`, and
-  `born`/`died` are nullable by design — but flagging it rather than filling it in from memory.
-- The voice personas' records carry `born`/`died` as `null` for the same reason: neither
-  `personaTastes.js` nor the persona source files state dates.
+- **Full selfcheck sweep** (continue-on-error manifest loop): **753 pass / 3 fail**. The 3 failures are the known sandbox-environmental ones, each **confirmed failing identically on the pristine base checkout** (`1bc67ad9`): `swarmWasm` ("build-wasm: cargo not found on PATH"), `accum` (V8 "JavaScript heap out of memory", exit 134), `rollSafety` (Playwright `page.evaluate: Target crashed`). New suite `personaTuning`: 10/10. Targeted suites all green, incl. personaKernel 10, mindConduct 30, loisCut 5, trioLive 37, director 25, queenLean 30, queenDeniability 7, casingInCss ok, devPanel 12 lazy tabs, panelGraph 734 modules.
+- **`npm run lint`**: 0 errors, 11 warnings — all pre-existing, all in files this PR does not touch.
+- **`npm run format:check`**: pass (all files Prettier-clean).
+- **`npm run build`**: pass (only the pre-existing ineffective-dynamic-import warnings).
+- Deniability/casing fixes the suites demanded during the build: the panel contains no forbidden identifier string anywhere (role labels only), and no `.toUpperCase()` in JSX (display case lives in `TUNING_SEAT_ROLES`, per the casing law). `HotkeyOverlay.jsx`'s prose tab list and `devPanel.selfcheck`'s tab list were extended with the new tab.
+- `package-lock.json` churn from `npm install` was reverted; it is not part of this change.

@@ -29,15 +29,23 @@
 //                     no stacking
 import { GATE_OPEN } from './queenChannel.js';
 import { extractFeatures } from './taste.js';
+import { personaTuning, TUNING_DEFAULTS } from '../personas/tuning.mjs';
 
 const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 
+// #2382: every magnitude in this module lives in the persona tuning table (personas/tuning.json,
+// `kc-persona-tuning/1`, spec §3c). The exported constants below are the SHIPPED values — what existing
+// importers and pins read — while the mechanics read the table in force through qk(), so a DEV-mode edit
+// moves the live value without a reload. With no edits in force the two are the same numbers.
+const QK_DEFAULTS = TUNING_DEFAULTS.personas.queen.knobs;
+const qk = () => personaTuning().personas.queen.knobs;
+
 /** v1 anchor: the keeps that already exist. Below this she is identity. */
-export const MIN_KEEPS = 8;
+export const MIN_KEEPS = QK_DEFAULTS.minKeeps;
 
 // ─── M1: nod-easing → rankLois bias ──────────────────────────────────────
-export const M1_BIAS = 0.06;
-export const M1_PROXIMITY = 0.72;
+export const M1_BIAS = QK_DEFAULTS.m1.bias;
+export const M1_PROXIMITY = QK_DEFAULTS.m1.proximity;
 
 /** Cosine proximity of two 0..1 feature maps. */
 export function proximity(a, b) {
@@ -85,6 +93,7 @@ export function rankBiases(candidates, centroid) {
   const n = candidates ? candidates.length : 0;
   const out = new Array(n).fill(0);
   if (!centroid || n === 0) return out;
+  const k = qk();
   for (let i = 0; i < n; i++) {
     let p = 0;
     try {
@@ -92,7 +101,7 @@ export function rankBiases(candidates, centroid) {
     } catch {
       p = 0;
     }
-    out[i] = p >= M1_PROXIMITY ? M1_BIAS : 0;
+    out[i] = p >= k.m1.proximity ? k.m1.bias : 0;
   }
   return out;
 }
@@ -126,10 +135,10 @@ export function applyRankBias(scores, biases) {
 }
 
 // ─── M2: temperature warming ─────────────────────────────────────────────
-export const M2_T0 = 0.4;
-export const M2_SLOPE = 0.15;
-export const M2_CAP = 0.55;
-export const M2_FLOOR = 0.4;
+export const M2_T0 = QK_DEFAULTS.m2.t0;
+export const M2_SLOPE = QK_DEFAULTS.m2.slope;
+export const M2_CAP = QK_DEFAULTS.m2.cap;
+export const M2_FLOOR = QK_DEFAULTS.m2.floor;
 
 /**
  * Warmed softmax temperature from audio richness 0..1.
@@ -137,12 +146,13 @@ export const M2_FLOOR = 0.4;
  * which lands exactly on the floor. Never below floor, never above cap.
  */
 export function warmedTemperature(richness) {
+  const { t0, slope, cap, floor } = qk().m2;
   const r = clamp01(richness);
-  return Math.min(M2_CAP, Math.max(M2_FLOOR, M2_T0 + M2_SLOPE * r));
+  return Math.min(cap, Math.max(floor, t0 + slope * r));
 }
 
 // ─── M3: palette gravity ─────────────────────────────────────────────────
-export const M3_DRIFT = 0.1;
+export const M3_DRIFT = QK_DEFAULTS.m3.drift;
 
 /**
  * Most-kept palette id (mode; first max wins ties — deterministic).
@@ -174,12 +184,12 @@ export function keptPaletteId(keeps) {
 export function paletteDriftTarget(keeps, beatConfident) {
   if (!beatConfident) return null;
   const id = keptPaletteId(keeps);
-  return id ? { paletteId: id, weight: M3_DRIFT } : null;
+  return id ? { paletteId: id, weight: qk().m3.drift } : null;
 }
 
 // ─── M4: beat-sway (phrase timing) ───────────────────────────────────────
-export const M4_ARM_MS = 40;
-export const M4_HOLD_PCT = 0.08;
+export const M4_ARM_MS = QK_DEFAULTS.m4.armMs;
+export const M4_HOLD_PCT = QK_DEFAULTS.m4.holdPct;
 
 /**
  * Phrase-timing lean at beat confidence, loop-time only. Arm the phrase up
@@ -188,11 +198,12 @@ export const M4_HOLD_PCT = 0.08;
  * the beat length). All zeros when not confident.
  */
 export function phraseTiming(beatConfident) {
-  return beatConfident ? { armEarlyMs: M4_ARM_MS, holdPct: M4_HOLD_PCT } : { armEarlyMs: 0, holdPct: 0 };
+  const { armMs, holdPct } = qk().m4;
+  return beatConfident ? { armEarlyMs: armMs, holdPct } : { armEarlyMs: 0, holdPct: 0 };
 }
 
 // ─── M5: the lean-in ─────────────────────────────────────────────────────
-export const M5_GAIN_PEAK = 1.18;
+export const M5_GAIN_PEAK = QK_DEFAULTS.m5.gainPeak;
 
 /**
  * Reactivity gain on audio/MIDI return: 1.18 at the return, relaxing
@@ -203,25 +214,32 @@ export const M5_GAIN_PEAK = 1.18;
 export function reactivityGain(returned, phraseProgress) {
   if (!returned) return 1.0;
   const p = clamp01(phraseProgress);
-  return 1 + (M5_GAIN_PEAK - 1) * (1 - p);
+  return 1 + (qk().m5.gainPeak - 1) * (1 - p);
 }
 
 // ─── beat confidence ─────────────────────────────────────────────────────
 // Detector confidence ≥ 0.62 across two attacks. Attacks arrive as peaks;
 // this module does not detect them (the beat path does) — it judges them.
-export const BEAT_CONFIDENCE = 0.62;
+export const BEAT_CONFIDENCE = QK_DEFAULTS.beatConfidence;
 
 /** True when the last two recorded attack peaks both clear the bar. */
 export function beatConfidentFromPeaks(peaks) {
   if (!Array.isArray(peaks) || peaks.length < 2) return false;
   const [a, b] = peaks.slice(-2);
-  return a >= BEAT_CONFIDENCE && b >= BEAT_CONFIDENCE;
+  const bar = qk().beatConfidence;
+  return a >= bar && b >= bar;
 }
 
 // ─── gated composite ─────────────────────────────────────────────────────
-/** All-zero sway: she is not leaning. */
+/** All-zero sway: she is not leaning. (The shipped snapshot; the live neutral is built from the table in force.) */
 export const NEUTRAL_SWAY = Object.freeze({
   temperature: M2_T0,
+  palette: null,
+  phrase: Object.freeze({ armEarlyMs: 0, holdPct: 0 }),
+  reactivity: 1.0,
+});
+const neutralSway = () => ({
+  temperature: qk().m2.t0,
   palette: null,
   phrase: Object.freeze({ armEarlyMs: 0, holdPct: 0 }),
   reactivity: 1.0,
@@ -234,7 +252,7 @@ export const NEUTRAL_SWAY = Object.freeze({
  */
 export function swayOpen(keeps, signals) {
   const list = Array.isArray(keeps) ? keeps : [];
-  if (list.length < MIN_KEEPS) return NEUTRAL_SWAY;
+  if (list.length < qk().minKeeps) return neutralSway();
   const s = signals || {};
   const beatConfident = beatConfidentFromPeaks(s.attackPeaks);
   // M5 never fires on FILE/unsupported/denied — only a live return counts.
@@ -256,7 +274,7 @@ export function swayOpen(keeps, signals) {
  * via rankBiases() + applyRankBias(), not here.
  */
 export function swayBiases(keeps, signals) {
-  if (!GATE_OPEN) return NEUTRAL_SWAY;
+  if (!GATE_OPEN) return neutralSway();
   return swayOpen(keeps, signals);
 }
 
@@ -277,8 +295,8 @@ export function trace(...args) {
 // remembered in a session ring (never saved, never replayed from a file: the traits ride the resolver input like
 // Davis's own). A moth born later is rolled around a CENTRE nudged from the default toward the mean of those, by
 // M6_STRENGTH x the room's allowance. Identity below MIN_KEEPS keeps and while the gate is closed. Surfaces nothing.
-export const M6_KEEPS = 3;
-export const M6_STRENGTH = 0.35;
+export const M6_KEEPS = QK_DEFAULTS.m6.keeps;
+export const M6_STRENGTH = QK_DEFAULTS.m6.strength;
 
 /**
  * Ungated: the centre for one birth, or null for "no nudge".
@@ -287,11 +305,12 @@ export const M6_STRENGTH = 0.35;
  * @param allowance  the room's allowance 0..1
  */
 export function warmCentreOpen(ring, defaults, allowance, nKeeps = Infinity) {
-  if (!(nKeeps >= MIN_KEEPS) || !Array.isArray(ring)) return null;
-  const a = clamp01(allowance) * M6_STRENGTH;
+  const k = qk();
+  if (!(nKeeps >= k.minKeeps) || !Array.isArray(ring)) return null;
+  const a = clamp01(allowance) * k.m6.strength;
   if (a === 0) return null;
   const sample = ring
-    .slice(-M6_KEEPS)
+    .slice(-k.m6.keeps)
     .flat()
     .filter((t) => t && typeof t === 'object');
   if (!sample.length) return null;
@@ -313,10 +332,10 @@ export function warmCentre(ring, defaults, allowance, nKeeps) {
 // Matt (2026-10-13): she may ease the BPM toward the music, a small bounded step per phrase, only while her mark
 // shows; a BPM the artist sets by hand always wins and silences her (the driver, curator/paceLive.js, owns that).
 // Identity below MIN_KEEPS keeps, with no allowance, with a doubtful tempo, and while the gate is closed.
-export const M7_CONFIDENCE = 0.6; // below this the tempo is not trusted
-export const M7_STEP = 3; // bpm per phrase at full allowance (half of it at the smallest hand)
-export const M7_DEADBAND = 2; // within this of the target she is done: no chasing a wobble
-export const M7_RANGE = Object.freeze([60, 180]); // never leaves the BEAT dial's useful span
+export const M7_CONFIDENCE = QK_DEFAULTS.m7.confidence; // below this the tempo is not trusted
+export const M7_STEP = QK_DEFAULTS.m7.step; // bpm per phrase at full allowance (half of it at the smallest hand)
+export const M7_DEADBAND = QK_DEFAULTS.m7.deadband; // within this of the target she is done: no chasing a wobble
+export const M7_RANGE = QK_DEFAULTS.m7.range; // never leaves the BEAT dial's useful span
 
 /**
  * Ungated: the next BPM, or null for "no move".
@@ -327,17 +346,18 @@ export const M7_RANGE = Object.freeze([60, 180]); // never leaves the BEAT dial'
  * @param allowance   the room's allowance 0..1
  */
 export function tempoEaseOpen({ current, target, confidence, nKeeps = Infinity, allowance = 0 } = {}) {
-  if (!(nKeeps >= MIN_KEEPS)) return null;
+  const k = qk();
+  if (!(nKeeps >= k.minKeeps)) return null;
   const a = clamp01(allowance);
   if (a === 0) return null;
-  if (!(confidence >= M7_CONFIDENCE)) return null;
+  if (!(confidence >= k.m7.confidence)) return null;
   const cur = Number(current);
   const want = Number(target);
   if (!Number.isFinite(cur) || !Number.isFinite(want)) return null;
-  const goal = Math.min(M7_RANGE[1], Math.max(M7_RANGE[0], want));
+  const goal = Math.min(k.m7.range[1], Math.max(k.m7.range[0], want));
   const gap = goal - cur;
-  if (Math.abs(gap) <= M7_DEADBAND) return null;
-  const step = Math.min(Math.abs(gap), M7_STEP * (0.5 + 0.5 * a));
+  if (Math.abs(gap) <= k.m7.deadband) return null;
+  const step = Math.min(Math.abs(gap), k.m7.step * (0.5 + 0.5 * a));
   return Math.round((cur + Math.sign(gap) * step) * 10) / 10;
 }
 
@@ -366,11 +386,11 @@ export function tempoEase(args) {
 // and only inside a silence window with no artist hand on either dial (the hand-silence lives in the
 // driver, exactly as M7's lives in paceLive). Nothing here reads a clock or a die: a recorded lean
 // replays to the same dial values.
-export const M8_WET_STEP = 0.05; // of the wetness dial's 0..1 span, per phrase, at a full hand
-export const M8_WET_DEADBAND = 0.02; // within this of the goal she is done
-export const M8_EVOLVE_RANGE = [200, 10000]; // the evolve dial's own span, ms (EvolveControls' min/max)
-export const M8_EVOLVE_STEP = 250; // ms per phrase at a full hand (≈2.5% of the span, M7's fraction)
-export const M8_EVOLVE_DEADBAND = 100; // ms — within this of the goal she is done
+export const M8_WET_STEP = QK_DEFAULTS.m8.wetStep; // of the wetness dial's 0..1 span, per phrase, at a full hand
+export const M8_WET_DEADBAND = QK_DEFAULTS.m8.wetDeadband; // within this of the goal she is done
+export const M8_EVOLVE_RANGE = QK_DEFAULTS.m8.evolveRange; // the evolve dial's own span, ms (EvolveControls' min/max)
+export const M8_EVOLVE_STEP = QK_DEFAULTS.m8.evolveStep; // ms per phrase at a full hand (≈2.5% of the span, M7's fraction)
+export const M8_EVOLVE_DEADBAND = QK_DEFAULTS.m8.evolveDeadband; // ms — within this of the goal she is done
 
 const boundedDialStep = (current, goal, stepMax, deadband) => {
   const gap = goal - current;
@@ -384,14 +404,15 @@ const boundedDialStep = (current, goal, stepMax, deadband) => {
  *  target named, not a number, already arrived. */
 export function wetnessLeanOpen(args = {}) {
   const { current, target, nKeeps, allowance } = args;
-  if (!(nKeeps >= MIN_KEEPS)) return null;
+  const k = qk();
+  if (!(nKeeps >= k.minKeeps)) return null;
   if (!(allowance > 0)) return null;
   if (!Number.isFinite(current) || !Number.isFinite(target)) return null;
   const next = boundedDialStep(
     current,
     clamp01(target),
-    M8_WET_STEP * (0.5 + 0.5 * clamp01(allowance)),
-    M8_WET_DEADBAND,
+    k.m8.wetStep * (0.5 + 0.5 * clamp01(allowance)),
+    k.m8.wetDeadband,
   );
   return next === null ? null : Math.round(next * 1000) / 1000;
 }
@@ -405,12 +426,13 @@ export function wetnessLean(args) {
  *  the evolve interval toward the pace the lean names, or null on the same gates as wetnessLeanOpen. */
 export function evolveLeanOpen(args = {}) {
   const { current, lean, nKeeps, allowance } = args;
-  if (!(nKeeps >= MIN_KEEPS)) return null;
+  const k = qk();
+  if (!(nKeeps >= k.minKeeps)) return null;
   if (!(allowance > 0)) return null;
   if (!Number.isFinite(current) || !Number.isFinite(lean)) return null;
-  const [lo, hi] = M8_EVOLVE_RANGE;
+  const [lo, hi] = k.m8.evolveRange;
   const goal = hi - clamp01(lean) * (hi - lo);
-  const next = boundedDialStep(current, goal, M8_EVOLVE_STEP * (0.5 + 0.5 * clamp01(allowance)), M8_EVOLVE_DEADBAND);
+  const next = boundedDialStep(current, goal, k.m8.evolveStep * (0.5 + 0.5 * clamp01(allowance)), k.m8.evolveDeadband);
   return next === null ? null : Math.round(next);
 }
 
@@ -445,8 +467,9 @@ export function evolveLean(args) {
  * that just landed, judged by its config.layout, the read every pull uses.
  */
 export function surgeCallOpen({ priorKeeps = [], newKeep = null } = {}) {
+  const k = qk();
   const prior = Array.isArray(priorKeeps) ? priorKeeps : [];
-  if (prior.length < MIN_KEEPS) return 0;
+  if (prior.length < k.minKeeps) return 0;
   const layout = newKeep && newKeep.config && newKeep.config.layout;
   if (!layout || typeof layout !== 'object') return 0;
   const centroid = keptCentroid(prior);
@@ -457,7 +480,7 @@ export function surgeCallOpen({ priorKeeps = [], newKeep = null } = {}) {
   } catch {
     p = 0;
   }
-  return p >= M1_PROXIMITY ? p : 0;
+  return p >= k.m1.proximity ? p : 0;
 }
 
 /** surgeCall(args) — the public, gated M9 call. 0 while the gate is closed. */

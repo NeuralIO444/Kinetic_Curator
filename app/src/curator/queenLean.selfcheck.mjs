@@ -55,6 +55,7 @@ import {
   surgeCall,
 } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
+import { TUNING_DEFAULTS, setTuningValue, resetTuning } from '../personas/tuning.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const srcRoot = join(here, '..');
@@ -231,6 +232,43 @@ ok('M5: only mic/midi returns count', () => {
   assert.equal(swayOpen(eightKeeps, sig('file')).reactivity, 1.0, 'FILE is not a return');
   assert.equal(swayOpen(eightKeeps, sig(null)).reactivity, 1.0);
   assert.equal(swayOpen(eightKeeps, sig('denied')).reactivity, 1.0);
+});
+
+// ─── #2382: her magnitudes live in the persona tuning table ───
+ok('her exported constants are the tuning table’s shipped values, and a DEV edit is live', () => {
+  const k = TUNING_DEFAULTS.personas.queen.knobs;
+  assert.equal(MIN_KEEPS, k.minKeeps);
+  assert.equal(M1_BIAS, k.m1.bias);
+  assert.equal(M1_PROXIMITY, k.m1.proximity);
+  assert.equal(M2_T0, k.m2.t0);
+  assert.equal(M2_CAP, k.m2.cap);
+  assert.equal(M2_FLOOR, k.m2.floor);
+  assert.equal(M3_DRIFT, k.m3.drift);
+  assert.equal(M4_ARM_MS, k.m4.armMs);
+  assert.equal(M4_HOLD_PCT, k.m4.holdPct);
+  assert.equal(M5_GAIN_PEAK, k.m5.gainPeak);
+  assert.equal(BEAT_CONFIDENCE, k.beatConfidence);
+  assert.equal(M6_KEEPS, k.m6.keeps);
+  assert.equal(M6_STRENGTH, k.m6.strength);
+  assert.equal(M7_CONFIDENCE, k.m7.confidence);
+  assert.equal(M7_STEP, k.m7.step);
+  assert.equal(M7_DEADBAND, k.m7.deadband);
+  assert.deepStrictEqual(M7_RANGE, k.m7.range);
+  assert.equal(M8_WET_STEP, k.m8.wetStep);
+  assert.equal(M8_WET_DEADBAND, k.m8.wetDeadband);
+  assert.deepStrictEqual(M8_EVOLVE_RANGE, k.m8.evolveRange);
+  assert.equal(M8_EVOLVE_STEP, k.m8.evolveStep);
+  assert.equal(M8_EVOLVE_DEADBAND, k.m8.evolveDeadband);
+  assert.deepStrictEqual(swayBiases([], {}), NEUTRAL_SWAY, 'at rest the live neutral is the shipped snapshot');
+  try {
+    assert.equal(warmedTemperature(0), k.m2.t0, 'the shipped t0 floors the warmed temperature');
+    assert.equal(setTuningValue('personas.queen.knobs.m2.t0', 0.5).ok, true);
+    assert.equal(warmedTemperature(0), 0.5, 'the edited t0 is the floor the mechanic reads — live, no reload');
+    assert.equal(swayBiases([], {}).temperature, 0.5, 'the neutral sway follows the table in force');
+  } finally {
+    resetTuning();
+  }
+  assert.equal(warmedTemperature(0), k.m2.t0, 'reset restores the shipped value');
 });
 
 // ─── deniability: UI source must not reference her identifiers ───

@@ -108,9 +108,10 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
               </button>
               <span className="hotkey-desc">
                 Dev mode adds the DEV panel to the tab strip — X-RAY, GOV TUNE, SHADER LAB, BIOLOGY, UNITS, KERNEL,
-                MIND, CENSUS, TASTE, SHELF, MEGAMIND — in this build, not just in dev builds. It takes effect right
-                away, no restart, and the panel loads only when you open its tab. Those tools change real state, which
-                is why this is off by default. It is saved with the app's other preferences, on this machine only.
+                MIND, CENSUS, TASTE, SHELF, MEGAMIND, PERSONA TUNE — in this build, not just in dev builds. It takes
+                effect right away, no restart, and the panel loads only when you open its tab. Those tools change real
+                state, which is why this is off by default. It is saved with the app's other preferences, on this
+                machine only.
               </span>
             </div>
           </div>
