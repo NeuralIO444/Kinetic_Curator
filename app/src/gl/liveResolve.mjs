@@ -102,6 +102,8 @@ import { ASSETS_RISO } from '../data/assets/assets-riso.js'; // #2008: the gramm
 import { ASSETS_CONSTRUCTS, HOUSE_CONSTRUCT_RECORDS } from '../data/assets/index.js'; // #2108: the house constructs (catalogue-only until the gate); #2327: and their records
 import { constructPieceItems } from '../engine/constructStage.js'; // #2327: a construct tile dealt as its live pieces
 import { gaitStageOptions } from '../engine/gaitStage.js'; // #2329: a construct's assigned gait moves its pieces
+import { gaitsOfStamp } from '../engine/gaitAssign.js'; // #2330: the gait a breaking construct wears
+import { createGaitBreakup, checkBreakSnapshot } from '../engine/gaitBreakup.js'; // #2330: the field breaks a construct up; its gait says how
 
 // #1982 — the kana stamps are catalogue members for the census and the stage
 // atlas, but they are dealt by the FIELD director alone (Teijo's native
@@ -499,6 +501,9 @@ export function createLiveResolver() {
   // the culture's births the same way (the dish's standing read discipline). Absent stamp = no state, and a
   // build without one is byte-identical to one without this stage.
   const dishFluid = createDishFluidStage();
+  // #2330 (gait M4) — the break-up fold: which constructs the ferrofluid has broken up (or is letting rejoin), since which
+  // beat. The one stateful piece of the break-up; it rides the snapshot (an OPTIONAL key), so a take replays it exactly.
+  const gaitBreak = createGaitBreakup();
   // K1 slice 4b — input.dishFluidCells (the recorded, sparse, 8-bit field) unpacked once per distinct object (the input log
   // keeps identity, so an unchanged field is not re-unpacked); it wins over a raw dishFluidExternal (a dense host array).
   let cellsIn = null;
@@ -1036,6 +1041,13 @@ export function createLiveResolver() {
             H,
           }
         : null;
+    // #2330 (gait M4) — the break-up's "strong here" (Matt's ruling on #2330): the same lean field, but where the frame
+    // carries the recorded field (input.dishFluidCells) it reads THIS frame's cells, a pure function of the recorded
+    // input — so a take restored mid-break (whose host-owned field the fluid snapshot cannot carry) breaks identically.
+    const breakField =
+      fluidDrift && isFluidCells(input.dishFluidCells)
+        ? { ...fluidDrift, density: externalFluid(input).density }
+        : fluidDrift;
     // #1923 Phase 2 slice D — the background consumer's read, taken HERE, at the one coupling read:
     // the dish-mean level of the same publication, under the same shed fold (it exists only under
     // cultureScale). It is published at the end of the resolve (getLastCouplingBackground) for the
@@ -1698,16 +1710,51 @@ export function createLiveResolver() {
       // source — none is passed until gait M3/M4, so every construct draws as its tile. The rotation turns all alike.
       // #2329 — gait M3: a construct whose assigned gait moves (the recorded `input.gaits` stamp) deals as pieces and
       // its pieces wear the gait's drivers; no stamp, or only `still`, passes no `moving` (the same array as before).
+      // #2330 — gait M4: where the ferrofluid is strong at a construct wearing a moving gait (fluidDrift: the recorded
+      // field over the matter floor, a magnet standing, PULL up, under dishFluidMarks), its pieces release in the gait's
+      // order and scatter; when the field leaves they rejoin by the gait's ease and path. Breaking or rejoining counts as
+      // `moving`. No field and nothing breaking → the very same options as before (the hard gate).
       if (input.constructPieces) {
         const gaitStage = input.gaits
           ? gaitStageOptions(input.gaits, { driverSec, seed, canvasW: W, canvasH: H })
           : null;
+        let stageOpts = gaitStage || {};
+        const breakPrefix = `${layer.id}|`;
+        const breakSeen = new Set();
+        if (breakField || gaitBreak.size) {
+          const worn = input.gaits ? gaitsOfStamp(input.gaits) : null;
+          const keyOf = (it) => (it && it.key != null ? `${breakPrefix}${it.key}` : null);
+          stageOpts = {
+            moving: (it) => {
+              const k = keyOf(it);
+              if (k) breakSeen.add(k);
+              return !!(gaitStage && gaitStage.moving(it)) || (k !== null && gaitBreak.has(k));
+            },
+            pose: (marks, pieces, tile, slot) => {
+              const posed = gaitStage ? gaitStage.pose(marks, pieces, tile, slot) || marks : marks;
+              const k = keyOf(tile);
+              if (!k) return posed;
+              return gaitBreak.pose(k, {
+                marks: posed,
+                rest: marks,
+                depths: pieces.map((p) => p.depth | 0),
+                tile,
+                field: breakField,
+                gait: worn ? worn.get(tile.assetId) || null : null,
+                bpm: input.gaits ? input.gaits.bpm : null,
+                driverSec,
+                seed,
+              }).marks;
+            },
+          };
+        }
         items = constructPieceItems(items, {
           enabled: true,
           recordOf: (id) => HOUSE_CONSTRUCT_RECORDS.get(id) || null,
-          ...(gaitStage || {}),
+          ...stageOpts,
         });
-      }
+        if (gaitBreak.size) gaitBreak.sweep(breakPrefix, breakSeen); // a construct gone from the stage forgets its break
+      } else if (gaitBreak.size) gaitBreak.reset(); // CONSTRUCTS off / collapsed: every construct is its tile again
       const rotation = stratumRotationOf(layer);
       out.push({
         id: layer.id,
@@ -2215,6 +2262,7 @@ export function createLiveResolver() {
     dishLife.reset();
     dishFieldStage.reset(); // #1923 Phase 2
     dishFluid.reset(); // #1997
+    gaitBreak.reset(); // #2330
   }
 
   // ── #1367 — mid-session state snapshot ─────────────────────────────────────
@@ -2241,6 +2289,7 @@ export function createLiveResolver() {
     const dishLifeSnap = dishLife.snapshot();
     const dishFieldSnap = dishFieldStage.snapshot(); // #1923 Phase 2
     const dishFluidSnap = dishFluid.snapshot(); // #1997
+    const gaitBreakSnap = gaitBreak.snapshot(); // #2330
     return {
       v: 1,
       W,
@@ -2271,6 +2320,7 @@ export function createLiveResolver() {
       ...(dishLifeSnap ? { dishLife: dishLifeSnap } : {}), // #1923 — OPTIONAL key: present only while a culture runs, so every other snapshot is exactly what it was
       ...(dishFieldSnap ? { dishField: dishFieldSnap } : {}), // #1923 Phase 2 — OPTIONAL key on the same terms: present only while a field culture runs
       ...(dishFluidSnap ? { dishFluid: dishFluidSnap } : {}), // #1997 — OPTIONAL key on the same terms: present only while the ferrofluid runs
+      ...(gaitBreakSnap ? { gaitBreak: gaitBreakSnap } : {}), // #2330 — OPTIONAL key on the same terms: present only while a construct is broken up
       // #2006 slice 3 — OPTIONAL key on the same terms: present only while a
       // review settle is in flight or remembered, so every other snapshot
       // is exactly what it was. The settle is presentation state; a
@@ -2374,6 +2424,7 @@ export function createLiveResolver() {
     dishFluid.restore(snap.dishFluid); // absent (every pre-#1997 snapshot) = no fluid, as a fresh resolver's
     dishLife.restore(snap.dishLife); // #1923 — absent (every pre-DISH-LIFE snapshot) = no culture, as a fresh resolver's
     dishFieldStage.restore(snap.dishField); // #1923 Phase 2 — absent (every pre-Phase-2 snapshot) = no field culture, as a fresh resolver's
+    gaitBreak.restore(snap.gaitBreak); // #2330 — absent (every pre-M4 snapshot) = nothing broken up, as a fresh resolver's
     // travel kinemes — a pre-travel snapshot carries no roam: every mark home, the clock unanchored (a fresh resolver's state)
     if (snap.travel !== undefined) {
       restoreTravelStore(travelStore, snap.travel.store);
@@ -2567,6 +2618,8 @@ export function checkResolverSnapshot(snap) {
   if (!Number.isFinite(snap.densityTickSeen)) return false;
   if (!snap.creatures || typeof snap.creatures !== 'object') return false;
   if (!snap.dishCreatures || typeof snap.dishCreatures !== 'object') return false;
+  // #2330 — `gaitBreak` is optional; when present it must be a well-formed break-up fold.
+  if (snap.gaitBreak !== undefined && !checkBreakSnapshot(snap.gaitBreak)) return false;
   // #1694 slice 1 — `spawn` is optional (absent in every pre-repipe snapshot); when present it must be an object.
   if (snap.spawn !== undefined && (!snap.spawn || typeof snap.spawn !== 'object' || Array.isArray(snap.spawn)))
     return false;

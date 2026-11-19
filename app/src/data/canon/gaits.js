@@ -45,6 +45,60 @@ const LEAN = Object.freeze({
   marks: { breath: 0.5, pulse: 0.2, drift: 0.7, cascade: 0.375 },
 });
 
+/**
+ * #2330 (gait M4) — each style's break-up: how its constructs come apart when the ferrofluid is strong at them (the
+ * field decides WHEN; this decides HOW), and how they come back together when it leaves. One structure per style, worn
+ * by all three of its defaults. Taste call (flagged to Matt on the PR): most styles release leaf-first, so the tips go
+ * before the trunk; the precise styles (swiss, techno, pixel) snap out and back, the slow ones (japanese, engraved,
+ * organic, marks) drift or follow the flow and retrace their way home.
+ */
+const BREAK = Object.freeze({
+  swiss: {
+    release: { order: 'leaf-first', stagger: 0.25, scatter: 'burst' },
+    rejoin: { ease: 'outCubic', beats: 1, path: 'direct' },
+  },
+  bauhaus: {
+    release: { order: 'leaf-first', stagger: 0.25, scatter: 'burst' },
+    rejoin: { ease: 'outBack', beats: 1, path: 'direct' },
+  },
+  japanese: {
+    release: { order: 'leaf-first', stagger: 0.5, scatter: 'drift' },
+    rejoin: { ease: 'inOutCubic', beats: 4, path: 'retrace' },
+  },
+  grunge: {
+    release: { order: 'together', stagger: 0, scatter: 'burst' },
+    rejoin: { ease: 'outCubic', beats: 1, path: 'arc' },
+  },
+  engraved: {
+    release: { order: 'leaf-first', stagger: 0.5, scatter: 'drift' },
+    rejoin: { ease: 'inOutCubic', beats: 4, path: 'retrace' },
+  },
+  techno: {
+    release: { order: 'root-first', stagger: 0.125, scatter: 'burst' },
+    rejoin: { ease: 'outCubic', beats: 0.5, path: 'direct' },
+  },
+  pixel: {
+    release: { order: 'leaf-first', stagger: 0.25, scatter: 'burst' },
+    rejoin: { ease: 'linear', beats: 1, path: 'direct' },
+  },
+  organic: {
+    release: { order: 'leaf-first', stagger: 0.5, scatter: 'follow-flow' },
+    rejoin: { ease: 'inOutCubic', beats: 2, path: 'retrace' },
+  },
+  op: {
+    release: { order: 'root-first', stagger: 0.25, scatter: 'drift' },
+    rejoin: { ease: 'inOutCubic', beats: 2, path: 'arc' },
+  },
+  memphis: {
+    release: { order: 'leaf-first', stagger: 0.25, scatter: 'burst' },
+    rejoin: { ease: 'outBack', beats: 2, path: 'arc' },
+  },
+  marks: {
+    release: { order: 'leaf-first', stagger: 0.375, scatter: 'follow-flow' },
+    rejoin: { ease: 'outCubic', beats: 2, path: 'retrace' },
+  },
+});
+
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
 function gaitOf(style, kind) {
@@ -66,6 +120,7 @@ function gaitOf(style, kind) {
       },
     },
     cascade: lean.cascade,
+    ...(BREAK[style] || BREAK.swiss),
   });
 }
 

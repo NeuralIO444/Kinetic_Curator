@@ -116,6 +116,14 @@ export function constructPieceItems(
         y = it.y + lx * si + ly * co;
       }
       const next = { ...it, assetId: m.assetId, x, y, rotation: m.rotation, scale: m.scale, scaleY: m.scale * sy };
+      // #2330 — a piece out in a break-up reads a little quieter than its whole (dealt > pieces); at rest no factor rides
+      if (
+        typeof m.alphaMul === 'number' &&
+        Number.isFinite(m.alphaMul) &&
+        m.alphaMul !== 1 &&
+        Number.isFinite(it.alpha)
+      )
+        next.alpha = it.alpha * m.alphaMul;
       const k = pieceKey(it.key, p.id);
       if (k !== undefined) next.key = k;
       out.push(next);
