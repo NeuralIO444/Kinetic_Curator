@@ -37,6 +37,7 @@ import { sanitizeAssetAttach } from '../engine/assetAttach.js';
 import { sanitizeCreatureRecords } from '../engine/creatureAssembler.js';
 import { sanitizeConstructRecords } from '../engine/constructAssembler.js';
 import { sanitizeGaitRecords } from '../engine/gait.js'; // #2328
+import { assignmentsFromLocks, gaitLocksOf } from '../engine/gaitAssign.js'; // #2329 follow-up
 import { sanitizeShapeShelf } from '../panels/shapeShelf.mjs';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
@@ -136,6 +137,9 @@ export function sceneFieldsFromDoc(doc, state, { kits = [] } = {}) {
   next.constructRecords = sanitizeConstructRecords(doc.constructRecords); // #2108 — a doc without constructs has none
   next.constructLead = doc.constructLead === true; // #2108 — the gate rides the project; absent = off
   next.gaitRecords = sanitizeGaitRecords(doc.gaitRecords); // #2328 — a doc without gaits has none
+  // #2329 follow-up — the document's gait locks stand up as the user's locks; a doc without them clears them. A QUEEN
+  // pick is a session claim on the OLD scene and never survives a scene change (she re-picks at the next phrase).
+  next.gaitAssignments = assignmentsFromLocks(doc.gaitLocks);
   // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
   // rest of the params; parseProject lands a pre-fold-in document's top-level creatureCount
   // there). Homes are found again for the new dish either way.
@@ -204,8 +208,8 @@ export function sceneRuntimeResets() {
     // #2327 — the construct collapse is likewise a governor claim on the OLD document's constructs.
     constructCollapse: false,
     constructPiecesLive: false,
-    // #2329 (review of #2402) — gait picks and locks are session claims on the OLD document's constructs.
-    gaitAssignments: {},
+    // #2329 (review of #2402) — gait picks were cleared here too; since the #2329 follow-up the user's LOCKS are a
+    // scene field (doc.gaitLocks), so `gaitAssignments` is set by sceneFieldsFromDoc / sceneFieldsFor instead.
   };
 }
 
@@ -224,8 +228,12 @@ export function sceneFieldsFor(doc, state, { replaceAll = false } = {}) {
   const carried = new Set(Object.keys(doc));
   if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId)
     for (const k of SNAPSHOT_INSTALLED) carried.add(k);
+  if (carried.has('gaitLocks')) carried.add('gaitAssignments'); // #2329 follow-up — the doc key and the store field differ
   const out = {};
   for (const k of Object.keys(all)) if (carried.has(k)) out[k] = all[k];
+  // #2329 follow-up — an older recipe that does not speak for locks keeps the user's own; the QUEEN's picks are claims
+  // on the old scene and clear, as on every scene change
+  if (!carried.has('gaitLocks')) out.gaitAssignments = assignmentsFromLocks(gaitLocksOf(state.gaitAssignments));
   return out;
 }
 

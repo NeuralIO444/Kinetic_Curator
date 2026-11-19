@@ -30,6 +30,38 @@ import { nudgeAxis } from './groundNudge.js';
 
 export const MOTH_PARTS = Object.freeze({ body: 'org_pod_02', wing: 'org_leaf_02' });
 
+/**
+ * #2327 (the shared piece cap) — the most items one moth can append in a frame, from its recipe: the body, two fore
+ * and two hind wings (the hind pair counted always: it grows in and out with the crowd) and their fans; a halo under
+ * each of the five non-fan parts; and, while a glitch band rides the pin, two ghosts beside each non-halo part (the
+ * hatch only re-sorts). The construct stage counts this against the shared budget BEFORE it deals pieces, because the
+ * moths are appended after it (gl/liveResolve.mjs).
+ */
+const fanSum = (c) => c.plate + c.feather + c.leaf + c.chevron;
+const MOTH_PARTS_MAX = 1 + 2 * (1 + fanSum(FAN_COUNTS.fore)) + 2 * (1 + fanSum(FAN_COUNTS.hind));
+const MOTH_HALOS_MAX = 5;
+export const MOTH_ITEMS_MAX = MOTH_PARTS_MAX + MOTH_HALOS_MAX;
+export const MOTH_ITEMS_MAX_GLITCHED = 3 * MOTH_PARTS_MAX + MOTH_HALOS_MAX;
+
+/**
+ * An upper bound on the items createCreatureBuilder().append will add for this input: a pure function of the input
+ * (the pins that grow a moth this frame — formed, not hosted by the dish creature, at a finite place). Never below
+ * the real count; the caller decides whether moths may append at all (mothsAllowed).
+ */
+export function mothItemBound(input) {
+  const pins = input && input.dishPins;
+  const formed = input && input.dishFormed;
+  if (!Array.isArray(pins) || !Array.isArray(formed)) return 0;
+  let n = 0;
+  for (let i = 0; i < pins.length; i++) {
+    const pin = pins[i];
+    if (!formed[i] || (input.dishHosted && input.dishHosted[i]) || !pin) continue;
+    if (!Number.isFinite(pin.x) || !Number.isFinite(pin.y)) continue;
+    n += input.dishGlitch && input.dishGlitch[i] ? MOTH_ITEMS_MAX_GLITCHED : MOTH_ITEMS_MAX;
+  }
+  return n;
+}
+
 /** Phase 2 S2 — hierarchy path segment → the skeleton chain that skins it (wingWarp.mjs). */
 const WARP_SEGMENTS = Object.freeze({
   wingL: { chain: 'fore', side: 'L' },

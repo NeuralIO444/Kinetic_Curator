@@ -137,12 +137,68 @@ export const CANON_GAITS = Object.freeze(
 const BY_ID = new Map();
 for (const set of Object.values(CANON_GAITS)) for (const g of Object.values(set)) BY_ID.set(g.id, g);
 
+/**
+ * #2329 follow-up — the Canon gait ids as #2402 (gait M3, main @ 7af21e5) shipped them, before #2405 (M4) added each
+ * style's release/rejoin. A gait id is the content hash of the record, so M4 changed every id. A take or a document
+ * written between the two names a gait by its OLD id (a GAIT_ASSIGN row, an `input.gaits` stamp, a saved lock); each
+ * row here says which style and kind that id was, so it resolves to the same default now.
+ *
+ * LITERAL DATA, never recomputed at load: computed once from the pre-M4 records (`git show 7af21e5:app/src/data/canon/
+ * gaits.js`, every CANON_GAITS[style][kind].id). data/canon/gaits.selfcheck.mjs proves each row equals the current
+ * record of that style and kind with M4's release/rejoin taken out — i.e. that each old id names the same gait.
+ *   [old id, style, kind]
+ */
+export const PRE_M4_GAIT_IDS = Object.freeze([
+  ['gait:a5af271336ba7f22', 'swiss', 'still'],
+  ['gait:b78bc6b903502b55', 'swiss', 'idle'],
+  ['gait:a7777f1f2020d0d1', 'swiss', 'performing'],
+  ['gait:680c2eee6f0965b9', 'bauhaus', 'still'],
+  ['gait:02bdaf200b52820f', 'bauhaus', 'idle'],
+  ['gait:7f8f860bbf3a95a6', 'bauhaus', 'performing'],
+  ['gait:4506976339b4b0cd', 'japanese', 'still'],
+  ['gait:cee521c64ce07202', 'japanese', 'idle'],
+  ['gait:9724f2736401b6f3', 'japanese', 'performing'],
+  ['gait:5d9a9861b9c89d5b', 'grunge', 'still'],
+  ['gait:4eebcfea8f51cd75', 'grunge', 'idle'],
+  ['gait:f8e50d72abaead33', 'grunge', 'performing'],
+  ['gait:6c1f93a6f18b907b', 'engraved', 'still'],
+  ['gait:54b734038e4d0f62', 'engraved', 'idle'],
+  ['gait:b2e88b9ac27a1aae', 'engraved', 'performing'],
+  ['gait:bbe4db2826c55c19', 'techno', 'still'],
+  ['gait:5e3be4a946c0bd14', 'techno', 'idle'],
+  ['gait:b2e7edb35d74c06e', 'techno', 'performing'],
+  ['gait:11bf915c98f5df4f', 'pixel', 'still'],
+  ['gait:872bd3f93c67a83b', 'pixel', 'idle'],
+  ['gait:53d113074309039e', 'pixel', 'performing'],
+  ['gait:b42a0d1136e332c1', 'organic', 'still'],
+  ['gait:a7288b3e07893c4a', 'organic', 'idle'],
+  ['gait:2e680ea58d310022', 'organic', 'performing'],
+  ['gait:309e752c9e62a942', 'op', 'still'],
+  ['gait:827d4e556bb40e23', 'op', 'idle'],
+  ['gait:a9659d129d20f426', 'op', 'performing'],
+  ['gait:05857d052f790fd9', 'memphis', 'still'],
+  ['gait:5c595e0e54e78623', 'memphis', 'idle'],
+  ['gait:2340217e15db8716', 'memphis', 'performing'],
+  ['gait:4baad138a8877901', 'marks', 'still'],
+  ['gait:dba4193e6e3e3651', 'marks', 'idle'],
+  ['gait:236aec667bae1bd9', 'marks', 'performing'],
+]);
+
+/** old id → the current record of the same style and kind. */
+const ALIAS = new Map(PRE_M4_GAIT_IDS.map(([old, style, kind]) => [old, CANON_GAITS[style][kind]]));
+
 /** A Canon style's three default gaits ({ still, idle, performing }), or null for a style the Canon does not know. */
 export function canonGaits(styleId) {
   return Object.prototype.hasOwnProperty.call(CANON_GAITS, styleId) ? CANON_GAITS[styleId] : null;
 }
 
-/** The Canon default gait with this id, or null. */
+/** The Canon default gait with this id (a pre-M4 id resolves through PRE_M4_GAIT_IDS), or null. */
 export function canonGaitById(id) {
-  return BY_ID.get(id) || null;
+  return BY_ID.get(id) || ALIAS.get(id) || null;
+}
+
+/** The id to keep for a gait id: a pre-M4 Canon id becomes the current id of the same gait; any other id is itself. */
+export function canonicalGaitId(id) {
+  const g = ALIAS.get(id);
+  return g ? g.id : id;
 }

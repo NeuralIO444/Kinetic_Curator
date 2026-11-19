@@ -19,7 +19,7 @@ import {
 } from './gaitRecord.mjs';
 import { createGlobalSlice } from '../state/slices/globalSlice.js';
 import { canonGaits } from '../data/canon/gaits.js';
-import { sceneRuntimeResets } from '../state/sceneApply.js';
+import { sceneRuntimeResets, sceneFieldsFromDoc } from '../state/sceneApply.js';
 import { ASSETS_CONSTRUCTS } from '../data/assets/index.js';
 
 let n = 0;
@@ -103,9 +103,11 @@ ok('once a phrase, not once a bar: a level change mid-phrase waits for the bound
   assert.equal(wears(A), canonGaits('swiss').performing.id);
   runBars(PHRASE_BARS);
   assert.equal(wears(A), canonGaits('swiss').idle.id, 'mid → idle');
+  energy('high');
+  runBars(PHRASE_BARS);
   energy('low');
   runBars(PHRASE_BARS);
-  assert.equal(wears(A), canonGaits('swiss').still.id, 'low → still');
+  assert.equal(wears(A), canonGaits('swiss').idle.id, 'low → idle (#2329 follow-up: only true silence is still)');
   emit(Events.AUDIO_SILENCE_START, { ms: 2100 });
   energy('high');
   runBars(PHRASE_BARS);
@@ -135,7 +137,7 @@ ok('a LOCK survives a full 32-bar Trio cycle (and more) while the QUEEN keeps pi
     assert.equal(state.gaitAssignments[A].locked, true);
   }
   assert.ok(bars - start > OWN_BARS, `ran ${bars - start} bars > the Trio's ${OWN_BARS}-bar cycle`);
-  assert.equal(wears(B), canonGaits('organic').still.id, 'the unlocked wearer followed the room (last: low)');
+  assert.equal(wears(B), canonGaits('organic').idle.id, 'the unlocked wearer followed the room (last: low → idle)');
   // a QUEEN (or DAVIS) assignment against the lock is refused, and says so
   assert.deepEqual(state.assignGait({ target: A, gaitId: canonGaits('swiss').performing.id, by: 'davis' }), {
     applied: false,
@@ -174,8 +176,13 @@ ok('the take records every landed GAIT_ASSIGN; replay re-publishes them as they 
   let frame = 0;
   const rec = createGaitRecorder({ getFrame: () => frame });
   setGaitTap((e) => rec.update(e));
-  for (const lv of ['high', 'mid', 'low', 'high']) {
-    energy(lv);
+  // #2329 follow-up: low energy is idle now, so the still phrase is true silence
+  for (const lv of ['high', 'mid', 'silent', 'high']) {
+    if (lv === 'silent') emit(Events.AUDIO_SILENCE_START, { ms: 2100 });
+    else {
+      emit(Events.AUDIO_SILENCE_END, { ms: 4000 });
+      energy(lv);
+    }
     frame += 240;
     runBars(PHRASE_BARS);
   }
@@ -228,7 +235,7 @@ trio.stop();
 offHeard();
 offBar();
 
-ok('review of #2402: a take starts with what already stands; a scene change clears picks and locks', () => {
+ok('review of #2402: a take starts with what already stands; a scene change clears picks (locks ride the doc)', () => {
   const g = canonGaits('organic');
   const rec = createGaitRecorder({
     getFrame: () => 5,
@@ -246,7 +253,9 @@ ok('review of #2402: a take starts with what already stands; a scene change clea
     ],
   );
   assert.ok(checkGaitRecord(out));
-  assert.deepEqual(sceneRuntimeResets().gaitAssignments, {});
+  // #2329 follow-up: the resets no longer speak for gaits; the scene half does — a doc without locks clears them all
+  assert.equal(sceneRuntimeResets().gaitAssignments, undefined);
+  assert.deepEqual(sceneFieldsFromDoc({ seed: 1 }, { paletteId: 'bone' }).gaitAssignments, {});
 });
 
 console.log(`gaitLive.selfcheck: ${n} checks ok`);

@@ -34,6 +34,7 @@ export const PROJECT_STATE_KEYS = Object.freeze([
   'constructRecords', // #2108
   'constructLead', // #2108
   'gaitRecords', // #2328
+  'gaitAssignments', // #2329 follow-up — a user lock is saved (doc.gaitLocks); a QUEEN pick only re-saves the same doc
   'audioRoutes',
   'canvasW',
   'canvasH',

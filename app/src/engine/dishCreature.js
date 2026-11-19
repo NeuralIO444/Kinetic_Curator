@@ -332,6 +332,26 @@ function birthState(seed, pinIndex, pin, limbDirs, sig, rawTraits, rawGenome = n
  * artist's edit wins (attachPointsFor); a point at the very centre has no direction and points down.
  * No L anywhere → no limbs: the markers choose where, or nothing grows.
  */
+/**
+ * #2327 (the shared piece cap) — an upper bound on the items createDishCreatureBuilder().append adds for this input:
+ * per live hosted pin, the rim/body/core trio on every disc plus the head's eye, and the trio on every limb disc of
+ * every limb the host asset's L anchors grow. A pure function of the input and the pool; never below the real count.
+ */
+export function dishCreatureItemBound(input, pool) {
+  const pins = input && input.dishPins;
+  const formed = input && input.dishFormed;
+  const hosted = input && input.dishHosted;
+  if (!Array.isArray(pins) || !Array.isArray(formed) || !Array.isArray(hosted)) return 0;
+  let live = 0;
+  for (let i = 0; i < pins.length; i++) {
+    const pin = pins[i];
+    if (hosted[i] && formed[i] && pin && Number.isFinite(pin.x) && Number.isFinite(pin.y)) live++;
+  }
+  if (!live) return 0;
+  const limbs = dishLimbDirs(pool, input.assetAttach).length;
+  return live * (N_DISCS * 3 + 1 + limbs * LIMB_N * 3);
+}
+
 export function dishLimbDirs(pool, assetAttach) {
   let pts = null;
   const own = assetAttach ? assetAttach[DISH_CREATURE.asset] : undefined;

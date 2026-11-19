@@ -126,13 +126,23 @@ ok('apply: new map on change, SAME map on no-op or refusal; a lock refuses queen
 });
 
 ok('the QUEEN: energy → kind; picks only what changed, skips locks and styleless targets, in sorted order', () => {
-  assert.equal(queenGaitKind({}), 'still');
-  assert.equal(queenGaitKind({ energy: 'low' }), 'still');
+  // #2329 follow-up (Matt, 2026-11-18 18:53 PT): low energy → idle; only true silence (or no audio at all) stays still
+  assert.equal(queenGaitKind({}), 'still', 'no reading (no audio) stays still');
+  assert.equal(queenGaitKind({ energy: 'low' }), 'idle', 'low energy is idle, not still');
+  assert.equal(queenGaitKind({ energy: 'low', silent: true }), 'still', 'true silence stays still');
   assert.equal(queenGaitKind({ energy: 'mid' }), 'idle');
   assert.equal(queenGaitKind({ energy: 'high' }), 'performing');
   assert.equal(queenGaitKind({ energy: 'high', silent: true }), 'still');
   const styleOf = (t) => ({ b: 'swiss', a: 'organic', c: 'techno' })[t] ?? null;
-  assert.deepEqual(queenPicks({ targets: ['a', 'b'], styleOf, energy: 'low' }), [], 'unassigned already rests');
+  assert.deepEqual(queenPicks({ targets: ['a', 'b'], styleOf, silent: true }), [], 'unassigned already rests');
+  assert.deepEqual(
+    queenPicks({ targets: ['a', 'b'], styleOf, energy: 'low' }),
+    [
+      { target: 'a', gaitId: canonGaits('organic').idle.id, by: 'queen', locked: false },
+      { target: 'b', gaitId: SW.idle.id, by: 'queen', locked: false },
+    ],
+    'low energy picks idle',
+  );
   const picks = queenPicks({ targets: ['b', 'a', 'z', 'b'], styleOf, energy: 'high' });
   assert.deepEqual(picks, [
     { target: 'a', gaitId: canonGaits('organic').performing.id, by: 'queen', locked: false },
@@ -145,7 +155,7 @@ ok('the QUEEN: energy → kind; picks only what changed, skips locks and stylele
   };
   assert.deepEqual(queenPicks({ assignments, targets: ['a', 'b', 'c'], styleOf, energy: 'high' }), []);
   assert.deepEqual(
-    queenPicks({ assignments, targets: ['a', 'b', 'c'], styleOf, energy: 'low' }).map((e) => e.target),
+    queenPicks({ assignments, targets: ['a', 'b', 'c'], styleOf, silent: true }).map((e) => e.target),
     ['a', 'c'],
     'the locked b is never re-picked',
   );

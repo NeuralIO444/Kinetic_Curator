@@ -249,4 +249,34 @@ ok('a take with a break-up replays to every checkpoint; a take started mid-break
   assert.equal(createLiveResolver().restoreState(junk), false, 'a malformed fold is refused');
 });
 
+ok('#2330 follow-up: a broken-up construct whose layer is hidden or deleted leaves the fold that frame', () => {
+  for (const gone of [(layers) => layers.map((l) => ({ ...l, visible: false })), () => []]) {
+    const resolver = createLiveResolver();
+    let folds = [];
+    for (let f = 0; f < FIELD_ON + 60; f++) {
+      const t = (f + 1) * (1000 / 60);
+      const hidden = f >= FIELD_ON + 40;
+      resolver.resolveLayers({
+        ...STABLE,
+        ...(hidden ? { layers: gone(STABLE.layers) } : {}),
+        loopTimeMs: t,
+        dtSec: 1 / 60,
+        constructPieces: true,
+        gaits: PERFORMING(),
+        dishFluid: fluidStamp(t, { shed: 0 }),
+        dishFluidMagnets: [{ x: 0.5, y: 0.5 }],
+        dishFluidDial: { flow: 0.5, pull: 0.7, couple: 0 },
+        dishFluidCells: packFluidCells(f >= FIELD_ON ? DENSE : EMPTY, f),
+        dishFluidMarks: 1,
+      });
+      folds.push(resolver.snapshotState().gaitBreak || null);
+    }
+    assert.ok(folds[FIELD_ON + 39], 'broken up while the layer stands');
+    assert.ok(Object.keys(folds[FIELD_ON + 39]).every((k) => k.startsWith('lyr-a|')));
+    for (let f = FIELD_ON + 40; f < folds.length; f++) assert.equal(folds[f], null, `frame ${f}: no dead key`);
+    resolver.dispose();
+    folds = null;
+  }
+});
+
 console.log(`liveResolve.gaitBreakup.selfcheck: ${n} checks ok`);
