@@ -30,7 +30,7 @@ import { createRouteRecorder } from '../gl/routeRecord.mjs';
 import { createGestureRecorder } from '../gl/gestureRecord.mjs';
 import { createBirthRecorder, setBirthTap, birthRecordsFromSection } from '../curator/birthRecord.mjs';
 import { createGaitRecorder, setGaitTap } from '../curator/gaitRecord.mjs'; // #2329: the take logs every GAIT_ASSIGN
-import { createBandRecorder, setBandTap, BAND_RECORD_VERSION } from '../personas/bandRecord.mjs'; // #2387: the take logs every band turn
+import { createBandRecorder, setBandTap, setBandHeadsTap, BAND_RECORD_VERSION } from '../personas/bandRecord.mjs'; // #2387: the take logs every band turn; #2394: and stamps the heads that steered
 import { bandOn } from '../personas/bandLive.js';
 import { wireSection } from '../personas/wireLive.js'; // #2390: the take's `wire` section (declines while the Wire is off)
 import { createRhythmRecorder, setRhythmTap } from '../personas/rhythmRecord.mjs'; // #2389: the rhythm section's timing + looks ride band.rhythm
@@ -228,6 +228,10 @@ const bandSection = (getFrame) => {
   const seed = useStore.getState().seed;
   const rec = createBandRecorder({ getFrame, seed });
   setBandTap((t) => rec.update(t));
+  // #2394 — the heads that steer this take stamp themselves into its band section (`heads`): only the
+  // ones that actually fired, with their versions; absent when none did, so an unsteered take's
+  // section is exactly P7's.
+  setBandHeadsTap((hs) => rec.noteHeads(hs));
   // #2389 — the rhythm section's timing leans and looks ride inside the band section as `rhythm` (additive: absent
   // when she leaned on nothing and looked at nothing, so a take with her unruled is exactly P7's)
   const rhythm = createRhythmRecorder({ getFrame });
@@ -235,6 +239,7 @@ const bandSection = (getFrame) => {
   return {
     stop() {
       setBandTap(null);
+      setBandHeadsTap(null);
       setRhythmTap(null);
       const band = rec.finish();
       const r = rhythm.finish();

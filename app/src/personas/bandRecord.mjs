@@ -27,6 +27,7 @@ import {
   applyTurn,
   standingSolo,
 } from './band.mjs';
+import { PERSONA_DECISION_KINDS } from '../curator/decisionFeatures.mjs';
 
 export const BAND_RECORD_VERSION = 1;
 /** A take is at most 20 minutes (~150 phrases); at most two rows a phrase stays far below this. */
@@ -46,6 +47,39 @@ export function noteBandTurn(turn) {
   } catch {
     /* a take that cannot hear a turn does not break the band */
   }
+}
+
+let headsTap = null;
+/** Install (or clear, with null) the steering tap — the recording take's ear for head stamps (A1). */
+export function setBandHeadsTap(fn) {
+  headsTap = typeof fn === 'function' ? fn : null;
+}
+/** Report the heads that steered this phrase ([{ id, kind, version }], from stepBand) to the take. */
+export function noteBandHeads(entries) {
+  if (!headsTap || !entries || !entries.length) return;
+  try {
+    headsTap(entries);
+  } catch {
+    /* a take that cannot hear a stamp does not break the band */
+  }
+}
+
+/** The stamp's shape, alone: [{ id, kind, version }] — a band seat that can hold a head (never the
+ * rhythm section: she has no personas entry in A1), a decision kind (A0's kinds, one vocabulary),
+ * a head version ≥ 1, one entry per (id, kind). */
+function checkHeadsStamp(heads) {
+  if (!Array.isArray(heads) || heads.length > (Object.keys(BAND_SEATS).length - 1) * PERSONA_DECISION_KINDS.length) return false;
+  const seen = new Set();
+  for (const h of heads) {
+    if (!h || typeof h !== 'object' || Array.isArray(h)) return false;
+    if (!Object.hasOwn(BAND_SEATS, h.id) || h.id === 'queen') return false;
+    if (!PERSONA_DECISION_KINDS.includes(h.kind)) return false;
+    if (!Number.isInteger(h.version) || h.version < 1) return false;
+    const key = `${h.id}|${h.kind}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  return true;
 }
 
 const isU32 = (v) => Number.isInteger(v) && v >= 0 && v <= 0xffffffff;
@@ -88,9 +122,17 @@ export function turnOf(row) {
 /**
  * The take-side recorder. `seed` is the seed the band drew from (the take's), written once so the section alone says
  * what conversation it holds. finish() is undefined when no turn was played — the section is then absent.
+ *
+ * A1 (#2394, ruling Q4): the section also carries the take's head stamp — `heads`, the persona heads
+ * that ACTUALLY steered a decision in this take ({ id, kind, version }, fed by noteHeads as the band
+ * plays). A head that was loaded but never fired is not credited. The stamp is a record, never an
+ * input: playback re-publishes the recorded turns and never re-decides, so nothing reads it back into
+ * a decision. Absent when no head steered — a pre-A1 take, and a take no head touched, are exactly
+ * the sections they always were.
  */
 export function createBandRecorder({ getFrame = () => 0, seed = 0 } = {}) {
   const rows = [];
+  const steered = new Map(); // `${id}|${kind}` -> { id, kind, version }
   return {
     update(turn) {
       if (!turn || rows.length >= BAND_RECORD_MAX) return;
@@ -98,9 +140,25 @@ export function createBandRecorder({ getFrame = () => 0, seed = 0 } = {}) {
       if (!checkRow(row, createBandState(), true)) return; // a malformed turn is not written
       rows.push(JSON.parse(JSON.stringify(row)));
     },
+    /** Record heads that steered (stepBand's per-phrase report). Malformed entries are not written. */
+    noteHeads(entries) {
+      if (!Array.isArray(entries)) return;
+      for (const h of entries) {
+        if (!h || typeof h !== 'object') continue;
+        const entry = { id: h.id, kind: h.kind, version: h.version };
+        if (!checkHeadsStamp([entry])) continue;
+        steered.set(`${entry.id}|${entry.kind}`, entry);
+      }
+    },
     finish() {
       if (!rows.length) return undefined;
-      return { version: BAND_RECORD_VERSION, seed: seed >>> 0, turns: rows.map((r) => JSON.parse(JSON.stringify(r))) };
+      const out = { version: BAND_RECORD_VERSION, seed: seed >>> 0, turns: rows.map((r) => JSON.parse(JSON.stringify(r))) };
+      if (steered.size) {
+        out.heads = [...steered.values()].sort((a, b) =>
+          a.id === b.id ? (a.kind < b.kind ? -1 : 1) : a.id < b.id ? -1 : 1,
+        );
+      }
+      return out;
     },
   };
 }
@@ -164,11 +222,15 @@ function checkRow(row, state, shapeOnly = false) {
 
 /**
  * A take's band section, checked: { version, seed, turns } (rows copied) or null (absent / malformed — fail closed:
- * one bad row refuses the whole section, so a half-true conversation is never played).
+ * one bad row refuses the whole section, so a half-true conversation is never played). The A1 head
+ * stamp rides along when present ({ ..., heads }, copied): shape-checked like everything else in
+ * the section, but never re-derived — steering is a fact the take records, not a consequence the
+ * fold can recompute, and replay never reads it (it re-publishes turns; it never re-decides).
  */
 export function checkBandRecord(section) {
   if (!section || typeof section !== 'object' || section.version !== BAND_RECORD_VERSION) return null;
   if (!isU32(section.seed) || !Array.isArray(section.turns) || section.turns.length > BAND_RECORD_MAX) return null;
+  if (section.heads != null && !checkHeadsStamp(section.heads)) return null;
   let state = createBandState();
   let lastFrame = 0;
   let lastPhrase = 0;
@@ -181,7 +243,9 @@ export function checkBandRecord(section) {
     state = applyTurn(state, turnOf(row));
     turns.push(JSON.parse(JSON.stringify(row)));
   }
-  return { version: BAND_RECORD_VERSION, seed: section.seed >>> 0, turns };
+  const out = { version: BAND_RECORD_VERSION, seed: section.seed >>> 0, turns };
+  if (section.heads != null) out.heads = section.heads.map((h) => ({ id: h.id, kind: h.kind, version: h.version }));
+  return out;
 }
 
 /** The conversation a take holds, as turns in order (the exact turns the band played), or [] for no/bad section. */

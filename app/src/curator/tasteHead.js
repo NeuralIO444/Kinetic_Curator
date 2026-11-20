@@ -16,6 +16,7 @@
 // app/src/curator/tasteTerms.fixture.json.
 import { recipeFeatures, FEATURES_VERSION } from './recipeFeatures.js';
 import { validateChapterMemory } from './chapterMemory.mjs';
+import { decisionFeatureNames, DECISION_FEATURES_VERSION, PERSONA_DECISION_KINDS } from './decisionFeatures.mjs';
 
 export const TASTE_KIND = 'kc-taste';
 export const TASTE_VERSION = 1;
@@ -151,7 +152,120 @@ export function validateTaste(raw) {
     const cm = validateChapterMemory(raw.chapters);
     if (cm) taste.chapters = cm;
   }
+  // Persona Adapters A1 (#2394) — the optional personas section: one tree head per persona per
+  // decision kind, trained on Matt's labeled turns (A0/A2). Same law as the queen and chapters
+  // sections above, NOT the lois law: personas are additive learning layered over a working
+  // instrument, so an unreadable section neutralizes — the personas stay on rules and the taste
+  // that exists is untouched. (Curation stands on the lois head; nothing stands on a persona head
+  // that has not earned in.) Absent (every pre-A1 file) stays absent, and a taste with no personas
+  // section validates to exactly the object it always did.
+  if (raw.personas != null) {
+    const personas = validatePersonasSection(raw.personas);
+    if (personas) taste.personas = personas;
+  }
   return { ok: true, taste };
+}
+
+// ─── Persona Adapters A1 (#2394): the personas section ─────────────────────
+//
+// Artifact shape (spec §3, as keyed by ruling Q3 — per persona PER TURN KIND, A0's label kinds):
+//   personas: { <personaId>: { <kind>: { version, kind, head, labeledTurns, heldOut, trainedAt } } }
+// `version` is the head's own version (stamped into the takes it steers, ruling Q4; A2's rollback
+// reads it). `heldOut` is the head's held-out score from its training run — the earn-in gate reads
+// it against HEAD_MIN_FIDELITY, and `labeledTurns` against EARN_IN_MIN_LABELED_TURNS.
+
+/** The personas a head may belong to, in cast order — every band seat except the rhythm section:
+ * she gets NO personas entry in A1 (ruling on #2394; her timing-inclination head is A6's phase).
+ * The selfcheck pins this list against band.mjs's BAND_SEATS. */
+export const PERSONA_HEAD_IDS = Object.freeze(['governor', 'davis', 'lois', 'carson', 'greiman', 'ashworth']);
+
+/** Which personas may hold a head of each decision kind — the band's structure, restated for the
+ * artifact: a solo head only for a seat that solos, a trade head only for a seat that answers, a
+ * cut head only for the bandleader (LOIS's cut is a trade answer, labeled 'trade' by A0 — it is
+ * not a standalone cut). A file claiming a structurally impossible head is malformed, and the
+ * selfcheck pins this table against band.mjs so the two can never drift apart. */
+export const PERSONA_HEAD_STRUCTURE = Object.freeze({
+  solo: Object.freeze(['davis', 'carson', 'greiman', 'ashworth']),
+  trade: Object.freeze(['davis', 'lois', 'carson', 'greiman', 'ashworth']),
+  cut: Object.freeze(['governor']),
+});
+
+/** Earn-in (spec §0/A4): a persona head steers only with at least this many of Matt's labeled
+ * turns behind it (and held-out at or above HEAD_MIN_FIDELITY). Tunable; shipped at the ruled 200. */
+export const EARN_IN_MIN_LABELED_TURNS = 200;
+
+/**
+ * Validate a taste.json `personas` section. Returns the cleaned section — entries rebuilt from
+ * known fields only, heads validated against the DECISION-feature universe — or null when the
+ * section is unreadable (the caller then neutralizes it: validateTaste keeps the file, drops the
+ * section). All-or-nothing: a half-valid section never steers half the band.
+ */
+export function validatePersonasSection(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const names = decisionFeatureNames();
+  const out = {};
+  for (const [id, byKind] of Object.entries(raw)) {
+    if (!PERSONA_HEAD_IDS.includes(id)) return null; // an unknown seat — or the rhythm section (A6's phase)
+    if (!byKind || typeof byKind !== 'object' || Array.isArray(byKind)) return null;
+    const kinds = Object.keys(byKind);
+    if (!kinds.length) return null;
+    const cleanKinds = {};
+    for (const kind of kinds) {
+      if (!PERSONA_DECISION_KINDS.includes(kind)) return null;
+      if (!PERSONA_HEAD_STRUCTURE[kind].includes(id)) return null;
+      const e = byKind[kind];
+      if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+      if (!Number.isInteger(e.version) || e.version < 1) return null;
+      if (e.kind !== kind) return null; // the entry's kind is its key (ruling Q3: one vocabulary)
+      if (!Number.isInteger(e.labeledTurns) || e.labeledTurns < 0) return null;
+      if (!finite(e.heldOut) || e.heldOut < -1 || e.heldOut > 1) return null;
+      if (e.featuresVersion != null && e.featuresVersion !== DECISION_FEATURES_VERSION) return null;
+      const v = validateTreeHeadFor(e.head, names);
+      if (!v.ok) return null;
+      cleanKinds[kind] = {
+        version: e.version,
+        kind,
+        head: v.head,
+        labeledTurns: e.labeledTurns,
+        heldOut: e.heldOut,
+        trainedAt: String(e.trainedAt || ''),
+        featuresVersion: DECISION_FEATURES_VERSION,
+      };
+    }
+    out[id] = cleanKinds;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** Has this personas entry earned in? ≥200 labeled turns AND held-out ≥ HEAD_MIN_FIDELITY (0.3).
+ * No experimental switch applies here (acceptance on #2394: a below-gate head never steers). */
+export function personaHeadEarnedIn(entry) {
+  return (
+    !!entry &&
+    Number.isInteger(entry.labeledTurns) &&
+    entry.labeledTurns >= EARN_IN_MIN_LABELED_TURNS &&
+    finite(entry.heldOut) &&
+    entry.heldOut >= HEAD_MIN_FIDELITY
+  );
+}
+
+/**
+ * The steering bundle for the band: { <personaId>: { <kind>: { version, head } } } holding ONLY
+ * the heads that have earned in — or null when the taste carries no personas section or no head
+ * has earned in, so the band runs on rules exactly as it did before A1. This is the earn-in gate:
+ * stepBand only ever sees heads that passed it.
+ */
+export function steeringHeads(taste) {
+  const personas = taste && taste.personas;
+  if (!personas) return null;
+  const out = {};
+  for (const [id, byKind] of Object.entries(personas)) {
+    for (const [kind, entry] of Object.entries(byKind)) {
+      if (!personaHeadEarnedIn(entry)) continue;
+      (out[id] ||= {})[kind] = { version: entry.version, head: entry.head };
+    }
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 function validateHead(h, numKeys) {
@@ -178,12 +292,19 @@ function validateHead(h, numKeys) {
  * inside the artifact bounds, and every number the walk will read is finite.
  * Validation rebuilds each node — the app keeps a clean copy, never the
  * file's own objects.
+ *
+ * A1 (#2394) parameterizes the universe: a persona head binds to the
+ * DECISION-feature universe (decisionFeatures.mjs) instead of the recipe
+ * one. The node law is identical — one validator, two universes — so
+ * validateTreeHeadFor is the general form and validateTreeHead is the
+ * recipe-bound original, byte-identical in what it accepts and rejects.
  */
-function validateTreeHead(h) {
+export function validateTreeHeadFor(h, featureNames) {
+  if (!h || typeof h !== 'object') return { ok: false, error: 'tree head missing' };
   if (h.objective !== XGB_OBJECTIVE) return { ok: false, error: `tree head objective must be ${XGB_OBJECTIVE}` };
   if (!finite(h.baseScore)) return { ok: false, error: 'bad tree head baseScore' };
   if (!finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad tree head fidelity' };
-  const allowed = new Set(treeFeatureNames());
+  const allowed = new Set(featureNames);
   const features = h.features;
   if (!Array.isArray(features) || !features.length) return { ok: false, error: 'tree head features missing' };
   const seen = new Set();
@@ -215,6 +336,11 @@ function validateTreeHead(h) {
       trees: clean,
     },
   };
+}
+
+/** The recipe-bound tree-head validation (the taste head's own universe). */
+function validateTreeHead(h) {
+  return validateTreeHeadFor(h, treeFeatureNames());
 }
 
 /** One node: a leaf { leaf } or a split { f, op, v, y, n, gain }. Depth is
@@ -303,12 +429,18 @@ function walkTree(node, features, names) {
   return walkTreePath(node, features, names).leaf;
 }
 
+/** Tree-head score over a precomputed feature vector: sigmoid(baseScore + Σ leaf margins) — a
+ * keep-probability. The general walk (A1, #2394): the recipe path computes recipeFeatures, a persona
+ * head's walk computes decisionFeatures — the trees never know which universe they are walking. */
+export function scoreTreeHeadWith(head, features) {
+  let margin = head.baseScore;
+  for (const t of head.trees) margin += walkTree(t, features, head.features);
+  return sigmoid(margin);
+}
+
 /** Tree-head score: sigmoid(baseScore + Σ leaf margins) — a keep-probability. */
 export function scoreTreeHead(head, layoutParams) {
-  const f = recipeFeatures({ layoutParams });
-  let margin = head.baseScore;
-  for (const t of head.trees) margin += walkTree(t, f, head.features);
-  return sigmoid(margin);
+  return scoreTreeHeadWith(head, recipeFeatures({ layoutParams }));
 }
 
 // ─── XGBoost T3 — Davis's citable reasons (spec §6/§7.5) ───────────────────

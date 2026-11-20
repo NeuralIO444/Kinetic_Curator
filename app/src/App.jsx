@@ -79,6 +79,8 @@ import { replayGaitFrame, endGaitReplay } from './curator/gaitRecord.mjs'; // #2
 import { ASSETS_CONSTRUCTS } from './data/assets/index.js'; // #2329: the house constructs (the gait wearers) and their styles
 import { startTrio, getTrioView } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
 import { startBand, bandOn } from './personas/bandLive.js'; // #2387: the band plays on the phrase clock (opt-in, off by default)
+import { getTaste } from './curator/tasteStore.js'; // #2394: the loaded taste carries the personas heads
+import { steeringHeads } from './curator/tasteHead.js'; // #2394: only earned-in heads steer the band
 import { replayRhythmFrame, endRhythmReplay } from './personas/rhythmRecord.mjs'; // #2389: a take replays the rhythm section's timing and looks
 import { createRhythmEyes } from './personas/rhythmVisionLive.js'; // #2389: the rhythm section's eyes (local vision model; at most once a phrase)
 import { startWire, stopWire, wireReader } from './personas/wireLive.js'; // #2390: the Wire (opt-in, off by default, nothing renders)
@@ -224,6 +226,10 @@ function AppInner() {
         return { keep, lock };
       },
       isReplaying: isPlaybackActive,
+      // #2394 — Adapters A1: the band steers on the loaded taste's persona heads, but only the ones
+      // that have earned in (≥200 labeled turns, held-out ≥ 0.3); no taste, no section, or no
+      // earned-in head reads null here and the band plays on rules exactly as before.
+      getHeads: () => steeringHeads(getTaste()),
       // #2389 — P9 the rhythm section's seat: her timing lean on each turn (when, never who or what) and her eyes, at
       // most once a phrase through a local vision model. Unruled (null) shares and cadence: nothing leans, nothing looks.
       getTiming: bandTimingStep,
