@@ -673,11 +673,39 @@ await ok('NOTHING RENDERS: only the engine side imports the Wire — no componen
     if (/from\s+['"][^'"]*\/wire(Feed|Record|Live)\.(m?js)['"]/.test(read(rel))) importers.push(rel);
   }
   assert.deepEqual(importers.sort(), [...allowed].filter((r) => !/^personas\/wire/.test(r)).sort());
-  // and the three places that import it only wire plumbing: no JSX is added around it
-  const app = read('App.jsx');
-  for (const m of app.matchAll(/^.*(?:wireReader|startWire|stopWire|replayWireFrame|endWireReplay).*$/gm)) assert.doesNotMatch(m[0], /<[A-Za-z]|className|aria-|title=/, m[0]);
-  const btn = read('components/PerformanceButton.jsx');
-  for (const m of btn.matchAll(/^.*wireSection.*$/gm)) assert.doesNotMatch(m[0], /<[A-Za-z]|className|aria-|title=/, m[0]);
+  // and the places that import it only wire plumbing: no JSX is added around it. Not by function name — by what a
+  // file imports: every identifier a render-capable file takes from the Wire may appear only on the import line and in
+  // plain call/prop positions, never on a line that carries markup, a class, an aria, a title or a visible string.
+  const SURFACE = /<[A-Za-z]|className|aria-|\btitle=|\bplaceholder=|\balt=|\blabel=/;
+  const ALLOWED_IDS = {
+    'App.jsx': ['endWireReplay', 'replayWireFrame', 'startWire', 'stopWire', 'wireReader'],
+    'components/PerformanceButton.jsx': ['wireSection'],
+  };
+  for (const [rel, ids] of Object.entries(ALLOWED_IDS)) {
+    const code = stripComments(read(rel));
+    const imported = [];
+    for (const m of code.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]*\/wire(?:Feed|Record|Live)\.m?js['"]/g))
+      imported.push(...m[1].split(',').map((x) => x.trim().split(/\s+as\s+/).pop()).filter(Boolean));
+    assert.deepEqual(imported.sort(), ids, `${rel}: imports exactly the Wire plumbing it is allowed (a new Wire import fails here)`);
+    assert.doesNotMatch(code, /import\s+\*\s+as\s+\w+\s+from\s*['"][^'"]*\/wire(?:Feed|Record|Live)\./, `${rel}: no namespace import of the Wire`);
+    for (const line of code.split('\n')) {
+      if (/^\s*import\b/.test(line)) continue;
+      if (imported.some((id) => new RegExp(`\\b${id}\\b`).test(line))) assert.doesNotMatch(line, SURFACE, `${rel}: Wire plumbing line carries markup: ${line.trim()}`);
+      // no string literal or JSX text anywhere in the file names the Wire (a title, aria-label, button, toast...)
+      for (const lit of line.matchAll(/(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g)) {
+        if (/^\s*import\b|\bfrom\s*$/.test(line.slice(0, lit.index))) continue;
+        assert.doesNotMatch(lit[2], /\bwire\b|design wire/i, `${rel}: a string literal names the Wire: ${line.trim()}`);
+      }
+      assert.doesNotMatch(line, />[^<>{}\n]*\bwire\b[^<>{}\n]*</i, `${rel}: visible JSX text names the Wire: ${line.trim()}`);
+    }
+  }
+  // no other file — component, panel, hook — so much as names a Wire reader or shelf getter
+  const READERS = /\b(getWireItems|getWireView|setWireShelf|holdWireShelf|clearWireShelf|wireReader|wireSection)\b/;
+  for (const f of walk(SRC)) {
+    const rel = path.relative(SRC, f).split(path.sep).join('/');
+    if (rel.endsWith('.selfcheck.mjs') || /^personas\/wire(Feed|Record|Live)\./.test(rel) || rel === 'personas/queenView.mjs' || rel in ALLOWED_IDS) continue;
+    assert.doesNotMatch(stripComments(read(rel)), READERS, `${rel}: names a Wire reader`);
+  }
 });
 
 await ok('NOTHING RENDERS: the Wire files carry no JSX, no DOM, no label, title, aria, tooltip, alert or notification — and no user-visible string', () => {

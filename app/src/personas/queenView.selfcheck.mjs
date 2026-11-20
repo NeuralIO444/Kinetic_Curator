@@ -138,7 +138,7 @@ ok("every persona's private state: COVER's verdict and grudges, OVERLAP's heat a
   clearGovernorEvents();
 });
 
-ok('the Archive (array of shelves), the Wire (typed, empty, P10 not built), her looks', () => {
+ok('the Archive (array of shelves), the Wire (typed, empty slot while the Wire is off or its shelf is empty), her looks', () => {
   resetRhythm();
   noteRhythmTiming({ phrase: 3, enterEarlyMs: 10, breathePct: 0.01, tightMs: 0 });
   noteRhythmLook({ phrase: 3, motion: 'busy' });

@@ -38,6 +38,7 @@ import { useStore } from '../state/store.js';
 import { resetDirector } from './director.js';
 import { fieldFormForDeal } from '../poets/fieldForm.js';
 import { mkRng } from '../engine/prng.js';
+import { HYBRID_PLANE_ALPHA, HYBRID_SPECTRUM_SPAN } from '../poets/rayGunForm.js';
 import * as queenLean from './queenLean.mjs';
 
 let passed = 0;
@@ -78,6 +79,15 @@ ok(
     for (const m of HYBRID_MOVES) assert.ok(seen.get(m) > 40, `${m} is played (${seen.get(m)} of 400)`);
     assert.equal(hybridMove(-1), hybridMove(0), 'junk seeds read as 0');
     assert.equal(hybridMove(NaN), hybridMove(0));
+  },
+);
+
+ok(
+  'A2b the planes’ opacities are pinned as literals: front to back [1, .62, .34]; spectrum span 8 (QA nit, P5)',
+  () => {
+    assert.deepStrictEqual([...HYBRID_PLANE_ALPHA], [1, 0.62, 0.34], 'plane alphas');
+    assert.ok(Object.isFrozen(HYBRID_PLANE_ALPHA), 'the table is frozen');
+    assert.equal(HYBRID_SPECTRUM_SPAN, 8, 'spectrum swatch span');
   },
 );
 
@@ -268,8 +278,10 @@ ok('D1 stance: agrees with SWISS GRIT on the grid, pushes back on BLAST; unruled
 ok('E1 callsigns only: HYBRID on the surface; no real name in the doctrine’s surface strings or the new copy', () => {
   const g = getPersona('greiman');
   assert.equal(g.identity.callsign, 'HYBRID');
-  for (const text of [DOCTRINES.greiman.name, DOCTRINES.greiman.title])
-    assert.ok(!/greiman|ashworth|carson/i.test(text), text);
+  assert.ok(!/greiman|ashworth|carson/i.test(DOCTRINES.greiman.name), DOCTRINES.greiman.name);
+  // Matt's ruling (QA nit, P5): the HYBRID button carries no hover tooltip — the unsigned title copy is gone.
+  assert.equal(DOCTRINES.greiman.title, undefined, 'HYBRID has no doctrine title');
+  assert.ok(!('title' in getPersona('greiman').doctrine), 'the record carries no doctrine.title');
   const panel = src('../panels/DavisPanel.jsx');
   assert.ok(/DOCTRINES\[id\]\.name/.test(panel), 'the doctrine row prints the callsign, from the table');
   const hy = stripComments(src('./hybrid.mjs'));
