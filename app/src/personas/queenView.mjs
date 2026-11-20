@@ -14,7 +14,7 @@
 //   governor  the Governor's budget (stress pressure and band) and cuts (the perf governor's sheds, the band's cuts)
 //   ledgers   keeps, passes, takes, taste version, dwell, time of night
 //   archive   the bundled Archive shelves (text only)
-//   wire      the Wire (P10, not built): a typed empty slot until it lands
+//   wire      the Wire (P10): the items in reach (plain text, read-only); the typed empty slot while there are none
 //   looks     her own readings of the frame (and the timing lean standing now)
 //   room      the story machine (rapport and grudge standing) and the room feed
 //
@@ -36,10 +36,11 @@ import { isPlaybackActive } from '../gl/playback.mjs';
 import { getBandView } from './bandLive.js';
 import { bundledArchiveFiles } from './personaArchiveLive.js';
 import { getRhythmLooks, getRhythmTiming } from './rhythmRecord.mjs';
+import { getWireView } from './wireRecord.mjs';
 
 export const QUEEN_VIEW_SCHEMA = 'kc-queen-view/1';
 
-/** The Wire's slot (P10, #2390, not built): typed, empty, read-only. P10 fills `items` from its own getter. */
+/** The Wire's slot: typed, empty, read-only — what stands while nothing is in reach (the Wire off, or an empty shelf). P10 (#2390) fills it from wireRecord's getter. */
 export const WIRE_SLOT = Object.freeze({ schema: 'kc-wire/0', built: false, items: Object.freeze([]) });
 
 /** Every section the view carries, in order (the selfcheck pins it). */
@@ -147,7 +148,7 @@ export function queenView({ state = null, activity = null, hour = null } = {}) {
       timeOfNight: timeOfNight(hour),
     },
     archive: plain((read(bundledArchiveFiles) || []).map((f) => ({ persona: f.persona, file: f.file, text: f.text }))),
-    wire: plain(WIRE_SLOT),
+    wire: plain(read(getWireView) ?? WIRE_SLOT),
     looks: { readings: plain(read(getRhythmLooks) || []), timing: plain(read(getRhythmTiming)) },
     room: { story: plain(read(getStoryView)), feed: plain(read(getRoomFeed) || []) },
   };

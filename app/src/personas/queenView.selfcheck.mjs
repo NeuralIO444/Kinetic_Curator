@@ -41,6 +41,7 @@ const READERS = new Set([
   'bundledArchiveFiles',
   'getRhythmLooks',
   'getRhythmTiming',
+  'getWireView',
 ]);
 const WRITER = /^(set|dispatch|emit|on|off|note|push|append|write|save|store|update|clear|reset|start|stop|subscribe|record|ensure|create|schedule|use|apply|replay|end|init|bump|assign|mark|export|download|flip|toggle|commit|delete|remove|load)/i;
 

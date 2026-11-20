@@ -1,0 +1,5 @@
+{
+  "schema": "kc-wire-feeds/1",
+  "note": "The Wire ships EMPTY until Matt approves a list (P10, #2390). A proposal lives in docs/design/wire-starter-feeds.md, never here. A machine can try feeds with the DEV override globalThis.__KC_WIRE_FEEDS (never saved).",
+  "feeds": []
+}

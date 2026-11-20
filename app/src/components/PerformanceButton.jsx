@@ -32,6 +32,7 @@ import { createBirthRecorder, setBirthTap, birthRecordsFromSection } from '../cu
 import { createGaitRecorder, setGaitTap } from '../curator/gaitRecord.mjs'; // #2329: the take logs every GAIT_ASSIGN
 import { createBandRecorder, setBandTap, BAND_RECORD_VERSION } from '../personas/bandRecord.mjs'; // #2387: the take logs every band turn
 import { bandOn } from '../personas/bandLive.js';
+import { wireSection } from '../personas/wireLive.js'; // #2390: the take's `wire` section (declines while the Wire is off)
 import { createRhythmRecorder, setRhythmTap } from '../personas/rhythmRecord.mjs'; // #2389: the rhythm section's timing + looks ride band.rhythm
 import { createTreatmentRecorder } from '../curator/treatmentRecord.mjs'; // #2010: the take logs its treatment acts
 import { on, Events } from '../composition/eventBus.js';
@@ -319,6 +320,7 @@ export function PerformanceButton() {
             treatments: treatmentsSection,
             gaits: gaitsSection,
             band: bandSection,
+            wire: wireSection,
           },
         })
       ) {

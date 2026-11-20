@@ -20,6 +20,7 @@ import { createThinker } from './mindThinker.js';
 import { PERSONAS, wantsStage, validateReply } from './mindContract.js';
 import { createMindReplay, decisionOf } from './mindRecord.js';
 import { withArchiveSnippets } from '../personas/personaArchive.mjs';
+import { withWireItems } from '../personas/wireFeed.mjs';
 
 let tap = null;
 /** Observe every live decision: fn(decision, requested). One listener (or null); the take recorder uses it. */
@@ -84,6 +85,10 @@ const requestOf = (d) => ({
  *                    cited snippets from the persona's own shelf, attached to the MODEL-bound context only — the
  *                    thinker and the rules keep the untouched context, and an empty snippet list hands the model
  *                    the identical object, so the no-model instrument is byte-identical. Absent = no Archive.
+ * @param wire        optional { itemsFor(persona, context) => [{ cite, text }] } (#2390 the Wire): a few design-news headlines
+ *                    the persona may read as CONTEXT (never a ruling), attached to the model-bound context after the
+ *                    Archive's snippets and fitted inside the same 4,096-token window. An empty list hands the model
+ *                    the identical object, so with the Wire off the ask is byte-identical. Absent = no Wire.
  * @returns stop()
  */
 export function startMind({
@@ -95,6 +100,7 @@ export function startMind({
   log = () => {},
   conductHeat = null,
   archive = null,
+  wire = null,
 }) {
   const name = model && ['demo', 'ollama'].includes(model.name) ? model.name : 'apple';
   const available = () => {
@@ -137,6 +143,13 @@ export function startMind({
             ctx = withArchiveSnippets(context, await archive.snippetsFor(persona, context));
           } catch {
             ctx = context;
+          }
+        }
+        if (wire && typeof wire.itemsFor === 'function') {
+          try {
+            ctx = withWireItems(ctx, wire.itemsFor(persona, ctx));
+          } catch {
+            /* the Wire never colours or breaks an ask */
           }
         }
         return model.ask(persona, ctx, meta);
