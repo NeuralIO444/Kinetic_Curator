@@ -765,19 +765,18 @@
     transform: scale(1);
   }
 }
-/* #1258 — the presence mark next to BEATS. Davis rendering: sway is a
-   continuous signal, so it breathes amber — never a TE blink. The glow and
-   the breath depth scale with --sway (0..1). Square like everything else
-   (law #1033): no border-radius anywhere near it. Below threshold the mark
-   renders as null, not dimmed — silence is default. */
+/* #1258 — the presence mark. #2389 (spec §4 Q18): it left the top bar and lives in
+   STIMULI as the faint warmth at the meter's edge — one trace, a warm wash on the
+   meter's right edge, breathing with --sway (0..1). No glyph, no text. Square like
+   everything else (law #1033): no border-radius anywhere near it. Below threshold
+   the mark renders as null, not dimmed — silence is default. */
 .sway-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  line-height: 1;
-  flex-shrink: 0;
-  filter: drop-shadow(0 0 calc(2px + 6px * var(--sway, 0)) rgba(255, 205, 130, calc(0.25 + 0.55 * var(--sway, 0))));
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: calc(10px + 10px * var(--sway, 0));
+  background: linear-gradient(to left, rgba(255, 170, 110, calc(0.14 + 0.36 * var(--sway, 0))), rgba(255, 170, 110, 0));
   animation: sway-breathe 3.2s ease-in-out infinite;
   pointer-events: none; /* never named, never interactive: no hover, no tooltip */
 }
@@ -785,18 +784,15 @@
   0%,
   100% {
     opacity: 0.55;
-    transform: scale(1);
   }
   50% {
     opacity: 1;
-    transform: scale(1.12);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .sway-mark {
     animation: none;
     opacity: 0.85;
-    filter: none;
   }
 }
 /* The tempo dropdown. Rendered in a portal on document.body (position: fixed

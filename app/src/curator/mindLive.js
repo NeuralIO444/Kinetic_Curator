@@ -35,6 +35,16 @@ export function getMindSystem() {
   return system ? { ...system } : null;
 }
 
+// #2389 (P9): each persona's latest decision (its verdict, and Davis's skip trace on `skips`), live or replayed — a
+// read-only holder for the aggregate read (personas/queenView.mjs). Observability only: nothing decides from it.
+const lastDecisions = {};
+/** Each persona's latest decision, { [persona]: decision } (copies; skips included where the rules gave them). */
+export function getLastDecisions() {
+  const out = {};
+  for (const [k, d] of Object.entries(lastDecisions)) out[k] = JSON.parse(JSON.stringify(d));
+  return out;
+}
+
 let lastStatus = null; // the last published mind:status payload (#2078: a late subscriber's first read)
 /** The answering backend as last published on mind:status: { available, backend, model?, tier? }, or null before the mind boots. */
 export function getMindStatus() {
@@ -249,6 +259,7 @@ export function startMind({
         }
       }
       const requested = wantsStage(d.persona, d.reply, ctx.room);
+      lastDecisions[d.persona] = d;
       emit(Events.MIND_DECISION, d, { cause: 'mind' });
       if (d.backend === 'rules')
         emit(
@@ -300,6 +311,7 @@ export function replayMindFrame(frame, record, { seeked = false } = {}) {
   for (const e of replay.cursor.conductStep(frame)) emit(Events.MIND_ROUTE, e, { cause: 'replay' }); // #1483: the take's conducting, as it happened
   for (const row of rows) {
     const d = decisionOf(row);
+    lastDecisions[d.persona] = d;
     emit(Events.MIND_DECISION, d, { cause: 'replay' });
     if (row[6] === 1) emit(Events.MIND_REQUEST, requestOf(d), { cause: 'replay' });
   }

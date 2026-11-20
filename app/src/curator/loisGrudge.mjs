@@ -159,6 +159,10 @@ export function createGrudgeTally({ now = () => Date.now() } = {}) {
 /** The session's tally — fed by the round wiring (cuts) and the keep doors
  * (overrules); read by the backstage readout. */
 export const loisGrudge = createGrudgeTally();
+/** #2389 (P9): the live grudge tally as a read (its snapshot) — the reader's door, with no way to note a cut. */
+export function getLoisGrudges() {
+  return loisGrudge.snapshot();
+}
 
 const genreLabel = (r) => {
   const name = chapterById(r.chapterId)?.name ?? r.chapterId;

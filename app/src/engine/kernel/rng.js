@@ -229,6 +229,10 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // decision about motion, not placement or colour, so it rides the noise stream like the gait. band.mjs passes no
   // offsets, so the group offset is the identity for its draws; the registration keeps the name accounted for (#1238).
   band: 'noise',
+  // #2389 — the beat composer's mutations (curator/beatLibrary.js composePattern): which steps of a pattern she varies,
+  // inside its vibe. A rhythm decision (motion), so the noise stream; no offsets are passed (identity), and the
+  // composer only runs while the band is on, so no existing draw moves.
+  'beat-compose': 'noise',
 });
 
 const OFFSET_GROUP_OF = new Map([
