@@ -451,6 +451,13 @@ export function sanitizeFieldForm(raw) {
     )
       return null;
     for (const axis of ['bitmap', 'planes', 'spectrum']) if (raygun[axis] !== undefined && raygun[axis] !== 1) return null;
+    // Persona Kernel P6 (#2386): a doctrine's layout moves — `typeset: 1` (type layout) and/or `page: 1` (page layout), and
+    // `hand: 1 | -1` (the handedness an answered call named). Layout needs the doctrine that armed it; a lone `hand` is
+    // refused whole. Absent, no key is added and the form draws exactly as it always did.
+    for (const axis of ['typeset', 'page']) if (raygun[axis] !== undefined && raygun[axis] !== 1) return null;
+    if (raygun.hand !== undefined && raygun.hand !== 1 && raygun.hand !== -1) return null;
+    if ((raygun.typeset === 1 || raygun.page === 1) && !raygun.doctrine) return null;
+    if (raygun.hand !== undefined && raygun.typeset !== 1 && raygun.page !== 1) return null;
     raygunMark = {
       mode: raygun.mode,
       seed: raygun.seed,
@@ -459,6 +466,9 @@ export function sanitizeFieldForm(raw) {
       ...(raygun.bitmap === 1 ? { bitmap: 1 } : {}),
       ...(raygun.planes === 1 ? { planes: 1 } : {}),
       ...(raygun.spectrum === 1 ? { spectrum: 1 } : {}),
+      ...(raygun.typeset === 1 ? { typeset: 1 } : {}),
+      ...(raygun.page === 1 ? { page: 1 } : {}),
+      ...(raygun.hand === 1 || raygun.hand === -1 ? { hand: raygun.hand } : {}),
       ...(raygun.life ? { life: raygun.life } : {}),
       ...(raygun.doctrine ? { doctrine: raygun.doctrine } : {}),
     };
