@@ -1,4 +1,4 @@
-// swayMark.selfcheck.mjs — the presence mark next to BEATS (#1258).
+// swayMark.selfcheck.mjs — the presence mark (#1258); since #2389 the faint warmth at the STIMULI meter's edge.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import {
@@ -85,27 +85,43 @@ ok('the pick path publishes sway to the holder (never store state)', () => {
   assert.ok(!/swayMagnitude\s*:/.test(slice), 'no sway key in store state (deniability law)');
 });
 
-ok('placement: the mark sits immediately right of BEATS in the top bar', () => {
+ok('placement (#2389, spec §4 Q18): the mark left the top bar and lives on the STIMULI meter, at its edge', () => {
   const bar = read('../panels/layout/CuratorBar.jsx');
-  assert.ok(bar.includes("import { SwayMark } from '../../components/SwayMark.jsx';"), 'imported');
-  const i = bar.indexOf('<BeatButton />');
-  assert.ok(i >= 0, 'BEATS found');
-  const after = bar.slice(i, i + 400);
+  assert.ok(!bar.includes('SwayMark'), 'the top bar no longer carries the mark');
+  assert.ok(!bar.includes('sway-mark'), 'no trace of it in the top bar');
+  const meter = read('../panels/stimulus/MeterHero.jsx');
+  assert.ok(meter.includes("import { SwayMark } from '../../components/SwayMark.jsx';"), 'the meter imports it');
   assert.ok(
-    /<BeatButton \/>\s*\{\/\* #1258[\s\S]*?\*\/\}\s*<SwayMark \/>/.test(after),
-    'SwayMark directly after BeatButton',
+    /<div className="stim-meter-stage">\s*<canvas[\s\S]*?\/>\s*<SwayMark \/>\s*<\/div>/.test(meter),
+    'it sits on the meter stage, right after the meter canvas',
   );
+  // exactly one trace, anywhere in the UI
+  const uses = [meter, bar, read('./SwayMark.jsx')].join('\n').match(/<SwayMark \/>/g) || [];
+  assert.equal(uses.length, 1, 'one trace');
 });
 
-ok('CSS: Davis amber breath, reduced-motion static, square corners', () => {
+ok('one trace, still unnamed: no glyph, no text, no title, no tooltip, no aria name', () => {
+  const jsx = read('./SwayMark.jsx');
+  const tag = jsx.match(/<span[^>]*\/>/);
+  assert.ok(tag, 'a self-closing span: nothing inside it to read');
+  assert.ok(!/title=|aria-label=|aria-labelledby=|data-tip|tooltip/i.test(tag[0]), 'nothing names it');
+  assert.ok(!/\p{Extended_Pictographic}/u.test(jsx), 'no glyph (the crown left with the top bar)');
+});
+
+ok('CSS: a warm edge on the meter, breathing; reduced-motion static; square corners; never interactive', () => {
   const css = read('../styles/controls.css').replace(/\/\*[\s\S]*?\*\//g, '');
   assert.ok(css.includes('.sway-mark'), 'class exists');
-  assert.ok(/\.sway-mark\s*\{[^}]*animation:\s*sway-breathe/.test(css), 'breathes');
+  const rule = css.match(/\.sway-mark\s*\{([^}]*)\}/)[1];
+  assert.ok(/animation:\s*sway-breathe/.test(rule), 'breathes');
+  assert.ok(/position:\s*absolute/.test(rule) && /right:\s*0/.test(rule), 'on the right edge');
+  assert.ok(/linear-gradient/.test(rule), 'a warmth, not a glyph');
   assert.ok(css.includes('@keyframes sway-breathe'), 'keyframes exist');
-  assert.ok(!/\.sway-mark\s*\{[^}]*border-radius/.test(css), 'no border-radius (law #1033)');
+  assert.ok(!/border-radius/.test(rule), 'no border-radius (law #1033)');
   const rm = css.match(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[^}]*\.sway-mark\s*\{([^}]*)\}/);
   assert.ok(rm && /animation:\s*none/.test(rm[1]), 'reduced motion: static mark');
-  assert.ok(/\.sway-mark\s*\{[^}]*pointer-events:\s*none/.test(css), 'never interactive');
+  assert.ok(/pointer-events:\s*none/.test(rule), 'never interactive');
+  const panels = read('../styles/panels.css');
+  assert.ok(/\.stim-meter-stage\s*\{[^}]*position:\s*relative/.test(panels), 'the meter stage holds it');
 });
 
 console.log(`\nswayMark: ${n} checks passed`);

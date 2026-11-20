@@ -6,7 +6,7 @@
 //
 // Silent: it adds to the same band feed the meter feeds, so every route, kineme and pattern track reacts as it does to
 // real audio, and a take replays it from the inputs it already records (scaleMul / alphaBoost / beatDrive).
-import { BEATS } from './beatLibrary.js';
+import { BEATS, BEAT_CRATE, composePattern } from './beatLibrary.js';
 import { playLevels } from './beatPlayer.mjs';
 import { createSourceArbiter } from './sourceArbiter.mjs';
 import { getMusicalTime } from '../composition/clockLive.js';
@@ -54,9 +54,12 @@ export function choosePattern({ vibes, bpm, seed, slot, lib = BEATS }) {
  * @param getRoom      () => { davis: 'FLOW' | ... | null, lois: 'AWAY' | ... | null }
  * @param getBand      () => 'relax' | 'normal' | 'tighten' | null
  * @param getSeed      () => the document seed
+ * @param grow         () => boolean — #2389 (P9): her library grows (the crate joins the shelf and each pick is a
+ *                     seeded variation inside its vibe). Off (the default, and whenever the band is off): BEATS only,
+ *                     the exact pick as before.
  * @returns { feed(loopMs), stop() }
  */
-export function createSet({ getBpm, getIdleMs, getRealLevel, getRoom, getBand, getSeed }) {
+export function createSet({ getBpm, getIdleMs, getRealLevel, getRoom, getBand, getSeed, grow = () => false }) {
   const arbiter = createSourceArbiter();
   let current = null;
   let slot = -1;
@@ -77,7 +80,16 @@ export function createSet({ getBpm, getIdleMs, getRealLevel, getRoom, getBand, g
       slot = s;
       const room = getRoom() || {};
       const vibes = room.lois === 'AWAY' ? ['calm', 'sparse'] : VIBES_FOR[room.davis] || DEFAULT_VIBES;
-      current = choosePattern({ vibes, bpm, seed: getSeed(), slot: s });
+      let grown;
+      try {
+        grown = grow() === true;
+      } catch {
+        grown = false;
+      }
+      if (grown) {
+        const seed = getSeed();
+        current = composePattern(choosePattern({ vibes, bpm, seed, slot: s, lib: [...BEATS, ...BEAT_CRATE] }), seed, s);
+      } else current = choosePattern({ vibes, bpm, seed: getSeed(), slot: s });
     }
     const intensity = INTENSITY_FOR[getBand()] ?? INTENSITY_FOR.normal;
     const lv = playLevels(current, t.pos, { intensity });
@@ -86,6 +98,8 @@ export function createSet({ getBpm, getIdleMs, getRealLevel, getRoom, getBand, g
   return {
     feed,
     source: () => arbiter.mix(),
+    /** #2389: the pattern the set is playing (or null) — read by the opt-in audible layer, never written. */
+    pattern: () => current,
     reset() {
       arbiter.reset();
       current = null;

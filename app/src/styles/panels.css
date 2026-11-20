@@ -692,6 +692,10 @@
 .stim-source.idle {
   color: var(--dim);
 }
+/* #2389 — the meter's stage: the presence mark (.sway-mark) sits on its right edge */
+.stim-meter-stage {
+  position: relative;
+}
 .stim-meter-canvas {
   display: block;
   width: 100%;

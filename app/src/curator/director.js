@@ -50,6 +50,7 @@ import {
   wetnessLean,
   evolveLean,
   surgeCall,
+  bandTiming,
 } from './queenLean.mjs';
 import { personaTuning } from '../personas/tuning.mjs';
 
@@ -528,6 +529,14 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
     get lastSway() {
       return lastSway;
     },
+    /** #2389 (P9): is the beat confident right now (the two-attack bar)? Read by the band-timing host. Never rendered. */
+    get beatConfident() {
+      return beats.confident;
+    },
+    /** #2389 (P9): how many counted keeps the pull holds (the MIN_KEEPS floor's count). Never rendered. */
+    get pullKeepCount() {
+      return pullKeeps(pull.keeps).length;
+    },
     /** Pacing debt as of the last tick, for the selfcheck: { debt, owed }. Never rendered. */
     get pacing() {
       return { debt, owed };
@@ -689,6 +698,21 @@ export function birthCentre({ ring, keeps, allowance, defaults }) {
 export function paceStep({ current, target, confidence, keeps, allowance }) {
   try {
     return tempoEase({ current, target, confidence, nKeeps: pullKeeps(keeps).length, allowance });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * #2389 (P9) — her timing lean on one band turn, hosted like everything the pull touches: the counted keeps and the
+ * beat confidence are the Director's own, `look` is a recorded reading of the frame (or null). Returns the lean
+ * { phrase, enterEarlyMs, breathePct, tightMs } or null; a throw anywhere reads as no lean. The band's live adapter
+ * calls it once per turn; nothing renders it.
+ */
+export function bandTimingStep(turn, look = null) {
+  try {
+    const d = getDirector();
+    return bandTiming(turn, { nKeeps: d.pullKeepCount, beatConfident: d.beatConfident === true, look });
   } catch {
     return null;
   }

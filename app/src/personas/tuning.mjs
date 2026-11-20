@@ -50,7 +50,9 @@ const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArr
 // ── the shape (what the selfcheck pins) ────────────────────────────────────────────────────────────────
 // Leaf tags: 'prob' a number in [0,1] · 'probPos' a number in (0,1] (a leaf the mechanics divide by) ·
 // 'count' an integer ≥ 0 · 'num' a finite number ≥ 0 ·
-// 'range' [lo, hi] with 0 ≤ lo < hi · 'opener' a spectrum opener { key, value: prob }.
+// 'range' [lo, hi] with 0 ≤ lo < hi · 'opener' a spectrum opener { key, value: prob } ·
+// 'prob?' / 'countPos?' — a knob that ships UNRULED: null (null = unruled = the mechanic does nothing), or once Matt
+// rules it, a probability in [0, 1] / an integer ≥ 1. The rig never edits a null leaf (setTuningValue refuses it).
 const KNOB_SHAPES = {
   lois: {
     brake: { at: 'prob', max: 'prob' },
@@ -89,6 +91,13 @@ const KNOB_SHAPES = {
     m6: { keeps: 'count', strength: 'prob' },
     m7: { confidence: 'prob', step: 'num', deadband: 'num', range: 'range' },
     m8: { wetStep: 'prob', wetDeadband: 'prob', evolveRange: 'range', evolveStep: 'num', evolveDeadband: 'num' },
+    // Persona Kernel P9 (#2389, spec §4 Q9): her sway on the WHOLE band's timing — each a share 0..1 of her M4
+    // phrase timing (≤ 40 ms early, ≤ +8% hold): when a horn comes in, how long a solo breathes, how tight a trade
+    // sits to the beat. Unruled (null): she does not touch the band's timing.
+    timing: { hornEntry: 'prob?', soloBreath: 'prob?', tradeTight: 'prob?' },
+    // P9 (spec §4 Q11): her eyes. everyPhrases — she looks at most once every N phrases (null: she does not look);
+    // weight — how far one reading may move her timing sway (null: a reading moves nothing).
+    vision: { everyPhrases: 'countPos?', weight: 'prob?' },
   },
 };
 const OPENER_KEYS = Object.freeze(['scale', 'displace', 'colour']);
@@ -96,6 +105,12 @@ const BAND_FIELDS = Object.freeze(['soloLengthPhrases', 'stepCap', 'odds', 'heat
 const ODDS_KEYS = Object.freeze(['agree', 'disagree', 'layOut']);
 
 function checkLeaf(tag, v, at, problems) {
+  if (tag.endsWith('?')) {
+    if (v === null) return; // unruled
+    if (tag === 'prob?') return checkLeaf('prob', v, at, problems);
+    if (!Number.isInteger(v) || v < 1) problems.push(`${at} must be null (unruled) or an integer ≥ 1`);
+    return;
+  }
   if (tag === 'prob') {
     if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1) problems.push(`${at} must be a probability in [0, 1]`);
   } else if (tag === 'probPos') {

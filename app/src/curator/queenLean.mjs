@@ -30,6 +30,7 @@
 import { GATE_OPEN } from './queenChannel.js';
 import { extractFeatures } from './taste.js';
 import { personaTuning, TUNING_DEFAULTS } from '../personas/tuning.mjs';
+import { BAND_HORNS } from '../personas/band.mjs'; // #2389 (P9): which seats are horns — structure, not tuning
 
 const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 
@@ -452,4 +453,88 @@ export function surgeCallOpen({ priorKeeps = [], newKeep = null } = {}) {
 /** surgeCall(args) — the public, gated M9 call. 0 while the gate is closed. */
 export function surgeCall(args) {
   return GATE_OPEN ? surgeCallOpen(args) : 0;
+}
+
+// ─── M10: the band's timing (Persona Kernel P9, #2389; spec §4 Q9, Q11) ──────────────────────────────────────
+// Matt (Q9, 2026-11-18): she sways the WHOLE band's timing, never its content — when a horn comes in, how long a
+// solo breathes, how tight a trade sits to the beat. This is M4's phrase timing (≤ 40 ms early, hold ≤ +8%) handed
+// to the band: the band (personas/band.mjs) decides WHO plays and WHAT; she only leans WHEN. A turn's timing is a
+// separate record beside the turn (personas/rhythmRecord.mjs), never a field of it, so the conversation a take holds
+// is exactly the band's.
+//
+// Bounds carried over: small (a share of M4, so never past its caps — and clamped to the LITERAL caps below as well,
+// so a table edit can never exceed them), capped, relaxing (each lean lives for the phrase of its turn and relaxes
+// linearly to nothing across it: relaxedTiming), identity below MIN_KEEPS keeps, gated by #762, never surfaced.
+// Null is unruled: the shares ship null in the tuning table (queen.knobs.timing) and a null share leans nothing.
+//
+// Her eyes (Q11, the named exception to "vision verdicts steer nothing"): one recorded reading of the frame's
+// motion may move ONLY these three numbers, by at most the tuned weight (queen.knobs.vision.weight; null moves
+// nothing): a busy frame tightens the entries and trades and lets a solo breathe less; a still frame the reverse.
+// The reading never touches a turn, a seat, a verdict or the stage.
+
+/** M4's bounds, as literals: no band lean is ever earlier than this, in ms. */
+export const BAND_ARM_CAP_MS = 40;
+/** M4's bounds, as literals: no solo is ever held longer than this share of its length. */
+export const BAND_HOLD_CAP = 0.08;
+/** The one thing her eyes read: how much the frame moves. */
+export const LOOK_MOTIONS = Object.freeze(['still', 'flowing', 'busy']);
+const LOOK_DIR = Object.freeze({ still: -1, flowing: 0, busy: 1 });
+
+const share = (v) => (typeof v === 'number' && Number.isFinite(v) ? clamp01(v) : 0);
+const ms3 = (v) => Math.round(v * 1000) / 1000;
+const pct6 = (v) => Math.round(v * 1e6) / 1e6;
+
+/** Does this turn bring a horn in (a solo taken by a horn, or a trade that hands the solo to a horn)? */
+function hornComesIn(turn) {
+  if (turn.kind === 'solo') return BAND_HORNS.includes(turn.by);
+  if (turn.kind === 'trade') return turn.owner !== null && turn.owner !== turn.by && BAND_HORNS.includes(turn.owner);
+  return false;
+}
+/** Does this turn start a solo (its length is what breathes)? */
+const soloStarts = (turn) =>
+  turn.kind === 'solo' || (turn.kind === 'trade' && turn.owner !== null && turn.owner !== turn.by);
+
+/**
+ * Ungated: her timing lean on ONE band turn, or null for "no lean". Pure: (turn, signals, table).
+ *   turn     a band turn (personas/band.mjs: { kind, phrase, by, owner?, ... })
+ *   signals  { nKeeps, beatConfident, look? }   look: a recorded reading { motion } or null
+ * Returns { phrase, enterEarlyMs, breathePct, tightMs } (each ≥ 0, within the literal caps; at least one > 0).
+ */
+export function bandTimingOpen(turn, { nKeeps = 0, beatConfident = false, look = null } = {}, knobs = qk()) {
+  if (!turn || typeof turn !== 'object' || !Number.isInteger(turn.phrase)) return null;
+  if (!(nKeeps >= knobs.minKeeps)) return null;
+  const t = knobs.timing || {};
+  if (t.hornEntry == null && t.soloBreath == null && t.tradeTight == null) return null; // unruled
+  const base = phraseTiming(beatConfident === true);
+  if (!(base.armEarlyMs > 0) && !(base.holdPct > 0)) return null;
+  const v = knobs.vision || {};
+  const dir = look && LOOK_DIR[look.motion] !== undefined && v.weight != null ? LOOK_DIR[look.motion] : 0;
+  const w = share(v.weight);
+  const tighten = Math.max(0, 1 + w * dir);
+  const breathe = Math.max(0, 1 - w * dir);
+  const enterEarlyMs = hornComesIn(turn)
+    ? ms3(Math.min(BAND_ARM_CAP_MS, base.armEarlyMs * share(t.hornEntry) * tighten))
+    : 0;
+  const breathePct = soloStarts(turn) ? pct6(Math.min(BAND_HOLD_CAP, base.holdPct * share(t.soloBreath) * breathe)) : 0;
+  const tightMs =
+    turn.kind === 'trade' ? ms3(Math.min(BAND_ARM_CAP_MS, base.armEarlyMs * share(t.tradeTight) * tighten)) : 0;
+  if (!(enterEarlyMs > 0) && !(breathePct > 0) && !(tightMs > 0)) return null;
+  return Object.freeze({ phrase: turn.phrase, enterEarlyMs, breathePct, tightMs });
+}
+
+/** The gated band lean. Null while the gate is closed (#762). */
+export function bandTiming(turn, signals) {
+  return GATE_OPEN ? bandTimingOpen(turn, signals) : null;
+}
+
+/** A lean relaxed across its phrase: full at the boundary, nothing at the next (progress 0..1). Pure. */
+export function relaxedTiming(timing, phraseProgress) {
+  if (!timing) return null;
+  const k = 1 - clamp01(phraseProgress);
+  return {
+    phrase: timing.phrase,
+    enterEarlyMs: timing.enterEarlyMs * k,
+    breathePct: timing.breathePct * k,
+    tightMs: timing.tightMs * k,
+  };
 }

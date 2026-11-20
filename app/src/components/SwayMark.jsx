@@ -1,11 +1,13 @@
-// SwayMark (#1258) — the presence mark next to BEATS on the top bar.
+// SwayMark (#1258) — the presence mark. #2389 (Persona Kernel P9, spec §4 Q18): it left the top bar and lives in the
+// audio STIMULI panel now, as the faint warmth at the meter's edge — one trace, where she lives, still unnamed: no
+// glyph, no text, no tooltip, no aria name, no title (aria-hidden; never interactive). MeterHero hosts it.
 //
 // Amends the 2026-10-07 never-renders law per Matt's 2026-10-09 call: exactly
 // one icon, and it is never named — no name, no tooltip, no label, no
 // user-visible identifier. (The sway mechanics' deniability selfcheck scans UI
 // source for her identifiers; this file references none of them.)
 //
-// Behavior: present and breathing amber (Davis — sway is a continuous signal)
+// Behavior: present and breathing warm (sway is a continuous signal)
 // when the sway magnitude clears the threshold; fully absent below it
 // (silence is default, not a dimmed ghost). The pick path publishes the
 // magnitude to an ephemeral module holder on every CURATE press (deniability
@@ -25,9 +27,5 @@ export function SwayMark() {
   const mag = useSyncExternalStore(subscribeSway, getSwayMagnitude);
   const visible = Number.isFinite(mag) && mag > SWAY_VISIBLE_THRESHOLD;
   if (!visible) return null;
-  return (
-    <span className="sway-mark" aria-hidden="true" style={{ '--sway': mag.toFixed(3) }}>
-      👸🏽
-    </span>
-  );
+  return <span className="sway-mark" aria-hidden="true" style={{ '--sway': mag.toFixed(3) }} />;
 }

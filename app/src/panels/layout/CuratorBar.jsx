@@ -32,7 +32,6 @@ import { TAP_PULSE_MS } from '../../hooks/coldOpen.mjs';
 import { useInvite } from '../../hooks/useInvite.js';
 import { BeatButton } from '../../components/BeatButton.jsx';
 import { SCOPE_LABEL, sanitizeScope, nextScope, deckReadout } from '../../state/kineticScope.mjs';
-import { SwayMark } from '../../components/SwayMark.jsx';
 
 // #1772 — what each START state means, for the pill's tooltip (deadpan: the label is ≤4 chars, the tooltip explains).
 const SCOPE_HINT = {
@@ -417,8 +416,6 @@ export function CuratorBar() {
       )}
       {/* #1103 — BEAT sits right of the locks: the verbs, then the clock they run on. [•B] opens to BEAT · 120. */}
       <BeatButton />
-      {/* #1258 — the presence mark sits immediately right of BEATS. Never named: no title, no tooltip, no label. */}
-      <SwayMark />
       {/* #1855 — the landing card: fixed-position, shows only in the seconds after a cold flip lands. */}
       <ChapterCard />
     </div>

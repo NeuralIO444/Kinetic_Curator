@@ -11,6 +11,7 @@ import { nextRoute } from '../../data/audioRoutes.js';
 import { createBeatTracker } from '../../curator/beatConfidence.mjs';
 import { emit, Events } from '../../composition/eventBus.js';
 import { getGhost } from '../../curator/mindGhost.js';
+import { SwayMark } from '../../components/SwayMark.jsx'; // #2389: the presence mark lives here now (spec §4 Q18)
 
 const H = 132;
 const WAVE_H = 52;
@@ -214,13 +215,17 @@ export function MeterHero() {
           {source}
         </span>
       </div>
-      <canvas
-        ref={canvasRef}
-        className="stim-meter-canvas"
-        style={{ height: H, cursor: 'pointer' }}
-        onClick={routeBand}
-        aria-label="Audio meter: waveform, seven bands, beat. Click a band to add a route for it."
-      />
+      {/* #2389 — the faint warmth at the meter's edge (the mark left the top bar). Never named: no title, no label. */}
+      <div className="stim-meter-stage">
+        <canvas
+          ref={canvasRef}
+          className="stim-meter-canvas"
+          style={{ height: H, cursor: 'pointer' }}
+          onClick={routeBand}
+          aria-label="Audio meter: waveform, seven bands, beat. Click a band to add a route for it."
+        />
+        <SwayMark />
+      </div>
     </div>
   );
 }

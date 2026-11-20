@@ -32,7 +32,7 @@ import { useStore } from './state/store.js';
 import { useMetroPulse } from './hooks/useMetroPulse.js';
 import { say } from './curator/whisper.js'; // #1139
 import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
-import { initDirectorBeat, setPresenceProvider, conductHeat } from './curator/director.js'; // #1145
+import { initDirectorBeat, setPresenceProvider, conductHeat, bandTimingStep } from './curator/director.js'; // #1145; #2389: the band's timing host
 import { initPhase } from './curator/phase.js'; // #1144: the instrument knows the phase
 import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.js'; // #1354: stress and bands (the creature's posture consumes them since S5)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
@@ -70,7 +70,7 @@ import { startMindRoom, getMindRoom } from './curator/mindRoom.js'; // #1145: th
 import { startCanonBus } from './curator/canonBus.mjs'; // #2049: Canon records on the core buses
 import { isPlaybackActive, setPlaybackFrameTap, subscribePlayback } from './gl/playback.mjs'; // #1462: a take's decisions replay
 import { createSet } from './curator/setLive.js'; // #1475: her set
-import { setSourceFeed } from './gl/sourceFeed.mjs';
+import { setSourceFeed, peekSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
 import { startBreak } from './curator/breakLive.js'; // #2116: the assemble trigger
 import { startLean } from './curator/leanLive.js'; // #1640: the dial lean, applied in silence
@@ -78,7 +78,10 @@ import { startGaitPick } from './curator/gaitLive.js'; // #2329: each construct'
 import { replayGaitFrame, endGaitReplay } from './curator/gaitRecord.mjs'; // #2329: a take re-publishes its gait picks
 import { ASSETS_CONSTRUCTS } from './data/assets/index.js'; // #2329: the house constructs (the gait wearers) and their styles
 import { startTrio, getTrioView } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
-import { startBand } from './personas/bandLive.js'; // #2387: the band plays on the phrase clock (opt-in, off by default)
+import { startBand, bandOn } from './personas/bandLive.js'; // #2387: the band plays on the phrase clock (opt-in, off by default)
+import { replayRhythmFrame, endRhythmReplay } from './personas/rhythmRecord.mjs'; // #2389: a take replays the rhythm section's timing and looks
+import { createRhythmEyes } from './personas/rhythmVisionLive.js'; // #2389: the rhythm section's eyes (local vision model; at most once a phrase)
+import { startAudibleBeats } from './curator/beatSynthLive.js'; // #2389: the set made audible (opt-in DEV flag, off by default)
 import { replayBandFrame, endBandReplay } from './personas/bandRecord.mjs'; // #2387: a take re-publishes the band's turns
 import { createShowSpectrum } from './curator/showSpectrum.js'; // #1483 stage 2: the spectrum the personas are told
 import { SPECTRUM_PARAMS } from './curator/mindConduct.js'; // #1483 stage 2: the marks dials Davis may re-tune
@@ -219,6 +222,10 @@ function AppInner() {
         return { keep, lock };
       },
       isReplaying: isPlaybackActive,
+      // #2389 — P9 the rhythm section's seat: her timing lean on each turn (when, never who or what) and her eyes, at
+      // most once a phrase through a local vision model. Unruled (null) shares and cadence: nothing leans, nothing looks.
+      getTiming: bandTimingStep,
+      eyes: createRhythmEyes(),
     });
     const roomCodes = () => {
       const f = loisActivity.snapshot();
@@ -399,12 +406,14 @@ function AppInner() {
       replaySpectrumFrame(frame, perf && perf.spectrum, o);
       replayGaitFrame(frame, perf && perf.gaits, o);
       replayBandFrame(frame, perf && perf.band, o);
+      replayRhythmFrame(frame, perf && perf.band && perf.band.rhythm, o);
     });
     const offPlayback = subscribePlayback(() => {
       endMindReplay();
       endSpectrumReplay();
       endGaitReplay();
       endBandReplay();
+      endRhythmReplay();
       resetMindFaces();
       resetRoomFeed();
       resetGhost();
@@ -421,6 +430,15 @@ function AppInner() {
       getRoom: roomCodes,
       getBand: () => getStressState().band,
       getSeed: () => useStore.getState().seed,
+      grow: bandOn, // #2389: with the band on, her library grows (the crate + seeded variations); off, the set is unchanged
+    });
+    // #2389 — her set, audible: OFF by default (DEV flag), and even on it waits for a user gesture; synthesized from the
+    // pattern the set plays, it yields the moment live audio is on. Output only: it writes nothing back.
+    const stopAudible = startAudibleBeats({
+      getPattern: set.pattern,
+      getMix: () => (peekSourceFeed() ? peekSourceFeed().mix : 0),
+      getTime: getMusicalTime,
+      isLiveAudio: () => !!useStore.getState().audioEnabled,
     });
     scheduleArchiveIndexing(archiveRetriever); // #2384: embed the shelves at idle, never per frame
     setSourceFeed(set.feed);
@@ -441,6 +459,7 @@ function AppInner() {
       stopGaitPick();
       stopBand();
       offBandKeep();
+      stopAudible();
       stopMind();
       canonBus.stop();
       stopReviewVoice();

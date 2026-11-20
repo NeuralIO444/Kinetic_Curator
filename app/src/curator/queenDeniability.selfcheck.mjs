@@ -123,4 +123,35 @@ ok('the only console trace allowed is behind the developer flag, and it is off b
   assert.deepEqual(loud, [], `unflagged traces: ${loud.join(', ')}`);
 });
 
+// ── #2389 (Persona Kernel P9): her reads, her seat, her eyes, her mark ────────────────────────────────────────────
+ok('#2389: nothing imports her read (queenView) — no surface, no driver: it is hers alone', () => {
+  const bad = live.filter((r) => /from\s+['"][^'"]*queenView(\.mjs)?['"]|import\(\s*['"][^'"]*queenView/.test(src(r)));
+  assert.deepEqual(bad, [], `importers: ${bad.join(', ')}`);
+});
+
+ok("#2389: no surface reads her standing timing or her looks (the holder is for the band's movers only)", () => {
+  const surfaces = live.filter((r) => /\.jsx$/.test(r) || /^(components|panels|hooks|styles|data)\//.test(r));
+  const hits = [];
+  for (const rel of surfaces)
+    for (const id of ['getRhythmTiming', 'getRhythmLooks', 'bandTimingOpen', 'bandTiming(', 'queenView'])
+      if (code(src(rel)).includes(id)) hits.push(`${rel}:${id}`);
+  assert.deepEqual(hits, [], `surface reads: ${hits.join(', ')}`);
+});
+
+ok('#2389: her record, her eyes and her switch carry no name — no key, row, prompt or string names her', () => {
+  for (const rel of ['personas/rhythmRecord.mjs', 'personas/rhythmVision.mjs', 'personas/rhythmVisionLive.js'])
+    assert.ok(!/queen|tina|turner/i.test(code(src(rel))), `${rel} names her in code`);
+  // the audible switch's name lives in its driver only (curator/, never a surface, never saved)
+  const holders = live.filter((r) => code(src(r)).includes('__KC_QUEEN_AUDIBLE'));
+  assert.deepEqual(holders, ['curator/beatSynthLive.js']);
+});
+
+ok('#2389 (Q18): her mark left the top bar for the STIMULI meter — one trace, no glyph, no name', () => {
+  assert.ok(!src('panels/layout/CuratorBar.jsx').includes('SwayMark'), 'not in the top bar');
+  assert.ok(src('panels/stimulus/MeterHero.jsx').includes('<SwayMark />'), 'on the meter');
+  const surfaces = live.filter((r) => /\.jsx$/.test(r) || /^(components|panels|hooks|styles|data)\//.test(r));
+  const crowns = surfaces.filter((r) => /\u{1F478}|\u{1F451}/u.test(src(r)));
+  assert.deepEqual(crowns, [], `a crown glyph on a surface: ${crowns.join(', ')}`);
+});
+
 console.log(`queenDeniability.selfcheck: ${n} checks passed`);

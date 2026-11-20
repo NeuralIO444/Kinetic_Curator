@@ -30,8 +30,9 @@ import { createRouteRecorder } from '../gl/routeRecord.mjs';
 import { createGestureRecorder } from '../gl/gestureRecord.mjs';
 import { createBirthRecorder, setBirthTap, birthRecordsFromSection } from '../curator/birthRecord.mjs';
 import { createGaitRecorder, setGaitTap } from '../curator/gaitRecord.mjs'; // #2329: the take logs every GAIT_ASSIGN
-import { createBandRecorder, setBandTap } from '../personas/bandRecord.mjs'; // #2387: the take logs every band turn
+import { createBandRecorder, setBandTap, BAND_RECORD_VERSION } from '../personas/bandRecord.mjs'; // #2387: the take logs every band turn
 import { bandOn } from '../personas/bandLive.js';
+import { createRhythmRecorder, setRhythmTap } from '../personas/rhythmRecord.mjs'; // #2389: the rhythm section's timing + looks ride band.rhythm
 import { createTreatmentRecorder } from '../curator/treatmentRecord.mjs'; // #2010: the take logs its treatment acts
 import { on, Events } from '../composition/eventBus.js';
 import { useApp } from '../state/AppContext.jsx';
@@ -223,12 +224,21 @@ const gaitsSection = (getFrame) => {
 // leaves the section absent too.
 const bandSection = (getFrame) => {
   if (!bandOn()) return null;
-  const rec = createBandRecorder({ getFrame, seed: useStore.getState().seed });
+  const seed = useStore.getState().seed;
+  const rec = createBandRecorder({ getFrame, seed });
   setBandTap((t) => rec.update(t));
+  // #2389 — the rhythm section's timing leans and looks ride inside the band section as `rhythm` (additive: absent
+  // when she leaned on nothing and looked at nothing, so a take with her unruled is exactly P7's)
+  const rhythm = createRhythmRecorder({ getFrame });
+  setRhythmTap((e) => rhythm.update(e));
   return {
     stop() {
       setBandTap(null);
-      return rec.finish();
+      setRhythmTap(null);
+      const band = rec.finish();
+      const r = rhythm.finish();
+      if (!r) return band;
+      return { ...(band || { version: BAND_RECORD_VERSION, seed: seed >>> 0, turns: [] }), rhythm: r };
     },
   };
 };
