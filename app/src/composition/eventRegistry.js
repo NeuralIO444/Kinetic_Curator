@@ -180,7 +180,10 @@ export const EVENT_REGISTRY = {
       'curator/breakLive.js',
     ],
   },
-  ACTIVITY_HEARTBEAT: { handler: null, note: 'telemetry: published by loisActivity (#1390); no listener yet' },
+  ACTIVITY_HEARTBEAT: {
+    handler: ['personas/wireLive.js'],
+    note: 'published by loisActivity (#1390). The Wire (#2390, opt-in, off by default) reads idleMs as its idle moment: at most one fetch round per 30 minutes, never a poll; with the Wire off nothing subscribes',
+  },
   DISH_DENSITY: {
     handler: null,
     note: 'telemetry: published by dishDensityLive each frame the contacts pass runs (#1412); the formation check (#1355) and telemetry read it — a pull getter (getDishDensityField) sits beside it',

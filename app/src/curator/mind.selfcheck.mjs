@@ -557,7 +557,7 @@ await ok('wired: a take records the mind section and playback replays it', () =>
   assert.match(
     flat(app),
     fre(
-      /setPlaybackFrameTap\(\(frame, perf, o\) => \{ replayMindFrame\(frame, perf && perf\.mind, o\); replaySpectrumFrame\(frame, perf && perf\.spectrum, o\); replayGaitFrame\(frame, perf && perf\.gaits, o\); replayBandFrame\(frame, perf && perf\.band, o\); replayRhythmFrame\(frame, perf && perf\.band && perf\.band\.rhythm, o\); \}\)/,
+      /setPlaybackFrameTap\(\(frame, perf, o\) => \{ replayMindFrame\(frame, perf && perf\.mind, o\); replaySpectrumFrame\(frame, perf && perf\.spectrum, o\); replayGaitFrame\(frame, perf && perf\.gaits, o\); replayBandFrame\(frame, perf && perf\.band, o\); replayRhythmFrame\(frame, perf && perf\.band && perf\.band\.rhythm, o\); replayWireFrame\(perf && perf\.wire\); \}\)/,
     ),
   );
   for (const e of ['MIND_REQUEST', 'MIND_STATUS']) assert.ok(EVENT_REGISTRY[e], `${e} is registered`);

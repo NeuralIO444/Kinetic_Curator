@@ -81,6 +81,8 @@ import { startTrio, getTrioView } from './curator/trioLive.js'; // #1483: Davis 
 import { startBand, bandOn } from './personas/bandLive.js'; // #2387: the band plays on the phrase clock (opt-in, off by default)
 import { replayRhythmFrame, endRhythmReplay } from './personas/rhythmRecord.mjs'; // #2389: a take replays the rhythm section's timing and looks
 import { createRhythmEyes } from './personas/rhythmVisionLive.js'; // #2389: the rhythm section's eyes (local vision model; at most once a phrase)
+import { startWire, stopWire, wireReader } from './personas/wireLive.js'; // #2390: the Wire (opt-in, off by default, nothing renders)
+import { replayWireFrame, endWireReplay } from './personas/wireRecord.mjs'; // #2390: a take replays the Wire items it had in reach
 import { startAudibleBeats } from './curator/beatSynthLive.js'; // #2389: the set made audible (opt-in DEV flag, off by default)
 import { replayBandFrame, endBandReplay } from './personas/bandRecord.mjs'; // #2387: a take re-publishes the band's turns
 import { createShowSpectrum } from './curator/showSpectrum.js'; // #1483 stage 2: the spectrum the personas are told
@@ -350,6 +352,7 @@ function AppInner() {
       isReplaying: isPlaybackActive,
       model: DEBUG_MIND ? demoModel : mindModel,
       archive: archiveRetriever,
+      wire: wireReader, // #2390: the Wire's items ride the model-bound context (read-only; [] while the Wire is off)
       getSeed: () => useStore.getState().seed,
       getSnapshot: () => {
         const st = useStore.getState();
@@ -401,12 +404,14 @@ function AppInner() {
     // #1462 — a take plays back its recorded decisions, frame by frame; no backend is asked
     // #1534 — and its recorded hearing: the take's spectrum feeds the live core in the analyser's place
     // #2329 — and its gait picks, re-published as they happened (nothing re-picks)
+    // #2390 — and the Wire items it had in reach (the take's own, never the live shelf: replay needs no network)
     setPlaybackFrameTap((frame, perf, o) => {
       replayMindFrame(frame, perf && perf.mind, o);
       replaySpectrumFrame(frame, perf && perf.spectrum, o);
       replayGaitFrame(frame, perf && perf.gaits, o);
       replayBandFrame(frame, perf && perf.band, o);
       replayRhythmFrame(frame, perf && perf.band && perf.band.rhythm, o);
+      replayWireFrame(perf && perf.wire);
     });
     const offPlayback = subscribePlayback(() => {
       endMindReplay();
@@ -414,6 +419,7 @@ function AppInner() {
       endGaitReplay();
       endBandReplay();
       endRhythmReplay();
+      endWireReplay();
       resetMindFaces();
       resetRoomFeed();
       resetGhost();
@@ -441,6 +447,7 @@ function AppInner() {
       isLiveAudio: () => !!useStore.getState().audioEnabled,
     });
     scheduleArchiveIndexing(archiveRetriever); // #2384: embed the shelves at idle, never per frame
+    startWire(); // #2390: opt-in (DEV flag + an approved feed list); one fetch at launch in an idle moment, then idle moments only
     setSourceFeed(set.feed);
     const unKeep = loisActivity.onKeep(noteKeep); // #1356 step 5: remember the living moths' traits at a keep
     const stop = initStress({
@@ -461,6 +468,7 @@ function AppInner() {
       offBandKeep();
       stopAudible();
       stopMind();
+      stopWire();
       canonBus.stop();
       stopReviewVoice();
       stopTreatments();
