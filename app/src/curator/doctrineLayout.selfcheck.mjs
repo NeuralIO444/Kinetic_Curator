@@ -50,6 +50,21 @@ const src = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
 const stripComments = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 console.log('doctrineLayout.selfcheck');
 
+// The caps, pinned as literals (QA nit, P6): a raise of any constant must fail here, not slide through a derived bound.
+ok(
+  'B0 the caps are pinned: slam 9 deg; bleed 0.14/axis; stair 0.15; drift 0.1 on a 0.05 grid; 12 columns, indent 0..2, column 0.12',
+  () => {
+    assert.equal(SLAM_DEG, 9, 'BLAST slam degrees');
+    assert.equal(BLEED_CAP, 0.14, 'BLAST bleed per axis');
+    assert.equal(STAIR_CAP, 0.15, 'HYBRID stair total');
+    assert.equal(DRIFT_STEP, 0.1, 'HYBRID drift step');
+    assert.equal(DRIFT_GRID, 0.05, 'HYBRID drift grid');
+    assert.equal(GRID_COLUMNS, 12, 'SWISS GRIT columns');
+    assert.equal(INDENT_MAX_COLS, 2, 'SWISS GRIT indent 0..2 columns');
+    assert.equal(COLUMN_CAP, 0.12, 'SWISS GRIT column pull');
+  },
+);
+
 const FORMS = [
   fieldFormForDeal({ poetId: 'teijo', pieceId: 't4' }, mkRng(1)),
   fieldFormForDeal({ poetId: 'teijo', pieceId: 't1' }, mkRng(1)),
@@ -149,16 +164,20 @@ for (const id of LAYOUT_DOCTRINE_IDS) {
                 if (s.alpha !== undefined || p.alpha !== undefined) assert.equal(s.alpha, p.alpha);
                 if (s.spec !== undefined || p.spec !== undefined) assert.deepStrictEqual(s.spec, p.spec);
                 maxShift = Math.max(maxShift, dist(s, p));
+                // slam tilts the block by at most 9 degrees (literal)
+                if (LAYOUT_MOVES[id][axis] === 'slam' && s.rotation !== undefined && p.rotation !== undefined)
+                  assert.ok(Math.abs(s.rotation - p.rotation) <= 9 + 1e-6, 'slam tilt within 9 degrees');
               });
               if (maxShift > 1e-9) moved++;
               // the cap: the block never travels further than its move's cap (slam: bounded by the tilt's chord)
               const cap = {
-                slam: 2 * Math.hypot(a.aspect, 1) * Math.sin(((SLAM_DEG / 2) * Math.PI) / 180) + 0.15,
-                bleed: Math.hypot(BLEED_CAP, BLEED_CAP) + 1e-6,
-                stair: STAIR_CAP + 1e-6,
-                drift: Math.hypot(DRIFT_STEP + DRIFT_GRID / 2, DRIFT_STEP * 0.6 + DRIFT_GRID / 2) + 1e-6,
-                indent: (INDENT_MAX_COLS * a.aspect) / GRID_COLUMNS + 1e-6,
-                column: Math.hypot(COLUMN_CAP, 1 / GRID_COLUMNS / 2) + 1e-6,
+                // LITERAL caps (QA nit, P6): never derived from the constants under test, so raising a cap fails here.
+                slam: 2 * Math.hypot(a.aspect, 1) * Math.sin(((9 / 2) * Math.PI) / 180) + 0.15,
+                bleed: Math.hypot(0.14, 0.14) + 1e-6,
+                stair: 0.15 + 1e-6,
+                drift: Math.hypot(0.1 + 0.05 / 2, 0.1 * 0.6 + 0.05 / 2) + 1e-6,
+                indent: (2 * a.aspect) / 12 + 1e-6,
+                column: Math.hypot(0.12, 1 / 12 / 2) + 1e-6,
               }[LAYOUT_MOVES[id][axis]];
               assert.ok(
                 maxShift <= cap,
@@ -248,7 +267,7 @@ ok(
       if (new Set(xs.map((v) => v.toFixed(6))).size > 2) cascaded++;
       const w = run(FORMS[0], 'ashworth', seed, { page: 1, hand: 1 });
       const left = inkLeft(w.after);
-      const col = w.aspect / GRID_COLUMNS;
+      const col = w.aspect / 12;
       if ([1, 2, 3].some((k) => Math.abs(left - k * col) < 1e-6)) columned++;
     }
     for (const [name, n] of Object.entries({ tilted, bled, onGrid, cascaded, columned }))

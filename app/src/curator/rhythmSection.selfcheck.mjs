@@ -381,6 +381,7 @@ function harness(opts) {
   return {
     turns,
     rhythm,
+    stop, // the band's own stop, without clearing the taps
     bars: (list) => list.forEach((bar) => emit(Events.CLOCK_BAR, { bar })),
     done() {
       stop();
@@ -481,6 +482,56 @@ await ok('live: muted while a take plays — no lean, no look (the take’s rows
   assert.equal(asked, 0);
   h.done();
 });
+
+await ok('live: no look while the band is unruled — a ruled vision cadence alone never asks (QA nit, P9)', async () => {
+  const t = bandFixture({ timing: RULED, vision: { everyPhrases: 1, weight: 0.5 } });
+  t.band.tradeRate = null; // one band number unruled: stepBand answers `unruled`, so the eyes stay shut
+  let asked = 0;
+  const h = harness({
+    enabled: () => true,
+    getTuning: () => t,
+    getTiming: (turn, look) => bandTimingOpen(turn, { ...SIG, look }, t.personas.queen.knobs),
+    eyes: { canLook: () => true, look: () => (asked++, Promise.resolve({ motion: 'busy' })) },
+  });
+  h.bars([0, 4, 8, 12, 16]);
+  await tick();
+  assert.equal(asked, 0, 'no look while unruled');
+  assert.deepEqual(h.rhythm, []);
+  h.done();
+});
+
+// A look that lands late is dropped unless the band is still live: replaying, switched off, or stopped.
+for (const [label, spoil] of [
+  ['a take is playing', (c) => (c.replaying = true)],
+  ['the band is switched off', (c) => (c.on = false)],
+  ['the band was stopped', (c, h) => h.stop()],
+]) {
+  await ok(`live: a late look is ignored when ${label} (control: it lands when live)`, async () => {
+    for (const spoiled of [false, true]) {
+      const t = bandFixture({ timing: RULED, vision: { everyPhrases: 1, weight: 0.5 } });
+      const c = { replaying: false, on: true };
+      let release;
+      const gate = new Promise((r) => (release = r));
+      let asked = 0;
+      const h = harness({
+        enabled: () => c.on,
+        isReplaying: () => c.replaying,
+        getTuning: () => t,
+        eyes: { canLook: () => true, look: () => (asked++, gate.then(() => ({ motion: 'busy' }))) },
+      });
+      h.bars([0]);
+      await tick();
+      assert.equal(asked, 1, 'the look was asked');
+      if (spoiled) spoil(c, h);
+      release();
+      await tick();
+      await tick();
+      const looks = h.rhythm.filter((e) => e.type === 'look');
+      assert.equal(looks.length, spoiled ? 0 : 1, spoiled ? 'the late look is dropped' : 'the live look lands');
+      h.done();
+    }
+  });
+}
 
 await ok('the holder: notes keep the last lean and a short look window; never on the band view', () => {
   resetRhythm();

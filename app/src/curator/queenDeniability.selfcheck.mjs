@@ -90,6 +90,30 @@ ok('the rest of curator/ outside the allowlist does not name her identifiers eit
   assert.deepEqual(hits, [], `leaks inside curator/: ${hits.join(', ')}`);
 });
 
+ok(
+  'the SwayMark names nothing: no title, aria-label, aria-labelledby, tooltip or visible text on its span (QA nit, P9)',
+  () => {
+    const text = code(src('components/SwayMark.jsx'));
+    const tags = [...text.matchAll(/<(?!\/)[A-Za-z][^>]*>/g)].map((m) => m[0]);
+    assert.ok(tags.length >= 1, 'the span is there');
+    for (const tag of tags)
+      assert.ok(
+        !/\btitle\s*=|aria-label\s*=|aria-labelledby\s*=|aria-describedby\s*=|\balt\s*=|data-tip|tooltip|\bplaceholder\s*=/i.test(
+          tag,
+        ),
+        `nothing names it: ${tag}`,
+      );
+    assert.ok(!/<[A-Za-z][^>]*>\s*[^<>{}\s][^<>]*<\//.test(text), 'no visible text inside the mark');
+    assert.ok(text.includes('aria-hidden="true"'), 'screen readers skip it');
+    // and no other surface that mounts it adds a title/aria-label around it
+    for (const rel of live.filter((r) => /\.jsx$/.test(r) && r !== 'components/SwayMark.jsx')) {
+      for (const line of code(src(rel)).split('\n'))
+        if (/<SwayMark\b/.test(line))
+          assert.ok(!/title\s*=|aria-label\s*=/.test(line), `${rel}: the mount carries a name: ${line.trim()}`);
+    }
+  },
+);
+
 ok('no store key and no saved-document key carries her: state is data, so she must not appear in it', () => {
   const hits = [];
   for (const rel of live.filter((r) => r.startsWith('state/'))) {

@@ -18,8 +18,6 @@ export const record = {
   doctrine: {
     name: 'HYBRID',
     modes: ['greiman'],
-    title:
-      'HYBRID — the digital pole: bitmap type, layered planes, a spectrum across a word, the float. Hand it the stage and every poem it deals lands in one of the four.',
     // What she owns beyond her mode (spec §4, Q13): PATTERN modes, and colour as the fifth principle.
     owns: { patternModes: ['GLYPH', 'TIDES'], principle: 'colour' },
   },
