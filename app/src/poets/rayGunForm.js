@@ -62,6 +62,7 @@
 
 import { mkRng } from '../engine/prng.js';
 import { stampWidthEm, stampInkBox, wearStampIdFor, bitmapStampIdFor, ORNAMENT_STAMP_IDS } from './placement.js';
+import { doctrineLayout } from './doctrineLayout.js'; // #2386 P6 — the doctrines' type-layout and page-layout moves
 
 /** The cycle, in tap order. Plain is the absence of the record. */
 export const RAYGUN_MODES = Object.freeze(['carson', 'greiman', 'grit', 'shot']);
@@ -680,7 +681,10 @@ export function rayGunForm(form, record) {
           : shot(form.stamps, rng, aspect);
   const worn = record.wear === 1 ? wear(stamps, mode, seed) : stamps;
   const dist = record.distort === 1 ? distort(worn, form.stamps, mode, seed, aspect) : worn;
-  return { ...form, stamps: mode === 'greiman' ? hybrid(dist, form.stamps.length, rows, record, seed) : dist };
+  const treated = mode === 'greiman' ? hybrid(dist, form.stamps.length, rows, record, seed) : dist;
+  // #2386 P6 — a doctrine's layout move (named in the record: typeset / page) sits on top of its treatment, last. No axis
+  // named (every tap, every older record, every call made with the switch off): the same array, untouched.
+  return { ...form, stamps: doctrineLayout(treated, { n: form.stamps.length, rows, aspect }, record) };
 }
 
 /**

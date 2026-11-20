@@ -95,6 +95,7 @@ export function bandRead(id, view) {
  *
  * @param {string} id  'carson' | 'greiman' | 'ashworth'
  * @param {{ stageMode?: string|null, stageSeed?: number|null, standing?: string|null, heat?: number, band?: object|null,
+ *           layout?: { typeset?: boolean, page?: boolean }|null,
  *           hybrid?: { bake?: boolean, layers?: boolean, spectrum?: boolean }|null }} [m]
  * @returns {{ id:string, code:'REST'|'ARMED'|'ON'|'BUILD', word:string, degree:number, layers:number, armed:boolean,
  *             variant:number, reasons:string[] }}
@@ -132,6 +133,12 @@ export function resolveHornState(id, m = {}) {
   if (owns) reasons.push('solo');
   if (build) reasons.push('build');
   if (counter) reasons.push('counter');
+  // #2386 (P6): the stage's own layout move, read off the standing record — a measurement, not a timer. It joins the
+  // reasons only (no picture, no word, no copy) while the stage is this horn's.
+  if (stage && m.layout) {
+    if (m.layout.typeset === true) reasons.push('typeset');
+    if (m.layout.page === true) reasons.push('page');
+  }
 
   const onFloor = stage || owns || build || counter;
   const bandOnHorn = owns || build || counter;

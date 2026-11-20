@@ -735,6 +735,7 @@ node src/personas/personaTuning.selfcheck.mjs
 node src/personas/band.selfcheck.mjs
 node src/curator/hornFaces.selfcheck.mjs
 node src/curator/hybrid.selfcheck.mjs
+node src/curator/doctrineLayout.selfcheck.mjs
 node src/curator/hornLines.selfcheck.mjs
 node src/panels/directors/hornStrip.selfcheck.mjs
 node src/personas/callsignSweep.selfcheck.mjs

@@ -1,5 +1,7 @@
 import { doctrineMode, isDoctrine } from '../../curator/doctrines.mjs';
 import { hybridAxes } from '../../curator/hybrid.mjs'; // #2385 P5: HYBRID's call names its move in the record
+import { layoutAxes } from '../../curator/doctrineLayout.mjs'; // #2386 P6: a doctrine's layout call (off by default)
+import { doctrineLayoutOn, layoutStanceNow } from '../../curator/doctrineLayoutLive.js';
 import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams, BLEND_MODES } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import {
@@ -349,6 +351,23 @@ function raygunWrite(state, mode) {
   };
 }
 
+/** #2386 — a keep names the standing poem: the form a kept look carries is this very object, and the artist's keep wins. */
+const poemKept = (state) =>
+  !!state.layoutParams?.fieldForm &&
+  [...(state.keeps || []), ...(state.favorites || [])].some(
+    (k) => k?.config?.layout?.fieldForm === state.layoutParams.fieldForm,
+  );
+
+/** #2386 P6 — the layout axes a doctrine call names (none unless the per-machine switch is on; the artist's hold/keep win). */
+const doctrineLayoutAxes = (state, id, seed, kept) =>
+  layoutAxes(id, seed, {
+    on: doctrineLayoutOn(),
+    held: poemHeld(state),
+    kept,
+    stance: layoutStanceNow(id),
+    standing: state.layoutParams?.fieldForm?.raygun ?? null,
+  });
+
 /** #1918 — HOLD: the standing poem is locked against re-deals (lockedParams.fieldForm, and a poem stands). */
 const poemHeld = (state) => !!state.lockedParams?.fieldForm && !!state.layoutParams?.fieldForm;
 
@@ -434,8 +453,8 @@ function doctrineArm(state, lp, form, streamIndex, reviewOpts) {
       ...form,
       raygun:
         id === 'greiman'
-          ? { mode, seed, doctrine: id, ...hybridAxes(seed) }
-          : { mode, seed, wear: 1, distort: 1, doctrine: id },
+          ? { mode, seed, doctrine: id, ...hybridAxes(seed), ...doctrineLayoutAxes(state, id, seed, false) }
+          : { mode, seed, wear: 1, distort: 1, doctrine: id, ...doctrineLayoutAxes(state, id, seed, false) },
     };
     delete armed.review;
     // A raygun-treated form is exempt from the review (Matt, 2026-11-06), so the veto reads the PLAIN landing: a
@@ -1524,6 +1543,7 @@ export const createLayoutSlice = (set) => ({
           // #2385 P5 — HYBRID names her move, not the hot/process-first material axes (see doctrineArm).
           ...(which === 'greiman' ? hybridAxes(seed) : { wear: 1, distort: 1 }),
           doctrine: which,
+          ...doctrineLayoutAxes(state, which, seed, poemKept(state)), // #2386 P6
           ...(form.raygun?.life ? { life: form.raygun.life } : {}),
         },
       };

@@ -26,6 +26,7 @@ import { LoisFaceNow, DavisFaceNow } from './RoomFaces.jsx';
 import { HornStrip } from './HornStrip.jsx';
 import { resolveHorns, bandRead, HORN_IDS, hornLabel } from '../../curator/hornFaces.js';
 import { hybridSignals } from '../../curator/hybrid.mjs'; // #2385 P5: HYBRID's measured moves
+import { layoutSignals } from '../../curator/doctrineLayout.mjs'; // #2386 P6: a doctrine's measured layout moves
 import { shownHeat, heatStep } from '../layout/kineticHeat.mjs';
 import { getBandView, subscribeBand } from '../../personas/bandLive.js';
 
@@ -82,6 +83,10 @@ export function RoomCodec() {
   const stageBitmap = useStore((s) => s.layoutParams?.fieldForm?.raygun?.bitmap === 1);
   const stagePlanes = useStore((s) => s.layoutParams?.fieldForm?.raygun?.planes === 1);
   const stageSpectrum = useStore((s) => s.layoutParams?.fieldForm?.raygun?.spectrum === 1);
+  // #2386 (P6) — the doctrine layout axes standing on the stage, as primitives (stable selectors).
+  const stageDoctrine = useStore((s) => s.layoutParams?.fieldForm?.raygun?.doctrine ?? null);
+  const stageTypeset = useStore((s) => s.layoutParams?.fieldForm?.raygun?.typeset === 1);
+  const stagePage = useStore((s) => s.layoutParams?.fieldForm?.raygun?.page === 1);
   const bandView = useBandView();
   const horns = resolveHorns({
     stageMode,
@@ -93,6 +98,13 @@ export function RoomCodec() {
       bitmap: stageBitmap ? 1 : 0,
       planes: stagePlanes ? 1 : 0,
       spectrum: stageSpectrum ? 1 : 0,
+    }),
+    layout: layoutSignals({
+      mode: stageMode,
+      seed: stageSeed,
+      doctrine: stageDoctrine,
+      typeset: stageTypeset ? 1 : 0,
+      page: stagePage ? 1 : 0,
     }),
     bands: Object.fromEntries(HORN_IDS.map((id) => [id, bandRead(id, bandView)])),
   });
