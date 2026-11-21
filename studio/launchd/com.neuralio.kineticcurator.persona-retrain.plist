@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Persona Adapters A3 (#2396): the nightly persona-retrain LaunchAgent — TEMPLATE.
+
+  Do not load this file as-is. personaNightlyInstall.sh renders it into
+  ~/Library/LaunchAgents/ with the placeholders below replaced by the Studio's real
+  absolute paths (launchd runs with a near-empty PATH and no shell profile, so every
+  path the job needs must be absolute and explicit — nothing is guessed):
+
+    __CHECKOUT__    Matt's existing working clone of Kinetic_Curator (never pulled by the job)
+    __NODE__        absolute path of the node interpreter
+    __PYTHON3__     absolute path of the python3 interpreter (the one that imports xgboost)
+    __DATA_HOME__   the adapters data home (canonical taste.json + store + scratch + logs)
+    __TAKES_DIR__   the desktop app's takes dir   (read in place, never written)
+    __LEDGERS_DIR__ the desktop app's ledgers dir (read in place, never written)
+
+  The schedule is Q2's ruling: 03:30 local, nightly. If the Studio is asleep the run
+  coalesces to next wake — harmless under the trainer's watermark.
+  StandardOut/StandardError go to the data home's launchd.log, which should stay empty:
+  the wrapper writes the night's real record to nightly.log itself, so anything in
+  launchd.log is a crash before the wrapper could open its own log.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.neuralio.kineticcurator.persona-retrain</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>__CHECKOUT__/studio/personaNightly.sh</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>KC_CHECKOUT</key>
+		<string>__CHECKOUT__</string>
+		<key>KC_NODE</key>
+		<string>__NODE__</string>
+		<key>KC_PYTHON3</key>
+		<string>__PYTHON3__</string>
+		<key>KC_ADAPTERS_HOME</key>
+		<string>__DATA_HOME__</string>
+		<key>KC_TAKES_DIR</key>
+		<string>__TAKES_DIR__</string>
+		<key>KC_LEDGERS_DIR</key>
+		<string>__LEDGERS_DIR__</string>
+	</dict>
+	<key>WorkingDirectory</key>
+	<string>__CHECKOUT__</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>3</integer>
+		<key>Minute</key>
+		<integer>30</integer>
+	</dict>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardOutPath</key>
+	<string>__DATA_HOME__/launchd.log</string>
+	<key>StandardErrorPath</key>
+	<string>__DATA_HOME__/launchd.log</string>
+</dict>
+</plist>

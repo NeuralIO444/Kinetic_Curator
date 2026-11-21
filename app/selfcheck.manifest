@@ -180,6 +180,7 @@ node src/curator/queenDeniability.selfcheck.mjs
 node ../studio/pool_rig.selfcheck.mjs
 node ../studio/labelExtractor.selfcheck.mjs
 node ../studio/personaRows.selfcheck.mjs
+node ../studio/personaNightly.selfcheck.mjs
 node src/curator/queenLean.selfcheck.mjs
 node src/curator/whisper.selfcheck.mjs
 node src/engine/mothBodies.selfcheck.mjs
