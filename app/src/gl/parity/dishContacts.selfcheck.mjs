@@ -158,6 +158,19 @@ try {
     compare('3 strata x 100 bodies', r.contacts, want);
     check('no overflow within 6 slots', r.overflow === 0);
   }
+  // the cap ladder's top step (2,048 bodies, #2188): the real kernel at the full cap, 4 strata x 512
+  {
+    const t = tableOf(512, 4, 1700, 0x2188);
+    const want = referenceContacts(t);
+    const r = await page.evaluate((a) => window.__kcContactsRun(a), { table: plain(t), slots: 6, mode: 'sync' });
+    check(
+      '2,048 bodies (the cap) produce contacts',
+      t.nb === 2048 && want.length > 100,
+      `${t.nb} bodies, ${want.length} pairs`,
+    );
+    compare('4 strata x 512 bodies', r.contacts, want);
+    check('no overflow within 6 slots at the cap', r.overflow === 0, `overflow ${r.overflow}`);
+  }
   // masks
   {
     const t = tableOf(80, 3, 520, 0x77, 0b101); // groups 0 and 2 only; cgroup 1 bodies match nothing

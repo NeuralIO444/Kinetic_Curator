@@ -55,12 +55,16 @@ assert.equal(bodies('swarm', 'high'), 350, 'no marker: the FULL tier cuts 500 to
 assert.equal(
   bodies('swarm', 'high', { swarmGpu: 1 }),
   500,
-  'marker: the layer runs its full 500 (cap 1,024, range 500)',
+  'marker: the layer runs its full 500 (cap 2,048, range 500)',
 );
 assert.equal(bodies('swarm', 'balanced'), 200);
-assert.equal(bodies('swarm', 'balanced', { swarmGpu: 1 }), 500, 'SHOW tier GPU cap is 585');
+assert.equal(bodies('swarm', 'balanced', { swarmGpu: 1 }), 500, 'SHOW tier GPU cap is 1,170 (range 500 binds)');
 assert.equal(bodies('swarm', 'performance'), 100);
-assert.equal(bodies('swarm', 'performance', { swarmGpu: 1 }), 293, 'LEAN tier GPU cap');
+assert.equal(
+  bodies('swarm', 'performance', { swarmGpu: 1 }),
+  500,
+  'LEAN tier GPU cap is 585: the range (500) binds now',
+);
 assert.equal(
   bodies('hype', 'high', { swarmGpu: 1 }),
   bodies('hype', 'high'),
