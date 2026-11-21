@@ -6,9 +6,10 @@ const STORAGE_KEY = 'kc:first-run-seen';
 /**
  * First-run “Play Me” intro overlay (#12).
  * Lightweight manifesto + one action that enables audio + Evolve.
- * Also the front door to the guided tour (#222).
+ * Also the front door to the guided tour (#222). The project wizard (#1710) is
+ * the step after this card: App renders it once this card is dismissed.
  */
-export function FirstRunOverlay({ onPlay, onTour }) {
+export function FirstRunOverlay({ onPlay, onTour, onDismiss }) {
   const [visible, setVisible] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_KEY) !== '1';
@@ -25,9 +26,11 @@ export function FirstRunOverlay({ onPlay, onTour }) {
         /* ignore */
       }
       setVisible(false);
+      // #1710 — the project wizard is the next step after this card; App hears every dismissal (play, skip, tour).
+      if (typeof onDismiss === 'function') onDismiss();
       if (play && typeof onPlay === 'function') onPlay();
     },
-    [onPlay],
+    [onPlay, onDismiss],
   );
 
   const startTour = useCallback(() => {

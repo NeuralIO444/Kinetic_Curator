@@ -9,6 +9,7 @@ import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { BackendIndicator } from './components/BackendIndicator.jsx'; // #2078: footer backend indicator (O / A / R)
 import { FirstRunOverlay } from './components/FirstRunOverlay.jsx';
+import { ProjectWizardOverlay } from './components/ProjectWizardOverlay.jsx';
 import { TourOverlay } from './components/TourOverlay.jsx';
 import { FavoritesTray } from './components/FavoritesTray.jsx';
 import { useHotkeys } from './hooks/useHotkeys.js';
@@ -532,6 +533,15 @@ function AppInner() {
   const [showHotkeys, setShowHotkeys] = useState(false);
   const [helpTab, setHelpTab] = useState('help');
   const [tourOpen, setTourOpen] = useState(false);
+  // #1710 — the project wizard is its own step after the Play Me card: it waits for the card to be gone (this
+  // launch's dismissal, or an earlier launch's) and never opens over the tour.
+  const [playMeGone, setPlayMeGone] = useState(() => {
+    try {
+      return localStorage.getItem('kc:first-run-seen') === '1';
+    } catch {
+      return false;
+    }
+  });
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
   useEffect(() => {
     evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
@@ -761,8 +771,9 @@ function AppInner() {
           setTourOpen(true);
         }}
       />
-      <FirstRunOverlay onPlay={onPlayMe} onTour={() => setTourOpen(true)} />
+      <FirstRunOverlay onPlay={onPlayMe} onTour={() => setTourOpen(true)} onDismiss={() => setPlayMeGone(true)} />
       <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
+      {playMeGone && !tourOpen ? <ProjectWizardOverlay /> : null}
       <PaletteStrip />
       <ModeStrip />
       <ErrorBoundary critical>

@@ -10,6 +10,7 @@ import { parseBootHash, describePaletteFallback, describeDroppedAssets } from '.
 import { fidelityNotice } from '../state/recipeFidelity.js';
 import { scopeDecks } from '../state/kineticScope.mjs'; // #1772: START sets the opener's width
 import { projectFolderLive } from './useProjectFolder.js'; // #1709: a project folder, when one is open
+import { captureBootSavedDoc } from './useProjectWizard.js'; // #1710: the saved doc, read before the boot can roll over it
 
 const DEBOUNCE_MS = 500;
 // General safety net: any sustained stream of edits (a held slider, a fast
@@ -207,6 +208,9 @@ export function useProjectAutosave() {
     if (restored.current || bootFired) return;
     restored.current = true;
     bootFired = true;
+    // #1710 — read the browser autosave doc BEFORE anything below can roll over it: the first-run wizard adopts
+    // the doc exactly as saved, and the browser boot's restore-roll would replace it within this same launch.
+    captureBootSavedDoc();
     // #1709 — the last project folder reopens at launch: its latest session, applied with NO startup roll and no write.
     // Only when it cannot be reached does the browser session boot (and the notice says why).
     const folder = projectFolderLive();
