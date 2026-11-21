@@ -219,7 +219,10 @@ export function validatePersonasSection(raw) {
       if (e.kind !== kind) return null; // the entry's kind is its key (ruling Q3: one vocabulary)
       if (!Number.isInteger(e.labeledTurns) || e.labeledTurns < 0) return null;
       if (!finite(e.heldOut) || e.heldOut < -1 || e.heldOut > 1) return null;
-      if (e.featuresVersion != null && e.featuresVersion !== DECISION_FEATURES_VERSION) return null;
+      // The universe version is REQUIRED (QA F3 on #2394): an unstamped entry is not silently
+      // re-stamped as current — if a future bump changes a feature's meaning without renaming
+      // it, the name check below cannot catch a stale head, so absent is malformed, full stop.
+      if (e.featuresVersion !== DECISION_FEATURES_VERSION) return null;
       const v = validateTreeHeadFor(e.head, names);
       if (!v.ok) return null;
       cleanKinds[kind] = {

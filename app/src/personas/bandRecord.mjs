@@ -28,6 +28,7 @@ import {
   standingSolo,
 } from './band.mjs';
 import { PERSONA_DECISION_KINDS } from '../curator/decisionFeatures.mjs';
+import { PERSONA_HEAD_STRUCTURE } from '../curator/tasteHead.js';
 
 export const BAND_RECORD_VERSION = 1;
 /** A take is at most 20 minutes (~150 phrases); at most two rows a phrase stays far below this. */
@@ -64,16 +65,21 @@ export function noteBandHeads(entries) {
   }
 }
 
-/** The stamp's shape, alone: [{ id, kind, version }] — a band seat that can hold a head (never the
- * rhythm section: she has no personas entry in A1), a decision kind (A0's kinds, one vocabulary),
- * a head version ≥ 1, one entry per (id, kind). */
+/** The stamp's shape, alone: [{ id, kind, version }] — a decision kind (A0's kinds, one
+ * vocabulary), a head version ≥ 1, one entry per (id, kind), and every (id, kind) pair must be
+ * a head that can EXIST: PERSONA_HEAD_STRUCTURE, the same table taste.json validation uses
+ * (QA F4 on #2394 — a stamp naming a structurally impossible head, LOIS-solo or a horn's cut,
+ * fails the record, and the rhythm section appears in no kind's list, so she is excluded by
+ * the same stroke). */
+const MAX_STAMP_ENTRIES = Object.values(PERSONA_HEAD_STRUCTURE).reduce((a, seats) => a + seats.length, 0);
 function checkHeadsStamp(heads) {
-  if (!Array.isArray(heads) || heads.length > (Object.keys(BAND_SEATS).length - 1) * PERSONA_DECISION_KINDS.length) return false;
+  if (!Array.isArray(heads) || heads.length > MAX_STAMP_ENTRIES) return false;
   const seen = new Set();
   for (const h of heads) {
     if (!h || typeof h !== 'object' || Array.isArray(h)) return false;
-    if (!Object.hasOwn(BAND_SEATS, h.id) || h.id === 'queen') return false;
+    if (!Object.hasOwn(BAND_SEATS, h.id)) return false;
     if (!PERSONA_DECISION_KINDS.includes(h.kind)) return false;
+    if (!PERSONA_HEAD_STRUCTURE[h.kind].includes(h.id)) return false;
     if (!Number.isInteger(h.version) || h.version < 1) return false;
     const key = `${h.id}|${h.kind}`;
     if (seen.has(key)) return false;

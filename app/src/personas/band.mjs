@@ -181,6 +181,22 @@ const headEntry = (heads, id, kind) => (heads && heads[id] && heads[id][kind]) |
 /** One head's keep-probability for one decision, walked over the decision-feature universe. */
 const headScore = (entry, input) => scoreTreeHeadWith(entry.head, decisionFeatures(input));
 
+/** The decision fields the BAND owns: the call being answered (caller, verdict, move), the cut's
+ * target, the deciding persona's heat, the standing solo's age. A caller-supplied decisionCtx may
+ * carry phrase context, census and recipe inputs — never these (stepBand's documented law). */
+const BAND_OWNED_FIELDS = Object.freeze(['caller', 'verdict', 'move', 'target', 'heat', 'soloAge']);
+
+/** One decision's feature input: baseInput with the band's own facts for THIS decision laid over
+ * it, and every other band-owned field stripped. A fact that is not a fact of this decision (a
+ * solo pick has no caller; a cut has no verdict) never reaches the vector — a hostile or merely
+ * careless decisionCtx cannot smuggle it in. (Pressure needs no handling here: baseInput already
+ * pins it over decisionCtx.) */
+function decisionInput(baseInput, owned) {
+  const input = { ...baseInput };
+  for (const k of BAND_OWNED_FIELDS) delete input[k];
+  return Object.assign(input, owned);
+}
+
 /** The move a verdict makes for a seat (verdictOf's own mapping, restated for the feature vector). */
 const moveOf = (id, verdict) =>
   verdict === 'agree' ? 'build' : verdict === 'layOut' ? 'rest' : BAND_SEATS[id].cuts ? 'cut' : 'counter';
@@ -211,21 +227,28 @@ function normalizeHold(hold) {
 function pickSoloist(seed, phrase, locked, tuning, heads, baseInput, noteSteered) {
   const pool = BAND_SOLOISTS.filter((id) => !locked.has(id));
   // A candidate with an earned-in solo head weighs in with its head's keep-probability for taking
-  // this solo; a candidate without one weighs its tuned heat, exactly as before A1.
-  const weights = pool.map((id) => {
-    const entry = headEntry(heads, id, 'solo');
-    if (!entry) return Math.max(0, tuning.personas[id].heat);
-    noteSteered(id, 'solo', entry);
-    return headScore(entry, { ...baseInput, heat: tuning.personas[id].heat });
-  });
+  // this solo; a candidate without one weighs its tuned heat, exactly as before A1. Every head in
+  // the pool is CONSULTED — but the stamp credits only the WINNER (ruling F1 on #2394): a head
+  // whose solo never played did not steer the take, so the note waits until the pick is made.
+  const entries = pool.map((id) => headEntry(heads, id, 'solo'));
+  const weights = pool.map((id, i) =>
+    entries[i]
+      ? headScore(entries[i], decisionInput(baseInput, { heat: tuning.personas[id].heat }))
+      : Math.max(0, tuning.personas[id].heat),
+  );
   const total = weights.reduce((a, b) => a + b, 0);
   if (!(total > 0)) return null;
   let u = draw(seed, phrase, 1) * total;
+  let winner = pool.length - 1;
   for (let i = 0; i < pool.length; i++) {
     u -= weights[i];
-    if (u < 0) return pool[i];
+    if (u < 0) {
+      winner = i;
+      break;
+    }
   }
-  return pool[pool.length - 1];
+  if (entries[winner]) noteSteered(pool[winner], 'solo', entries[winner]);
+  return pool[winner];
 }
 
 function soloTurn(phrase, by, tuning) {
@@ -258,14 +281,16 @@ function tradeTurn(seed, phrase, solo, locked, tuning, heads, baseInput, noteSte
       noteSteered(id, 'trade', entry);
       const p = {};
       for (const verdict of BAND_VERDICTS) {
-        p[verdict] = headScore(entry, {
-          ...baseInput,
-          caller,
-          verdict,
-          move: moveOf(id, verdict),
-          heat: tuning.personas[id].heat,
-          soloAge: phrase - solo.start,
-        });
+        p[verdict] = headScore(
+          entry,
+          decisionInput(baseInput, {
+            caller,
+            verdict,
+            move: moveOf(id, verdict),
+            heat: tuning.personas[id].heat,
+            soloAge: phrase - solo.start,
+          }),
+        );
       }
       const sum = p.agree + p.disagree + p.layOut;
       odds = sum > 0 ? { agree: p.agree / sum, disagree: p.disagree / sum, layOut: p.layOut / sum } : { agree: 0, disagree: 0, layOut: 1 };
@@ -300,12 +325,16 @@ function ownerAfter(phrase, caller, answers, tuning) {
  *       or null/absent for rules exactly as before A1
  *     decisionCtx: extra decision-feature inputs the caller can supply (bar, bpm, energy, census,
  *       recipe, principles — decisionFeatures.mjs); the band's own facts (pressure, caller, the
- *       candidate verdict, heat) always override it on the fields the band owns
+ *       candidate verdict, the cut's target, heat, solo age) always override it on the fields the
+ *       band owns — and a band-owned field that is not a fact of the decision at hand (a solo
+ *       pick has no caller) is stripped, never inherited from decisionCtx
  *
  * Returns { state, turns, unruled, steered } — `turns` is [] when nothing was played; `unruled` is the list of
  * null/absent paths when the table is not ruled enough (the band then returns `state` untouched, the SAME
- * object); `steered` lists the heads whose probability entered a draw this phrase ({ id, kind, version },
- * deduped) — the material for the take's band-section stamp (ruling Q4). Empty when no head steered.
+ * object); `steered` lists the heads credited with steering this phrase ({ id, kind, version }, deduped) —
+ * the material for the take's band-section stamp (rulings Q4 + F1: every trade answerer and the cut are
+ * credited as they decide, but a solo pick credits ONLY the winner's head, never the consulted losers).
+ * Empty when no head steered.
  */
 export function stepBand(state, ctx, opts = {}) {
   const tuning = opts.tuning ?? personaTuning();
@@ -363,7 +392,7 @@ export function stepBand(state, ctx, opts = {}) {
     const cutHead = headEntry(heads, 'governor', 'cut');
     if (cutHead) {
       noteSteered('governor', 'cut', cutHead);
-      const p = headScore(cutHead, { ...baseInput, target: solo.by, soloAge: phrase - solo.start });
+      const p = headScore(cutHead, decisionInput(baseInput, { target: solo.by, soloAge: phrase - solo.start }));
       if (draw(seed, phrase, CUT_DRAW_SLOT) < p) {
         push({ kind: 'cut', phrase, by: 'governor', target: solo.by });
         return done();

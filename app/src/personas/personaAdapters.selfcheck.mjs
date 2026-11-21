@@ -10,6 +10,9 @@
 //      draw. Before a head earns in, behaviour is byte-identical to today.
 //   Q3 heads are per persona per turn kind, keyed by A0's label kinds (solo / trade / cut).
 //   Q4 the take stamp lives in the band section and lists ONLY the heads that actually steered.
+// QA fix pass (2026-11-20): F1 the solo stamp credits the WINNER only (Matt's ruling); F2 band-owned
+// decision fields can never be smuggled in through decisionCtx; F3 a personas entry's featuresVersion
+// is REQUIRED; F4 the stamp checker validates every entry against PERSONA_HEAD_STRUCTURE.
 //
 // The shipped tuning table's band numbers are NULL (unruled), so every band behaviour below runs on
 // the same clearly-marked FIXTURE table band.selfcheck.mjs uses — made up here, never exported,
@@ -68,12 +71,12 @@ function fixture({ odds = {}, rate = 1, cut = 0.8, maxHorns = 3, first = {}, len
 const LEAD = { davis: 1, carson: 0, greiman: 0, ashworth: 0 }; // heat: DAVIS always takes the solo
 
 /** Play phrases 0..n-1 on a tuning table, with an optional steering bundle. Returns turns + steered. */
-function play(tuning, { seed = 7, n: phrases = 12, ctx = () => ({}), heads = undefined } = {}) {
+function play(tuning, { seed = 7, n: phrases = 12, ctx = () => ({}), heads = undefined, decisionCtx = undefined } = {}) {
   let state = createBandState();
   const turns = [];
   const steered = [];
   for (let phrase = 0; phrase < phrases; phrase++) {
-    const r = stepBand(state, { phrase, ...ctx(phrase) }, { seed, tuning, heads });
+    const r = stepBand(state, { phrase, ...ctx(phrase) }, { seed, tuning, heads, decisionCtx });
     state = r.state;
     turns.push(...r.turns);
     steered.push(...r.steered);
@@ -102,6 +105,7 @@ const entry = (kind, head, { version = 1, labeledTurns = 240, heldOut = 0.6 } = 
   labeledTurns,
   heldOut,
   trainedAt: '2026-11-20T00:00:00Z',
+  featuresVersion: DECISION_FEATURES_VERSION, // required since QA F3 — an unstamped entry neutralizes
 });
 /** A whole taste file (linear main head, as tasteHead.selfcheck.mjs builds) with a personas section. */
 const tasteFile = (personas) => ({
@@ -199,6 +203,10 @@ ok('section: a bad section NEUTRALIZES (queen/chapters law) — the file and its
     ['labeledTurns negative', { lois: { trade: entry('trade', agreeHead(), { labeledTurns: -1 }) } }],
     ['version below 1', { lois: { trade: entry('trade', agreeHead(), { version: 0 }) } }],
     ['trained on a stale feature universe', { lois: { trade: { ...entry('trade', agreeHead()), featuresVersion: 99 } } }],
+    [
+      'no featuresVersion at all (QA F3: required, never silently re-stamped as current)',
+      { lois: { trade: (() => { const e = entry('trade', agreeHead()); delete e.featuresVersion; return e; })() } },
+    ],
     ['an empty persona entry', { davis: {} }],
     ['the section is an array', []],
     ['a linear head where a tree head belongs', { lois: { trade: entry('trade', { terms: {}, num: {}, bias: 0, fidelity: 0.5 }) } }],
@@ -301,6 +309,41 @@ ok('byte-identical rails: no heads, empty heads, and below-gate heads all play e
   assert.deepEqual(r.steered, []);
 });
 
+ok('decisionCtx law (QA F2): band-owned fields cannot be smuggled into a solo or cut vector', () => {
+  // a solo head that takes the solo only when the "caller" is LOIS — a fact a solo pick does not have
+  const callerHead = () => treeHead(['caller'], [{ f: 0, op: '=', v: 'lois', y: { leaf: 6 }, n: { leaf: -20 }, gain: 1 }]);
+  const t = fixture({ heat: { davis: 0.5, carson: 0.5, greiman: 0.5, ashworth: 0.5 }, rate: 0, len: 1 });
+  const heads = bundle({ davis: { solo: entry('solo', callerHead()) } });
+  const control = play(t, { seed: 4, n: 40 }); // no heads: DAVIS solos his share on heat alone
+  assert.ok(control.turns.some((x) => x.kind === 'solo' && x.by === 'davis'), 'control: DAVIS solos on heat alone');
+  for (let seed = 1; seed <= 10; seed++) {
+    const plain = play(t, { seed, n: 40, heads });
+    const hostile = play(t, { seed, n: 40, heads, decisionCtx: { caller: 'lois' } });
+    assert.deepEqual(hostile.turns, plain.turns, `seed ${seed}: a smuggled caller changes no solo pick`);
+    assert.deepEqual(hostile.steered, plain.steered, `seed ${seed}: …and no stamp`);
+    assert.ok(plain.turns.every((x) => x.kind !== 'solo' || x.by !== 'davis'), `seed ${seed}: with no caller fact, DAVIS's head says no`);
+  }
+  // the same law on a band-owned NUMERIC: a solo head keyed on the standing solo's age
+  const ageHead = () => treeHead(['num.soloAge'], [{ f: 0, op: '<', v: 5, y: { leaf: 6 }, n: { leaf: -20 }, gain: 1 }]);
+  const ageHeads = bundle({ davis: { solo: entry('solo', ageHead()) } });
+  for (let seed = 1; seed <= 10; seed++) {
+    const plain = play(t, { seed, n: 40, heads: ageHeads });
+    const hostile = play(t, { seed, n: 40, heads: ageHeads, decisionCtx: { soloAge: 99 } });
+    assert.deepEqual(hostile.turns, plain.turns, `seed ${seed}: a smuggled soloAge changes no solo pick`);
+    assert.ok(plain.turns.some((x) => x.kind === 'solo' && x.by === 'davis'), `seed ${seed}: absent soloAge walks as 0 — DAVIS's head says yes`);
+  }
+  // and on the cut: a cut head keyed on a verdict — a fact a cut does not have
+  const verdictHead = () => treeHead(['verdict'], [{ f: 0, op: '=', v: 'agree', y: { leaf: 6 }, n: { leaf: -20 }, gain: 1 }]);
+  const ct = fixture({ heat: LEAD, rate: 0, len: 8, cut: 0.8 });
+  const cutHeads = bundle({ governor: { cut: entry('cut', verdictHead()) } });
+  for (let seed = 1; seed <= 6; seed++) {
+    const plain = play(ct, { seed, n: 8, ctx: () => ({ pressure: 0 }), heads: cutHeads });
+    const hostile = play(ct, { seed, n: 8, ctx: () => ({ pressure: 0 }), heads: cutHeads, decisionCtx: { verdict: 'agree' } });
+    assert.deepEqual(hostile.turns, plain.turns, `seed ${seed}: a smuggled verdict changes no cut`);
+    assert.ok(plain.turns.every((x) => x.kind !== 'cut'), `seed ${seed}: with no verdict fact, the cut head says no`);
+  }
+});
+
 // ── Q4: the take stamp ──────────────────────────────────────────────────────────────────────────────
 function record(turns, steered, seed = 11) {
   let frame = 0;
@@ -323,9 +366,34 @@ ok('stamp: the band section lists ONLY the heads that actually steered, with ver
   assert.ok(section);
   const stamped = Object.fromEntries(section.heads.map((h) => [`${h.id}|${h.kind}`, h.version]));
   assert.equal(stamped['lois|trade'], 3);
-  assert.equal(stamped['davis|solo'], 2, 'DAVIS\'s head weighed his solo pick — it steered');
+  assert.equal(stamped['davis|solo'], 2, 'DAVIS took the solos — the winner\'s head is stamped');
+  assert.deepEqual(
+    section.heads,
+    [
+      { id: 'davis', kind: 'solo', version: 2 },
+      { id: 'lois', kind: 'trade', version: 3 },
+    ],
+    'the stamp\'s TOTAL contents: exactly the heads that steered — nothing consulted-but-unplayed rides along',
+  );
   const checked = checkBandRecord(JSON.parse(JSON.stringify(section)));
   assert.deepEqual(checked.heads, section.heads, 'the stamp survives the check, copied');
+});
+ok('stamp (ruling F1): a consulted solo head whose solo never played is NOT credited — winner only', () => {
+  const t = fixture({ heat: { davis: 0.5, carson: 0.5, greiman: 0, ashworth: 0 }, rate: 0, len: 1 });
+  const heads = bundle({
+    davis: { solo: entry('solo', leafHead(1), { version: 2 }) },
+    carson: { solo: entry('solo', leafHead(-20), { version: 5 }) }, // consulted at every pick, weighs ~0, never wins
+  });
+  const { turns, steered } = play(t, { seed: 3, n: 10, heads });
+  assert.ok(turns.some((x) => x.kind === 'solo' && x.by === 'davis'), 'DAVIS solos');
+  assert.ok(turns.every((x) => x.kind !== 'solo' || x.by === 'davis'), 'CARSON never solos — his head says no');
+  assert.ok(steered.length > 0, 'steering was reported');
+  assert.ok(
+    steered.every((s) => s.id === 'davis' && s.kind === 'solo' && s.version === 2),
+    'every steered note is the winner\'s — CARSON\'s consulted head is never noted',
+  );
+  const section = record(turns, steered);
+  assert.deepEqual(section.heads, [{ id: 'davis', kind: 'solo', version: 2 }], 'the stamp holds exactly the winner');
 });
 ok('stamp: no steering, no stamp — the section is exactly the pre-A1 shape', () => {
   const t = fixture({ heat: LEAD, len: 3 });
@@ -337,7 +405,14 @@ ok('stamp: no steering, no stamp — the section is exactly the pre-A1 shape', (
   // a recorder told about malformed steering writes nothing
   const rec = createBandRecorder({ seed: 1 });
   rec.update({ kind: 'in', phrase: 0, by: 'governor' });
-  rec.noteHeads([{ id: 'queen', kind: 'trade', version: 1 }, { id: 'lois', kind: 'dance', version: 1 }, null, 'x']);
+  rec.noteHeads([
+    { id: 'queen', kind: 'trade', version: 1 },
+    { id: 'lois', kind: 'dance', version: 1 },
+    { id: 'lois', kind: 'solo', version: 1 }, // structurally impossible (QA F4): never written
+    { id: 'davis', kind: 'cut', version: 1 }, // structurally impossible (QA F4): never written
+    null,
+    'x',
+  ]);
   assert.equal('heads' in rec.finish(), false);
 });
 ok('stamp: the check is fail-closed on a bad stamp; replay never reads it', () => {
@@ -351,6 +426,8 @@ ok('stamp: the check is fail-closed on a bad stamp; replay never reads it', () =
     return checkBandRecord(s);
   };
   assert.equal(bad((s) => s.heads.push({ id: 'queen', kind: 'trade', version: 1 })), null, 'she holds no head in A1');
+  assert.equal(bad((s) => s.heads.push({ id: 'lois', kind: 'solo', version: 1 })), null, 'a stamp names only heads that can exist: LOIS never solos (QA F4)');
+  assert.equal(bad((s) => s.heads.push({ id: 'davis', kind: 'cut', version: 1 })), null, '…and only the bandleader holds a cut head (QA F4)');
   assert.equal(bad((s) => s.heads.push({ id: 'lois', kind: 'trade', version: 9 })), null, 'one entry per (id, kind)');
   assert.equal(bad((s) => (s.heads[0].kind = 'yield')), null, 'a stamp kind is a decision kind');
   assert.equal(bad((s) => (s.heads[0].version = 0)), null);
