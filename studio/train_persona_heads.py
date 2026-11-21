@@ -32,6 +32,10 @@ labeled-turn count grew since the last attempt that actually fit a challenger (s
 or below the bar); --force overrides. Floor and no-fit attempts do not move the watermark — a
 corpus that could not be judged yet is retried when it grows, not remembered as judged.
 
+Incumbents are read through a shape gate: every personas entry is validated up front against
+A1's rules (mirrored below), and an entry that fails is no incumbent for its slot — a malformed
+entry in the file can never crash a run after earlier entries have written to the store.
+
 Stdlib for shaping / split / store / rollback; xgboost is imported only inside the fit step
 (train_cost_head.py's shape), so CI — which has no xgboost — runs the stdlib selfcheck with
 fixture heads of known scores. Head conversion, base-score calibration, the spec walk and the
@@ -220,7 +224,8 @@ def fit_head_xgb(rows, train_idx, columns):
         "verbosity": 0,
     }
     booster = xgb.train(params, dtrain, num_boost_round=XGB_ROUNDS)
-    dump = booster.get_dump(dump_format="json")
+    # get_dump returns JSON STRINGS; the converter eats parsed dicts (curator.py's own pattern).
+    dump = [json.loads(s) for s in booster.get_dump(dump_format="json")]
     names, trees = curator.convert_xgb_dump(dump, columns, curator._xgb_gains(booster))
     margins = [float(m) for m in booster.predict(dtrain, output_margin=True)]
     leaf_sums = [
@@ -246,6 +251,130 @@ def heldout_score(head, rows, idx):
     return curator.spearman(head_scores(head, rows, idx), [rows[i]["weight"] for i in idx])
 
 
+# ── the incumbent shape gate (A1's rules, mirrored) ──────────────────────────────────────────────
+# The trainer reads taste.json's personas section as its incumbents, and a malformed entry must
+# never crash a run mid-loop — ships write the store and history per entry while the CLI writes
+# taste.json only at the end, so a crash on entry k would leave earlier entries recorded as
+# shipped but absent from taste.json (and watermark-skipped until the corpus grows). So every
+# incumbent is validated UP FRONT, before any write, against A1's shape rules (tasteHead.js's
+# validatePersonasSection + validateTreeHeadFor, mirrored for the v1 decision universe below).
+# An entry that fails is no incumbent for its slot: the slot is judged as a first head and a
+# ship overwrites the broken entry — the same degradation the "head not a dict" case always had,
+# extended to every shape failure. The mirror is pinned to decisionFeatures.mjs's live universe
+# by the selfcheck; it can only ever be applied to featuresVersion-1 entries (the version check
+# below), so a future universe bump cannot make it stale for the entries it judges.
+
+PERSONA_HEAD_IDS = ("governor", "davis", "lois", "carson", "greiman", "ashworth")
+HEAD_STRUCTURE = {  # tasteHead.js PERSONA_HEAD_STRUCTURE: who may hold a head of each kind
+    "solo": ("davis", "carson", "greiman", "ashworth"),
+    "trade": ("davis", "lois", "carson", "greiman", "ashworth"),
+    "cut": ("governor",),
+}
+MAX_TREES = 512  # tasteHead.js MAX_TREES (== curator.XGB_MAX_TREES)
+MAX_TREE_DEPTH = 6  # tasteHead.js MAX_TREE_DEPTH (== curator.XGB_MAX_DEPTH)
+MAX_TREE_NODES = 20000  # tasteHead.js MAX_TREE_NODES (== curator.XGB_MAX_NODES)
+# decisionFeatureNames() at DECISION_FEATURES_VERSION 1 (decisionFeatures.mjs + recipeFeatures v4).
+DECISION_FEATURE_NAMES = frozenset(
+    "phase caller verdict move target".split()
+    + (
+        "recipe.system recipe.symmetry recipe.behave recipe.blend recipe.paletteShift "
+        "recipe.palette recipe.accum recipe.mirror recipe.bleed recipe.overlap recipe.bodies "
+        "recipe.density recipe.scale"
+    ).split()
+    + (
+        "num.bar num.bpm num.energy num.beatConfidence num.density num.coverage num.heat "
+        "num.recentKeepRate num.pressure num.soloAge"
+    ).split()
+    + (
+        "num.recipe.count num.recipe.scaleMid num.recipe.rotateSpread num.recipe.alphaMid "
+        "num.recipe.jitter num.recipe.density num.recipe.zTiers num.recipe.noiseFreq "
+        "num.recipe.noiseSpeed num.recipe.displacement num.recipe.particleCount "
+        "num.recipe.swarmCohesion num.recipe.gravityWells num.recipe.damping num.recipe.wind "
+        "num.recipe.flap num.recipe.breath num.recipe.lifeDrift"
+    ).split()
+)
+
+
+def _finite(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)
+
+
+def _is_int(x):
+    """JSON integral (JS Number.isInteger): a Python int, or a float with no fraction."""
+    return (isinstance(x, int) and not isinstance(x, bool)) or (
+        isinstance(x, float) and x.is_integer()
+    )
+
+
+def _node_ok(node, features, depth, counter):
+    """validateTreeNode, mirrored: a leaf {leaf} or a split {f, op, v, y, n, gain} inside the
+    artifact bounds (node count, depth), every number the walk reads finite."""
+    if not isinstance(node, dict):
+        return False
+    counter[0] += 1
+    if counter[0] > MAX_TREE_NODES or depth > MAX_TREE_DEPTH:
+        return False
+    if "leaf" in node:
+        return _finite(node["leaf"])
+    f = node.get("f")
+    if not _is_int(f) or f < 0 or f >= len(features):
+        return False
+    op, v = node.get("op"), node.get("v")
+    if features[int(f)].startswith("num."):
+        if op != "<" or not _finite(v):
+            return False
+    elif op != "=" or not (isinstance(v, str) or isinstance(v, bool)):
+        return False
+    if not _finite(node.get("gain")):
+        return False
+    return _node_ok(node.get("y"), features, depth + 1, counter) and _node_ok(
+        node.get("n"), features, depth + 1, counter
+    )
+
+
+def _head_ok(head):
+    """validateTreeHeadFor against the decision universe, mirrored."""
+    if not isinstance(head, dict):
+        return False
+    if head.get("objective") != "binary:logistic":
+        return False
+    if not _finite(head.get("baseScore")):
+        return False
+    if not _finite(head.get("fidelity")) or not -1 <= head["fidelity"] <= 1:
+        return False
+    features = head.get("features")
+    if not isinstance(features, list) or not features:
+        return False
+    if any(not isinstance(n, str) or n not in DECISION_FEATURE_NAMES for n in features):
+        return False
+    if len(set(features)) != len(features):
+        return False
+    trees = head.get("trees")
+    if not isinstance(trees, list) or not trees or len(trees) > MAX_TREES:
+        return False
+    counter = [0]
+    return all(_node_ok(t, features, 0, counter) for t in trees)
+
+
+def incumbent_entry_ok(pid, kind, entry):
+    """A1's per-entry shape rules (validatePersonasSection). Total: any garbage returns False."""
+    if pid not in PERSONA_HEAD_IDS or pid not in HEAD_STRUCTURE.get(kind, ()):
+        return False
+    if not isinstance(entry, dict):
+        return False
+    if not _is_int(entry.get("version")) or entry["version"] < 1:
+        return False
+    if entry.get("kind") != kind:
+        return False
+    if not _is_int(entry.get("labeledTurns")) or entry["labeledTurns"] < 0:
+        return False
+    if not _finite(entry.get("heldOut")) or not -1 <= entry["heldOut"] <= 1:
+        return False
+    if entry.get("featuresVersion") != DECISION_FEATURES_VERSION:
+        return False
+    return _head_ok(entry.get("head"))
+
+
 # ── train ────────────────────────────────────────────────────────────────────────────────────────
 
 def train(rows_artifact, taste, taste_path, store, force=False, now=None, fit_fn=None):
@@ -265,6 +394,14 @@ def train(rows_artifact, taste, taste_path, store, force=False, now=None, fit_fn
     rows = rows_artifact.get("rows") or []
     history = read_history(store)
     personas = taste.get("personas") if isinstance(taste.get("personas"), dict) else {}
+    # The incumbents, validated up front (the shape gate above): a malformed entry is no
+    # incumbent for its slot, so nothing inside the loop can crash on the file's own contents
+    # after earlier entries have written to the store.
+    incumbents = {}
+    for pid, kind in ENTRY_KEYS:
+        by_kind = personas.get(pid)
+        raw_entry = by_kind.get(kind) if isinstance(by_kind, dict) else None
+        incumbents[(pid, kind)] = raw_entry if incumbent_entry_ok(pid, kind, raw_entry) else None
     entries = []
     shipped_any = False
     for pid, kind in ENTRY_KEYS:
@@ -292,17 +429,24 @@ def train(rows_artifact, taste, taste_path, store, force=False, now=None, fit_fn
             entry["verdict"] = "no-fit"
             _log_train(store, now, entry)
             continue
-        n_trees, _depth, n_nodes = curator.spec_head_stats(head)
-        if n_trees > curator.XGB_MAX_TREES or n_nodes > curator.XGB_MAX_NODES:
+        n_trees, depth, n_nodes = curator.spec_head_stats(head)
+        if (
+            n_trees > curator.XGB_MAX_TREES
+            or depth > curator.XGB_MAX_DEPTH
+            or n_nodes > curator.XGB_MAX_NODES
+        ):
             entry["verdict"] = "no-fit"
-            entry["note"] = "challenger exceeds the shipped head bounds"
+            entry["note"] = (
+                f"challenger exceeds the shipped head bounds "
+                f"({n_trees} trees, depth {depth}, {n_nodes} nodes)"
+            )
             _log_train(store, now, entry)
             continue
         challenger = heldout_score(head, erows, held_idx)
-        incumbent_entry = (personas.get(pid) or {}).get(kind)
+        incumbent_entry = incumbents[(pid, kind)]
         incumbent = (
             heldout_score(incumbent_entry["head"], erows, held_idx)
-            if incumbent_entry and isinstance(incumbent_entry.get("head"), dict)
+            if incumbent_entry is not None
             else None
         )
         entry["challengerHeldOut"] = challenger

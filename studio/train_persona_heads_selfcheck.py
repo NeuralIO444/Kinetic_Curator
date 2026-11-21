@@ -13,7 +13,15 @@ per ruling:
   Q6  labeledTurns counts ALL labeled turns (train + held-out);
   watermark — an entry whose labeled count did not grow is not retrained (--force overrides);
   the held-out floor — under 30 held-out turns nothing ships;
-  empty corpus — nothing is written, not even history.
+  empty corpus — nothing is written, not even history;
+  the real fit's dump seam — a stub xgboost whose booster returns JSON strings (as the real
+      Booster.get_dump does) driven through the REAL fit_head_xgb, which the fixture-fit seam
+      never touches;
+  malformed incumbents — an entry failing A1's shape rules degrades to no-incumbent for its
+      slot instead of crashing the run, and store/history never claim a ship taste.json
+      does not carry;
+  the depth bound — a challenger deeper than the app's MAX_TREE_DEPTH is rejected like
+      every other bounds failure.
 
 Run: python3 studio/train_persona_heads_selfcheck.py
 (The real-xgboost end-to-end runs only when xgboost imports; it skips loudly otherwise.)
@@ -24,6 +32,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import types
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import curator  # noqa: E402
@@ -322,6 +331,184 @@ out = subprocess.run(
 check(out.returncode == 0, f"CLI rollback past v1 failed: {out.stderr}")
 with open(taste_path, encoding="utf-8") as fh:
     check(json.load(fh) == {}, "past v1, the CLI rollback removes the entry and the section")
+
+# ── the real fit's dump seam: a stub xgboost returning JSON strings, through fit_head_xgb ────────
+# Real xgboost's Booster.get_dump(dump_format="json") returns a list of JSON STRINGS; the fit must
+# parse them before curator.convert_xgb_dump (the repo's own pattern in curator.py and
+# train_cost_head.py). The fixture-fit seam above never calls fit_head_xgb, so this pin drives the
+# real function with a stub module — CI (no xgboost) still exercises the dump handling.
+STUB_TREE = {
+    "nodeid": 0, "split": "num.heat", "split_condition": 0.5, "yes": 1, "no": 2, "missing": 1,
+    "children": [{"nodeid": 1, "leaf": -1.5}, {"nodeid": 2, "leaf": 1.5}],
+}
+
+
+class _StubDMatrix:
+    def __init__(self, X, label=None, weight=None, feature_names=None):
+        self.rows = len(X)
+
+
+class _StubBooster:
+    def __init__(self, n):
+        self._n = n
+
+    def get_dump(self, dump_format="json"):
+        return [json.dumps(STUB_TREE)]  # strings, exactly as the real booster returns
+
+    def predict(self, data, output_margin=False):
+        return [0.0] * self._n
+
+    # no trees_to_dataframe: curator._xgb_gains degrades to {} by design
+
+
+_stub_xgb = types.ModuleType("xgboost")
+_stub_xgb.DMatrix = _StubDMatrix
+_stub_xgb.train = lambda params, dtrain, num_boost_round=0: _StubBooster(dtrain.rows)
+_real_xgb = sys.modules.get("xgboost")
+sys.modules["xgboost"] = _stub_xgb
+try:
+    stub_rows = solo_rows(10)
+    stub_idx = list(range(len(stub_rows)))
+    stub_cols = T.feature_columns(stub_rows, stub_idx)
+    stub_head = T.fit_head_xgb(stub_rows, stub_idx, stub_cols)
+finally:
+    if _real_xgb is None:
+        sys.modules.pop("xgboost", None)
+    else:
+        sys.modules["xgboost"] = _real_xgb
+check(stub_head is not None, "the stub fit must produce a head")
+check(stub_head["features"] == ["num.heat", "num.pressure"],
+      f"stub head features: {stub_head['features']}")
+check(stub_head["trees"] == [{"f": 0, "op": "<", "v": 0.5,
+                               "y": {"leaf": -1.5}, "n": {"leaf": 1.5}, "gain": 0.0}],
+      f"the JSON-string dump must convert to the spec tree: {stub_head['trees']}")
+check(curator.score_spec_head(stub_head, {"num": {"heat": 0.9}}) > 0.5
+      > curator.score_spec_head(stub_head, {"num": {"heat": 0.1}}),
+      "the converted head separates hot from cold")
+
+# ── the shape gate's universe mirror is decisionFeatures.mjs's live v1 universe ──────────────────
+# The trainer's DECISION_FEATURE_NAMES is a static mirror (it is only ever applied to
+# featuresVersion-1 entries, so it cannot go stale for them) — pinned here against the source
+# of truth whenever node is on hand.
+try:
+    out = subprocess.run(
+        ["node", "-e",
+         "import('./app/src/curator/decisionFeatures.mjs')"
+         ".then(m => console.log(JSON.stringify(m.decisionFeatureNames())))"],
+        capture_output=True, text=True,
+        cwd=os.path.join(HERE, ".."), timeout=60)
+    if out.returncode == 0:
+        live_names = set(json.loads(out.stdout.strip()))
+        check(live_names == set(T.DECISION_FEATURE_NAMES),
+              f"the trainer's universe mirror drifted from decisionFeatures.mjs: "
+              f"missing {sorted(live_names - set(T.DECISION_FEATURE_NAMES))}, "
+              f"extra {sorted(set(T.DECISION_FEATURE_NAMES) - live_names)}")
+        print("  [node] universe mirror matches decisionFeatureNames()")
+    else:
+        print("  [node] universe-mirror pin could not run (node import failed) — skipped")
+except (OSError, subprocess.SubprocessError):
+    print("  [node] node not available — universe-mirror pin skipped")
+
+# ── malformed incumbents: A1-shape failures degrade to no-incumbent; the run never desyncs ───────
+def valid_entry(kind, head, version=3):
+    return {
+        "version": version,
+        "kind": kind,
+        "head": head,
+        "labeledTurns": 120,
+        "heldOut": 0.9,
+        "trainedAt": "2026-11-19T00:00:00Z",
+        "featuresVersion": 1,
+    }
+
+
+def assert_no_desync(store_dir, taste_dict):
+    """Every ship the history claims is a ship taste carries, byte for byte in the store."""
+    for rec in T.read_history(store_dir):
+        if rec.get("action") == "train" and rec.get("verdict") == "shipped":
+            entry = taste_dict["personas"][rec["id"]][rec["kind"]]
+            check(entry["version"] == rec["version"],
+                  f"history claims v{rec['version']} shipped for {rec['id']}|{rec['kind']}, "
+                  f"taste carries v{entry['version']}")
+            with open(T.store_artifact_path(store_dir, rec["id"], rec["kind"], rec["version"]),
+                      encoding="utf-8") as fh:
+                check(fh.read() == T.canonical(entry),
+                      f"the store artifact for {rec['id']}|{rec['kind']} is the taste entry exactly")
+
+
+# crash shape 1: the incumbent's head is a dict missing the keys the spec walk reads
+store_m1 = tempfile.mkdtemp()
+broken_head_entry = valid_entry("solo", heat_head(-2.0, 2.0))
+broken_head_entry["head"] = {"kind": "xgboost-trees"}  # no baseScore / features / trees
+taste_m1 = {"personas": {"davis": {"solo": broken_head_entry}}}
+result = T.train(rows_artifact(solo_rows(10)), taste_m1, "taste.json", store_m1,
+                 fit_fn=fit_returning(heat_head(-2.0, 2.0)))
+e = entry_of(result, "davis", "solo")
+check(e["verdict"] == "shipped" and e["version"] == 1 and e["incumbentHeldOut"] is None,
+      f"a head missing its keys is no incumbent at all: {e}")
+check(taste_m1["personas"]["davis"]["solo"]["head"]["trees"], "the shipped head replaced the broken one")
+assert_no_desync(store_m1, taste_m1)
+
+# crash shape 2: the incumbent entry is missing `version` — scorable head, crash at ship time
+store_m2 = tempfile.mkdtemp()
+no_version_entry = valid_entry("solo", heat_head(-2.0, 2.0))
+del no_version_entry["version"]
+taste_m2 = {"personas": {"carson": {"solo": no_version_entry}}}
+result = T.train(rows_artifact(mixed_rows(10, pid="carson")), taste_m2, "taste.json", store_m2,
+                 fit_fn=fit_returning(heat_age_head()))
+e = entry_of(result, "carson", "solo")
+check(e["verdict"] == "shipped" and e["version"] == 1 and e["incumbentHeldOut"] is None,
+      f"an entry missing its version is no incumbent at all: {e}")
+assert_no_desync(store_m2, taste_m2)
+
+# the desync shape: an early entry ships, a later entry's incumbent is malformed — one clean run
+store_m3 = tempfile.mkdtemp()
+taste_m3 = {"personas": {"carson": {"solo": broken_head_entry}}}
+both_rows = solo_rows(10, pid="davis") + solo_rows(10, pid="carson")
+result = T.train(rows_artifact(both_rows), taste_m3, "taste.json", store_m3,
+                 fit_fn=fit_returning(heat_head(-2.0, 2.0)))
+check(entry_of(result, "davis", "solo")["verdict"] == "shipped", "the clean entry ships")
+check(entry_of(result, "carson", "solo")["verdict"] == "shipped", "the malformed slot ships over no-incumbent")
+assert_no_desync(store_m3, taste_m3)
+
+# a malformed incumbent with a below-bar challenger: judged as a first head, taste untouched
+store_m4 = tempfile.mkdtemp()
+taste_m4 = {"personas": {"davis": {"solo": copy.deepcopy(broken_head_entry)}}}
+before_m4 = copy.deepcopy(taste_m4)
+result = T.train(rows_artifact(solo_rows(10)), taste_m4, "taste.json", store_m4,
+                 fit_fn=fit_returning(constant_head()))
+check(entry_of(result, "davis", "solo")["verdict"] == "below-bar",
+      "no incumbent + a constant challenger is a first head under the bar")
+check(taste_m4 == before_m4 and not result["shipped"], "the malformed entry is left exactly as found")
+
+# ── the depth bound: deeper than the app's cap is a bounds rejection, like trees/nodes ───────────
+def deep_head(levels):
+    node = {"leaf": 1.0}
+    for _ in range(levels):
+        node = {"f": 0, "op": "<", "v": 0.5, "y": {"leaf": -1.0}, "n": node, "gain": 1.0}
+    return {
+        "kind": "xgboost-trees",
+        "objective": "binary:logistic",
+        "baseScore": 0.0,
+        "fidelity": 0.0,
+        "fitOn": 0,
+        "features": ["num.heat"],
+        "trees": [node],
+    }
+
+
+store_d = tempfile.mkdtemp()
+taste_d8 = {}
+result = T.train(rows_artifact(solo_rows(10)), taste_d8, "taste.json", store_d,
+                 fit_fn=fit_returning(deep_head(8)))
+e = entry_of(result, "davis", "solo")
+check(e["verdict"] == "no-fit" and "depth 8" in e.get("note", ""),
+      f"a depth-8 challenger exceeds the app's cap and is rejected on bounds: {e}")
+check("personas" not in taste_d8 and not result["shipped"], "an over-deep head never enters taste.json")
+result = T.train(rows_artifact(solo_rows(10)), {}, "taste.json", tempfile.mkdtemp(),
+                 fit_fn=fit_returning(deep_head(6)))
+check(entry_of(result, "davis", "solo")["verdict"] == "shipped",
+      "a depth-6 challenger sits at the cap and is judged on its score")
 
 # ── the real fit, when xgboost exists in this environment (skips loudly otherwise) ───────────────
 try:

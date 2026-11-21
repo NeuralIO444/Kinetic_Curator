@@ -53,6 +53,19 @@ const STRESS_A = {
   bands: [],
   occupancy: { relax: 0, normal: 0, tighten: 0 },
 };
+// The SAME signals with the runs annotated at frames 50/200: under the stress record's law the
+// annotations are not the timeline (order is what replays), so this record must read back
+// identically to STRESS_A — a fixture where the run-frame reading and the ordinal reading differ.
+const STRESS_GAPPED = {
+  version: 1,
+  initial: { smoothed: 0.2, band: 'relax' },
+  runs: [
+    [50, 0.9, 0.9, 0.9, 10],
+    [200, 0, 0, 0, 300],
+  ],
+  bands: [],
+  occupancy: { relax: 0, normal: 0, tighten: 0 },
+};
 const takeA = { format: 'kc-performance', version: 3, frames: 400, band: { version: 1, seed: 101, turns: TURNS_A }, stress: STRESS_A };
 const takeC = { format: 'kc-performance', version: 3, frames: 400, band: { version: 1, seed: 103, turns: TURNS_C } };
 
@@ -78,13 +91,31 @@ const labeled = extractLabels(
   verdicts,
 );
 
-// The expected pressure at a frame, stated independently: replay the runs update by update, one
-// update per frame from each run's first frame, and read the clamped smoothed after the last
-// update at or before the frame (the initial smoothed before any update).
-function expectedPressure(frame) {
-  const t = createStressTracker({ initial: STRESS_A.initial });
-  let p = clamp01(STRESS_A.initial.smoothed);
-  for (const [f0, activity, dish, taste, n] of STRESS_A.runs) {
+// The expected pressure at a frame, stated independently, under the stress record's documented
+// law: a run's frame is an annotation — order is what replays — so the k-th update of the take
+// (counting every run's updates in order) sits at frame k, exactly as expandStressRecord reads
+// the record back. Read the clamped smoothed after the last update at or before the frame (the
+// initial smoothed before any update).
+function expectedPressure(frame, rec = STRESS_A) {
+  const t = createStressTracker({ initial: rec.initial });
+  let p = clamp01(rec.initial.smoothed);
+  let ord = 0;
+  for (const [, activity, dish, taste, n] of rec.runs) {
+    for (let j = 0; j < n; j++) {
+      t.update({ activity, dish, taste });
+      if (ord <= frame) p = clamp01(t.smoothed);
+      ord += 1;
+    }
+  }
+  return p;
+}
+
+// The superseded reading — update j of a run at frame (run frame + j) — kept here only so the
+// gapped fixture can prove the two laws give different pressures and the ordinal one is in force.
+function runFrameLawPressure(frame, rec) {
+  const t = createStressTracker({ initial: rec.initial });
+  let p = clamp01(rec.initial.smoothed);
+  for (const [f0, activity, dish, taste, n] of rec.runs) {
     for (let j = 0; j < n; j++) {
       t.update({ activity, dish, taste });
       if (f0 + j <= frame) p = clamp01(t.smoothed);
@@ -173,6 +204,26 @@ function expectedPressure(frame) {
   assert.equal(solo.features.num.pressure, expectedPressure(0), "the solo's row carries frame 0's pressure");
   const trade = art.rows.find((r) => r.kind === 'trade' && r.id === 'lois');
   assert.equal(trade.features.num.pressure, expectedPressure(100), "the trade's row carries frame 100's pressure");
+}
+
+// ── pressure, gapped record: the run frames are annotations — the ordinal law is the one in force ──
+{
+  const gappedTake = { ...takeA, stress: STRESS_GAPPED };
+  const at = pressureReader(gappedTake);
+  // The two laws genuinely disagree on this record (at frame 100 the ordinal series has cooled
+  // through 91 cold updates; the run-frame reading has not reached the cold run yet).
+  assert.notEqual(expectedPressure(100, STRESS_GAPPED), runFrameLawPressure(100, STRESS_GAPPED), 'the fixture separates the two laws');
+  assert.equal(at(0), expectedPressure(0, STRESS_GAPPED));
+  assert.equal(at(5), expectedPressure(5, STRESS_GAPPED), 'frame 5 is six updates in, though the first run is annotated at 50');
+  assert.equal(at(100), expectedPressure(100, STRESS_GAPPED));
+  assert.notEqual(at(100), runFrameLawPressure(100, STRESS_GAPPED), 'the reader follows the ordinal law, not the annotations');
+  // Same signals, different annotations: the readback is STRESS_A's, value for value.
+  const atA = pressureReader(takeA);
+  for (const f of [0, 5, 9, 10, 100, 309]) assert.equal(at(f), atA(f), `annotation-free readback at frame ${f}`);
+  // And through buildRows: the trade at frame 100 carries the ordinal pressure.
+  const art = buildRows(labeled, [{ name: 'a.kcperf', perf: gappedTake }], TUNING);
+  const trade = art.rows.find((r) => r.kind === 'trade' && r.id === 'lois');
+  assert.equal(trade.features.num.pressure, expectedPressure(100, STRESS_GAPPED), "the trade's row carries the ordinal frame-100 pressure");
 }
 
 // ── honesty: unmatched takes and unruled heat ───────────────────────────────────────────────────────

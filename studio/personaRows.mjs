@@ -36,8 +36,11 @@
 //             the only source; a null (unruled) heat stays absent from the vector, as it walks.
 //   pressure — re-derived by deterministic replay of the take's `stress` section through the app's
 //             own createStressTracker: the recorder logged every per-frame update as runs
-//             [frame, activity, dish, taste, n], so update j of a run is at frame (run frame + j),
-//             and the pressure at a decision's frame is the clamped smoothed value after the last
+//             [frame, activity, dish, taste, n], but a run's frame is an ANNOTATION — the stress
+//             record's documented law (stressRecord.js) is that order is what replays, and its
+//             canonical per-frame readback (expandStressRecord) numbers updates by ordinal: the
+//             k-th update of the take, counting every run's updates in order, sits at frame k.
+//             The pressure at a decision's frame is the clamped smoothed value after the last
 //             update at or before it (the take's initial smoothed before the first update — what
 //             the live getPressure() would have read). A take with no stress section encodes no
 //             pressure: an absent numeric walks as 0, one consistent fact on both sides.
@@ -59,19 +62,22 @@ const clamp01 = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1
  * The pressure reader for one take: frame → the clamped smoothed stress the band would have read at
  * that frame, or null when the take carries no usable stress section. Deterministic: the same record
  * replays to the same series (the stress record's own law — its logged band changes are the check).
+ * Frames are update ORDINALS, exactly as expandStressRecord reads the record back: a run's logged
+ * frame is an annotation and is never consulted, so two records with the same signals and different
+ * annotations read back identically.
  */
 export function pressureReader(perf) {
   const rec = perf && typeof perf === 'object' ? perf.stress : null;
   if (!rec || rec.version !== 1 || !Array.isArray(rec.runs)) return null;
   const tracker = createStressTracker({ initial: rec.initial || null });
-  const points = []; // [frame, clamped smoothed after that update], in replay order
+  const points = []; // [ordinal frame, clamped smoothed after that update], in replay order
   for (const run of rec.runs) {
     if (!Array.isArray(run)) continue;
-    const [frame, activity, dish, taste, n] = run;
-    if (!Number.isInteger(frame) || !Number.isInteger(n) || n < 0) continue;
+    const [, activity, dish, taste, n] = run;
+    if (!Number.isInteger(n) || n < 0) continue;
     for (let j = 0; j < n; j++) {
       tracker.update({ activity, dish, taste });
-      points.push([frame + j, clamp01(tracker.smoothed)]);
+      points.push([points.length, clamp01(tracker.smoothed)]);
     }
   }
   const initial = rec.initial && Number.isFinite(rec.initial.smoothed) ? clamp01(rec.initial.smoothed) : 0;
