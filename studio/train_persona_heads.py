@@ -515,8 +515,9 @@ def _log_train(store, now, entry):
 def rollback(taste, pid, kind, store, now=None):
     """Restore the entry's previous-version artifact from the store; past version 1, remove the
     entry (pruning the persona, then the section, when they empty). Mutates `taste`; returns the
-    history record. Raises without touching anything when there is nothing to roll back to, or the
-    stored artifact is missing/mismatched — a rollback that cannot restore exactly does not run."""
+    history record. Raises without touching anything when there is nothing to roll back to, the
+    shipped entry is itself malformed, or the stored artifact is missing/mismatched — a rollback
+    that cannot restore exactly does not run."""
     if pid not in TRAINABLE.get(kind, ()):
         raise ValueError(f"not a trainable entry: {pid}|{kind}")
     now = now or utc_now_iso()
@@ -524,6 +525,8 @@ def rollback(taste, pid, kind, store, now=None):
     current = (personas.get(pid) or {}).get(kind)
     if not current:
         raise ValueError(f"no shipped entry for {pid}|{kind} — nothing to roll back")
+    if not incumbent_entry_ok(pid, kind, current):
+        raise ValueError(f"shipped entry for {pid}|{kind} is malformed — refusing to roll back")
     version = current["version"]
     record = {"ts": now, "action": "rollback", "id": pid, "kind": kind, "fromVersion": version}
     if version <= 1:

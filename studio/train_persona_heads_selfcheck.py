@@ -20,6 +20,8 @@ per ruling:
   malformed incumbents — an entry failing A1's shape rules degrades to no-incumbent for its
       slot instead of crashing the run, and store/history never claim a ship taste.json
       does not carry;
+  rollback on a malformed entry — the same shape gate refuses with a clean ValueError
+      (never a KeyError/TypeError from the version read) and taste stays byte-unchanged;
   the depth bound — a challenger deeper than the app's MAX_TREE_DEPTH is rejected like
       every other bounds failure.
 
@@ -480,6 +482,32 @@ result = T.train(rows_artifact(solo_rows(10)), taste_m4, "taste.json", store_m4,
 check(entry_of(result, "davis", "solo")["verdict"] == "below-bar",
       "no incumbent + a constant challenger is a first head under the bar")
 check(taste_m4 == before_m4 and not result["shipped"], "the malformed entry is left exactly as found")
+
+# ── rollback on a malformed entry: the shape gate refuses cleanly; taste stays byte-unchanged ────
+def assert_rollback_refused(taste_dict, pid, kind, store_dir, why):
+    before = T.canonical(taste_dict)
+    try:
+        T.rollback(taste_dict, pid, kind, store_dir)
+        check(False, f"rollback of a malformed entry ({why}) must refuse")
+    except ValueError:
+        pass
+    except (KeyError, TypeError) as exc:
+        check(False, f"rollback of a malformed entry ({why}) crashed with {type(exc).__name__}: {exc}")
+    check(T.canonical(taste_dict) == before,
+          f"a refused rollback ({why}) leaves taste byte-unchanged")
+    check(not [h for h in T.read_history(store_dir) if h["action"] == "rollback"],
+          f"a refused rollback ({why}) writes no history")
+
+
+no_version_current = valid_entry("solo", heat_head(-2.0, 2.0), version=2)
+del no_version_current["version"]
+assert_rollback_refused({"personas": {"davis": {"solo": no_version_current}}},
+                        "davis", "solo", tempfile.mkdtemp(), "missing version")
+
+string_version_current = valid_entry("solo", heat_head(-2.0, 2.0), version=2)
+string_version_current["version"] = "2"
+assert_rollback_refused({"personas": {"davis": {"solo": string_version_current}}},
+                        "davis", "solo", tempfile.mkdtemp(), "string version")
 
 # ── the depth bound: deeper than the app's cap is a bounds rejection, like trees/nodes ───────────
 def deep_head(levels):
