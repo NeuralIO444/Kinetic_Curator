@@ -9,12 +9,14 @@
 //   · a refused name and a cancelled folder pick keep the wizard where it was, the reason in plain words
 //   · wiring: the boot reads the saved doc before the browser boot can roll over it; App shows the wizard after
 //     the Play Me card and never over the tour.
+//   · a corrupt autosave's quarantine verdict survives the boot capture: the read quarantines on first
+//     contact, so the browser boot consumes the captured read and RESTORE FAILED still fires (#107 §6).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createProjectWizard, WIZARD_ASKED_KEY } from './projectWizard.mjs';
 import { createProjectFolderLive, LAST_PROJECT_KEY } from './projectFolderLive.mjs';
 import { createMemoryProjectFs } from '../state/projectFs.mjs';
-import { parseProject, PIPELINE_KEY } from '../state/projectDocument.js';
+import { parseProject, PIPELINE_KEY, readPipelineAutosave, AUTOSAVE_KEY, QUARANTINE_KEY } from '../state/projectDocument.js';
 
 let n = 0;
 const ok = async (name, fn) => {
@@ -234,7 +236,19 @@ await ok('wired: the boot reads the saved doc before the browser boot; App seque
   assert.ok(capture < effect.indexOf(flat('browserBoot();')), 'captured before the browser boot (and its roll)');
 
   const wiring = flat(readFileSync(new URL('../hooks/useProjectWizard.js', import.meta.url), 'utf8'));
-  assert.ok(wiring.includes(flat('bootSavedDoc = readPipelineAutosave().doc ?? null;')), 'the snapshot IS the autosave read');
+  assert.ok(wiring.includes(flat('bootSavedRead = readPipelineAutosave();')), 'the boot read IS the autosave read, taken once');
+  assert.ok(
+    wiring.includes(flat('bootSavedDoc = captureBootSavedRead().doc ?? null;')),
+    'the snapshot derives from the one boot read',
+  );
+  assert.ok(
+    hook.includes(flat('const { doc, quarantined } = captureBootSavedRead();')),
+    'the browser boot consumes the captured read — quarantine verdict included',
+  );
+  assert.ok(
+    !hook.includes(flat('const { doc, quarantined } = readPipelineAutosave();')),
+    'no second, consuming read in the boot path (it would find the slot emptied and lose the verdict)',
+  );
   assert.ok(wiring.includes(flat('create(name, { doc, land: true })')), 'creation goes through the live create, landing the doc');
   assert.ok(wiring.includes(flat('live.isOpen() || live.lastRoot() != null')), 'ever-opened reads the live project');
 
@@ -247,6 +261,30 @@ await ok('wired: the boot reads the saved doc before the browser boot; App seque
   );
   const firstRun = flat(readFileSync(new URL('../components/FirstRunOverlay.jsx', import.meta.url), 'utf8'));
   assert.ok(firstRun.includes(flat("if (typeof onDismiss === 'function') onDismiss();")), 'every dismissal reports');
+});
+
+await ok('a corrupt autosave: the first read carries the quarantine verdict, a second read cannot', () => {
+  // The mechanism the boot wiring above routes around (#107 §6): readPipelineAutosave QUARANTINES on the
+  // read that meets the poison — the blob is kept for recovery, the slot is emptied, and quarantined:true
+  // is returned exactly once. The wizard's capture is that first read, so the browser boot must consume
+  // the captured result; on a fresh read it would see an emptied slot and RESTORE FAILED would never show
+  // (the e2e autosave-quarantine failure on PR #2438's first CI run).
+  const storage = memStorage({ [AUTOSAVE_KEY]: '{ this is not json' });
+  const prev = globalThis.localStorage;
+  globalThis.localStorage = storage;
+  try {
+    const first = readPipelineAutosave();
+    assert.equal(first.doc, null);
+    assert.equal(first.quarantined, true, 'the first (captured) read is where the verdict lives');
+    assert.ok((storage.getItem(QUARANTINE_KEY) ?? '').includes('not json'), 'the blob is kept for recovery');
+    assert.equal(storage.getItem(AUTOSAVE_KEY), null, 'and removed from the boot path');
+    const second = readPipelineAutosave();
+    assert.equal(second.doc, null);
+    assert.equal(second.quarantined, false, 'a second read sees an emptied slot — the verdict is spent');
+  } finally {
+    if (prev === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = prev;
+  }
 });
 
 console.log(`projectWizard.selfcheck: ${n} checks passed (#1710 — the first-run wizard asks once)`);

@@ -15,15 +15,31 @@ const storage = () => {
   }
 };
 
+let bootSavedRead; // undefined = not captured yet; the whole boot read, verdict included
+/**
+ * The browser autosave read as it stood when this launch booted — taken ONCE, before the browser boot can
+ * roll over it. The read is destructive by design (#107 §6): a document it cannot parse is quarantined on
+ * that read and the slot emptied, so the `quarantined` verdict exists only in this one result. Every boot
+ * consumer reads it here — a second readPipelineAutosave() would find the slot already emptied, report no
+ * quarantine, and a corrupt autosave would be refused in silence (no RESTORE FAILED on the MasterBar).
+ */
+export function captureBootSavedRead() {
+  if (bootSavedRead === undefined) {
+    try {
+      bootSavedRead = readPipelineAutosave();
+    } catch {
+      // A read that throws left the document unread with the session still at risk — the quarantine
+      // verdict in another shape (#1646): the boot must say RESTORE FAILED, and there is no doc.
+      bootSavedRead = { doc: null, quarantined: true, fromBackup: false };
+    }
+  }
+  return bootSavedRead;
+}
+
 let bootSavedDoc; // undefined = not captured yet; null = there was none
 /** The browser autosave doc as it stood when this launch booted (read once, before the browser boot can roll over it). */
 export function captureBootSavedDoc() {
-  if (bootSavedDoc !== undefined) return bootSavedDoc;
-  try {
-    bootSavedDoc = readPipelineAutosave().doc ?? null;
-  } catch {
-    bootSavedDoc = null;
-  }
+  if (bootSavedDoc === undefined) bootSavedDoc = captureBootSavedRead().doc ?? null;
   return bootSavedDoc;
 }
 
