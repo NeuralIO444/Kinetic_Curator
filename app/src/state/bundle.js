@@ -124,6 +124,8 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
   'kc:startup-mode:v1': 'per-machine startup preference',
   'kc:active-panel-tab': 'a remembered tab, a convenience',
   'kc:first-run-seen': 'first-run flag',
+  'kc:project-folder:wizard-asked':
+    '#1710 first-run flag: the project-folder wizard has asked on this machine (dismissing counts as asked). Never project content',
   'kc:tour-seen': 'first-run flag',
   'kc:patch-oneliner-seen': 'first-run flag',
   'kc:retrain-nudge:v1': 'a derived counter, rebuilt from keeps',

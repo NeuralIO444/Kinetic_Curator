@@ -54,15 +54,26 @@ export function createProjectFolderLive({ fs, getState, now, mintId, storage = n
       }
     },
 
-    async create(name) {
+    /**
+     * New project where the performer picks. `doc` defaults to the scene on stage (the PIPELINE row: the current
+     * scene becomes session 01, nothing on screen changes). The wizard (#1710) passes the doc instead — the saved
+     * autosave doc for adoption, a blank doc for a fresh start — and `land` puts that doc on stage when the project
+     * lands, so the stage IS session 01 and the first autosave cannot quietly rewrite it with something else.
+     */
+    async create(name, { doc: givenDoc = null, land = false } = {}) {
       if (session.status().state !== 'closed') return { ok: false, reason: 'close this project first' };
       const where = await fs.pickParent();
       if (!where.ok) return where;
       if (!where.path) return { ok: false, cancelled: true };
-      const doc = docNow();
+      const doc = givenDoc ?? docNow();
       const r = await session.create({ parent: where.path, name, doc });
       if (r.ok) {
-        onDisk = JSON.stringify(doc);
+        if (land) {
+          getState().applyProject(doc);
+          onDisk = JSON.stringify(docNow()); // what the stage holds now (the same contract OPEN keeps)
+        } else {
+          onDisk = JSON.stringify(doc);
+        }
         remember(r.root);
       }
       return r;

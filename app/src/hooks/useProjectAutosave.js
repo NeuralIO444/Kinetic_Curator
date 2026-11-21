@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
 import { Events, emit } from '../composition/eventBus.js';
-import { serializeProject, writePipelineAutosave, readPipelineAutosave } from '../state/projectDocument.js';
+import { serializeProject, writePipelineAutosave } from '../state/projectDocument.js';
 import { decideBoot } from '../state/startupBoot.mjs';
 import { projectDirty } from '../state/projectWatch.mjs'; // every field the document saves
 import { recipeToProjectDoc, recipeApplyOptions } from '../state/recipes.js';
@@ -10,6 +10,7 @@ import { parseBootHash, describePaletteFallback, describeDroppedAssets } from '.
 import { fidelityNotice } from '../state/recipeFidelity.js';
 import { scopeDecks } from '../state/kineticScope.mjs'; // #1772: START sets the opener's width
 import { projectFolderLive } from './useProjectFolder.js'; // #1709: a project folder, when one is open
+import { captureBootSavedDoc, captureBootSavedRead } from './useProjectWizard.js'; // #1710: the saved doc, read before the boot can roll over it
 
 const DEBOUNCE_MS = 500;
 // General safety net: any sustained stream of edits (a held slider, a fast
@@ -147,7 +148,11 @@ async function browserBoot() {
     const hashBoot = await bootFromHash(); // awaited BEFORE the autosave read: an explicit link wins
     if (hashBoot === 'applied') return;
     const st = useStore.getState();
-    const { doc, quarantined } = readPipelineAutosave();
+    // #1710 — the boot's one autosave read already happened (the capture at the top of the boot effect):
+    // a corrupt document was quarantined BY that read and its verdict lives in the captured result. A
+    // fresh read here would find the slot already emptied and report no quarantine — the refusal would
+    // be silent and RESTORE FAILED would never show.
+    const { doc, quarantined } = captureBootSavedRead();
     restoreAtRisk = !!doc; // no document, nothing left to lose
     const decision = decideBoot({
       shareApplied: false,
@@ -207,6 +212,9 @@ export function useProjectAutosave() {
     if (restored.current || bootFired) return;
     restored.current = true;
     bootFired = true;
+    // #1710 — read the browser autosave doc BEFORE anything below can roll over it: the first-run wizard adopts
+    // the doc exactly as saved, and the browser boot's restore-roll would replace it within this same launch.
+    captureBootSavedDoc();
     // #1709 — the last project folder reopens at launch: its latest session, applied with NO startup roll and no write.
     // Only when it cannot be reached does the browser session boot (and the notice says why).
     const folder = projectFolderLive();
