@@ -736,6 +736,7 @@ node src/curator/doctrines.selfcheck.mjs
 node src/personas/personaKernel.selfcheck.mjs
 node src/personas/personaTuning.selfcheck.mjs
 node src/personas/band.selfcheck.mjs
+node src/personas/personaAdapters.selfcheck.mjs
 node src/personas/queenView.selfcheck.mjs
 node src/curator/hornFaces.selfcheck.mjs
 node src/curator/hybrid.selfcheck.mjs

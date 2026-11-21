@@ -20,7 +20,7 @@ import { on, emit, Events } from '../composition/eventBus.js';
 import { PHRASE_BARS } from '../curator/paceLive.js';
 import { personaTuning } from './tuning.mjs';
 import { createBandState, stepBand, bandReadiness } from './band.mjs';
-import { noteBandTurn } from './bandRecord.mjs';
+import { noteBandTurn, noteBandHeads } from './bandRecord.mjs';
 import { noteRhythmTiming, noteRhythmLook, resetRhythm } from './rhythmRecord.mjs';
 import { shouldLook } from './rhythmVision.mjs';
 
@@ -62,6 +62,9 @@ const notify = () => {
  * @param isReplaying  () => true while a take plays
  * @param enabled      () => boolean, read at every phrase (default: bandOn)
  * @param getTuning    () => the tuning table in force (default: personaTuning)
+ * @param getHeads     () => the steering bundle of earned-in persona heads, or null (Adapters A1, #2394;
+ *                     default: none — the band plays on rules exactly as before A1). Read per phrase,
+ *                     like the tuning; the bundle is data, built by the caller from the loaded taste.
  * @param getTiming    (turn, look) => her timing lean on one turn, or null (#2389; default: none)
  * @param eyes         { canLook(), look(): Promise<{ motion } | null> } her eyes, or null (#2389; default: none)
  * @returns stop()
@@ -73,6 +76,7 @@ export function startBand({
   isReplaying = () => false,
   enabled = bandOn,
   getTuning = personaTuning,
+  getHeads = null,
   getTiming = null,
   eyes = null,
 }) {
@@ -133,14 +137,17 @@ export function startBand({
       if (isReplaying() || !enabled()) return;
       let ctx;
       let seed;
+      let heads;
       try {
         ctx = { phrase: p.bar / PHRASE_BARS, pressure: getPressure(), hold: getHold(), ending: silent };
         seed = getSeed();
+        heads = getHeads ? getHeads() : null;
       } catch {
         return;
       }
-      const res = stepBand(state, ctx, { seed, tuning: getTuning() });
+      const res = stepBand(state, ctx, { seed, tuning: getTuning(), heads: heads || null });
       state = res.state;
+      if (res.steered && res.steered.length) noteBandHeads(res.steered); // A1: the take stamps who steered
       for (const turn of res.turns) {
         emit(Events.BAND_TURN, turn, { cause: 'band' });
         noteBandTurn(turn);

@@ -30,6 +30,8 @@
 
 import { hashU01 } from '../engine/kernel/rng.js';
 import { personaTuning, validateTuning } from './tuning.mjs';
+import { decisionFeatures } from '../curator/decisionFeatures.mjs';
+import { scoreTreeHeadWith } from '../curator/tasteHead.js';
 
 export const BAND_SCHEMA = 'kc-band/1';
 /** The rng channel every band draw rides (registered in engine/kernel/rng.js STRING_CHANNEL_GROUPS). */
@@ -160,6 +162,44 @@ export function ownerAt(turns, phrase) {
 // ── one phrase ────────────────────────────────────────────────────────────────────────────────────────────
 
 const draw = (seed, phrase, slot) => hashU01(seed >>> 0, BAND_CHANNEL, phrase * BAND_SLOTS + slot);
+/** The slot a head-steered bandleader cut draws on (A1, #2394). Slots 0 (trade gate), 1 (soloist) and
+ * 2..6 (one per answerer) were already taken; every draw is index-stable by (phrase, slot), so this
+ * draw — which exists only when a cut head has earned in — can never shift another decision's draw. */
+const CUT_DRAW_SLOT = 7;
+
+// ── persona heads (Adapters A1, #2394): the head sets the odds ────────────────────────────────────────
+//
+// A head that has earned in (the gate lives in curator/tasteHead.js: steeringHeads admits only heads
+// with ≥200 labeled turns and held-out ≥ 0.3) supplies the probability its decision is a keep, and
+// that probability REPLACES the tuning odds in the decision's draw (ruling Q2) — the decision stays a
+// draw off the same slot, the band keeps its stochastic feel, and a decision with no earned-in head
+// runs on the tuning table exactly as before. With no heads at all (every take before A1, and every
+// taste without a personas section) each path below is the pre-A1 code path untouched.
+
+const headEntry = (heads, id, kind) => (heads && heads[id] && heads[id][kind]) || null;
+
+/** One head's keep-probability for one decision, walked over the decision-feature universe. */
+const headScore = (entry, input) => scoreTreeHeadWith(entry.head, decisionFeatures(input));
+
+/** The decision fields the BAND owns: the call being answered (caller, verdict, move), the cut's
+ * target, the deciding persona's heat, the standing solo's age. A caller-supplied decisionCtx may
+ * carry phrase context, census and recipe inputs — never these (stepBand's documented law). */
+const BAND_OWNED_FIELDS = Object.freeze(['caller', 'verdict', 'move', 'target', 'heat', 'soloAge']);
+
+/** One decision's feature input: baseInput with the band's own facts for THIS decision laid over
+ * it, and every other band-owned field stripped. A fact that is not a fact of this decision (a
+ * solo pick has no caller; a cut has no verdict) never reaches the vector — a hostile or merely
+ * careless decisionCtx cannot smuggle it in. (Pressure needs no handling here: baseInput already
+ * pins it over decisionCtx.) */
+function decisionInput(baseInput, owned) {
+  const input = { ...baseInput };
+  for (const k of BAND_OWNED_FIELDS) delete input[k];
+  return Object.assign(input, owned);
+}
+
+/** The move a verdict makes for a seat (verdictOf's own mapping, restated for the feature vector). */
+const moveOf = (id, verdict) =>
+  verdict === 'agree' ? 'build' : verdict === 'layOut' ? 'rest' : BAND_SEATS[id].cuts ? 'cut' : 'counter';
 
 /** Odds shifted by the relation bias b in [-1, 1]: agree × (1+b), disagree × (1−b), lay-out untouched; renormalised. */
 export function shiftedOdds(odds, bias) {
@@ -184,17 +224,31 @@ function normalizeHold(hold) {
   return { all: h.keep === true || lockAll, why: h.keep === true ? 'keep' : 'lock', locked };
 }
 
-function pickSoloist(seed, phrase, locked, tuning) {
+function pickSoloist(seed, phrase, locked, tuning, heads, baseInput, noteSteered) {
   const pool = BAND_SOLOISTS.filter((id) => !locked.has(id));
-  const weights = pool.map((id) => Math.max(0, tuning.personas[id].heat));
+  // A candidate with an earned-in solo head weighs in with its head's keep-probability for taking
+  // this solo; a candidate without one weighs its tuned heat, exactly as before A1. Every head in
+  // the pool is CONSULTED — but the stamp credits only the WINNER (ruling F1 on #2394): a head
+  // whose solo never played did not steer the take, so the note waits until the pick is made.
+  const entries = pool.map((id) => headEntry(heads, id, 'solo'));
+  const weights = pool.map((id, i) =>
+    entries[i]
+      ? headScore(entries[i], decisionInput(baseInput, { heat: tuning.personas[id].heat }))
+      : Math.max(0, tuning.personas[id].heat),
+  );
   const total = weights.reduce((a, b) => a + b, 0);
   if (!(total > 0)) return null;
   let u = draw(seed, phrase, 1) * total;
+  let winner = pool.length - 1;
   for (let i = 0; i < pool.length; i++) {
     u -= weights[i];
-    if (u < 0) return pool[i];
+    if (u < 0) {
+      winner = i;
+      break;
+    }
   }
-  return pool[pool.length - 1];
+  if (entries[winner]) noteSteered(pool[winner], 'solo', entries[winner]);
+  return pool[winner];
 }
 
 function soloTurn(phrase, by, tuning) {
@@ -202,7 +256,7 @@ function soloTurn(phrase, by, tuning) {
   return { kind: 'solo', phrase, by, len: Math.max(1, p.soloLengthPhrases), cap: p.stepCap };
 }
 
-function tradeTurn(seed, phrase, solo, locked, tuning) {
+function tradeTurn(seed, phrase, solo, locked, tuning, heads, baseInput, noteSteered) {
   const caller = solo.by;
   const eligible = BAND_ANSWERERS.filter((id) => id !== caller && !locked.has(id));
   // who answers first: the seats whose own `answersFirst` is the caller, then the rest, each in cast order
@@ -218,7 +272,30 @@ function tradeTurn(seed, phrase, solo, locked, tuning) {
       horns += 1;
     }
     const u = draw(seed, phrase, 2 + BAND_ANSWERERS.indexOf(id));
-    const [verdict, move] = verdictOf(id, tuning.personas[id].odds, tuning.relations[`${id}->${caller}`], u);
+    // An answerer with an earned-in trade head answers on its head's odds: the head scores each
+    // candidate verdict, the three keep-probabilities normalize into the odds, and the relation
+    // bias still shifts them (the bias is A5's to learn; the head replaces the table's odds only).
+    const entry = headEntry(heads, id, 'trade');
+    let odds = tuning.personas[id].odds;
+    if (entry) {
+      noteSteered(id, 'trade', entry);
+      const p = {};
+      for (const verdict of BAND_VERDICTS) {
+        p[verdict] = headScore(
+          entry,
+          decisionInput(baseInput, {
+            caller,
+            verdict,
+            move: moveOf(id, verdict),
+            heat: tuning.personas[id].heat,
+            soloAge: phrase - solo.start,
+          }),
+        );
+      }
+      const sum = p.agree + p.disagree + p.layOut;
+      odds = sum > 0 ? { agree: p.agree / sum, disagree: p.disagree / sum, layOut: p.layOut / sum } : { agree: 0, disagree: 0, layOut: 1 };
+    }
+    const [verdict, move] = verdictOf(id, odds, tuning.relations[`${id}->${caller}`], u);
     answers.push({ by: id, verdict, move });
   }
   if (!answers.length) return null;
@@ -242,21 +319,37 @@ function ownerAfter(phrase, caller, answers, tuning) {
  *     pressure  0..1, how hard the room is pressed (the bandleader cuts a solo once it reaches band.bandleaderCut)
  *     hold      { keep?: boolean, lock?: boolean | string[] } — the artist's hand; it always wins
  *     ending    true when the bandleader should call the ending
- *   opts { seed, tuning? }   seed: the take's seed (uint32); tuning: the table (default: the table in force)
+ *   opts { seed, tuning?, heads?, decisionCtx? }
+ *     seed: the take's seed (uint32); tuning: the table (default: the table in force)
+ *     heads: the steering bundle (curator/tasteHead.js steeringHeads) — earned-in persona heads only,
+ *       or null/absent for rules exactly as before A1
+ *     decisionCtx: extra decision-feature inputs the caller can supply (bar, bpm, energy, census,
+ *       recipe, principles — decisionFeatures.mjs); the band's own facts (pressure, caller, the
+ *       candidate verdict, the cut's target, heat, solo age) always override it on the fields the
+ *       band owns — and a band-owned field that is not a fact of the decision at hand (a solo
+ *       pick has no caller) is stripped, never inherited from decisionCtx
  *
- * Returns { state, turns, unruled } — `turns` is [] when nothing was played; `unruled` is the list of null/absent
- * paths when the table is not ruled enough (the band then returns `state` untouched, the SAME object).
+ * Returns { state, turns, unruled, steered } — `turns` is [] when nothing was played; `unruled` is the list of
+ * null/absent paths when the table is not ruled enough (the band then returns `state` untouched, the SAME
+ * object); `steered` lists the heads credited with steering this phrase ({ id, kind, version }, deduped) —
+ * the material for the take's band-section stamp (rulings Q4 + F1: every trade answerer and the cut are
+ * credited as they decide, but a solo pick credits ONLY the winner's head, never the consulted losers).
+ * Empty when no head steered.
  */
 export function stepBand(state, ctx, opts = {}) {
   const tuning = opts.tuning ?? personaTuning();
   const ready = bandReadiness(tuning);
-  if (!ready.ready) return { state, turns: [], unruled: ready.missing };
+  if (!ready.ready) return { state, turns: [], unruled: ready.missing, steered: [] };
   if (!ctx || !Number.isInteger(ctx.phrase) || ctx.phrase < 0 || ctx.phrase <= state.phrase)
-    return { state, turns: [], unruled: null };
+    return { state, turns: [], unruled: null, steered: [] };
   const seed = Number.isInteger(opts.seed) ? opts.seed >>> 0 : 0;
   const phrase = ctx.phrase;
   const pressure = clamp01(ctx.pressure);
   const hold = normalizeHold(ctx.hold);
+  const heads = opts.heads || null;
+  const baseInput = { ...(opts.decisionCtx || {}), pressure };
+  const steeredByKey = new Map();
+  const noteSteered = (id, kind, entry) => steeredByKey.set(`${id}|${kind}`, { id, kind, version: entry.version });
   const turns = [];
   let cur = state;
   const push = (turn) => {
@@ -266,7 +359,7 @@ export function stepBand(state, ctx, opts = {}) {
   const done = () => {
     // a phrase that played nothing is still played: the guard against re-deciding it
     if (cur.phrase < phrase) cur = deepFreeze({ ...cur, phrase });
-    return { state: cur, turns, unruled: null };
+    return { state: cur, turns, unruled: null, steered: [...steeredByKey.values()] };
   };
 
   // 1. the artist wins: a keep, or a lock on everything, silences the band and ends any solo
@@ -292,14 +385,25 @@ export function stepBand(state, ctx, opts = {}) {
   }
   const room = pressure >= tuning.band.bandleaderCut;
   if (solo) {
-    // 4. the bandleader cuts a solo the room can't afford
-    if (room) {
+    // 4. the bandleader cuts a solo the room can't afford. With an earned-in cut head, the head's
+    // keep-probability for cutting replaces the tuned line: pressure becomes a feature, the draw
+    // decides (on its own slot), and a head that says let it play lets the phrase move on to the
+    // trade. Without one, the tuned line decides exactly as before.
+    const cutHead = headEntry(heads, 'governor', 'cut');
+    if (cutHead) {
+      noteSteered('governor', 'cut', cutHead);
+      const p = headScore(cutHead, decisionInput(baseInput, { target: solo.by, soloAge: phrase - solo.start }));
+      if (draw(seed, phrase, CUT_DRAW_SLOT) < p) {
+        push({ kind: 'cut', phrase, by: 'governor', target: solo.by });
+        return done();
+      }
+    } else if (room) {
       push({ kind: 'cut', phrase, by: 'governor', target: solo.by });
       return done();
     }
     // 5. a trade: the solo that played last phrase is the call, and the room answers it
     if (solo.start < phrase && draw(seed, phrase, 0) < tuning.band.tradeRate) {
-      const trade = tradeTurn(seed, phrase, solo, hold.locked, tuning);
+      const trade = tradeTurn(seed, phrase, solo, hold.locked, tuning, heads, baseInput, noteSteered);
       if (trade) {
         push(trade);
         return done();
@@ -309,7 +413,7 @@ export function stepBand(state, ctx, opts = {}) {
   }
   // 6. nobody is soloing: someone takes the next one (not while the room can't afford it)
   if (!room) {
-    const by = pickSoloist(seed, phrase, hold.locked, tuning);
+    const by = pickSoloist(seed, phrase, hold.locked, tuning, heads, baseInput, noteSteered);
     if (by) push(soloTurn(phrase, by, tuning));
   }
   return done();
