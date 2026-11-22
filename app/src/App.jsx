@@ -56,6 +56,7 @@ import { setRoomCodesProvider } from './curator/roomCodes.js'; // #1949
 import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js'; // #1462: Mind 1
 import { ensureArchiveRetriever, scheduleArchiveIndexing } from './personas/personaArchiveLive.js'; // #2384: Persona Archive
 import { startReviewVoice } from './curator/fieldReviewVoiceLive.mjs'; // #2006 slice 2: the review loop's voice on the tape
+import { startFieldRevision } from './curator/fieldRevisionLive.js'; // #2151: the standing poem's critical pass (requests under the pressure law)
 import { startTreatments } from './curator/treatmentsLive.mjs'; // #2010: the treatments surface + its bus announcer
 import { replaySpectrumFrame, endSpectrumReplay } from './curator/spectrumRecord.js'; // #1534: a take replays its hearing
 import { startMindFaces, resetMindFaces } from './curator/mindFace.js'; // #1462: a request blends a face state in and out
@@ -134,6 +135,14 @@ function AppInner() {
     loisActivity.start({ store: useStore });
     return () => loisActivity.stop();
   }, []);
+
+  // #2151 — the standing poem's critical pass: while the user's tempo is
+  // watching, a poem standing at a register pole draws a revision
+  // request from LOIS/DAVIS, and the poem answers through its own deal
+  // machinery; hot tempo flips deals to variety, fiddling silences
+  // requests, and any user change overrides a pending one. Muted while
+  // a take plays back.
+  useEffect(() => startFieldRevision({ getState: useStore.getState, isReplaying: isPlaybackActive }), []);
 
   // #2439 — Persona Adapters boot bridge: load the nightly trainer's heads once, at start, onto the
   // loaded taste (desktop only). Silent by ruling: a missing or unreadable store leaves no trace and

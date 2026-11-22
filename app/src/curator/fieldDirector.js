@@ -5,6 +5,7 @@ import { GREENLEAF } from '../poets/greenleaf.js';
 import { TEIJO } from '../poets/teijo.js';
 import { ROSSELLI } from '../poets/rosselli.js';
 import { GIBSON } from '../poets/gibson.js';
+import { POET_REGISTERS } from '../poets/fieldForm.js'; // #2151 — the variety pool's register half (the supply authority)
 
 export const POETS = Object.freeze({
   greenleaf: GREENLEAF,
@@ -100,6 +101,7 @@ export function choosePoet({
   japaneseContext = false,
   bauhausContext = false,
   soloContext = false,
+  variety = false,
 } = {}) {
   // #1932 — the genre gate outranks temperature: a non-type-native room is
   // silent, full stop.
@@ -124,7 +126,12 @@ export function choosePoet({
   const poetId = pool[Math.floor(rng() * pool.length)] || 'greenleaf';
   const deck = POETS[poetId];
   if (!deck || deck.length === 0) return null;
-  const piece = deck[Math.floor(rng() * deck.length)];
+  // #2151 — variety (the pressure law's hot mode: the user is smashing
+  // KINETIC and wants range): the pick ranges across the whole register
+  // line — the poet's deck plus their register cache, cover pole to
+  // interior pole. Off, the pick is the deck alone, exactly as shipped.
+  const pickPool = variety ? [...deck, ...POET_REGISTERS[poetId]] : deck;
+  const piece = pickPool[Math.floor(rng() * pickPool.length)];
   const density = genreLean === 'dense' ? Math.min(1, (piece.density || 0.4) + 0.15) : piece.density || 0.4;
   // #2005 — the plate call, read off the room with no draw: the solo room
   // at its stillest (see PLATE_CALL_MAX_INTENSITY). Computed once so the

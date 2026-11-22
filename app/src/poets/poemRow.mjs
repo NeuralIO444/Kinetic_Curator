@@ -5,7 +5,7 @@
 // banks a kept poem, and fixes the seeded sub-streams every poem re-deal draws from. No store, no
 // React — layoutSlice is the single write site and the row only reads.
 
-import { POET_DECKS, sanitizeFieldForm } from './fieldForm.js';
+import { POET_DECKS, findPoetPiece, sanitizeFieldForm } from './fieldForm.js';
 
 /** Display surname per deck. Greenleaf is Whittier (John Greenleaf Whittier), per the #1917/#1918 rulings. */
 export const POET_SURNAMES = Object.freeze({
@@ -64,7 +64,10 @@ export function poemIdentity(fieldForm) {
   if (!fieldForm || typeof fieldForm !== 'object') return null;
   const deck = POET_DECKS[fieldForm.poetId];
   if (!deck) return null;
-  const piece = deck.find((p) => p.id === fieldForm.pieceId);
+  // #2151 — the chip names the whole supply: a register-cache poem stands
+  // under its own words, and a pushed one-word poem's clean transcription
+  // is read here, off the piece — never off the treated stamps.
+  const piece = findPoetPiece(fieldForm.poetId, fieldForm.pieceId);
   if (!piece) return null;
   const words = piece.lines.join(' ').split(/\s+/).filter(Boolean);
   return {
@@ -80,6 +83,18 @@ export function poemIdentity(fieldForm) {
 /** The identity of a form for keep de-duplication: poet + piece + placement (exact materialization). */
 function keepKey(f) {
   return JSON.stringify([f.poetId, f.pieceId, f.layout, f.aspect, f.stamps.map((s) => [s.ch, s.x, s.y, s.rotation, s.em])]);
+}
+
+/**
+ * #2151 — a standing form's key, for the revision pass: the keep key of
+ * the sanitized form (poet + piece + exact materialization), or null
+ * when the payload is not an honest form. A re-deal of the same piece
+ * places anew and keys differently — the key names THIS standing poem,
+ * not the piece it came from.
+ */
+export function poemFormKey(fieldForm) {
+  const form = sanitizeFieldForm(fieldForm);
+  return form ? keepKey(form) : null;
 }
 
 /**

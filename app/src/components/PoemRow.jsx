@@ -25,6 +25,7 @@ export function PoemRow() {
   const fieldForm = useStore((s) => s.layoutParams.fieldForm);
   const held = useStore((s) => !!s.lockedParams?.fieldForm);
   const poemKeeps = useStore((s) => s.layoutParams.poemKeeps);
+  const fieldRevision = useStore((s) => s.fieldRevision);
   const redealPoem = useStore((s) => s.redealPoem);
   const togglePoemHold = useStore((s) => s.togglePoemHold);
   const togglePoemWhisper = useStore((s) => s.togglePoemWhisper);
@@ -32,6 +33,15 @@ export function PoemRow() {
 
   const id = poemIdentity(fieldForm);
   if (!id) return null;
+  // #2151 — a pending revision request names this standing poem (its
+  // piece, while it stands): the chip says what the critics read, and
+  // the poem's answer — or the user's overriding hand — clears it.
+  const revision =
+    fieldRevision?.status === 'pending' &&
+    fieldRevision.poetId === fieldForm.poetId &&
+    fieldRevision.pieceId === fieldForm.pieceId
+      ? fieldRevision
+      : null;
   const kept = isPoemKept(poemKeeps, fieldForm);
   const whisper = fieldForm.register === 'whisper';
   const raygun = fieldForm.raygun;
@@ -70,6 +80,19 @@ export function PoemRow() {
         <span className="chip-btn poem-form" title={`Form: ${id.form}`} aria-label={`Form ${id.form}`}>
           {id.form}
         </span>
+        {revision ? (
+          <span
+            className="chip-btn poem-revision"
+            title={
+              revision.read === 'empty'
+                ? 'Too empty — this poem stands at the cover register, and a revision has been requested. The poem answers with a fuller piece in a moment, unless you change something first: your hand overrides the request.'
+                : 'Too crowded — this poem stands at the interior register, and a revision has been requested. The poem answers with a lighter piece in a moment, unless you change something first: your hand overrides the request.'
+            }
+            aria-label={revision.read === 'empty' ? 'Revision requested: too empty' : 'Revision requested: too crowded'}
+          >
+            {revision.read === 'empty' ? 'too empty' : 'too crowded'}
+          </span>
+        ) : null}
         <button
           type="button"
           className={`chip-btn poem-act${raygun ? ' active' : ''}`}

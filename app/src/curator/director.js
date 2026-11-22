@@ -552,7 +552,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
      * piece already standing, so the dislike path sheds the poem it was asked to shed.
      * @returns {{ poetId, pieceId, layout } | null}
      */
-    dealPoet({ fieldRng: pickRng = null, avoidPieceId = null, lookFamily = undefined } = {}) {
+    dealPoet({ fieldRng: pickRng = null, avoidPieceId = null, lookFamily = undefined, variety = false } = {}) {
       // The row always passes its document's seeded poem stream; a bare call falls back to the
       // Director's own deal stream exactly as a tick would draw it (main's #1917 law).
       let draw = typeof pickRng === 'function' ? pickRng : injectedFieldRng;
@@ -569,6 +569,9 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
         rejected: false,
         lookFamily: lastLookFamily,
         keepPressure: lastKeepPressure,
+        // #2151 — hot-tempo variety (the store's tempo flag, read by the
+        // landPoem caller): the pick ranges across the register line.
+        variety: variety === true,
       };
       let r = fieldStep(fieldState, input, draw);
       for (let i = 0; i < 4 && avoidPieceId && r.decision && r.decision.pieceId === avoidPieceId; i++) {

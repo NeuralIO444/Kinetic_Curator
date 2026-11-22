@@ -19,10 +19,10 @@
 // runs inside sanitizeFieldForm: a stored form that would spawn unreadable
 // is refused at the document door too.
 
-import { GREENLEAF } from './greenleaf.js';
-import { TEIJO } from './teijo.js';
-import { ROSSELLI } from './rosselli.js';
-import { GIBSON } from './gibson.js';
+import { GREENLEAF, GREENLEAF_REGISTER } from './greenleaf.js';
+import { TEIJO, TEIJO_REGISTER } from './teijo.js';
+import { ROSSELLI, ROSSELLI_REGISTER } from './rosselli.js';
+import { GIBSON, GIBSON_REGISTER } from './gibson.js';
 import {
   placePiece,
   stampIdForChar,
@@ -62,6 +62,33 @@ export const POET_DECKS = Object.freeze({
   rosselli: ROSSELLI,
   gibson: GIBSON,
 });
+
+/**
+ * #2151 — the register-spanning caches (PR #2310, data only until this
+ * build): each poet's pieces across the register line, every piece tagged
+ * `register: 'cover' | 'between' | 'interior'`. The decks above stay the
+ * dealt decks — untouched, exactly as the poemRegister suite pins them;
+ * the caches join the SUPPLY (findPoetPiece below), which is where the
+ * #2151 paths draw: hot-tempo variety deals and revision answers.
+ */
+export const POET_REGISTERS = Object.freeze({
+  greenleaf: GREENLEAF_REGISTER,
+  teijo: TEIJO_REGISTER,
+  rosselli: ROSSELLI_REGISTER,
+  gibson: GIBSON_REGISTER,
+});
+
+/**
+ * #2151 — the poem supply: a piece by (poet, id), the dealt deck first,
+ * then the poet's register cache. Ids never collide across the two (the
+ * poemRegister suite pins it), so the order is a discipline, not a
+ * disambiguation. Null for an unknown poet or piece.
+ */
+export function findPoetPiece(poetId, pieceId) {
+  const deck = POET_DECKS[poetId];
+  if (!deck || typeof pieceId !== 'string') return null;
+  return deck.find((p) => p.id === pieceId) ?? POET_REGISTERS[poetId].find((p) => p.id === pieceId) ?? null;
+}
 
 /** Hard ceiling on a form's stamp count (a poem is dozens of glyphs, not thousands). */
 export const MAX_FIELD_STAMPS = 200;
@@ -232,7 +259,9 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
   if (!decision || typeof decision !== 'object') return silent;
   const deck = POET_DECKS[decision.poetId];
   if (!deck) return silent;
-  const piece = deck.find((p) => p.id === decision.pieceId);
+  // #2151 — the deal serves the whole supply: the deck, and the register
+  // cache the revision answers and hot-tempo variety deals draw from.
+  const piece = findPoetPiece(decision.poetId, decision.pieceId);
   if (!piece) return silent;
   const density = Number.isFinite(decision.density) ? decision.density : piece.density;
   const asp = Number.isFinite(aspect) && aspect >= 0.5 && aspect <= 3 ? aspect : DEFAULT_FIELD_ASPECT;
@@ -297,14 +326,29 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
     dealLines = [dealLines[0], ORNAMENT_GLYPH_BY_ID.get(decision.plateBreak), ...dealLines.slice(1)];
     breakId = decision.plateBreak;
   }
+  // #2151 — the two ruled exceptions to the #1932 threshold, judged on
+  // the face actually dealt (dealLines, after the script/face/case calls
+  // have had their say):
+  // - a ONE-WORD poem is exempt (Matt, 2026-11-17): one line, no spaces,
+  //   in whichever face it deals — the cover pole at its limit is a poem.
+  // - a Japanese COVER deals in the native face whatever its length
+  //   (Matt, 2026-11-17): a register-'cover' piece on a kana deal is
+  //   exempt — Japanese is denser than English, and Teijo's covers are
+  //   3–6 characters. Every other piece keeps the threshold, in every face.
+  const oneWordDeal = dealLines.length === 1 && !/\s/.test(dealLines[0].trim());
+  const coverKanaDeal = kana && piece.register === 'cover';
   const { layout, stamps } = placePiece({ ...piece, lines: dealLines, density }, rng, {
     aspect: asp,
     face: plate ? 'plate' : serif ? 'serif' : undefined,
+    // #2151 — a one-word deal is placed PUSHED (placement.js: display
+    // scale, per-glyph treatment). The push is a property of the poem,
+    // not of the path that dealt it.
+    push: oneWordDeal,
   });
   // #1932 — the threshold counts LETTERS: a plate-break ornament is
   // furniture between the poem's lines, not a letter of it (#2002).
   const letterStamps = stamps.reduce((n, s) => n + (ORNAMENT_STAMP_IDS.has(s.assetId) ? 0 : 1), 0);
-  if (letterStamps < FIELD_POEM_MIN_STAMPS) return silent; // #1932 — the threshold: a fragment is not a poem
+  if (letterStamps < FIELD_POEM_MIN_STAMPS && !oneWordDeal && !coverKanaDeal) return silent; // #1932 — the threshold: a fragment is not a poem
   // S4 (#1905) — the stillborn gate: a form that would spawn unreadable
   // never spawns. The deal falls back to silence and the verdict rides the
   // record (layoutSlice banks it on the commit as fieldGateRefusal).
@@ -341,9 +385,10 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
  * (genre-lean adjusted at pick time) wins over the deck's when present.
  * Returns the layoutParams.fieldForm payload, or null for silence
  * (null decision, unknown poet/piece, a piece that places fewer than
- * FIELD_POEM_MIN_STAMPS stamps — #1932: a fragment is not a poem — or a
- * stillborn form the S4 gate refused; use fieldDealReport when the
- * refusal itself matters).
+ * FIELD_POEM_MIN_STAMPS stamps — #1932: a fragment is not a poem, with
+ * the two #2151 exceptions ruled on that issue (a one-word poem; a
+ * Japanese cover in the native face) — or a stillborn form the S4 gate
+ * refused; use fieldDealReport when the refusal itself matters).
  */
 export function fieldFormForDeal(decision, rng, opts = {}) {
   return fieldDealReport(decision, rng, opts).form;

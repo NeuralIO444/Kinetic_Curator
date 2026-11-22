@@ -554,7 +554,24 @@ function fitEm(em, wEm, hEm, aspect, maxW = MAX_W, maxH = MAX_H) {
  * Rosselli's square keeps its cell law under any face — the quadro IS its
  * discipline, and the Director never calls a plate on it.
  */
-export function placePiece(piece, rng, { aspect = 10 / 7, face } = {}) {
+/**
+ * #2151 — the one-word push: a single word is the cover pole at its limit,
+ * and the deal may really push it (Matt's ruling on #2151, with Ashworth's
+ * "I want to go big" as the reference): the word is sized to this share of
+ * the dish's width before the fit box judges it, capped at PUSH_EM_CAP —
+ * under the document door's own stamp ceiling (sanitizeFieldForm refuses
+ * em > 0.3), so a pushed form still passes the door it will be stored
+ * behind. The per-glyph treatment rides the same call: each glyph's em
+ * breathes by up to ±PUSH_GLYPH_JITTER and its rotation by ±PUSH_ROT_JITTER
+ * radians, drawn off the placement stream after the module origin, in
+ * stamp order — a given (piece, seed) pushes identically every time.
+ */
+export const PUSH_WIDTH_SHARE = 0.84;
+export const PUSH_EM_CAP = 0.28;
+export const PUSH_GLYPH_JITTER = 0.05;
+export const PUSH_ROT_JITTER = 0.05;
+
+export function placePiece(piece, rng, { aspect = 10 / 7, face, push = false } = {}) {
   const lines = Array.isArray(piece?.lines) ? piece.lines.map((l) => String(l)) : [];
   const layout = PLACEMENT_LAYOUTS.includes(piece?.layout) ? piece.layout : 'bands';
   const density = clamp01(piece?.density ?? 0.4);
@@ -650,9 +667,21 @@ export function placePiece(piece, rng, { aspect = 10 / 7, face } = {}) {
     const adv = null; // #1928: proportional
     let em = 0.054 + 0.033 * density;
     const wEm = lineAdvanceEm(joined, adv, SPACE_ADV, widthOf, track);
+    // #2151 — the push (see PUSH_* above): one word only — a phrase is
+    // never pushed, whatever the caller asked. The fit box still judges
+    // the result, and the stillborn gate judges the placed form as always.
+    const pushed = push === true && wEm > 0 && !/\s/.test(joined);
+    if (pushed) em = Math.min((PUSH_WIDTH_SHARE * asp) / wEm, PUSH_EM_CAP);
     em = fitEm(em, wEm, 1, asp, fitMaxW, fitMaxH);
     const { ox, oy } = moduleOrigin(draw, wEm * em, em, asp, margin);
     stamps = layLine(joined, { ox, oy: oy + 0.5 * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf, track });
+    if (pushed) {
+      stamps = stamps.map((s) => ({
+        ...s,
+        em: s.em * (1 + (draw() - 0.5) * 2 * PUSH_GLYPH_JITTER),
+        rotation: (draw() - 0.5) * 2 * PUSH_ROT_JITTER,
+      }));
+    }
   } else if (layout === 'two') {
     // Two-line module, locked baselines, generous negative space.
     const adv = null; // #1928: proportional
