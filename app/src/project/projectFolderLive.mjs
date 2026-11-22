@@ -15,7 +15,7 @@
 // instrument state, like the loot folder's path, never part of a project.
 import { createProjectSession } from '../state/projectSession.mjs';
 import { serializeProject } from '../state/projectDocument.js';
-import { parseRecents, touchRecents, removeRecent, renameRecent } from './projectRecents.mjs';
+import { parseRecents, touchRecents, removeRecent } from './projectRecents.mjs';
 
 export const LAST_PROJECT_KEY = 'kc:project-folder:last';
 export const RECENTS_KEY = 'kc:project-folder:recents';
@@ -141,7 +141,8 @@ export function createProjectFolderLive({ fs, getState, now, mintId, storage = n
       const r = await session.rename(name);
       if (r.ok) {
         remember(r.root);
-        saveRecents(renameRecent(loadRecents(), before, { name: r.name, root: r.root }));
+        // the old root's entry goes; the renamed project is the most recent (it may predate the list entirely)
+        saveRecents(touchRecents(removeRecent(loadRecents(), before), { name: r.name, root: r.root }, now()));
       }
       return r;
     },
@@ -171,10 +172,19 @@ export function createProjectFolderLive({ fs, getState, now, mintId, storage = n
       const p = await fs.pickProject();
       if (!p.ok) return p;
       if (!p.path) return { ok: false, cancelled: true };
+      const before = session.status().root;
       const r = await session.resume(p.path);
       if (r.ok) {
         onDisk = null;
         remember(session.status().root);
+        // the project lives at a new home now: the recents entry follows it (#1711)
+        saveRecents(
+          touchRecents(
+            removeRecent(loadRecents(), before),
+            { name: session.status().name, root: session.status().root },
+            now(),
+          ),
+        );
       }
       return r;
     },

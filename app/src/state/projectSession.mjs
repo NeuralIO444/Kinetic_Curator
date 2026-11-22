@@ -264,6 +264,12 @@ export function createProjectSession({ fs, now, mintId, appVersion = null }) {
         }
       if (plan.some((p) => files.includes(p.to)))
         return { ok: false, reason: 'a session file for the new name is already in the folder' };
+      if (new Set(plan.map((p) => p.to)).size !== plan.length)
+        return {
+          ok: false,
+          reason:
+            'sessions under both the old names would land on the same file under the new one — nothing was renamed',
+        };
       const mf = await fs.read(cur.root, MANIFEST_FILE);
       const m = mf.ok ? readManifest(mf.text) : { ok: false };
       if (m.ok) {

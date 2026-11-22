@@ -84,6 +84,23 @@ await ok('refusals: the name it already has, a collision, an invalid name — no
   assert.ok(fs.files()[`${c.root}/sessions/Mine_01.kcproject`], 'the session file stands');
 });
 
+await ok('sessions under both old names landing on one file refuse the rename whole', async () => {
+  const fs = createMemoryProjectFs({ folders: [P] });
+  const s = mk(fs);
+  const c = await s.create({ parent: P, name: 'Alpha', doc: docOf(1) });
+  await s.close();
+  await fs.renameFolder(c.root, 'KC1_Loot_Beta'); // renamed outside KC-1: folder name wins, manifest still says Alpha
+  const o = await s.open(`${P}/KC1_Loot_Beta`);
+  assert.equal(o.ok, true, o.reason);
+  assert.equal((await s.save(docOf(2))).ok, true, 'the save writes session 01 under the folder name');
+  const files = Object.keys(fs.files());
+  assert.ok(files.some((f) => f.endsWith('Alpha_01.kcproject')) && files.some((f) => f.endsWith('Beta_01.kcproject')));
+  const r = await s.rename('Gamma');
+  assert.equal(r.ok, false, 'both _01 files would land on Gamma_01');
+  assert.equal(s.status().name, 'Beta', 'nothing was renamed');
+  assert.ok(fs.files()[`${P}/KC1_Loot_Beta/sessions/Beta_01.kcproject`]);
+});
+
 await ok('while paused, rename refuses and pause-and-protect holds', async () => {
   const fs = createMemoryProjectFs({ folders: [P] });
   const s = mk(fs);
