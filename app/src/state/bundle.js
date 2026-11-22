@@ -117,6 +117,10 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
     "#1709 which project folder was open, so the next launch reopens it: this machine's absolute path. Never in a bundle (it would leak the folder layout and mean nothing on another Mac); the project itself lives in its folder",
   'kc:project-folder:recents':
     "#1711 the recent-projects list (name + folder path, most-recent-first): this machine's absolute paths. Never in a bundle, for the same reason as kc:project-folder:last",
+  'kc:persona-heads:snapshot':
+    "#2397 the boot bridge's baseline: the persona-head versions this machine's nightly store had loaded at the last boot. Per-machine store state, not project content — a bundle carries no copy",
+  'kc:persona-heads:launch-note':
+    "#2397 the DEV readout's launch note (which head last changed on this machine). Derived from the snapshot above; per-machine, never bundled",
   'kc:look-library:v1':
     "#2148 the Look Library: installed Looks travel as their own shareable kc-pack/1 file (Pipeline ↓ LOOKS), so a bundle carries no second copy. Whether a bundle part should carry the Library is the Library step's call (#2148 step 2)",
   'kc:weave:v1': 'per-machine display preference, not project content',

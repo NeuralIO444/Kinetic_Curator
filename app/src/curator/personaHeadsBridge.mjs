@@ -9,7 +9,65 @@
 // back alone, the rest still load (validatePersonasSection is all-or-nothing over a section, so entries are
 // validated one at a time here); (3) boot-only — the caller reads once at app start, never again, so heads
 // written mid-session take effect at the next launch, never between takes.
-import { validatePersonasSection } from './tasteHead.js';
+import { validatePersonasSection, PERSONA_HEAD_IDS } from './tasteHead.js';
+
+/**
+ * How a head is named on a surface: by callsign, always (the A4 launch note is callsigns only).
+ * The governor's callsign is null by law — he is never named; his head is spoken of by its
+ * instrument ("the cut"). The Queen has no entry here at all: she is not a head-holding seat in
+ * the section this bridge reads, and she is never named anywhere.
+ */
+export const HEAD_CALLSIGNS = Object.freeze({
+  governor: null,
+  davis: 'OVERLAP',
+  lois: 'COVER',
+  carson: 'BLAST',
+  greiman: 'HYBRID',
+  ashworth: 'SWISS GRIT',
+});
+
+/** A stable fingerprint of a personas section's versions — "what is loaded", for change detection. */
+export function headsFingerprint(section) {
+  const parts = [];
+  for (const id of PERSONA_HEAD_IDS) {
+    const byKind = section && section[id];
+    if (!byKind) continue;
+    for (const kind of Object.keys(byKind).sort()) parts.push(`${id}/${kind}@${byKind[kind].version}`);
+  }
+  return parts.join('|');
+}
+
+/**
+ * The entries in `after` that are new or carry a different version than in `before` — the head
+ * changes a boot just landed. Both arguments are personas sections (or null).
+ */
+export function changedHeadEntries(before, after) {
+  const out = [];
+  for (const id of PERSONA_HEAD_IDS) {
+    const byKind = after && after[id];
+    if (!byKind) continue;
+    for (const [kind, entry] of Object.entries(byKind)) {
+      const prev = before && before[id] && before[id][kind];
+      if (!prev || prev.version !== entry.version) out.push({ id, kind, entry });
+    }
+  }
+  return out;
+}
+
+/**
+ * The one-line launch note for a set of changed heads (A4): "<callsign> learned from N turns",
+ * naming the most recently trained change. The governor's change is spoken of by its instrument.
+ * Returns null when nothing changed.
+ */
+export function launchNoteLine(changed) {
+  if (!changed || !changed.length) return null;
+  const pick = [...changed].sort((a, b) =>
+    String(b.entry.trainedAt || '').localeCompare(String(a.entry.trainedAt || '')),
+  )[0];
+  const name = HEAD_CALLSIGNS[pick.id];
+  const who = name ?? (pick.id === 'governor' ? 'the cut' : pick.id);
+  return `${who} learned from ${pick.entry.labeledTurns} turns`;
+}
 
 /**
  * The store file's text → a cleaned personas overlay { <id>: { <kind>: entry } }, or null when the file

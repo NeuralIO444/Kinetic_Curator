@@ -178,4 +178,23 @@ ok('#2389 (Q18): her mark left the top bar for the STIMULI meter — one trace, 
   assert.deepEqual(crowns, [], `a crown glyph on a surface: ${crowns.join(', ')}`);
 });
 
+// ── #2397 (Persona Adapters A4): the heads readout can never show her ────────────────────────────────────────────
+ok('#2397: the A4 readout, rollback and note machinery name her nowhere in code', () => {
+  for (const rel of [
+    'panels/PersonaHeadsPanel.jsx',
+    'curator/personaRollback.mjs',
+    'curator/personaRollbackLive.js',
+    'curator/personaHeadsBridge.mjs',
+  ])
+    assert.ok(!/queen/i.test(code(src(rel))), `${rel} names her in code`);
+});
+
+ok('#2397: the readout lists only the head-holding seats — she holds no entry in that list', () => {
+  const panel = src('panels/PersonaHeadsPanel.jsx');
+  assert.ok(panel.includes('PERSONA_HEAD_IDS'), 'rows come from the head-holding seat list');
+  const idsLine = src('curator/tasteHead.js').match(/PERSONA_HEAD_IDS = Object\.freeze\(\[([^\]]*)\]\)/);
+  assert.ok(idsLine, 'the seat list is a literal in tasteHead.js');
+  assert.ok(!idsLine[1].includes('queen'), 'she is not a head-holding seat');
+});
+
 console.log(`queenDeniability.selfcheck: ${n} checks passed`);

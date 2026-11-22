@@ -10,8 +10,21 @@
 // is in memory only — the app's stored taste is never rewritten by the bridge.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { personasOverlayFromStoreText, mergePersonasSection } from './personaHeadsBridge.mjs';
-import { loadPersonaHeadsAtBoot, ADAPTERS_DIR, ADAPTERS_TASTE_FILE } from './personaHeadsLive.js';
+import {
+  personasOverlayFromStoreText,
+  mergePersonasSection,
+  headsFingerprint,
+  changedHeadEntries,
+  launchNoteLine,
+  HEAD_CALLSIGNS,
+} from './personaHeadsBridge.mjs';
+import {
+  loadPersonaHeadsAtBoot,
+  getLaunchNote,
+  LAUNCH_NOTE_KEY,
+  ADAPTERS_DIR,
+  ADAPTERS_TASTE_FILE,
+} from './personaHeadsLive.js';
 import { DECISION_FEATURES_VERSION } from './decisionFeatures.mjs';
 
 let n = 0;
@@ -153,6 +166,67 @@ await ok('wired: App boots the bridge once; the fs allowlist can read inside $AP
     cargo.includes('"fs-read-file"'),
     'the tauri feature matches the allowlist (cargo check enforces the pair)',
   );
+});
+
+// ── #2397 (A4): the launch note — diff, naming, persistence ──
+
+await ok('the note machinery: fingerprint, change diff, callsign naming', () => {
+  const a = { davis: { solo: entry('solo', leafHead(1), { version: 1 }) } };
+  const b = {
+    davis: {
+      solo: entry('solo', leafHead(2), { version: 2, labeledTurns: 480, trainedAt: '2026-11-21T03:30:00.000Z' }),
+    },
+    lois: {
+      trade: entry('trade', leafHead(3), { version: 1, labeledTurns: 210, trainedAt: '2026-11-20T03:30:00.000Z' }),
+    },
+  };
+  // entry() stamps trainedAt identically; make the davis change the most recent explicitly
+  b.davis.solo.trainedAt = '2026-11-21T04:30:00.000Z';
+  assert.equal(headsFingerprint(a), 'davis/solo@1');
+  assert.equal(headsFingerprint(null), '');
+  const changed = changedHeadEntries(a, b);
+  assert.equal(changed.length, 2);
+  assert.equal(changedHeadEntries(b, b).length, 0);
+  assert.equal(launchNoteLine(changed), 'OVERLAP learned from 480 turns');
+  assert.equal(launchNoteLine([]), null);
+  assert.equal(HEAD_CALLSIGNS.lois, 'COVER');
+  assert.equal(HEAD_CALLSIGNS.governor, null);
+  // the bandleader's change is spoken of by its instrument, never by name
+  assert.equal(
+    launchNoteLine([{ id: 'governor', kind: 'cut', entry: entry('cut', leafHead(1), { labeledTurns: 205 }) }]),
+    'the cut learned from 205 turns',
+  );
+});
+
+function fakeStorage() {
+  const m = new Map();
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), _map: m };
+}
+
+await ok('the note is written on a change, stands on a quiet boot, and is replaced by the next change', async () => {
+  const storage = fakeStorage();
+  const taste = { kind: 'kc-taste', version: 1, personas: {} };
+  const deps = (storeText) => ({
+    isDesktop: () => true,
+    appDataDir: async () => '/data',
+    join: async (...p) => p.join('/'),
+    readTextFile: async () => storeText,
+    getTaste: () => taste,
+    overlay: (o) => {
+      taste.personas = o;
+      return true;
+    },
+    storage,
+  });
+  const storeV1 = storeText({ lois: { trade: entry('trade', leafHead(1), { version: 1, labeledTurns: 240 }) } });
+  assert.equal((await loadPersonaHeadsAtBoot(deps(storeV1))).ok, true);
+  assert.equal(getLaunchNote({ storage }), 'COVER learned from 240 turns');
+  assert.equal((await loadPersonaHeadsAtBoot(deps(storeV1))).ok, true);
+  assert.equal(getLaunchNote({ storage }), 'COVER learned from 240 turns', 'a quiet boot leaves the note standing');
+  const storeV2 = storeText({ lois: { trade: entry('trade', leafHead(2), { version: 2, labeledTurns: 480 }) } });
+  assert.equal((await loadPersonaHeadsAtBoot(deps(storeV2))).ok, true);
+  assert.equal(getLaunchNote({ storage }), 'COVER learned from 480 turns');
+  assert.equal(storage._map.get(LAUNCH_NOTE_KEY), 'COVER learned from 480 turns');
 });
 
 console.log(

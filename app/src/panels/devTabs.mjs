@@ -53,6 +53,7 @@ const TasteTreePanel = lazy(() => import('./TasteTreePanel.jsx').then((m) => ({ 
 const ShelfDevPanel = lazy(() => import('./ShelfDevPanel.jsx').then((m) => ({ default: m.ShelfDevPanel })));
 const MegaMindPanel = lazy(() => import('./MegaMindPanel.jsx').then((m) => ({ default: m.MegaMindPanel })));
 const PersonaTunePanel = lazy(() => import('./PersonaTunePanel.jsx').then((m) => ({ default: m.PersonaTunePanel })));
+const PersonaHeadsPanel = lazy(() => import('./PersonaHeadsPanel.jsx').then((m) => ({ default: m.PersonaHeadsPanel })));
 
 /** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233), Mind (#1464), Census (#1507), Taste Trees (XGBoost T3), Shelf (#1590), MegaMind (#1525), Persona Tune (#2382). */
 export const DEV_TABS = [
@@ -79,6 +80,9 @@ export const DEV_TABS = [
   // #2382: the persona tuning table (kc-persona-tuning/1) — every persona
   // number, live-editable for the session; rig, never saved in a project.
   { id: 'personatune', title: 'PERSONA TUNE', icon: '♠', component: PersonaTunePanel },
+  // #2397: the persona heads readout — per-head version, labeled turns, held-out vs the 0.3 bar,
+  // one-tap rollback, and the launch note as its top line.
+  { id: 'heads', title: 'HEADS', icon: '♟', component: PersonaHeadsPanel },
 ];
 
 export const devTabById = (id) => DEV_TABS.find((t) => t.id === id) ?? DEV_TABS[0];
