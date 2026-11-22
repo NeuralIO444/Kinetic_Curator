@@ -67,6 +67,15 @@ export function featureTerms(features) {
 
 const finite = (x) => typeof x === 'number' && Number.isFinite(x);
 
+// #2437 — a Spearman score's float error can land a hair outside [-1, 1] (observed:
+// 1.0000000000000002 from a perfectly separating head). On read, a finite score within
+// float error of the bound clamps to the bound instead of rejecting, so an over-range
+// stamp can never neutralize a whole section (Matt's ruling, 2026-11-21: clamp at both
+// ends — the trainer never stamps outside [0, 1], the app clamps on read as backstop).
+// Grossly out-of-range values are corruption, not float error, and still reject.
+const SCORE_EPSILON = 1e-9;
+const clampedScore = (v) => (Math.abs(v) <= 1 ? v : Math.abs(v) <= 1 + SCORE_EPSILON ? Math.sign(v) : v);
+
 /**
  * Validate a taste.json (a trust boundary: it comes from a file). Returns
  * { ok: true, taste } with ONLY what the app needs (the probe's 1152 weights
@@ -244,7 +253,9 @@ export function validatePersonasSection(raw) {
       if (!Number.isInteger(e.version) || e.version < 1) return null;
       if (e.kind !== kind) return null; // the entry's kind is its key (ruling Q3: one vocabulary)
       if (!Number.isInteger(e.labeledTurns) || e.labeledTurns < 0) return null;
-      if (!finite(e.heldOut) || e.heldOut < -1 || e.heldOut > 1) return null;
+      if (!finite(e.heldOut)) return null;
+      const heldOut = clampedScore(e.heldOut);
+      if (heldOut < -1 || heldOut > 1) return null;
       // The universe version is REQUIRED (QA F3 on #2394): an unstamped entry is not silently
       // re-stamped as current — if a future bump changes a feature's meaning without renaming
       // it, the name check below cannot catch a stale head, so absent is malformed, full stop.
@@ -256,7 +267,7 @@ export function validatePersonasSection(raw) {
         kind,
         head: v.head,
         labeledTurns: e.labeledTurns,
-        heldOut: e.heldOut,
+        heldOut,
         trainedAt: String(e.trainedAt || ''),
         featuresVersion: DECISION_FEATURES_VERSION,
       };
@@ -281,7 +292,9 @@ export function validateQueenTimingSection(raw) {
   if (!Number.isInteger(raw.version) || raw.version < 1) return null;
   if (raw.kind !== 'timing') return null;
   if (!Number.isInteger(raw.labeledTakes) || raw.labeledTakes < 0) return null;
-  if (!finite(raw.heldOut) || raw.heldOut < -1 || raw.heldOut > 1) return null;
+  if (!finite(raw.heldOut)) return null;
+  const heldOut = clampedScore(raw.heldOut);
+  if (heldOut < -1 || heldOut > 1) return null;
   if (raw.featuresVersion !== QUEEN_TIMING_FEATURES_VERSION) return null;
   const v = validateTreeHeadFor(raw.head, queenTimingFeatureNames());
   if (!v.ok) return null;
@@ -290,7 +303,7 @@ export function validateQueenTimingSection(raw) {
     kind: 'timing',
     head: v.head,
     labeledTakes: raw.labeledTakes,
-    heldOut: raw.heldOut,
+    heldOut,
     trainedAt: String(raw.trainedAt || ''),
     featuresVersion: QUEEN_TIMING_FEATURES_VERSION,
   };
@@ -348,7 +361,9 @@ export function validateVoiceSection(raw) {
     if (!Number.isInteger(e.version) || e.version < 1) return null;
     if (e.kind !== 'voice') return null; // the entry's kind is its section's (one vocabulary)
     if (!Number.isInteger(e.labeledTurns) || e.labeledTurns < 0) return null;
-    if (!finite(e.heldOut) || e.heldOut < -1 || e.heldOut > 1) return null;
+    if (!finite(e.heldOut)) return null;
+    const heldOut = clampedScore(e.heldOut);
+    if (heldOut < -1 || heldOut > 1) return null;
     // The universe version is REQUIRED, as for persona entries: an unstamped entry is not
     // silently re-stamped as current.
     if (e.featuresVersion !== VOICE_FEATURES_VERSION) return null;
@@ -359,7 +374,7 @@ export function validateVoiceSection(raw) {
       kind: 'voice',
       head: v.head,
       labeledTurns: e.labeledTurns,
-      heldOut: e.heldOut,
+      heldOut,
       trainedAt: String(e.trainedAt || ''),
       featuresVersion: VOICE_FEATURES_VERSION,
     };
@@ -455,7 +470,9 @@ export function validateTreeHeadFor(h, featureNames) {
   if (!h || typeof h !== 'object') return { ok: false, error: 'tree head missing' };
   if (h.objective !== XGB_OBJECTIVE) return { ok: false, error: `tree head objective must be ${XGB_OBJECTIVE}` };
   if (!finite(h.baseScore)) return { ok: false, error: 'bad tree head baseScore' };
-  if (!finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad tree head fidelity' };
+  if (!finite(h.fidelity)) return { ok: false, error: 'bad tree head fidelity' };
+  const fidelity = clampedScore(h.fidelity);
+  if (fidelity < -1 || fidelity > 1) return { ok: false, error: 'bad tree head fidelity' };
   const allowed = new Set(featureNames);
   const features = h.features;
   if (!Array.isArray(features) || !features.length) return { ok: false, error: 'tree head features missing' };
@@ -482,7 +499,7 @@ export function validateTreeHeadFor(h, featureNames) {
       kind: XGB_HEAD_KIND,
       objective: XGB_OBJECTIVE,
       baseScore: h.baseScore,
-      fidelity: h.fidelity,
+      fidelity,
       fitOn: Number(h.fitOn) || 0,
       features: [...features],
       trees: clean,

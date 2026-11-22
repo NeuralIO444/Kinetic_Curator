@@ -253,6 +253,19 @@ def heldout_score(head, rows, idx):
     return curator.spearman(head_scores(head, rows, idx), [rows[i]["weight"] for i in idx])
 
 
+# #2437 — Matt's ruling: clamp at BOTH ends. The trainer never stamps a score outside
+# [0, 1]: curator.spearman's float error can return 1.0000000000000002 for a perfectly
+# separating head, and stamping that verbatim would make the app reject the whole
+# section. The app clamps on read as a backstop (tasteHead.js's clampedScore, same
+# float-error window), and the shape-gate mirrors below accept that same window, so
+# the trainer and the app never disagree about an incumbent.
+SCORE_EPSILON = 1e-9
+
+
+def _clamp_stamp(score):
+    return max(0.0, min(1.0, score))
+
+
 # ── the incumbent shape gate (A1's rules, mirrored) ──────────────────────────────────────────────
 # The trainer reads taste.json's personas section as its incumbents, and a malformed entry must
 # never crash a run mid-loop — ships write the store and history per entry while the CLI writes
@@ -342,7 +355,7 @@ def _head_ok(head):
         return False
     if not _finite(head.get("baseScore")):
         return False
-    if not _finite(head.get("fidelity")) or not -1 <= head["fidelity"] <= 1:
+    if not _finite(head.get("fidelity")) or not -1 - SCORE_EPSILON <= head["fidelity"] <= 1 + SCORE_EPSILON:
         return False
     features = head.get("features")
     if not isinstance(features, list) or not features:
@@ -370,7 +383,7 @@ def incumbent_entry_ok(pid, kind, entry):
         return False
     if not _is_int(entry.get("labeledTurns")) or entry["labeledTurns"] < 0:
         return False
-    if not _finite(entry.get("heldOut")) or not -1 <= entry["heldOut"] <= 1:
+    if not _finite(entry.get("heldOut")) or not -1 - SCORE_EPSILON <= entry["heldOut"] <= 1 + SCORE_EPSILON:
         return False
     if entry.get("featuresVersion") != DECISION_FEATURES_VERSION:
         return False
@@ -465,7 +478,8 @@ def train(rows_artifact, taste, taste_path, store, force=False, now=None, fit_fn
             continue
         # Ship it.
         head = dict(head)
-        head["fidelity"] = challenger
+        stamp = _clamp_stamp(challenger)
+        head["fidelity"] = stamp
         highest = max(
             [incumbent_entry["version"] if incumbent_entry else 0]
             + stored_versions(store, pid, kind)
@@ -476,7 +490,7 @@ def train(rows_artifact, taste, taste_path, store, force=False, now=None, fit_fn
             "kind": kind,
             "head": head,
             "labeledTurns": labeled_count,  # Q6: ALL labeled turns, train + held-out
-            "heldOut": challenger,
+            "heldOut": stamp,
             "trainedAt": now,
             "featuresVersion": DECISION_FEATURES_VERSION,
         }
@@ -487,7 +501,7 @@ def train(rows_artifact, taste, taste_path, store, force=False, now=None, fit_fn
         personas = taste["personas"]
         entry["verdict"] = "shipped"
         entry["version"] = version
-        entry["heldOut"] = challenger
+        entry["heldOut"] = stamp
         shipped_any = True
         _log_train(store, now, entry)
     return {"entries": entries, "shipped": shipped_any}
@@ -582,7 +596,7 @@ def _queen_head_ok(head):
         return False
     if not _finite(head.get("baseScore")):
         return False
-    if not _finite(head.get("fidelity")) or not -1 <= head["fidelity"] <= 1:
+    if not _finite(head.get("fidelity")) or not -1 - SCORE_EPSILON <= head["fidelity"] <= 1 + SCORE_EPSILON:
         return False
     features = head.get("features")
     if not isinstance(features, list) or not features:
@@ -608,7 +622,7 @@ def _queen_entry_ok(entry):
         return False
     if not _is_int(entry.get("labeledTakes")) or entry["labeledTakes"] < 0:
         return False
-    if not _finite(entry.get("heldOut")) or not -1 <= entry["heldOut"] <= 1:
+    if not _finite(entry.get("heldOut")) or not -1 - SCORE_EPSILON <= entry["heldOut"] <= 1 + SCORE_EPSILON:
         return False
     if entry.get("featuresVersion") != QUEEN_FEATURES_VERSION:
         return False
@@ -678,7 +692,8 @@ def train_queen(rows_artifact, taste, taste_path, store, force=False, now=None, 
         _log_train(store, now, entry)
         return {"entry": entry, "shipped": False}
     head = dict(head)
-    head["fidelity"] = challenger
+    stamp = _clamp_stamp(challenger)
+    head["fidelity"] = stamp
     highest = max([incumbent_entry["version"] if incumbent_entry else 0] + stored_versions(store, QUEEN_ID, QUEEN_KIND))
     version = highest + 1
     shipped = {
@@ -686,7 +701,7 @@ def train_queen(rows_artifact, taste, taste_path, store, force=False, now=None, 
         "kind": QUEEN_KIND,
         "head": head,
         "labeledTakes": labeled_takes,
-        "heldOut": challenger,
+        "heldOut": stamp,
         "trainedAt": now,
         "featuresVersion": QUEEN_FEATURES_VERSION,
     }
@@ -696,7 +711,7 @@ def train_queen(rows_artifact, taste, taste_path, store, force=False, now=None, 
     taste["queenTiming"] = shipped
     entry["verdict"] = "shipped"
     entry["version"] = version
-    entry["heldOut"] = challenger
+    entry["heldOut"] = stamp
     _log_train(store, now, entry)
     return {"entry": entry, "shipped": True}
 
@@ -720,7 +735,7 @@ def _voice_head_ok(head):
         return False
     if not _finite(head.get("baseScore")):
         return False
-    if not _finite(head.get("fidelity")) or not -1 <= head["fidelity"] <= 1:
+    if not _finite(head.get("fidelity")) or not -1 - SCORE_EPSILON <= head["fidelity"] <= 1 + SCORE_EPSILON:
         return False
     features = head.get("features")
     if not isinstance(features, list) or not features:
@@ -746,7 +761,7 @@ def _voice_entry_ok(entry):
         return False
     if not _is_int(entry.get("labeledTurns")) or entry["labeledTurns"] < 0:
         return False
-    if not _finite(entry.get("heldOut")) or not -1 <= entry["heldOut"] <= 1:
+    if not _finite(entry.get("heldOut")) or not -1 - SCORE_EPSILON <= entry["heldOut"] <= 1 + SCORE_EPSILON:
         return False
     if entry.get("featuresVersion") != VOICE_FEATURES_VERSION:
         return False
@@ -793,10 +808,7 @@ def _train_voice_horn(horn, horn_rows, taste, store, history, force, now, fit_fn
         )
         _log_train(store, now, entry)
         return entry, False
-    # Spearman's float error can land a hair outside [-1, 1] on a perfect separation; the
-    # score's own range is the bound — clamp before it is compared or stamped, so a shipped
-    # entry never falls outside what the app's validator accepts.
-    challenger = max(-1.0, min(1.0, heldout_score(head, horn_rows, held_idx)))
+    challenger = heldout_score(head, horn_rows, held_idx)
     incumbent = heldout_score(incumbent_entry["head"], horn_rows, held_idx) if incumbent_entry is not None else None
     entry["challengerHeldOut"] = challenger
     entry["incumbentHeldOut"] = incumbent
@@ -809,7 +821,8 @@ def _train_voice_horn(horn, horn_rows, taste, store, history, force, now, fit_fn
         _log_train(store, now, entry)
         return entry, False
     head = dict(head)
-    head["fidelity"] = challenger
+    stamp = _clamp_stamp(challenger)
+    head["fidelity"] = stamp
     highest = max([incumbent_entry["version"] if incumbent_entry else 0] + stored_versions(store, horn, VOICE_KIND))
     version = highest + 1
     shipped = {
@@ -817,7 +830,7 @@ def _train_voice_horn(horn, horn_rows, taste, store, history, force, now, fit_fn
         "kind": VOICE_KIND,
         "head": head,
         "labeledTurns": labeled_turns,
-        "heldOut": challenger,
+        "heldOut": stamp,
         "trainedAt": now,
         "featuresVersion": VOICE_FEATURES_VERSION,
     }
@@ -829,7 +842,7 @@ def _train_voice_horn(horn, horn_rows, taste, store, history, force, now, fit_fn
     taste["voice"][horn] = shipped
     entry["verdict"] = "shipped"
     entry["version"] = version
-    entry["heldOut"] = challenger
+    entry["heldOut"] = stamp
     _log_train(store, now, entry)
     return entry, True
 
