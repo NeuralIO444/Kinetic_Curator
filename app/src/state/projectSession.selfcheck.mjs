@@ -5,7 +5,8 @@
 //   · yanking the folder mid-session triggers pause-and-protect with ZERO writes anywhere else, the work held; saving
 //     resumes when the folder returns, or when the performer points at its new home (and only if it is this project)
 // Plus the rulings it rests on: strict names and refuse-on-collision at create, autosave in place, new session = max+1
-// with the old session untouched, a newer file refused and left byte-identical, opening writes nothing.
+// with the old session untouched, a newer file refused and left byte-identical, opening writes no session
+// (its only write is the #1711 ownership claim).
 import assert from 'node:assert/strict';
 import { createProjectSession, SESSIONS_DIR, PAUSED_LINE } from './projectSession.mjs';
 import { createMemoryProjectFs, isInsideRel } from './projectFs.mjs';
@@ -51,7 +52,11 @@ await ok('create → save → close → reopen: the folder, the manifest, sessio
   assert.ok(fs.files()[`${c.root}/${MANIFEST_FILE}`]);
   assert.ok(sessionText(fs, c.root, 'Night Migration_01.kcproject'));
   assert.equal((await s.save(docOf(2))).ok, true, 'autosave in place');
-  assert.equal(Object.keys(fs.files()).length, 2, 'still one manifest and one session: saving rewrites in place');
+  assert.deepEqual(
+    Object.keys(fs.files()).sort(),
+    [`${c.root}/.kc/lock.json`, `${c.root}/${MANIFEST_FILE}`, `${c.root}/${SESSIONS_DIR}/Night Migration_01.kcproject`],
+    'one manifest, one session, one ownership lock: saving rewrites in place',
+  );
   assert.equal(s.status().state, 'saved');
   assert.equal((await s.close()).ok, true);
   assert.equal(s.status().state, 'closed');
@@ -92,23 +97,37 @@ await ok('new session: max+1, gaps never reused, the old session left exactly as
   const files = fs.files();
   files[`${root}/${SESSIONS_DIR}/Moths_05.kcproject`] = files[`${root}/${SESSIONS_DIR}/Moths_01.kcproject`];
   const fs2 = createMemoryProjectFs({ folders: [P], files });
-  const s2 = mk(fs2);
+  // a fresh window much later: the first window is long gone, its lock silent past the stale window, so this
+  // open takes over (said plainly in the result) — the #1711 ownership path, exercised here end to end
+  const later = () => new Date(Date.parse(now()) + 31_000).toISOString();
+  const s2 = createProjectSession({ fs: fs2, now: later, mintId, appVersion: 'test' });
   const o = await s2.open(root);
   assert.equal(o.session, 5, 'open takes the latest session');
+  assert.equal(o.tookOver, true, 'the silent lock was taken over, and the open says so');
   const b = await s2.newSession(docOf(6));
   assert.equal(b.session, 6);
 });
 
-await ok('opening writes nothing — the first write is the first save asked for', async () => {
+await ok('opening writes no session — its only write is the ownership claim (#1711)', async () => {
   const fs = createMemoryProjectFs({ folders: [P] });
   const s = mk(fs);
   const { root } = await s.create({ parent: P, name: 'Quiet', doc: docOf(1) });
   await s.close();
   const before = fs.writes.length;
-  const snap = JSON.stringify(fs.files());
+  const snap = fs.files();
   await s.open(root);
-  assert.equal(fs.writes.length, before);
-  assert.equal(JSON.stringify(fs.files()), snap);
+  const during = fs.writes.slice(before);
+  assert.ok(
+    during.every((w) => w.path.endsWith('/.kc/lock.json')),
+    `every write during open is the lock claim (${JSON.stringify(during)})`,
+  );
+  const after = fs.files();
+  assert.equal(after[`${root}/${MANIFEST_FILE}`], snap[`${root}/${MANIFEST_FILE}`], 'the manifest is untouched');
+  assert.equal(
+    after[`${root}/${SESSIONS_DIR}/Quiet_01.kcproject`],
+    snap[`${root}/${SESSIONS_DIR}/Quiet_01.kcproject`],
+    'the session is byte-identical: the first session write is still the first save asked for',
+  );
 });
 
 await ok('an older file migrates on open; the next save writes the current version', async () => {

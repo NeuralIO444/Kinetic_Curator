@@ -227,7 +227,11 @@ export function useProjectAutosave() {
             const st = folder.status();
             useStore
               .getState()
-              .setBootNotice(`Opened project ${st.name} · session ${String(st.session).padStart(2, '0')}`);
+              .setBootNotice(
+                `Opened project ${st.name} · session ${String(st.session).padStart(2, '0')}` +
+                  (st.readOnly ? ' — read-only: another window has it open' : '') +
+                  (r.tookOver ? ' — took over from another window (its heartbeat had stopped)' : ''),
+              );
             return;
           }
           useStore.getState().setBootNotice(`Project folder not reachable (${r.reason}) — opened your browser session`);

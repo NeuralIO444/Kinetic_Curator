@@ -16,11 +16,17 @@
 import { validateProjectName, folderNameFor, nameCollides, projectNameFromFolder } from './projectNaming.mjs';
 import { sessionFileName, parseSessionNumber, nextSessionNumber } from './projectNaming.mjs';
 import { readSessionFile, writeSessionFile, readManifest, writeManifest, MANIFEST_FILE } from './projectFile.mjs';
+import { LOCK_DIR, LOCK_FILE, writeLock, readLock, lockHeldByOther } from '../project/projectLock.mjs';
 
 export const SESSIONS_DIR = 'sessions';
 /** The plain line the status carries while paused (the UI shows it as is). */
 export const PAUSED_LINE =
   'The project folder is gone — saving is paused and your work is held here. Reconnect the folder to save.';
+/** The plain line a read-only window carries (#1711: it can watch and perform, it never writes). */
+export const READONLY_LINE =
+  'Another window has this project open — this window is read-only: it can watch and perform, but it never writes.';
+
+let instanceCounter = 0;
 
 const baseOf = (p) => p.slice(p.lastIndexOf('/') + 1);
 const parentOf = (p) => p.slice(0, p.lastIndexOf('/')) || '/';
@@ -31,11 +37,13 @@ const foldKey = (s) => s.normalize('NFC').toLowerCase();
  * @param now         () => ISO string (the caller owns the clock)
  * @param mintId      () => a project id (8–64 of [A-Za-z0-9_-])
  * @param appVersion  string written into each session file
+ * @param instanceId  this window's ownership identity (#1711); absent: one is minted per session object
  */
-export function createProjectSession({ fs, now, mintId, appVersion = null }) {
+export function createProjectSession({ fs, now, mintId, appVersion = null, instanceId = null }) {
   if (!fs || typeof now !== 'function' || typeof mintId !== 'function')
     throw new Error('createProjectSession: fs, now, mintId');
-  let cur = null; // { root, name, projectId, session }
+  const owner = typeof instanceId === 'string' && instanceId ? instanceId : `inst-${++instanceCounter}`;
+  let cur = null; // { root, name, projectId, session, readOnly }
   let state = 'closed'; // closed | saved | unsaved | paused
   let reason = null;
   let pending = null; // the doc not yet on disk (held in memory while unsaved or paused)
@@ -60,8 +68,30 @@ export function createProjectSession({ fs, now, mintId, appVersion = null }) {
       name: cur ? cur.name : null,
       session: cur ? cur.session : null,
       held: pending !== null,
+      readOnly: !!(cur && cur.readOnly),
     };
   }
+  /**
+   * Ownership (#1711 PR-2): claim the project's lock for this window, or learn that another live window holds it.
+   * A released lock, a stale lock, our own lock, or no lock at all → we own it; claiming over a stale foreign lock
+   * is a TAKEOVER and is reported, never silent. A failed claim never blocks the open: the session proceeds
+   * unowned (the pre-ownership behaviour) rather than locking the performer out of their own project on an error.
+   */
+  async function claim(root, projectId) {
+    try {
+      await fs.makeSubfolder(root, LOCK_DIR);
+      const rd = await fs.read(root, LOCK_FILE);
+      const existing = rd.ok ? readLock(rd.text) : { ok: false };
+      if (existing.ok && lockHeldByOther(existing.lock, owner, now())) return { readOnly: true, tookOver: false };
+      const tookOver = existing.ok && !existing.lock.released && existing.lock.owner !== owner;
+      const w = await fs.write(root, LOCK_FILE, writeLock({ projectId, owner, at: now() }));
+      if (!w.ok) return { readOnly: false, tookOver: false };
+      return { readOnly: false, tookOver };
+    } catch {
+      return { readOnly: false, tookOver: false };
+    }
+  }
+
   const sessionRel = (name, n) => `${SESSIONS_DIR}/${sessionFileName(name, n)}`;
   const fileText = (doc, n) =>
     writeSessionFile({ doc, projectId: cur.projectId, session: n, savedAt: now(), appVersion });
@@ -119,7 +149,9 @@ export function createProjectSession({ fs, now, mintId, appVersion = null }) {
         const r = await step();
         if (!r.ok) return { ok: false, reason: r.reason, partial: made.path };
       }
-      cur = { root: made.path, name: v.name, also: v.name, projectId, session: 1 };
+      cur = { root: made.path, name: v.name, also: v.name, projectId, session: 1, readOnly: false };
+      const own = await claim(cur.root, projectId);
+      cur = { ...cur, readOnly: own.readOnly };
       const first = await fs.write(cur.root, sessionRel(cur.name, 1), fileText(doc, 1), { create: true });
       if (!first.ok) {
         const r = { ok: false, reason: first.reason, partial: made.path };
@@ -161,15 +193,34 @@ export function createProjectSession({ fs, now, mintId, appVersion = null }) {
       if (!rd.ok) return { ok: false, unreachable: rd.unreachable, reason: rd.reason };
       const s = readSessionFile(rd.text);
       if (!s.ok) return { ok: false, newer: s.newer, reason: `${best.file}: ${s.error}` };
-      cur = { root, name, also: m.manifest.name, projectId: m.manifest.projectId, session: best.n };
+      // ownership, claimed only once the open has succeeded: the first live window owns the project and holds
+      // autosave; a second window opens read-only — it can watch and perform, it never writes (#1711)
+      const own = await claim(root, m.manifest.projectId);
+      cur = {
+        root,
+        name,
+        also: m.manifest.name,
+        projectId: m.manifest.projectId,
+        session: best.n,
+        readOnly: own.readOnly,
+      };
       pending = null;
       set('saved');
-      return { ok: true, doc: s.doc, session: best.n, migratedFrom: s.meta.migratedFrom, sanitized: s.sanitized };
+      return {
+        ok: true,
+        doc: s.doc,
+        session: best.n,
+        migratedFrom: s.meta.migratedFrom,
+        sanitized: s.sanitized,
+        readOnly: own.readOnly,
+        tookOver: own.tookOver,
+      };
     },
 
     /** Autosave in place: rewrite the current session with `doc`. While paused the doc is only held. */
     async save(doc) {
       if (!cur) return { ok: false, reason: 'no project is open' };
+      if (cur.readOnly) return { ok: false, readOnly: true, reason: READONLY_LINE };
       if (state === 'paused') {
         pending = doc;
         return { ok: false, paused: true, reason: PAUSED_LINE };
@@ -183,6 +234,7 @@ export function createProjectSession({ fs, now, mintId, appVersion = null }) {
      */
     async resume(root = null) {
       if (!cur) return { ok: false, reason: 'no project is open' };
+      if (cur.readOnly) return { ok: false, readOnly: true, reason: READONLY_LINE };
       const target = root || cur.root;
       const there = await fs.reachable(target);
       if (!there.ok || !there.reachable) return { ok: false, unreachable: true, reason: PAUSED_LINE };
@@ -201,9 +253,28 @@ export function createProjectSession({ fs, now, mintId, appVersion = null }) {
       return put(pending);
     },
 
+    /**
+     * The ownership heartbeat (#1711): refresh the lock so other windows know this one is alive. If another window
+     * has taken over meanwhile (our heartbeat was silent past the stale window — sleep, a long stall), this window
+     * steps down to read-only and says so through its status, rather than writing over the new owner's work.
+     */
+    async heartbeat() {
+      if (!cur || cur.readOnly || state === 'paused') return { ok: false };
+      const rd = await fs.read(cur.root, LOCK_FILE);
+      const existing = rd.ok ? readLock(rd.text) : { ok: false };
+      if (existing.ok && lockHeldByOther(existing.lock, owner, now())) {
+        cur = { ...cur, readOnly: true };
+        set(state, reason);
+        return { ok: false, lost: true };
+      }
+      const w = await fs.write(cur.root, LOCK_FILE, writeLock({ projectId: cur.projectId, owner, at: now() }));
+      return { ok: w.ok };
+    },
+
     /** Freeze the current session as it stands and continue in the next number (max+1), starting from `doc`. */
     async newSession(doc) {
       if (!cur) return { ok: false, reason: 'no project is open' };
+      if (cur.readOnly) return { ok: false, readOnly: true, reason: READONLY_LINE };
       if (state === 'paused') return { ok: false, paused: true, reason: PAUSED_LINE };
       if (pending !== null) {
         const flushed = await put(pending);
@@ -237,6 +308,7 @@ export function createProjectSession({ fs, now, mintId, appVersion = null }) {
      */
     async rename(newName) {
       if (!cur) return { ok: false, reason: 'no project is open' };
+      if (cur.readOnly) return { ok: false, readOnly: true, reason: READONLY_LINE };
       if (state === 'paused') return { ok: false, paused: true, reason: PAUSED_LINE };
       const v = validateProjectName(newName);
       if (!v.ok) return { ok: false, reason: v.reason };
@@ -303,6 +375,19 @@ export function createProjectSession({ fs, now, mintId, appVersion = null }) {
           if (r.ok) return this.close();
         }
         return { ok: false, held: true, reason: 'work is not saved yet — reconnect the folder, or close with discard' };
+      }
+      if (!cur.readOnly) {
+        // release the lock (written back as released — the fs law is that nothing deletes a file); a failed
+        // release only means the next opener waits out the stale window or takes over after it
+        try {
+          await fs.write(
+            cur.root,
+            LOCK_FILE,
+            writeLock({ projectId: cur.projectId, owner, at: now(), released: true }),
+          );
+        } catch {
+          /* the lock goes stale on its own */
+        }
       }
       cur = null;
       pending = null;

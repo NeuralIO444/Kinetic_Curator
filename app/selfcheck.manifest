@@ -681,6 +681,7 @@ node src/project/projectFolderLive.selfcheck.mjs
 node src/project/projectWizard.selfcheck.mjs
 node src/project/projectRecents.selfcheck.mjs
 node src/state/projectRename.selfcheck.mjs
+node src/state/projectOwnership.selfcheck.mjs
 node src/loot/lootPalettes.selfcheck.mjs
 node src/loot/lootLooks.selfcheck.mjs
 node src/loot/lootWeb.selfcheck.mjs
