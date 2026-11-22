@@ -176,6 +176,7 @@ node src/state/queueTransport.selfcheck.mjs
 node src/curator/recipeFeatures.selfcheck.mjs
 node src/curator/tasteHead.selfcheck.mjs
 node src/curator/personaHeadsBridge.selfcheck.mjs
+node src/curator/personaRollback.selfcheck.mjs
 node src/curator/queenChannel.selfcheck.mjs
 node src/curator/queenDeniability.selfcheck.mjs
 node ../studio/pool_rig.selfcheck.mjs

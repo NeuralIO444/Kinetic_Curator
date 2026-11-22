@@ -6,11 +6,59 @@
 // rules exactly as it did before the bridge existed. The Queen's head (A6, #2399) rides this same bridge
 // when it exists; nothing here surfaces any head anywhere.
 import { isTauriRuntime } from '../platform/desktop.mjs';
-import { personasOverlayFromStoreText } from './personaHeadsBridge.mjs';
+import {
+  personasOverlayFromStoreText,
+  headsFingerprint,
+  changedHeadEntries,
+  launchNoteLine,
+} from './personaHeadsBridge.mjs';
 import { getTaste, overlayPersonasSection } from './tasteStore.js';
 
 export const ADAPTERS_DIR = 'adapters';
 export const ADAPTERS_TASTE_FILE = 'taste.json';
+
+// #2397 (A4) — the launch note's home. The note is a DEV-readout line, never a surface of its own:
+// it is written here at boot when the loaded heads changed, and it stays until the next head change
+// replaces it (no seen/unseen state). The snapshot is the previous boot's overlay, the baseline the
+// change is measured against; both live in localStorage beside the taste, and both are best-effort.
+export const HEADS_SNAPSHOT_KEY = 'kc:persona-heads:snapshot';
+export const LAUNCH_NOTE_KEY = 'kc:persona-heads:launch-note';
+
+const storageOf = (deps) => deps.storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+
+/** The current launch note line, or null. Read by the DEV readout (A4); shown nowhere else. */
+export function getLaunchNote(deps = {}) {
+  try {
+    const s = storageOf(deps);
+    return (s && s.getItem(LAUNCH_NOTE_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * After a boot load lands: if the store's heads changed since the last boot, replace the launch
+ * note with the new change's line and remember the new baseline. No change → the note stands.
+ */
+function noteHeadChanges(overlay, deps) {
+  try {
+    const s = storageOf(deps);
+    if (!s) return;
+    let prev = null;
+    try {
+      prev = JSON.parse(s.getItem(HEADS_SNAPSHOT_KEY) || 'null');
+    } catch {
+      prev = null;
+    }
+    if (!prev || prev.fingerprint !== headsFingerprint(overlay)) {
+      const line = launchNoteLine(changedHeadEntries(prev ? prev.section : null, overlay));
+      if (line) s.setItem(LAUNCH_NOTE_KEY, line);
+      s.setItem(HEADS_SNAPSHOT_KEY, JSON.stringify({ fingerprint: headsFingerprint(overlay), section: overlay }));
+    }
+  } catch {
+    // the note is a courtesy line in a DEV readout; a storage failure changes nothing else
+  }
+}
 
 const short = (e) =>
   String((e && e.message) || e || 'failed')
@@ -37,7 +85,9 @@ export async function loadPersonaHeadsAtBoot(deps = {}) {
     const overlay = personasOverlayFromStoreText(await readTextFile(path));
     if (!overlay) return { ok: false, reason: 'the store carries no loadable heads' };
     if (!readTaste()) return { ok: false, reason: 'no taste loaded' };
-    return apply(overlay) ? { ok: true } : { ok: false, reason: 'no taste loaded' };
+    if (!apply(overlay)) return { ok: false, reason: 'no taste loaded' };
+    noteHeadChanges(overlay, deps);
+    return { ok: true };
   } catch (e) {
     return { ok: false, reason: short(e) };
   }
