@@ -38,10 +38,20 @@ export function projectFolderLive() {
   return live;
 }
 
-/** The live project's status ({ state, reason, root, name, session, held }), re-rendered on every change. */
+/** The live project's status ({ state, reason, root, name, session, held, readOnly }), re-rendered on every change. */
 export function useProjectFolderStatus() {
   const lp = projectFolderLive();
   const [status, setStatus] = useState(() => lp.status());
   useEffect(() => lp.subscribe(setStatus), [lp]);
+  // #1711 — the ownership heartbeat: while this window owns a project, refresh its lock every 10 s (the stale
+  // window is 30 s, so two missed beats still hold). A read-only window does not heartbeat — it does not own.
+  const owning = status.state !== 'closed' && !status.readOnly;
+  useEffect(() => {
+    if (!owning) return;
+    const t = setInterval(() => {
+      lp.heartbeat().catch(() => {});
+    }, 10_000);
+    return () => clearInterval(t);
+  }, [lp, owning]);
   return status;
 }

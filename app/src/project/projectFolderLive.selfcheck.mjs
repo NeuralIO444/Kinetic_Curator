@@ -63,7 +63,7 @@ await ok('NEW saves the scene on stage as session 01, changes nothing on stage, 
   assert.equal(fs2.writes.length, 0);
 });
 
-await ok('OPEN applies the latest session and writes nothing — not even the autosave the apply wakes', async () => {
+await ok('OPEN applies the latest session and writes no session — not even the autosave the apply wakes', async () => {
   const fs = createMemoryProjectFs({ folders: [P] });
   fs.picks.parent.push(P);
   const live = createProjectFolderLive(deps(fs, makeStore(21), memStorage()));
@@ -80,8 +80,16 @@ await ok('OPEN applies the latest session and writes nothing — not even the au
   assert.equal(store.seed, 21, 'the session is on stage');
   const autosave = await again.save(); // what applyProject's store change triggers in the app
   assert.deepEqual(autosave, { ok: true, unchanged: true });
-  assert.equal(fs.writes.length, writesBefore, 'opening wrote nothing');
-  assert.equal(JSON.stringify(fs.files()), snap);
+  // #1711: opening's only write is the ownership claim — the session itself is byte-identical, untouched
+  assert.ok(
+    fs.writes.slice(writesBefore).every((w) => w.path.endsWith('/.kc/lock.json')),
+    'opening wrote nothing but the ownership claim',
+  );
+  assert.equal(
+    fs.files()[`${P}/KC1_Loot_Set/sessions/Set_01.kcproject`],
+    JSON.parse(snap)[`${P}/KC1_Loot_Set/sessions/Set_01.kcproject`],
+    'the session file is byte-identical after open',
+  );
   // the first edit is the first write
   store.seed = 22;
   assert.equal((await again.save()).ok, true);

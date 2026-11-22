@@ -27,8 +27,8 @@ export const RECENTS_KEY = 'kc:project-folder:recents';
  * @param mintId    () => a project id
  * @param storage   localStorage-like (getItem/setItem/removeItem), or null
  */
-export function createProjectFolderLive({ fs, getState, now, mintId, storage = null, appVersion = null }) {
-  const session = createProjectSession({ fs, now, mintId, appVersion });
+export function createProjectFolderLive({ fs, getState, now, mintId, storage = null, appVersion = null, instanceId = null }) {
+  const session = createProjectSession({ fs, now, mintId, appVersion, instanceId: instanceId ?? mintId() });
   const remember = (root) => {
     try {
       if (root) storage?.setItem(LAST_PROJECT_KEY, root);
@@ -147,6 +147,9 @@ export function createProjectFolderLive({ fs, getState, now, mintId, storage = n
       return r;
     },
 
+    /** The ownership heartbeat (#1711 PR-2): the hook calls it on an interval while this window owns a project. */
+    heartbeat: () => session.heartbeat(),
+
     async save() {
       const doc = docNow();
       const text = JSON.stringify(doc);
@@ -204,6 +207,7 @@ export function createProjectFolderLive({ fs, getState, now, mintId, storage = n
 export function projectStatusLine(st) {
   if (!st || st.state === 'closed') return 'No project open: this session lives in the browser.';
   const where = `${st.name} · session ${String(st.session).padStart(2, '0')}`;
+  if (st.readOnly) return `${where} — read-only: another window has this project open`;
   if (st.state === 'paused') return `${where} — ${st.reason}`;
   if (st.state === 'unsaved') return `${where} — not saved: ${st.reason}`;
   return `${where} — saved in its folder`;

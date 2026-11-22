@@ -89,12 +89,17 @@ export function ProjectFolderRow() {
       setNewName('');
     }
   };
+  const openVia = async (fn) => {
+    const r = await run(fn);
+    if (r && r.ok && r.tookOver) setNote('Took over this project from another window — its heartbeat had stopped.');
+    return r;
+  };
   const openRecent = async (entry) => {
     if (reach[entry.root] === false) {
       setNote('that folder is not reachable');
       return;
     }
-    await run(() => live.open(entry.root));
+    await openVia(() => live.open(entry.root));
   };
   const forget = async (entry) => {
     live.forgetRecent(entry.root);
@@ -137,7 +142,7 @@ export function ProjectFolderRow() {
             >
               RENAME
             </button>
-            <button type="button" className="chip-btn" disabled={busy} onClick={() => run(() => live.open())}>
+            <button type="button" className="chip-btn" disabled={busy} onClick={() => openVia(() => live.open())}>
               OPEN
             </button>
             <button type="button" className="chip-btn" disabled={busy} onClick={() => run(() => live.close())}>
@@ -155,7 +160,7 @@ export function ProjectFolderRow() {
             >
               NEW
             </button>
-            <button type="button" className="chip-btn" disabled={busy} onClick={() => run(() => live.open())}>
+            <button type="button" className="chip-btn" disabled={busy} onClick={() => openVia(() => live.open())}>
               OPEN
             </button>
           </>
