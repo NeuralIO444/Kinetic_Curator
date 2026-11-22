@@ -19,6 +19,7 @@ import { validateChapterMemory } from './chapterMemory.mjs';
 import { decisionFeatureNames, DECISION_FEATURES_VERSION, PERSONA_DECISION_KINDS } from './decisionFeatures.mjs';
 import { validateRelationsSection } from '../personas/chemistry.mjs';
 import { queenTimingFeatureNames, QUEEN_TIMING_FEATURES_VERSION } from './queenTimingFeatures.mjs';
+import { voiceFeatureNames, VOICE_FEATURES_VERSION } from './voiceFeatures.mjs';
 
 export const TASTE_KIND = 'kc-taste';
 export const TASTE_VERSION = 1;
@@ -180,6 +181,14 @@ export function validateTaste(raw) {
     const queenTiming = validateQueenTimingSection(raw.queenTiming);
     if (queenTiming) taste.queenTiming = queenTiming;
   }
+  // Persona Adapters A7 (#2400) — the optional voice section: one line-chooser head per horn,
+  // in its own section (the horns hold personas entries for their DECISIONS; their voice is a
+  // separate artifact under separate rulings). Same neutralization law as the sections above.
+  // Absent (every pre-A7 file) stays absent.
+  if (raw.voice != null) {
+    const voice = validateVoiceSection(raw.voice);
+    if (voice) taste.voice = voice;
+  }
   return { ok: true, taste };
 }
 
@@ -309,6 +318,75 @@ export function queenTimingInclination(taste, features) {
   if (!queenTimingEarnedIn(entry)) return null;
   const p = scoreTreeHeadWith(entry.head, features);
   return Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : null;
+}
+
+// ─── Persona Adapters A7 (#2400): the voice section ─────────────────────────
+//
+// Artifact shape:  voice: { <horn>: { version, kind: 'voice', head, labeledTurns, heldOut,
+// trainedAt, featuresVersion } } — one chooser head per horn, keyed by the horn's seat id.
+// `labeledTurns` is counted in labeled line-MOMENTS (ruling on #2400: the chooser trains on
+// labeled line-moments, per persona). The horns are the only seats that speak lines
+// (hornLines.mjs); no other seat may hold a voice entry, and a voice head never joins the
+// personas section or the decision universe.
+
+/** The seats that may hold a voice head — the three horns, in cast order. */
+export const VOICE_HORN_IDS = Object.freeze(['carson', 'greiman', 'ashworth']);
+
+/**
+ * Validate a taste.json `voice` section. Returns the cleaned section — entries rebuilt from
+ * known fields only, heads validated against the VOICE-feature universe — or null when the
+ * section is unreadable (the caller then neutralizes it: validateTaste keeps the file, drops
+ * the section). All-or-nothing, as for the personas section.
+ */
+export function validateVoiceSection(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const names = voiceFeatureNames();
+  const out = {};
+  for (const [id, e] of Object.entries(raw)) {
+    if (!VOICE_HORN_IDS.includes(id)) return null; // only a horn speaks — any other seat is malformed
+    if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+    if (!Number.isInteger(e.version) || e.version < 1) return null;
+    if (e.kind !== 'voice') return null; // the entry's kind is its section's (one vocabulary)
+    if (!Number.isInteger(e.labeledTurns) || e.labeledTurns < 0) return null;
+    if (!finite(e.heldOut) || e.heldOut < -1 || e.heldOut > 1) return null;
+    // The universe version is REQUIRED, as for persona entries: an unstamped entry is not
+    // silently re-stamped as current.
+    if (e.featuresVersion !== VOICE_FEATURES_VERSION) return null;
+    const v = validateTreeHeadFor(e.head, names);
+    if (!v.ok) return null;
+    out[id] = {
+      version: e.version,
+      kind: 'voice',
+      head: v.head,
+      labeledTurns: e.labeledTurns,
+      heldOut: e.heldOut,
+      trainedAt: String(e.trainedAt || ''),
+      featuresVersion: VOICE_FEATURES_VERSION,
+    };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** Has this horn's voice head earned in? The one earn-in law (ruling on #2400): ≥200 labeled
+ * line-moments AND held-out ≥ HEAD_MIN_FIDELITY — personaHeadEarnedIn over the voice entry. */
+export function voiceHeadEarnedIn(entry) {
+  return personaHeadEarnedIn(entry);
+}
+
+/**
+ * The voice steering bundle for the room: { <horn>: { version, head } } holding ONLY the
+ * horns whose chooser has earned in — or null when the taste carries no voice section or no
+ * chooser has earned in, so line selection runs exactly as it did before A7 (ruling 1).
+ */
+export function voiceHeads(taste) {
+  const section = taste && taste.voice;
+  if (!section || typeof section !== 'object') return null;
+  const out = {};
+  for (const id of VOICE_HORN_IDS) {
+    const e = section[id];
+    if (voiceHeadEarnedIn(e)) out[id] = { version: e.version, head: e.head };
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /** Has this personas entry earned in? ≥200 labeled turns AND held-out ≥ HEAD_MIN_FIDELITY (0.3).

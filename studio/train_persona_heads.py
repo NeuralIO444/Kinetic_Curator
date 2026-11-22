@@ -701,6 +701,164 @@ def train_queen(rows_artifact, taste, taste_path, store, force=False, now=None, 
     return {"entry": entry, "shipped": True}
 
 
+# ── voice: the horns' line choosers (A7, #2400) ──────────────────────────────────────────────
+VOICE_ROWS_FORMAT = "kc-voice-rows"
+VOICE_ROWS_VERSION = 1
+VOICE_FEATURES_VERSION = 1
+#: voiceFeatureNames() (app/src/curator/voiceFeatures.mjs), mirrored.
+VOICE_FEATURE_NAMES = frozenset({"ctx", "line", "to"})
+VOICE_KIND = "voice"
+#: The only seats that speak lines (hornLines.mjs) — VOICE_HORN_IDS in tasteHead.js, mirrored.
+VOICE_HORNS = ("carson", "greiman", "ashworth")
+
+
+def _voice_head_ok(head):
+    """validateTreeHeadFor against the voice universe, mirrored (cf. _queen_head_ok)."""
+    if not isinstance(head, dict):
+        return False
+    if head.get("objective") != "binary:logistic":
+        return False
+    if not _finite(head.get("baseScore")):
+        return False
+    if not _finite(head.get("fidelity")) or not -1 <= head["fidelity"] <= 1:
+        return False
+    features = head.get("features")
+    if not isinstance(features, list) or not features:
+        return False
+    if any(not isinstance(n, str) or n not in VOICE_FEATURE_NAMES for n in features):
+        return False
+    if len(set(features)) != len(features):
+        return False
+    trees = head.get("trees")
+    if not isinstance(trees, list) or not trees or len(trees) > MAX_TREES:
+        return False
+    counter = [0]
+    return all(_node_ok(t, features, 0, counter) for t in trees)
+
+
+def _voice_entry_ok(entry):
+    """validateVoiceSection's per-entry law (tasteHead.js), mirrored. Total: garbage → False."""
+    if not isinstance(entry, dict):
+        return False
+    if not _is_int(entry.get("version")) or entry["version"] < 1:
+        return False
+    if entry.get("kind") != VOICE_KIND:
+        return False
+    if not _is_int(entry.get("labeledTurns")) or entry["labeledTurns"] < 0:
+        return False
+    if not _finite(entry.get("heldOut")) or not -1 <= entry["heldOut"] <= 1:
+        return False
+    if entry.get("featuresVersion") != VOICE_FEATURES_VERSION:
+        return False
+    return _voice_head_ok(entry.get("head"))
+
+
+def _train_voice_horn(horn, horn_rows, taste, store, history, force, now, fit_fn):
+    """One horn's training pass — train_queen's laws, per horn: split by take, held-out
+    Spearman, a first head must clear the bar, a challenger must strictly beat the incumbent
+    on the same slice, versions archived in the store. The count is labeled line-MOMENTS
+    (the ruling on #2400); the ≥200 earn-in gate itself is the app's. Mutates `taste` only
+    when a head ships. Returns (entry, shipped)."""
+    section = taste.get("voice") if isinstance(taste.get("voice"), dict) else {}
+    raw_incumbent = section.get(horn) if isinstance(section.get(horn), dict) else None
+    incumbent_entry = raw_incumbent if _voice_entry_ok(raw_incumbent) else None
+    labeled = [r for r in horn_rows if r.get("weight") != 0]
+    labeled_turns = len(labeled)
+    entry = {"id": horn, "kind": VOICE_KIND, "labeledTurns": labeled_turns}
+    if labeled_turns == 0:
+        entry["verdict"] = "no-corpus"
+        return entry, False
+    mark = watermark(history, horn, VOICE_KIND)
+    if not force and mark is not None and labeled_turns <= mark:
+        entry["verdict"] = "skipped-watermark"
+        return entry, False
+    train_idx, held_idx = split_rows(horn_rows, horn, VOICE_KIND)
+    entry["trainTurns"] = len(train_idx)
+    entry["heldOutTurns"] = len(held_idx)
+    if len(held_idx) < HELDOUT_FLOOR or not train_idx:
+        entry["verdict"] = "heldout-floor"
+        _log_train(store, now, entry)
+        return entry, False
+    columns = feature_columns(horn_rows, train_idx)
+    head = fit_fn(horn_rows, train_idx, columns)
+    if head is None:
+        entry["verdict"] = "no-fit"
+        _log_train(store, now, entry)
+        return entry, False
+    n_trees, depth, n_nodes = curator.spec_head_stats(head)
+    if n_trees > curator.XGB_MAX_TREES or depth > curator.XGB_MAX_DEPTH or n_nodes > curator.XGB_MAX_NODES:
+        entry["verdict"] = "no-fit"
+        entry["note"] = (
+            f"challenger exceeds the shipped head bounds ({n_trees} trees, depth {depth}, {n_nodes} nodes)"
+        )
+        _log_train(store, now, entry)
+        return entry, False
+    # Spearman's float error can land a hair outside [-1, 1] on a perfect separation; the
+    # score's own range is the bound — clamp before it is compared or stamped, so a shipped
+    # entry never falls outside what the app's validator accepts.
+    challenger = max(-1.0, min(1.0, heldout_score(head, horn_rows, held_idx)))
+    incumbent = heldout_score(incumbent_entry["head"], horn_rows, held_idx) if incumbent_entry is not None else None
+    entry["challengerHeldOut"] = challenger
+    entry["incumbentHeldOut"] = incumbent
+    if incumbent is None and challenger < HEAD_MIN_FIDELITY:
+        entry["verdict"] = "below-bar"
+        _log_train(store, now, entry)
+        return entry, False
+    if incumbent is not None and not challenger > incumbent:
+        entry["verdict"] = "rejected"
+        _log_train(store, now, entry)
+        return entry, False
+    head = dict(head)
+    head["fidelity"] = challenger
+    highest = max([incumbent_entry["version"] if incumbent_entry else 0] + stored_versions(store, horn, VOICE_KIND))
+    version = highest + 1
+    shipped = {
+        "version": version,
+        "kind": VOICE_KIND,
+        "head": head,
+        "labeledTurns": labeled_turns,
+        "heldOut": challenger,
+        "trainedAt": now,
+        "featuresVersion": VOICE_FEATURES_VERSION,
+    }
+    os.makedirs(os.path.join(store, horn, VOICE_KIND), exist_ok=True)
+    with open(store_artifact_path(store, horn, VOICE_KIND, version), "w", encoding="utf-8") as fh:
+        fh.write(canonical(shipped))
+    if not isinstance(taste.get("voice"), dict):
+        taste["voice"] = {}
+    taste["voice"][horn] = shipped
+    entry["verdict"] = "shipped"
+    entry["version"] = version
+    entry["heldOut"] = challenger
+    _log_train(store, now, entry)
+    return entry, True
+
+
+def train_voice(rows_artifact, taste, taste_path, store, force=False, now=None, fit_fn=None):
+    """One training pass for the horns' line choosers (A7). Each horn trains on its own rows
+    under its own watermark; one horn's outcome never touches another's entry. Returns
+    {entries, shipped}."""
+    if rows_artifact.get("format") != VOICE_ROWS_FORMAT or rows_artifact.get("version") != VOICE_ROWS_VERSION:
+        raise ValueError(f"not a {VOICE_ROWS_FORMAT} v{VOICE_ROWS_VERSION} artifact")
+    if rows_artifact.get("featuresVersion") != VOICE_FEATURES_VERSION:
+        raise ValueError(
+            f"voice rows carry featuresVersion {rows_artifact.get('featuresVersion')}, "
+            f"this trainer writes {VOICE_FEATURES_VERSION}"
+        )
+    fit_fn = fit_fn or fit_head_xgb
+    now = now or utc_now_iso()
+    rows = rows_artifact.get("rows") or []
+    history = read_history(store)
+    entries = []
+    shipped_any = False
+    for horn in VOICE_HORNS:
+        horn_rows = [r for r in rows if isinstance(r, dict) and r.get("id") == horn]
+        entry, shipped = _train_voice_horn(horn, horn_rows, taste, store, history, force, now, fit_fn)
+        entries.append(entry)
+        shipped_any = shipped_any or shipped
+    return {"entries": entries, "shipped": shipped_any}
+
+
 # ── rollback (Q5) ────────────────────────────────────────────────────────────────────────────────
 
 def rollback(taste, pid, kind, store, now=None):
@@ -775,6 +933,12 @@ def main(argv=None):
     q.add_argument("--store")
     q.add_argument("--force", action="store_true")
     q.add_argument("--now")
+    v = sub.add_parser("voice")
+    v.add_argument("--rows", required=True)
+    v.add_argument("--taste", required=True)
+    v.add_argument("--store")
+    v.add_argument("--force", action="store_true")
+    v.add_argument("--now")
     args = ap.parse_args(argv)
 
     store = args.store or default_store(args.taste)
@@ -815,6 +979,16 @@ def main(argv=None):
         extra = f" -> v{e['version']} (heldOut {e['heldOut']:.3f})" if e["verdict"] == "shipped" else ""
         print(f"[queen] timing: {e['verdict']}{extra} ({e['labeledTakes']} labeled takes)")
         print(f"[queen] taste.json {'updated' if result['shipped'] else 'unchanged'}")
+    elif args.cmd == "voice":
+        now = args.now or utc_now_iso()
+        result = train_voice(load_json(args.rows), taste, args.taste, store, force=args.force, now=now)
+        if result["shipped"]:
+            with open(args.taste, "w", encoding="utf-8") as fh:
+                fh.write(canonical(taste))
+        for e in result["entries"]:
+            extra = f" -> v{e['version']} (heldOut {e['heldOut']:.3f})" if e["verdict"] == "shipped" else ""
+            print(f"[voice] {e['id']}: {e['verdict']}{extra} ({e['labeledTurns']} labeled moments)")
+        print(f"[voice] taste.json {'updated' if result['shipped'] else 'unchanged'}")
     elif args.cmd == "chemistry":
         result = chemistry(load_json(args.rows), taste, store, now=args.now)
         if result["changed"]:

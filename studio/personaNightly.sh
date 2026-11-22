@@ -133,7 +133,7 @@ fail() {
 
 # ── preflight: every missing piece is named loudly, before anything is touched (Q6) ─────
 [ -d "$CHECKOUT" ] || fail "checkout not found: $CHECKOUT"
-for f in labelExtractor.mjs personaRows.mjs queenRows.mjs verify_persona_heads.mjs train_persona_heads.py; do
+for f in labelExtractor.mjs personaRows.mjs queenRows.mjs voiceRows.mjs verify_persona_heads.mjs train_persona_heads.py; do
   [ -f "$CHECKOUT/studio/$f" ] || fail "expected chain file missing: $CHECKOUT/studio/$f — is KC_CHECKOUT the working clone, and is it pulled past A2?"
 done
 [ -x "$NODE_BIN" ] || fail "node interpreter not executable: $NODE_BIN"
@@ -143,24 +143,28 @@ done
 [ -d "$LEDGERS_DIR" ] || fail "ledgers dir not found: $LEDGERS_DIR — the nightly reads the DESKTOP app's data"
 
 # ── the chain (A0 → A2, the audit's §2 sequence) ──────────────────────────────────────────
-# run_chain <labeled> <rows> <taste> <report> — stops at the first failing step and returns
+# run_chain <labeled> <rows> <taste> <report> <queenrows> <voicerows> — stops at the first failing step and returns
 # its exit code. The trainer is called WITHOUT --store (the store lives beside the taste it
 # is pointed at — Q5's law, and what makes the dry-run's isolation automatic), WITHOUT
 # --force (the watermark rules), and rollback is never invoked from here.
 run_chain() {
-  local labeled="$1" rows="$2" taste="$3" report="$4" queenrows="$5" rc=0
+  local labeled="$1" rows="$2" taste="$3" report="$4" queenrows="$5" voicerows="$6" rc=0
   echo "+ labelExtractor"
   "$NODE_BIN" "$CHECKOUT/studio/labelExtractor.mjs" --takes "$TAKES_DIR" --ledgers "$LEDGERS_DIR" --out "$labeled" || return $?
   echo "+ personaRows"
   "$NODE_BIN" "$CHECKOUT/studio/personaRows.mjs" --labeled "$labeled" --takes "$TAKES_DIR" --out "$rows" || return $?
   echo "+ queenRows"
   "$NODE_BIN" "$CHECKOUT/studio/queenRows.mjs" --labeled "$labeled" --takes "$TAKES_DIR" --out "$queenrows" || return $?
+  echo "+ voiceRows"
+  "$NODE_BIN" "$CHECKOUT/studio/voiceRows.mjs" --labeled "$labeled" --takes "$TAKES_DIR" --out "$voicerows" || return $?
   echo "+ train_persona_heads train"
   "$PYTHON_BIN" "$CHECKOUT/studio/train_persona_heads.py" train --rows "$rows" --taste "$taste" --report "$report" || return $?
   echo "+ train_persona_heads chemistry"
   "$PYTHON_BIN" "$CHECKOUT/studio/train_persona_heads.py" chemistry --rows "$rows" --taste "$taste" || return $?
   echo "+ train_persona_heads queen"
   "$PYTHON_BIN" "$CHECKOUT/studio/train_persona_heads.py" queen --rows "$queenrows" --taste "$taste" || return $?
+  echo "+ train_persona_heads voice"
+  "$PYTHON_BIN" "$CHECKOUT/studio/train_persona_heads.py" voice --rows "$voicerows" --taste "$taste" || return $?
   echo "+ verify_persona_heads (alarm only — Q4)"
   "$NODE_BIN" "$CHECKOUT/studio/verify_persona_heads.mjs" --taste "$taste" --rows "$rows" --report "$report"
   rc=$?
@@ -181,7 +185,7 @@ if [ "$MODE" = "dry" ]; then
     cp -R "$STORE" "$DRYDIR/persona-heads" || fail "dry-run: cannot copy the store"
   fi
   echo "DRY-RUN: the full chain runs against copies in $DRYDIR — the canonical taste and store are not touched."
-  run_chain "$DRYDIR/labeled.json" "$DRYDIR/rows.json" "$DRYDIR/taste.json" "$DRYDIR/report.json" "$DRYDIR/queen-rows.json" >>"$SECTION" 2>&1
+  run_chain "$DRYDIR/labeled.json" "$DRYDIR/rows.json" "$DRYDIR/taste.json" "$DRYDIR/report.json" "$DRYDIR/queen-rows.json" "$DRYDIR/voice-rows.json" >>"$SECTION" 2>&1
   rc=$?
   if [ "$rc" -ne 0 ]; then
     fail "dry-run chain step failed (exit $rc) — the copies are kept in $DRYDIR for inspection"
@@ -189,7 +193,7 @@ if [ "$MODE" = "dry" ]; then
   echo "DRY-RUN: complete — what would ship is in the trainer lines above; copies kept in $DRYDIR" >>"$SECTION"
   echo "── persona nightly — dry-run OK" >>"$SECTION"
 else
-  run_chain "$SCRATCH/labeled.json" "$SCRATCH/rows.json" "$TASTE" "$REPORT" "$SCRATCH/queen-rows.json" >>"$SECTION" 2>&1
+  run_chain "$SCRATCH/labeled.json" "$SCRATCH/rows.json" "$TASTE" "$REPORT" "$SCRATCH/queen-rows.json" "$SCRATCH/voice-rows.json" >>"$SECTION" 2>&1
   rc=$?
   if [ "$rc" -ne 0 ]; then
     fail "chain step failed (exit $rc) — taste and store are as the trainer's no-desync law leaves them; see the step output above"

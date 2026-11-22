@@ -657,4 +657,70 @@ try:
 except ValueError:
     check(True, "queen: a personas artifact must raise")
 
+# ── A7 (#2400): the horns' voice choosers — counted in moments, per horn, beat-the-old ───────
+def vrow(pid, seed, line, weight):
+    return {"id": pid, "takeSeed": seed,
+            "features": {"line": line, "ctx": "agree", "to": "davis", "num": {}},
+            "label": 1 if weight > 0 else 0, "weight": weight}
+
+
+def voice_artifact(rows):
+    return {"format": T.VOICE_ROWS_FORMAT, "version": T.VOICE_ROWS_VERSION,
+            "featuresVersion": T.VOICE_FEATURES_VERSION, "rows": rows}
+
+
+def vstump(sign=1):
+    return {"kind": "xgboost-trees", "objective": "binary:logistic", "baseScore": 0.0,
+            "fidelity": 0.0, "fitOn": 90, "features": ["ctx", "line", "to"],
+            "trees": [{"f": 1, "op": "=", "v": "H01", "gain": 1, "y": {"leaf": 2 * sign}, "n": {"leaf": -2 * sign}}]}
+
+
+# 60 takes × 2 carson moments: H01 in kept takes, H02 in passed ones; no rows for other horns
+vrows = []
+for i in range(60):
+    line, w = ("H01", 1.0) if i % 2 == 0 else ("H02", -1.0)
+    vrows += [vrow("carson", 2000 + i, line, w), vrow("carson", 2000 + i, line, w)]
+store_v = tempfile.mkdtemp()
+taste_v = {}
+res = T.train_voice(voice_artifact(vrows), taste_v, "taste.json", store_v, now="2026-11-22T03:30:00Z",
+                    fit_fn=fit_returning(vstump()))
+by_id = {e["id"]: e for e in res["entries"]}
+e = by_id["carson"]
+check(res["shipped"] and e["verdict"] == "shipped" and e["version"] == 1,
+      f"voice: the first head ships: {e}")
+check(e["labeledTurns"] == 120 and taste_v["voice"]["carson"]["labeledTurns"] == 120,
+      "voice: the count is in labeled line-MOMENTS (120 rows over 60 takes)")
+check(e["challengerHeldOut"] > 0.9, f"voice: the stump separates the lines: {e['challengerHeldOut']}")
+check(by_id["greiman"]["verdict"] == "no-corpus" and "greiman" not in taste_v["voice"],
+      "voice: a horn with no rows is a quiet verdict and gains no entry")
+check(_os.path.exists(T.store_artifact_path(store_v, "carson", "voice", 1)),
+      "voice: v1 archived in the store under carson/voice")
+hist_v = T.read_history(store_v)
+check(hist_v and hist_v[-1]["id"] == "carson" and hist_v[-1]["kind"] == "voice" and hist_v[-1]["labeledTurns"] == 120,
+      "voice: the history record carries the moments count as its watermark")
+# the watermark rules a same-count rerun; force + an inverted stump loses to the incumbent
+res = T.train_voice(voice_artifact(vrows), taste_v, "taste.json", store_v, now="2026-11-22T04:30:00Z",
+                    fit_fn=fit_returning(vstump()))
+check({x["id"]: x for x in res["entries"]}["carson"]["verdict"] == "skipped-watermark",
+      "voice: no new moments, no retrain")
+res = T.train_voice(voice_artifact(vrows), taste_v, "taste.json", store_v, force=True,
+                    now="2026-11-22T05:30:00Z", fit_fn=fit_returning(vstump(sign=-1)))
+check({x["id"]: x for x in res["entries"]}["carson"]["verdict"] == "rejected" and taste_v["voice"]["carson"]["version"] == 1,
+      "voice: beat-the-old is strict")
+# a malformed incumbent is no incumbent (the shape gate), never a crash
+taste_v2 = {"voice": {"carson": {"kind": "voice", "head": None}}}
+res = T.train_voice(voice_artifact(vrows), taste_v2, "taste.json", tempfile.mkdtemp(),
+                    now="2026-11-22T06:30:00Z", fit_fn=fit_returning(vstump()))
+check(res["shipped"] and taste_v2["voice"]["carson"]["version"] == 1,
+      "voice: a malformed incumbent is replaced, not crashed on")
+# no corpus is a verdict, not an error; a wrong artifact raises
+res = T.train_voice(voice_artifact([]), {}, "taste.json", tempfile.mkdtemp(), fit_fn=fit_returning(vstump()))
+check(all(x["verdict"] == "no-corpus" for x in res["entries"]) and not res["shipped"],
+      "voice: empty rows are quiet verdicts for every horn")
+try:
+    T.train_voice({"format": "kc-queen-rows", "version": 1, "rows": []}, {}, "t", tempfile.mkdtemp())
+    check(False, "voice: a queen artifact must raise")
+except ValueError:
+    check(True, "voice: a queen artifact must raise")
+
 print("train_persona_heads_selfcheck: all blocks passed")

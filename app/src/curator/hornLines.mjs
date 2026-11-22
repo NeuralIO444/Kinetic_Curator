@@ -72,6 +72,41 @@ export function lineFor(horn, ctx, to, lines = HORN_LINES) {
   return signed.find((l) => l.to === to && to) || signed.find((l) => l.to === null) || null;
 }
 
+/**
+ * #2400 (Adapters A7) — every SIGNED line that fits a moment, in today's pick order:
+ * addressee-specific lines first (table order), then the generic ones. Unsigned lines are
+ * never candidates. lineFor's pick is candidates[0] — the chooser (voiceChooser.mjs) ranks
+ * this same list when a horn's voice head has earned in.
+ */
+export function signedCandidates(horn, ctx, to, lines = HORN_LINES) {
+  const signed = lines.filter((l) => l.signed === true && l.horn === horn && l.ctx === ctx);
+  return [...signed.filter((l) => l.to === to && to), ...signed.filter((l) => l.to === null)];
+}
+
+const HORNS = ['carson', 'greiman', 'ashworth'];
+
+/**
+ * #2400 (Adapters A7) — the line-MOMENTS one band turn holds: [{ persona, ctx, to }] in the
+ * order linesForTurn speaks them. A moment is a horn answering a call (ctx = its verdict,
+ * to = the caller seat) or the soloist cut by COVER (ctx 'cut', to 'lois'). This is the one
+ * moment logic: linesForTurn speaks it through lineFor, the chooser ranks it, and
+ * studio/voiceRows.mjs trains on it — a moment can never mean one thing live and another in
+ * training. Pure.
+ */
+export function turnMoments(turn) {
+  const out = [];
+  if (!turn || turn.kind !== 'trade' || !Array.isArray(turn.answers)) return out;
+  const caller = turn.by;
+  for (const a of turn.answers) {
+    if (!a || !HORNS.includes(a.by)) continue;
+    out.push({ persona: a.by, ctx: a.verdict, to: caller });
+  }
+  // the soloist cut by COVER answers COVER
+  if (HORNS.includes(caller) && turn.answers.some((a) => a && a.by === 'lois' && a.move === 'cut'))
+    out.push({ persona: caller, ctx: 'cut', to: 'lois' });
+  return out;
+}
+
 const fill = (text, to) => text.replace('{to}', to || '');
 
 /**
@@ -80,21 +115,12 @@ const fill = (text, to) => text.replace('{to}', to || '');
  */
 export function linesForTurn(turn, lines = HORN_LINES) {
   const out = [];
-  if (!turn || turn.kind !== 'trade' || !Array.isArray(turn.answers)) return out;
-  const caller = turn.by;
+  const caller = turn && turn.by;
   const to = callsignOf(caller);
-  for (const a of turn.answers) {
-    if (!a || !['carson', 'greiman', 'ashworth'].includes(a.by) || !to) continue;
-    const l = lineFor(a.by, a.verdict, caller, lines);
-    if (l) out.push({ persona: a.by, id: l.id, text: fill(l.text, to) });
-  }
-  // the soloist cut by COVER answers COVER
-  if (
-    ['carson', 'greiman', 'ashworth'].includes(caller) &&
-    turn.answers.some((a) => a && a.by === 'lois' && a.move === 'cut')
-  ) {
-    const l = lineFor(caller, 'cut', 'lois', lines);
-    if (l) out.push({ persona: caller, id: l.id, text: fill(l.text, 'COVER') });
+  for (const m of turnMoments(turn)) {
+    if (m.ctx !== 'cut' && !to) continue;
+    const l = lineFor(m.persona, m.ctx, m.to, lines);
+    if (l) out.push({ persona: m.persona, id: l.id, text: fill(l.text, m.ctx === 'cut' ? 'COVER' : to) });
   }
   return out;
 }
