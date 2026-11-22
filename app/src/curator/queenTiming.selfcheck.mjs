@@ -66,6 +66,9 @@ await ok('the section validates whole — and neutralizes whole when malformed',
   assert.equal(validateQueenTimingSection(qEntry({ kind: 'solo' })), null, 'her only kind is timing');
   assert.equal(validateQueenTimingSection(qEntry({ labeledTakes: -1 })), null);
   assert.equal(validateQueenTimingSection(qEntry({ heldOut: 2 })), null);
+  // #2437: a float-error overshoot clamps on read instead of neutralizing the section
+  assert.equal(validateQueenTimingSection(qEntry({ heldOut: 1.0000000000000002 })).heldOut, 1);
+  assert.equal(validateQueenTimingSection(qEntry({ heldOut: -1.0000000000000002 })).heldOut, -1);
   assert.equal(validateQueenTimingSection(qEntry({ featuresVersion: 99 })), null, 'a stale universe is malformed');
   assert.equal(
     validateQueenTimingSection(qEntry({ head: { ...stump, features: ['num.heat'] } })),

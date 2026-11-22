@@ -91,6 +91,20 @@ await ok('damage is per entry: the bad ones fall back alone, the rest still load
   assert.deepEqual(Object.keys(o.davis), ['solo'], 'and within it, only the healthy kind');
 });
 
+await ok('#2437: a float-error overshoot clamps on read — the section survives, values at the bound', () => {
+  const o = personasOverlayFromStoreText(
+    storeText({
+      davis: {
+        solo: entry('solo', treeHead(['num.heat'], [{ leaf: 1 }], 1.0000000000000002), { heldOut: 1.0000000000000002 }),
+        trade: entry('trade', leafHead(1)),
+      },
+    }),
+  );
+  assert.equal(o.davis.solo.heldOut, 1, 'heldOut reads back at exactly 1');
+  assert.equal(o.davis.solo.head.fidelity, 1, 'head fidelity reads back at exactly 1');
+  assert.equal(o.davis.trade.heldOut, 0.6, 'the healthy entry is untouched');
+});
+
 await ok('the merge: the store wins per persona per kind, the rest of the section is untouched', () => {
   const current = {
     davis: { solo: entry('solo', leafHead(1), { version: 1 }), trade: entry('trade', leafHead(2), { version: 1 }) },

@@ -723,4 +723,31 @@ try:
 except ValueError:
     check(True, "voice: a queen artifact must raise")
 
+# ── #2437: clamp at both ends — the trainer never stamps a score outside [0, 1] ───────────────
+check(T._clamp_stamp(1.0000000000000002) == 1.0 and T._clamp_stamp(-0.25) == 0.0 and T._clamp_stamp(0.42) == 0.42,
+      "clamp: the stamp helper bounds scores to [0, 1]")
+# The issue's exact failure: spearman returns 1.0000000000000002 for a tie-heavy perfectly
+# separating head. Stub the computation at that value and prove the stamp lands at exactly
+# 1.0 — and that the shipped entry passes the shape gate as an incumbent (pre-fix it failed
+# the gate, so the entry was no incumbent and the section died app-side).
+_orig_heldout = T.heldout_score
+T.heldout_score = lambda head, rows, idx: 1.0000000000000002
+try:
+    taste_c = {}
+    res = T.train(rows_artifact(solo_rows(10)), taste_c, "taste.json", tempfile.mkdtemp(),
+                  now="2026-11-22T03:30:00Z", fit_fn=fit_returning(heat_head(-2.0, 2.0)))
+    shipped_c = taste_c["personas"]["davis"]["solo"]
+    check(entry_of(res, "davis", "solo")["verdict"] == "shipped"
+          and shipped_c["heldOut"] == 1.0 and shipped_c["head"]["fidelity"] == 1.0,
+          f"clamp: the stamp is exactly 1.0, never 1.0000000000000002: {shipped_c['heldOut']}")
+    check(T.incumbent_entry_ok("davis", "solo", shipped_c),
+          "clamp: the shipped entry passes the shape gate as an incumbent")
+    # the mirror gates accept the app's float-error window too — and still refuse corruption
+    over = dict(shipped_c, heldOut=1.0000000000000002)
+    check(T.incumbent_entry_ok("davis", "solo", over), "clamp: the gate accepts a hairline overshoot")
+    corrupt = dict(shipped_c, heldOut=2)
+    check(not T.incumbent_entry_ok("davis", "solo", corrupt), "clamp: the gate still refuses heldOut 2")
+finally:
+    T.heldout_score = _orig_heldout
+
 print("train_persona_heads_selfcheck: all blocks passed")

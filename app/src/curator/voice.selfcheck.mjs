@@ -75,6 +75,13 @@ await ok('the section validates per horn — and neutralizes when malformed', ()
   assert.equal(validateVoiceSection({ carson: vEntry({ kind: 'trade' }) }), null, "the entry's kind is its section's");
   assert.equal(validateVoiceSection({ carson: vEntry({ labeledTurns: -1 }) }), null);
   assert.equal(validateVoiceSection({ carson: vEntry({ heldOut: 2 }) }), null);
+  // #2437: a float-error overshoot clamps on read instead of neutralizing the section
+  assert.equal(validateVoiceSection({ carson: vEntry({ heldOut: 1.0000000000000002 }) }).carson.heldOut, 1);
+  assert.equal(
+    validateVoiceSection({ carson: vEntry({ head: { ...stumpFor('H01'), fidelity: 1.0000000000000002 } }) }).carson.head
+      .fidelity,
+    1,
+  );
   assert.equal(
     validateVoiceSection({ carson: vEntry({ featuresVersion: 99 }) }),
     null,
