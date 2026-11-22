@@ -18,6 +18,7 @@ import { recipeFeatures, FEATURES_VERSION } from './recipeFeatures.js';
 import { validateChapterMemory } from './chapterMemory.mjs';
 import { decisionFeatureNames, DECISION_FEATURES_VERSION, PERSONA_DECISION_KINDS } from './decisionFeatures.mjs';
 import { validateRelationsSection } from '../personas/chemistry.mjs';
+import { queenTimingFeatureNames, QUEEN_TIMING_FEATURES_VERSION } from './queenTimingFeatures.mjs';
 
 export const TASTE_KIND = 'kc-taste';
 export const TASTE_VERSION = 1;
@@ -172,6 +173,13 @@ export function validateTaste(raw) {
     const relations = validateRelationsSection(raw.relations);
     if (relations) taste.relations = relations;
   }
+  // Persona Adapters A6 (#2399) — the optional queenTiming section: her timing-inclination head,
+  // a single entry in its own section (she holds no personas entry, by law). Same neutralization
+  // law as the sections above. Absent (every pre-A6 file) stays absent.
+  if (raw.queenTiming != null) {
+    const queenTiming = validateQueenTimingSection(raw.queenTiming);
+    if (queenTiming) taste.queenTiming = queenTiming;
+  }
   return { ok: true, taste };
 }
 
@@ -247,6 +255,60 @@ export function validatePersonasSection(raw) {
     out[id] = cleanKinds;
   }
   return Object.keys(out).length ? out : null;
+}
+
+/** A6 (#2399) earn-in, counted in TAKES: her head steers only at ≥200 labeled takes AND
+ * held-out ≥ HEAD_MIN_FIDELITY (0.3) — one earn-in law for every head (ruling on #2399). */
+export const QUEEN_TIMING_MIN_TAKES = 200;
+
+/**
+ * Validate a taste `queenTiming` section (A6): a single timing-inclination entry — { version,
+ * kind: 'timing', head, labeledTakes, heldOut, trainedAt, featuresVersion } — with the head
+ * bound to HER feature universe (queenTimingFeatures.mjs) under the same node law and artifact
+ * bounds as a persona head. Returns the cleaned entry, or null when anything is off.
+ */
+export function validateQueenTimingSection(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (!Number.isInteger(raw.version) || raw.version < 1) return null;
+  if (raw.kind !== 'timing') return null;
+  if (!Number.isInteger(raw.labeledTakes) || raw.labeledTakes < 0) return null;
+  if (!finite(raw.heldOut) || raw.heldOut < -1 || raw.heldOut > 1) return null;
+  if (raw.featuresVersion !== QUEEN_TIMING_FEATURES_VERSION) return null;
+  const v = validateTreeHeadFor(raw.head, queenTimingFeatureNames());
+  if (!v.ok) return null;
+  return {
+    version: raw.version,
+    kind: 'timing',
+    head: v.head,
+    labeledTakes: raw.labeledTakes,
+    heldOut: raw.heldOut,
+    trainedAt: String(raw.trainedAt || ''),
+    featuresVersion: QUEEN_TIMING_FEATURES_VERSION,
+  };
+}
+
+/** Has her timing head earned in? ≥200 labeled takes AND held-out ≥ 0.3 (ruling on #2399). */
+export function queenTimingEarnedIn(entry) {
+  return (
+    !!entry &&
+    Number.isInteger(entry.labeledTakes) &&
+    entry.labeledTakes >= QUEEN_TIMING_MIN_TAKES &&
+    finite(entry.heldOut) &&
+    entry.heldOut >= HEAD_MIN_FIDELITY
+  );
+}
+
+/**
+ * Her inclination for one leaned turn, from the loaded taste: the earned-in head's
+ * keep-probability over the turn's timing features (queenTimingFeatures.mjs), in [0, 1] —
+ * 1 is today's sway size, smaller relaxes toward nothing. Null when the taste carries no
+ * earned-in head, so the caller leaves the lean exactly as computed (no head = today).
+ */
+export function queenTimingInclination(taste, features) {
+  const entry = taste && taste.queenTiming;
+  if (!queenTimingEarnedIn(entry)) return null;
+  const p = scoreTreeHeadWith(entry.head, features);
+  return Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : null;
 }
 
 /** Has this personas entry earned in? ≥200 labeled turns AND held-out ≥ HEAD_MIN_FIDELITY (0.3).

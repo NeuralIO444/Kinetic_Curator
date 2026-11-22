@@ -63,6 +63,17 @@ export function overlayRelationsSection(overlay) {
   return true;
 }
 
+/**
+ * #2399 (Adapters A6) — overlay the nightly store's queenTiming entry onto the loaded taste,
+ * in memory only, under the boot bridge's law: the store's entry replaces the taste's, and the
+ * stored taste is never rewritten. Returns false (changing nothing) when no taste is loaded.
+ */
+export function overlayQueenTimingSection(entry) {
+  if (!entry || !current) return false;
+  current = { ...current, queenTiming: entry };
+  return true;
+}
+
 export function clearTaste() {
   current = null;
   try {

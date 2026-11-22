@@ -527,6 +527,24 @@ export function bandTiming(turn, signals) {
   return GATE_OPEN ? bandTimingOpen(turn, signals) : null;
 }
 
+/**
+ * #2399 (A6) — a lean scaled by her learned inclination k in [0, 1]: 1 returns the lean as
+ * computed; smaller relaxes every channel toward nothing; a lean scaled to nothing is no lean.
+ * The scale never grows a sway, so the caps the lean already respects stay respected.
+ */
+export function scaleBandTiming(lean, k) {
+  if (!lean) return null;
+  if (typeof k !== 'number' || !Number.isFinite(k) || k >= 1) return lean;
+  const f = Math.max(0, k);
+  const out = {
+    phrase: lean.phrase,
+    enterEarlyMs: ms3(lean.enterEarlyMs * f),
+    breathePct: pct6(lean.breathePct * f),
+    tightMs: ms3(lean.tightMs * f),
+  };
+  return out.enterEarlyMs > 0 || out.breathePct > 0 || out.tightMs > 0 ? Object.freeze(out) : null;
+}
+
 /** A lean relaxed across its phrase: full at the boundary, nothing at the next (progress 0..1). Pure. */
 export function relaxedTiming(timing, phraseProgress) {
   if (!timing) return null;

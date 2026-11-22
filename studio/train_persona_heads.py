@@ -565,6 +565,142 @@ def chemistry(rows_artifact, taste, store, now=None):
     return {"offsets": offsets, "changed": changed}
 
 
+# ── her timing head (A6, #2399) ───────────────────────────────────────────────────────────────────
+QUEEN_ROWS_FORMAT = "kc-queen-rows"
+QUEEN_ROWS_VERSION = 1
+QUEEN_FEATURES_VERSION = 1
+#: queenTimingFeatureNames() (app/src/curator/queenTimingFeatures.mjs), mirrored.
+QUEEN_FEATURE_NAMES = frozenset({"kind", "num.breathePct", "num.enterEarlyMs", "num.tightMs"})
+QUEEN_ID, QUEEN_KIND = "queen", "timing"
+
+
+def _queen_head_ok(head):
+    """validateTreeHeadFor against her universe, mirrored (cf. _head_ok)."""
+    if not isinstance(head, dict):
+        return False
+    if head.get("objective") != "binary:logistic":
+        return False
+    if not _finite(head.get("baseScore")):
+        return False
+    if not _finite(head.get("fidelity")) or not -1 <= head["fidelity"] <= 1:
+        return False
+    features = head.get("features")
+    if not isinstance(features, list) or not features:
+        return False
+    if any(not isinstance(n, str) or n not in QUEEN_FEATURE_NAMES for n in features):
+        return False
+    if len(set(features)) != len(features):
+        return False
+    trees = head.get("trees")
+    if not isinstance(trees, list) or not trees or len(trees) > MAX_TREES:
+        return False
+    counter = [0]
+    return all(_node_ok(t, features, 0, counter) for t in trees)
+
+
+def _queen_entry_ok(entry):
+    """validateQueenTimingSection (tasteHead.js), mirrored. Total: any garbage returns False."""
+    if not isinstance(entry, dict):
+        return False
+    if not _is_int(entry.get("version")) or entry["version"] < 1:
+        return False
+    if entry.get("kind") != QUEEN_KIND:
+        return False
+    if not _is_int(entry.get("labeledTakes")) or entry["labeledTakes"] < 0:
+        return False
+    if not _finite(entry.get("heldOut")) or not -1 <= entry["heldOut"] <= 1:
+        return False
+    if entry.get("featuresVersion") != QUEEN_FEATURES_VERSION:
+        return False
+    return _queen_head_ok(entry.get("head"))
+
+
+def train_queen(rows_artifact, taste, taste_path, store, force=False, now=None, fit_fn=None):
+    """One training pass for her timing-inclination head (A6). Mirrors train()'s laws — split by
+    take, held-out Spearman, a first head must clear the bar, a challenger must strictly beat
+    the incumbent on the same slice, versions archived in the store — with the count kept in
+    TAKES (her earn-in unit, ruling on #2399; the ≥200 gate itself is the app's, as for the
+    persona heads). Mutates `taste` only when a head ships. Returns {entry, shipped}."""
+    if rows_artifact.get("format") != QUEEN_ROWS_FORMAT or rows_artifact.get("version") != QUEEN_ROWS_VERSION:
+        raise ValueError(f"not a {QUEEN_ROWS_FORMAT} v{QUEEN_ROWS_VERSION} artifact")
+    if rows_artifact.get("featuresVersion") != QUEEN_FEATURES_VERSION:
+        raise ValueError(
+            f"queen rows carry featuresVersion {rows_artifact.get('featuresVersion')}, "
+            f"this trainer writes {QUEEN_FEATURES_VERSION}"
+        )
+    fit_fn = fit_fn or fit_head_xgb
+    now = now or utc_now_iso()
+    rows = rows_artifact.get("rows") or []
+    history = read_history(store)
+    raw_incumbent = taste.get("queenTiming") if isinstance(taste.get("queenTiming"), dict) else None
+    incumbent_entry = raw_incumbent if _queen_entry_ok(raw_incumbent) else None
+    labeled = [r for r in rows if r.get("weight") != 0]
+    labeled_takes = len({r.get("takeSeed") for r in labeled})
+    entry = {"id": QUEEN_ID, "kind": QUEEN_KIND, "labeledTakes": labeled_takes, "labeledTurns": labeled_takes}
+    if labeled_takes == 0:
+        entry["verdict"] = "no-corpus"
+        return {"entry": entry, "shipped": False}
+    mark = watermark(history, QUEEN_ID, QUEEN_KIND)
+    if not force and mark is not None and labeled_takes <= mark:
+        entry["verdict"] = "skipped-watermark"
+        return {"entry": entry, "shipped": False}
+    train_idx, held_idx = split_rows(rows, QUEEN_ID, QUEEN_KIND)
+    entry["trainTurns"] = len(train_idx)
+    entry["heldOutTurns"] = len(held_idx)
+    if len(held_idx) < HELDOUT_FLOOR or not train_idx:
+        entry["verdict"] = "heldout-floor"
+        _log_train(store, now, entry)
+        return {"entry": entry, "shipped": False}
+    columns = feature_columns(rows, train_idx)
+    head = fit_fn(rows, train_idx, columns)
+    if head is None:
+        entry["verdict"] = "no-fit"
+        _log_train(store, now, entry)
+        return {"entry": entry, "shipped": False}
+    n_trees, depth, n_nodes = curator.spec_head_stats(head)
+    if n_trees > curator.XGB_MAX_TREES or depth > curator.XGB_MAX_DEPTH or n_nodes > curator.XGB_MAX_NODES:
+        entry["verdict"] = "no-fit"
+        entry["note"] = (
+            f"challenger exceeds the shipped head bounds ({n_trees} trees, depth {depth}, {n_nodes} nodes)"
+        )
+        _log_train(store, now, entry)
+        return {"entry": entry, "shipped": False}
+    challenger = heldout_score(head, rows, held_idx)
+    incumbent = heldout_score(incumbent_entry["head"], rows, held_idx) if incumbent_entry is not None else None
+    entry["challengerHeldOut"] = challenger
+    entry["incumbentHeldOut"] = incumbent
+    if incumbent is None and challenger < HEAD_MIN_FIDELITY:
+        entry["verdict"] = "below-bar"
+        _log_train(store, now, entry)
+        return {"entry": entry, "shipped": False}
+    if incumbent is not None and not challenger > incumbent:
+        entry["verdict"] = "rejected"
+        _log_train(store, now, entry)
+        return {"entry": entry, "shipped": False}
+    head = dict(head)
+    head["fidelity"] = challenger
+    highest = max([incumbent_entry["version"] if incumbent_entry else 0] + stored_versions(store, QUEEN_ID, QUEEN_KIND))
+    version = highest + 1
+    shipped = {
+        "version": version,
+        "kind": QUEEN_KIND,
+        "head": head,
+        "labeledTakes": labeled_takes,
+        "heldOut": challenger,
+        "trainedAt": now,
+        "featuresVersion": QUEEN_FEATURES_VERSION,
+    }
+    os.makedirs(os.path.join(store, QUEEN_ID, QUEEN_KIND), exist_ok=True)
+    with open(store_artifact_path(store, QUEEN_ID, QUEEN_KIND, version), "w", encoding="utf-8") as fh:
+        fh.write(canonical(shipped))
+    taste["queenTiming"] = shipped
+    entry["verdict"] = "shipped"
+    entry["version"] = version
+    entry["heldOut"] = challenger
+    _log_train(store, now, entry)
+    return {"entry": entry, "shipped": True}
+
+
 # ── rollback (Q5) ────────────────────────────────────────────────────────────────────────────────
 
 def rollback(taste, pid, kind, store, now=None):
@@ -633,6 +769,12 @@ def main(argv=None):
     c.add_argument("--taste", required=True)
     c.add_argument("--store")
     c.add_argument("--now")
+    q = sub.add_parser("queen")
+    q.add_argument("--rows", required=True)
+    q.add_argument("--taste", required=True)
+    q.add_argument("--store")
+    q.add_argument("--force", action="store_true")
+    q.add_argument("--now")
     args = ap.parse_args(argv)
 
     store = args.store or default_store(args.taste)
@@ -663,6 +805,16 @@ def main(argv=None):
                 ) + ")"
             print(f"[train] {e['id']}|{e['kind']}: {e['verdict']}{extra}")
         print(f"[train] taste.json {'updated' if result['shipped'] else 'unchanged'}")
+    elif args.cmd == "queen":
+        now = args.now or utc_now_iso()
+        result = train_queen(load_json(args.rows), taste, args.taste, store, force=args.force, now=now)
+        if result["shipped"]:
+            with open(args.taste, "w", encoding="utf-8") as fh:
+                fh.write(canonical(taste))
+        e = result["entry"]
+        extra = f" -> v{e['version']} (heldOut {e['heldOut']:.3f})" if e["verdict"] == "shipped" else ""
+        print(f"[queen] timing: {e['verdict']}{extra} ({e['labeledTakes']} labeled takes)")
+        print(f"[queen] taste.json {'updated' if result['shipped'] else 'unchanged'}")
     elif args.cmd == "chemistry":
         result = chemistry(load_json(args.rows), taste, store, now=args.now)
         if result["changed"]:
