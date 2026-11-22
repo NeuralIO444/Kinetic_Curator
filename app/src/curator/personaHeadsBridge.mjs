@@ -9,7 +9,12 @@
 // back alone, the rest still load (validatePersonasSection is all-or-nothing over a section, so entries are
 // validated one at a time here); (3) boot-only — the caller reads once at app start, never again, so heads
 // written mid-session take effect at the next launch, never between takes.
-import { validatePersonasSection, validateQueenTimingSection, PERSONA_HEAD_IDS } from './tasteHead.js';
+import {
+  validatePersonasSection,
+  validateQueenTimingSection,
+  validateVoiceSection,
+  PERSONA_HEAD_IDS,
+} from './tasteHead.js';
 import { relationsOverlay } from '../personas/chemistry.mjs';
 
 /**
@@ -106,6 +111,30 @@ export function queenTimingOverlayFromStoreText(text) {
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   return validateQueenTimingSection(raw.queenTiming);
+}
+
+/**
+ * #2400 (Adapters A7) — the same store file's voice section as a boot overlay: the horns'
+ * line-chooser heads, cleaned per horn (entries validated one at a time through
+ * validateVoiceSection, so a single damaged entry falls back alone, ruling 2). Null when
+ * the file carries nothing usable. Voice entries never join the personas overlay, the
+ * fingerprint, or the launch note — the DEV readout stays personas-only.
+ */
+export function voiceOverlayFromStoreText(text) {
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const section = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw.voice : null;
+  if (!section || typeof section !== 'object' || Array.isArray(section)) return null;
+  const out = {};
+  for (const [id, entry] of Object.entries(section)) {
+    const clean = validateVoiceSection({ [id]: entry });
+    if (clean) out[id] = clean[id];
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 export function personasOverlayFromStoreText(text) {

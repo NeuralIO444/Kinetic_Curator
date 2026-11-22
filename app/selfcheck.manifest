@@ -179,6 +179,8 @@ node src/curator/personaHeadsBridge.selfcheck.mjs
 node src/curator/personaRollback.selfcheck.mjs
 node src/curator/queenTiming.selfcheck.mjs
 node ../studio/queenRows.selfcheck.mjs
+node src/curator/voice.selfcheck.mjs
+node ../studio/voiceRows.selfcheck.mjs
 node src/curator/queenChannel.selfcheck.mjs
 node src/curator/queenDeniability.selfcheck.mjs
 node ../studio/pool_rig.selfcheck.mjs

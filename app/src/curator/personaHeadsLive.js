@@ -5,17 +5,25 @@
 // (the taste's `relations` section) under the same law. Every failure is silent by ruling (Matt, 2026-11-21): not the desktop build, no
 // store, an unreadable file, no taste loaded — no notice, no log, no readout entry; the band simply plays on
 // rules exactly as it did before the bridge existed. The Queen's head (A6, #2399) rides this same bridge
-// when it exists; nothing here surfaces any head anywhere.
+// when it exists; nothing here surfaces any head anywhere. The horns' voice heads (A7, #2400)
+// ride it too, under the same law — they surface nowhere either.
 import { isTauriRuntime } from '../platform/desktop.mjs';
 import {
   personasOverlayFromStoreText,
   relationsOverlayFromStoreText,
   queenTimingOverlayFromStoreText,
+  voiceOverlayFromStoreText,
   headsFingerprint,
   changedHeadEntries,
   launchNoteLine,
 } from './personaHeadsBridge.mjs';
-import { getTaste, overlayPersonasSection, overlayRelationsSection, overlayQueenTimingSection } from './tasteStore.js';
+import {
+  getTaste,
+  overlayPersonasSection,
+  overlayRelationsSection,
+  overlayQueenTimingSection,
+  overlayVoiceSection,
+} from './tasteStore.js';
 
 export const ADAPTERS_DIR = 'adapters';
 export const ADAPTERS_TASTE_FILE = 'taste.json';
@@ -86,17 +94,21 @@ export async function loadPersonaHeadsAtBoot(deps = {}) {
     const apply = deps.overlay || overlayPersonasSection;
     const applyRelations = deps.overlayRelations || overlayRelationsSection;
     const applyQueenTiming = deps.overlayQueenTiming || overlayQueenTimingSection;
+    const applyVoice = deps.overlayVoice || overlayVoiceSection;
     const path = await join(await appDataDir(), ADAPTERS_DIR, ADAPTERS_TASTE_FILE);
     const storeText = await readTextFile(path);
     const overlay = personasOverlayFromStoreText(storeText);
     const relOverlay = relationsOverlayFromStoreText(storeText);
     const queenOverlay = queenTimingOverlayFromStoreText(storeText);
-    if (!overlay && !relOverlay && !queenOverlay) return { ok: false, reason: 'the store carries no loadable heads' };
+    const voiceOverlay = voiceOverlayFromStoreText(storeText);
+    if (!overlay && !relOverlay && !queenOverlay && !voiceOverlay)
+      return { ok: false, reason: 'the store carries no loadable heads' };
     if (!readTaste()) return { ok: false, reason: 'no taste loaded' };
     let landed = false;
     if (overlay) landed = apply(overlay) || landed;
     if (relOverlay) landed = applyRelations(relOverlay) || landed;
     if (queenOverlay) landed = applyQueenTiming(queenOverlay) || landed;
+    if (voiceOverlay) landed = applyVoice(voiceOverlay) || landed;
     if (!landed) return { ok: false, reason: 'no taste loaded' };
     if (overlay) noteHeadChanges(overlay, deps);
     return { ok: true };

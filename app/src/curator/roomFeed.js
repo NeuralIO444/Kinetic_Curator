@@ -11,8 +11,10 @@
 // The Queen has no lines (law 2): her decisions never become records, and nothing here renders sway (DS rule 10).
 import { on, off, Events } from '../composition/eventBus.js';
 import { describeOp } from './mindConduct.js';
-import { HEAD_MIN_FIDELITY } from './tasteHead.js';
+import { HEAD_MIN_FIDELITY, voiceHeads } from './tasteHead.js';
 import { linesForTurn } from './hornLines.mjs';
+import { createVoiceChooser } from './voiceChooser.mjs';
+import { getTaste } from './tasteStore.js';
 
 export const ROOM_FEED_MAX = 60;
 
@@ -29,9 +31,31 @@ export function personaLineFrom(d) {
  * #2388 (P8) — a band turn → the horn lines it earns, as persona records. Only SIGNED lines (hornLines.mjs): the
  * shipped drafts are all unsigned, so this is [] and the transcript is exactly what it was. QUEEN and GOVERNOR never
  * become records.
+ *
+ * #2400 (Adapters A7) — when a horn's voice head has earned in, the chooser (voiceChooser.mjs)
+ * ranks that horn's signed lines for the moment; until then this is linesForTurn exactly.
+ * The chooser is kept module-level, keyed by the earned-in head versions: its repetition
+ * decay must persist across turns, and a new head version starts a fresh chooser.
  */
+let liveChooser = null;
+let liveChooserKey = null;
+
 export function bandLinesFrom(turn) {
-  return linesForTurn(turn).map((l) => ({ kind: 'persona', persona: l.persona, bar: null, text: l.text }));
+  const heads = voiceHeads(getTaste());
+  if (!heads) {
+    liveChooser = null;
+    liveChooserKey = null;
+    return linesForTurn(turn).map((l) => ({ kind: 'persona', persona: l.persona, bar: null, text: l.text }));
+  }
+  const key = Object.keys(heads)
+    .sort()
+    .map((id) => `${id}@${heads[id].version}`)
+    .join('|');
+  if (!liveChooser || liveChooserKey !== key) {
+    liveChooser = createVoiceChooser(heads);
+    liveChooserKey = key;
+  }
+  return liveChooser.linesForTurn(turn).map((l) => ({ kind: 'persona', persona: l.persona, bar: null, text: l.text }));
 }
 
 /** The room's verdict as the transcript's tail line (the frozen mockup's "— the room, working —"). */

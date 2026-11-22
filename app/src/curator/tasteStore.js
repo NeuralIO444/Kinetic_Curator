@@ -74,6 +74,19 @@ export function overlayQueenTimingSection(entry) {
   return true;
 }
 
+/**
+ * #2400 (Adapters A7) — overlay the nightly store's voice section (per-horn line-chooser
+ * heads) onto the loaded taste, in memory only, under the boot bridge's law: the store wins
+ * per horn, horns the store does not carry keep whatever the taste already had, and the
+ * stored taste is never rewritten. Returns false (changing nothing) when no taste is loaded
+ * or the overlay is empty.
+ */
+export function overlayVoiceSection(overlay) {
+  if (!overlay || !Object.keys(overlay).length || !current) return false;
+  current = { ...current, voice: { ...(current.voice || {}), ...overlay } };
+  return true;
+}
+
 export function clearTaste() {
   current = null;
   try {
