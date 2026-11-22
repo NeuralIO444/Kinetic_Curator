@@ -179,14 +179,19 @@ ok('#2389 (Q18): her mark left the top bar for the STIMULI meter — one trace, 
 });
 
 // ── #2397 (Persona Adapters A4): the heads readout can never show her ────────────────────────────────────────────
-ok('#2397: the A4 readout, rollback and note machinery name her nowhere in code', () => {
-  for (const rel of [
-    'panels/PersonaHeadsPanel.jsx',
-    'curator/personaRollback.mjs',
-    'curator/personaRollbackLive.js',
-    'curator/personaHeadsBridge.mjs',
-  ])
+ok('#2397: the A4 readout and rollback machinery name her nowhere in code', () => {
+  for (const rel of ['panels/PersonaHeadsPanel.jsx', 'curator/personaRollback.mjs', 'curator/personaRollbackLive.js'])
     assert.ok(!/queen/i.test(code(src(rel))), `${rel} names her in code`);
+});
+
+// ── #2399 (Persona Adapters A6): her timing head loads through the bridge — the note stays blind ────────────────
+ok('#2399: the bridge carries her timing overlay, and the note machinery never touches it', () => {
+  const bridge = src('curator/personaHeadsBridge.mjs');
+  assert.ok(bridge.includes('queenTimingOverlayFromStoreText'), 'her overlay rides the boot bridge (ruling on #2399)');
+  for (const fn of ['headsFingerprint', 'changedHeadEntries', 'launchNoteLine']) {
+    const body = bridge.slice(bridge.indexOf(`function ${fn}`), bridge.indexOf(`function ${fn}`) + 1200);
+    assert.ok(!/queen/i.test(body), `${fn} must stay blind to her section — her learning is never spoken of`);
+  }
 });
 
 ok('#2397: the readout lists only the head-holding seats — she holds no entry in that list', () => {

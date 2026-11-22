@@ -595,4 +595,66 @@ check(not res["changed"] and len(T.read_history(store_c)) == 1, "chemistry: a fr
 res = T.chemistry(rows_artifact([]), taste_c, store_c, now="2026-11-21T02:00:00Z")
 check(res["changed"] and "relations" not in taste_c, "chemistry: no labeled trades -> the section is removed")
 
+# ── A6 (#2399): her timing head — counted in takes, split by take, beat-the-old ─────────────────
+def qrow(seed, ms, weight):
+    return {"takeSeed": seed,
+            "features": {"kind": "solo", "num": {"enterEarlyMs": ms, "breathePct": 0.02, "tightMs": 0}},
+            "label": 1 if weight > 0 else 0, "weight": weight}
+
+
+def queen_artifact(rows):
+    return {"format": T.QUEEN_ROWS_FORMAT, "version": T.QUEEN_ROWS_VERSION,
+            "featuresVersion": T.QUEEN_FEATURES_VERSION, "rows": rows}
+
+
+def qstump(sign=1):
+    return {"kind": "xgboost-trees", "objective": "binary:logistic", "baseScore": 0.0,
+            "fidelity": 0.0, "fitOn": 90, "features": ["num.enterEarlyMs"],
+            "trees": [{"f": 0, "op": "<", "v": 20, "gain": 1, "y": {"leaf": -2 * sign}, "n": {"leaf": 2 * sign}}]}
+
+
+# 60 labeled takes × 2 leaned turns: big sways in kept takes, small in passed ones
+qrows = []
+for i in range(60):
+    ms, w = (30, 1.0) if i % 2 == 0 else (5, -1.0)
+    qrows += [qrow(1000 + i, ms, w), qrow(1000 + i, ms, w)]
+store_q = tempfile.mkdtemp()
+taste_q = {}
+res = T.train_queen(queen_artifact(qrows), taste_q, "taste.json", store_q, now="2026-11-22T03:30:00Z",
+                    fit_fn=fit_returning(qstump()))
+e = res["entry"]
+check(res["shipped"] and e["verdict"] == "shipped" and e["version"] == 1,
+      f"queen: the first head ships: {e}")
+check(e["labeledTakes"] == 60 and taste_q["queenTiming"]["labeledTakes"] == 60,
+      "queen: the count is in TAKES, not rows (120 rows, 60 takes)")
+check(e["challengerHeldOut"] > 0.9, f"queen: the stump separates the sizes: {e['challengerHeldOut']}")
+import os as _os
+check(_os.path.exists(T.store_artifact_path(store_q, "queen", "timing", 1)),
+      "queen: v1 archived in the store under queen/timing")
+hist_q = T.read_history(store_q)
+check(hist_q and hist_q[-1]["id"] == "queen" and hist_q[-1]["labeledTurns"] == 60,
+      "queen: the history record carries the takes count as its watermark")
+# the watermark rules a same-count rerun; force + an inverted stump loses to the incumbent
+res = T.train_queen(queen_artifact(qrows), taste_q, "taste.json", store_q, now="2026-11-22T04:30:00Z",
+                    fit_fn=fit_returning(qstump()))
+check(res["entry"]["verdict"] == "skipped-watermark", "queen: no new takes, no retrain")
+res = T.train_queen(queen_artifact(qrows), taste_q, "taste.json", store_q, force=True,
+                    now="2026-11-22T05:30:00Z", fit_fn=fit_returning(qstump(sign=-1)))
+check(res["entry"]["verdict"] == "rejected" and taste_q["queenTiming"]["version"] == 1,
+      f"queen: beat-the-old is strict: {res['entry']}")
+# a malformed incumbent is no incumbent (the shape gate), never a crash
+taste_q2 = {"queenTiming": {"kind": "timing", "head": None}}
+res = T.train_queen(queen_artifact(qrows), taste_q2, "taste.json", tempfile.mkdtemp(),
+                    now="2026-11-22T06:30:00Z", fit_fn=fit_returning(qstump()))
+check(res["shipped"] and taste_q2["queenTiming"]["version"] == 1,
+      "queen: a malformed incumbent is replaced, not crashed on")
+# no corpus is a verdict, not an error; a wrong artifact raises
+res = T.train_queen(queen_artifact([]), {}, "taste.json", tempfile.mkdtemp(), fit_fn=fit_returning(qstump()))
+check(res["entry"]["verdict"] == "no-corpus" and not res["shipped"], "queen: empty rows are a quiet verdict")
+try:
+    T.train_queen({"format": "kc-persona-rows", "version": 1, "rows": []}, {}, "t", tempfile.mkdtemp())
+    check(False, "queen: a personas artifact must raise")
+except ValueError:
+    check(True, "queen: a personas artifact must raise")
+
 print("train_persona_heads_selfcheck: all blocks passed")

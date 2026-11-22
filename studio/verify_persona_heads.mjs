@@ -23,6 +23,7 @@ import {
   scoreTreeHeadWith,
   steeringHeads,
   validatePersonasSection,
+  validateQueenTimingSection,
   validateTaste,
 } from "../app/src/curator/tasteHead.js";
 import { validateRelationsSection } from "../app/src/personas/chemistry.mjs";
@@ -105,6 +106,11 @@ if (
   validateRelationsSection(rawTaste.relations) === null
 )
   fail("the relations section does not survive validateRelationsSection");
+if (
+  rawTaste.queenTiming !== undefined &&
+  validateQueenTimingSection(rawTaste.queenTiming) === null
+)
+  fail("the queenTiming section does not survive validateQueenTimingSection");
 if (!rowsArtifact || rowsArtifact.format !== "kc-persona-rows")
   fail("rows artifact is not kc-persona-rows");
 if (!report || report.format !== "kc-persona-train-report")

@@ -10,11 +10,12 @@ import { isTauriRuntime } from '../platform/desktop.mjs';
 import {
   personasOverlayFromStoreText,
   relationsOverlayFromStoreText,
+  queenTimingOverlayFromStoreText,
   headsFingerprint,
   changedHeadEntries,
   launchNoteLine,
 } from './personaHeadsBridge.mjs';
-import { getTaste, overlayPersonasSection, overlayRelationsSection } from './tasteStore.js';
+import { getTaste, overlayPersonasSection, overlayRelationsSection, overlayQueenTimingSection } from './tasteStore.js';
 
 export const ADAPTERS_DIR = 'adapters';
 export const ADAPTERS_TASTE_FILE = 'taste.json';
@@ -84,15 +85,18 @@ export async function loadPersonaHeadsAtBoot(deps = {}) {
     const readTaste = deps.getTaste || getTaste;
     const apply = deps.overlay || overlayPersonasSection;
     const applyRelations = deps.overlayRelations || overlayRelationsSection;
+    const applyQueenTiming = deps.overlayQueenTiming || overlayQueenTimingSection;
     const path = await join(await appDataDir(), ADAPTERS_DIR, ADAPTERS_TASTE_FILE);
     const storeText = await readTextFile(path);
     const overlay = personasOverlayFromStoreText(storeText);
     const relOverlay = relationsOverlayFromStoreText(storeText);
-    if (!overlay && !relOverlay) return { ok: false, reason: 'the store carries no loadable heads' };
+    const queenOverlay = queenTimingOverlayFromStoreText(storeText);
+    if (!overlay && !relOverlay && !queenOverlay) return { ok: false, reason: 'the store carries no loadable heads' };
     if (!readTaste()) return { ok: false, reason: 'no taste loaded' };
     let landed = false;
     if (overlay) landed = apply(overlay) || landed;
     if (relOverlay) landed = applyRelations(relOverlay) || landed;
+    if (queenOverlay) landed = applyQueenTiming(queenOverlay) || landed;
     if (!landed) return { ok: false, reason: 'no taste loaded' };
     if (overlay) noteHeadChanges(overlay, deps);
     return { ok: true };

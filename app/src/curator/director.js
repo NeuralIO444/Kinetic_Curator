@@ -51,8 +51,12 @@ import {
   evolveLean,
   surgeCall,
   bandTiming,
+  scaleBandTiming,
 } from './queenLean.mjs';
 import { personaTuning } from '../personas/tuning.mjs';
+import { getTaste } from './tasteStore.js'; // #2399: her timing head rides the loaded taste
+import { queenTimingInclination } from './tasteHead.js';
+import { queenTimingFeatures } from './queenTimingFeatures.mjs';
 
 // #2382: the Queen's numbers this module used to import as constants (her keeps floor, the M2 span, the
 // M8 evolve range) live in the persona tuning table now — read the table in force so a DEV edit is live.
@@ -712,7 +716,24 @@ export function paceStep({ current, target, confidence, keeps, allowance }) {
 export function bandTimingStep(turn, look = null) {
   try {
     const d = getDirector();
-    return bandTiming(turn, { nKeeps: d.pullKeepCount, beatConfident: d.beatConfident === true, look });
+    const lean = bandTiming(turn, { nKeeps: d.pullKeepCount, beatConfident: d.beatConfident === true, look });
+    if (!lean) return null;
+    // #2399 (A6) — her learned inclination scales the lean's SIZE, never its content and never
+    // past the caps (the scale only relaxes). No earned-in head on the loaded taste: the lean
+    // stands exactly as computed — no head = today's behaviour.
+    const taste = getTaste();
+    const k = taste
+      ? queenTimingInclination(
+          taste,
+          queenTimingFeatures({
+            kind: turn.kind,
+            enterEarlyMs: lean.enterEarlyMs,
+            breathePct: lean.breathePct,
+            tightMs: lean.tightMs,
+          }),
+        )
+      : null;
+    return k === null ? lean : scaleBandTiming(lean, k);
   } catch {
     return null;
   }

@@ -9,7 +9,7 @@
 // back alone, the rest still load (validatePersonasSection is all-or-nothing over a section, so entries are
 // validated one at a time here); (3) boot-only — the caller reads once at app start, never again, so heads
 // written mid-session take effect at the next launch, never between takes.
-import { validatePersonasSection, PERSONA_HEAD_IDS } from './tasteHead.js';
+import { validatePersonasSection, validateQueenTimingSection, PERSONA_HEAD_IDS } from './tasteHead.js';
 import { relationsOverlay } from '../personas/chemistry.mjs';
 
 /**
@@ -89,6 +89,23 @@ export function relationsOverlayFromStoreText(text) {
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   return relationsOverlay(raw.relations);
+}
+
+/**
+ * #2399 (Adapters A6) — the same store file's queenTiming entry as a boot overlay: a single
+ * entry, validated whole by validateQueenTimingSection (a malformed entry lands nothing).
+ * Null when the file carries nothing usable. The entry never joins the personas overlay, the
+ * fingerprint, or the launch note — her learning is not spoken of.
+ */
+export function queenTimingOverlayFromStoreText(text) {
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  return validateQueenTimingSection(raw.queenTiming);
 }
 
 export function personasOverlayFromStoreText(text) {
