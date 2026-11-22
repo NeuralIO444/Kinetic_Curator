@@ -20,6 +20,7 @@
       "fs": {
         "all": false,
         "createDir": true,
+        "readFile": true,
         "writeFile": true,
         "scope": ["$APPDATA", "$APPDATA/**"]
       },

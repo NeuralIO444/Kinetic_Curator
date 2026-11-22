@@ -81,6 +81,7 @@ import { ASSETS_CONSTRUCTS } from './data/assets/index.js'; // #2329: the house 
 import { startTrio, getTrioView } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
 import { startBand, bandOn } from './personas/bandLive.js'; // #2387: the band plays on the phrase clock (opt-in, off by default)
 import { getTaste } from './curator/tasteStore.js'; // #2394: the loaded taste carries the personas heads
+import { loadPersonaHeadsAtBoot } from './curator/personaHeadsLive.js'; // #2439: the boot bridge to the trained heads
 import { steeringHeads } from './curator/tasteHead.js'; // #2394: only earned-in heads steer the band
 import { replayRhythmFrame, endRhythmReplay } from './personas/rhythmRecord.mjs'; // #2389: a take replays the rhythm section's timing and looks
 import { createRhythmEyes } from './personas/rhythmVisionLive.js'; // #2389: the rhythm section's eyes (local vision model; at most once a phrase)
@@ -131,6 +132,13 @@ function AppInner() {
   useEffect(() => {
     loisActivity.start({ store: useStore });
     return () => loisActivity.stop();
+  }, []);
+
+  // #2439 — Persona Adapters boot bridge: load the nightly trainer's heads once, at start, onto the
+  // loaded taste (desktop only). Silent by ruling: a missing or unreadable store leaves no trace and
+  // the band plays on rules exactly as before; heads written mid-session land at the next launch.
+  useEffect(() => {
+    loadPersonaHeadsAtBoot();
   }, []);
 
   // #1139 — whisper triggers (deniable transition lines). Budgets live in

@@ -2,6 +2,7 @@
 // project files. A module holder (not the zustand store) so curate.js can read
 // it without an import cycle; globalSlice mirrors a summary for the UI.
 import { validateTaste, clearRetrainNudge } from './tasteHead.js';
+import { mergePersonasSection } from './personaHeadsBridge.mjs';
 import { noteSessionOnly } from '../state/sessionOnly.mjs';
 
 export const TASTE_KEY = 'kc:taste:v1';
@@ -36,6 +37,18 @@ export function importTaste(raw) {
   }
   clearRetrainNudge(); // #925 — a fresh import re-baselines the retrain nudge
   return { ok: true, taste: r.taste };
+}
+
+/**
+ * #2439 — the boot bridge's landing: overlay trained persona heads onto the loaded taste, IN MEMORY ONLY.
+ * The stored taste is never rewritten (the adapters store stays the trainer's file; a later import or clear
+ * behaves exactly as before). With no taste loaded there is nothing to overlay onto — the heads wait for a
+ * taste rather than conjuring one. Returns whether the overlay landed.
+ */
+export function overlayPersonasSection(overlay) {
+  if (!overlay || !current) return false;
+  current = { ...current, personas: mergePersonasSection(current.personas, overlay) };
+  return true;
 }
 
 export function clearTaste() {
