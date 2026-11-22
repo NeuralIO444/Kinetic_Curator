@@ -148,6 +148,11 @@ await ok('wired: App boots the bridge once; the fs allowlist can read inside $AP
   const fs = conf.tauri.allowlist.fs;
   assert.equal(fs.readFile, true, 'readFile is enabled for the bridge');
   assert.deepEqual(fs.scope, ['$APPDATA', '$APPDATA/**'], 'and the scope stays the app data dir');
+  const cargo = readFileSync(new URL('../../../src-tauri/Cargo.toml', import.meta.url), 'utf8');
+  assert.ok(
+    cargo.includes('"fs-read-file"'),
+    'the tauri feature matches the allowlist (cargo check enforces the pair)',
+  );
 });
 
 console.log(
