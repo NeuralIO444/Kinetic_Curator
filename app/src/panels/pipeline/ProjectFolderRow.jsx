@@ -4,7 +4,11 @@
 // next number; CLOSE goes back to the browser session. When the folder goes away the row says so plainly and offers
 // RECONNECT (it came back) and FIND IT (it moved) — saving waits, the work is held, nothing is written anywhere else.
 // The browser build shows why it is desktop-only instead of a dead button.
-import { useState } from 'react';
+//
+// #1711 adds the management surface: RECENT lists the projects this machine has opened (most recent first, capped);
+// a folder that is not reachable stays listed, marked, with a remove — nothing is dropped silently, and opening one
+// answers plainly. RENAME renames the open project: folder, manifest and session files take the new name together.
+import { useEffect, useState } from 'react';
 import { projectFolderLive, useProjectFolderStatus } from '../../hooks/useProjectFolder.js';
 import { projectStatusLine } from '../../project/projectFolderLive.mjs';
 import { validateProjectName } from '../../state/projectNaming.mjs';
@@ -14,11 +18,48 @@ export function ProjectFolderRow() {
   const st = useProjectFolderStatus();
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [recents, setRecents] = useState([]);
+  const [reach, setReach] = useState({});
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState(null);
   const unavailable = live.unavailable();
   const open = st.state !== 'closed';
   const check = name ? validateProjectName(name) : null;
+  const renameCheck = newName ? validateProjectName(newName) : null;
+
+  const refreshRecents = async () => {
+    const list = live.recents();
+    const states = {};
+    await Promise.all(
+      list.map(async (e) => {
+        states[e.root] = await live.recentReachable(e.root);
+      }),
+    );
+    setRecents(list);
+    setReach(states);
+  };
+
+  useEffect(() => {
+    if (open || unavailable) return;
+    let live1 = true;
+    (async () => {
+      const list = live.recents();
+      const states = {};
+      await Promise.all(
+        list.map(async (e) => {
+          states[e.root] = await live.recentReachable(e.root);
+        }),
+      );
+      if (!live1) return;
+      setRecents(list);
+      setReach(states);
+    })();
+    return () => {
+      live1 = false;
+    };
+  }, [open, unavailable, live]);
 
   const run = async (fn) => {
     setBusy(true);
@@ -40,6 +81,24 @@ export function ProjectFolderRow() {
       setNaming(false);
       setName('');
     }
+  };
+  const doRename = async () => {
+    const r = await run(() => live.rename(newName));
+    if (r && r.ok) {
+      setRenaming(false);
+      setNewName('');
+    }
+  };
+  const openRecent = async (entry) => {
+    if (reach[entry.root] === false) {
+      setNote('that folder is not reachable');
+      return;
+    }
+    await run(() => live.open(entry.root));
+  };
+  const forget = async (entry) => {
+    live.forgetRecent(entry.root);
+    refreshRecents();
   };
 
   return (
@@ -68,6 +127,15 @@ export function ProjectFolderRow() {
           <>
             <button type="button" className="chip-btn act" disabled={busy} onClick={() => run(() => live.newSession())}>
               NEW SESSION
+            </button>
+            <button
+              type="button"
+              className="chip-btn"
+              disabled={busy}
+              aria-expanded={renaming}
+              onClick={() => setRenaming((v) => !v)}
+            >
+              RENAME
             </button>
             <button type="button" className="chip-btn" disabled={busy} onClick={() => run(() => live.open())}>
               OPEN
@@ -110,6 +178,56 @@ export function ProjectFolderRow() {
           </button>
         </div>
       )}
+      {!unavailable && renaming && open && (
+        <div className="pipeline-row">
+          <input
+            type="text"
+            aria-label="New project name"
+            placeholder="New name"
+            value={newName}
+            maxLength={64}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && renameCheck?.ok && !busy && doRename()}
+            style={{ flex: 1, fontSize: 11 }}
+          />
+          <button type="button" className="chip-btn act" disabled={busy || !renameCheck?.ok} onClick={doRename}>
+            SAVE
+          </button>
+        </div>
+      )}
+      {!unavailable && !open && recents.length > 0 && (
+        <>
+          <div className="pipeline-row">
+            <span className="lbl" style={{ flex: 1, fontSize: 10, opacity: 0.7 }}>
+              RECENT
+            </span>
+          </div>
+          {recents.map((e) => (
+            <div className="pipeline-row" key={e.root}>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={busy}
+                onClick={() => openRecent(e)}
+                style={{ flex: 1, textAlign: 'left', opacity: reach[e.root] === false ? 0.55 : 1 }}
+                title={e.root}
+              >
+                {e.name}
+                {reach[e.root] === false ? ' — not reachable' : ''}
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={busy}
+                aria-label={`Remove ${e.name} from recents`}
+                onClick={() => forget(e)}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </>
+      )}
       <div
         className="pipeline-hint"
         role={st.state === 'paused' || st.state === 'unsaved' ? 'status' : undefined}
@@ -119,7 +237,9 @@ export function ProjectFolderRow() {
           ? 'One folder per project, sessions saved inside it.'
           : naming && check && !check.ok
             ? check.reason
-            : note || projectStatusLine(st)}
+            : renaming && renameCheck && !renameCheck.ok
+              ? renameCheck.reason
+              : note || projectStatusLine(st)}
       </div>
     </div>
   );
