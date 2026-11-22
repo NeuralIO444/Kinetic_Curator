@@ -167,26 +167,43 @@ test('KIN still builds and sheds heat: rapid taps widen it, and it cools back', 
 test('cold open: KINETIC and CURATOR show their full names, then cool down to KIN and CUR; L and T stay L and T', async ({
   page,
 }) => {
+  // The arrival latch rides in the page from document start (#2428): every 25 ms it checks whether a verb's
+  // letters have all arrived while its cold open stands, and if so keeps the width it finds. A latch, not a
+  // poll, because the arrival state is transient and the runner is starved: the boot's long tasks make a single
+  // Node-side evaluate round-trip take 5 s or more, so a fixed-budget poll (4000 ms, as this test used) can
+  // spend its whole budget in transit and time out while the letters stand at full opacity in the page — and a
+  // sampler that only starts watching after boot can still miss the window entirely, arriving after the
+  // cold-open timer has fired and the first letter has started to let go. The latch's ticks are due from the
+  // first milliseconds, ahead of the cold-open timer in the page's own queue, so it sees the arrival on the
+  // page's clock however the runner is loaded.
+  await page.addInitScript(() => {
+    window.__kcColdOpen = {};
+    setInterval(() => {
+      for (const [key, sel] of [
+        ['kin', '.kinetic-btn'],
+        ['cur', '.randomize-btn'],
+      ]) {
+        if (window.__kcColdOpen[key]) continue;
+        const btnEl = document.querySelector(`.kc-topbar-curator ${sel}`);
+        if (!btnEl || btnEl.getAttribute('data-open') !== 'true') continue;
+        const letters = btnEl.querySelectorAll('.xl-ch');
+        if (letters.length > 0 && [...letters].every((e) => parseFloat(getComputedStyle(e).opacity) > 0.99))
+          window.__kcColdOpen[key] = Math.round(btnEl.getBoundingClientRect().width);
+      }
+    }, 25);
+  });
   await boot(page, { settle: false, hold: 4 }); // 4× the real 2.2 s, so a slow runner cannot miss it
   const kin = group(page).locator('.kinetic-btn');
   const cur = group(page).locator('.randomize-btn');
   await expect(kin).toHaveAttribute('data-open', 'true');
   await expect(cur).toHaveAttribute('data-open', 'true');
-  // measure the OPEN width only once every letter has arrived (a slow runner starts the opening late, so a width
-  // read right after data-open can still be the resting one)
-  const arrived = (loc) =>
-    expect
-      .poll(
-        () =>
-          loc
-            .locator('.xl-ch')
-            .evaluateAll((els) => els.length > 0 && els.every((e) => parseFloat(getComputedStyle(e).opacity) > 0.99)),
-        { timeout: 4000 },
-      )
-      .toBe(true);
-  await arrived(kin);
-  await arrived(cur);
-  const opened = { kin: await width(kin), cur: await width(cur) };
+  // the OPEN widths, latched in the page at the moment every letter had arrived (a width read from the Node
+  // side right after data-open can still be the resting one, and one read after a starved round-trip can
+  // already be the cooled one)
+  await page.waitForFunction(() => window.__kcColdOpen?.kin && window.__kcColdOpen?.cur, null, {
+    timeout: 15_000,
+  });
+  const opened = await page.evaluate(() => window.__kcColdOpen);
   expect(await text(btn(page, /^Looks/)), 'L is not part of the cold open').toBe('l');
   expect(await text(btn(page, /^Taste/))).toBe('t');
   await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 15000 });
