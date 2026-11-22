@@ -63,6 +63,7 @@ fn main() {
             project::project_read,
             project::project_write,
             project::project_make_subfolder,
+            project::project_rename,
             project::project_rename_folder,
         ])
         .run(tauri::generate_context!())

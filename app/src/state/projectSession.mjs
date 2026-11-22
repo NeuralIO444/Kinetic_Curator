@@ -23,6 +23,8 @@ export const PAUSED_LINE =
   'The project folder is gone — saving is paused and your work is held here. Reconnect the folder to save.';
 
 const baseOf = (p) => p.slice(p.lastIndexOf('/') + 1);
+const parentOf = (p) => p.slice(0, p.lastIndexOf('/')) || '/';
+const foldKey = (s) => s.normalize('NFC').toLowerCase();
 
 /**
  * @param fs          a projectFs backend
@@ -224,6 +226,66 @@ export function createProjectSession({ fs, now, mintId, appVersion = null }) {
       pending = null;
       set('saved');
       return { ok: true, session: n };
+    },
+
+    /**
+     * Rename the open project (#1711): one name, one truth — the manifest, every session file and the folder itself
+     * all take the new name. Steps run inside-out (manifest, session files, folder last): each step before the last
+     * is individually consistent — open() reads the folder name first and scans session files under the manifest's
+     * name too — so a failure midway leaves a project that still opens, never a scrambled one. The collision is
+     * refused up front, like create. While paused nothing is renamed (the folder is gone; pause-and-protect holds).
+     */
+    async rename(newName) {
+      if (!cur) return { ok: false, reason: 'no project is open' };
+      if (state === 'paused') return { ok: false, paused: true, reason: PAUSED_LINE };
+      const v = validateProjectName(newName);
+      if (!v.ok) return { ok: false, reason: v.reason };
+      if (foldKey(v.name) === foldKey(cur.name)) return { ok: false, reason: 'that is already its name' };
+      const listing = await fs.listNames(parentOf(cur.root));
+      if (!listing.ok) return { ok: false, unreachable: listing.unreachable, reason: listing.reason };
+      if (
+        nameCollides(
+          v.name,
+          listing.names.map((e) => e.name),
+        )
+      )
+        return { ok: false, exists: true, reason: `A project named "${v.name}" is already there. Pick another name.` };
+      const ls = await fs.list(cur.root, SESSIONS_DIR);
+      if (!ls.ok) {
+        if (ls.unreachable) set('paused', PAUSED_LINE);
+        return { ok: false, paused: !!ls.unreachable, reason: ls.reason };
+      }
+      const files = ls.names.filter((e) => !e.dir).map((e) => e.name);
+      const plan = [];
+      for (const nm of [...new Set([cur.name, cur.also])])
+        for (const f of files) {
+          const n = parseSessionNumber(nm, f);
+          if (n !== null) plan.push({ from: f, to: sessionFileName(v.name, n) });
+        }
+      if (plan.some((p) => files.includes(p.to)))
+        return { ok: false, reason: 'a session file for the new name is already in the folder' };
+      const mf = await fs.read(cur.root, MANIFEST_FILE);
+      const m = mf.ok ? readManifest(mf.text) : { ok: false };
+      if (m.ok) {
+        const w = await fs.write(
+          cur.root,
+          MANIFEST_FILE,
+          writeManifest({ projectId: m.manifest.projectId, name: v.name, createdAt: m.manifest.createdAt || now() }),
+        );
+        if (!w.ok) {
+          if (w.unreachable) set('paused', PAUSED_LINE);
+          return { ok: false, paused: !!w.unreachable, reason: w.reason };
+        }
+      }
+      for (const p of plan) {
+        const r = await fs.rename(cur.root, `${SESSIONS_DIR}/${p.from}`, `${SESSIONS_DIR}/${p.to}`);
+        if (!r.ok) return { ok: false, partial: true, reason: r.reason };
+      }
+      const moved = await fs.renameFolder(cur.root, folderNameFor(v.name));
+      if (!moved.ok) return { ok: false, exists: moved.exists, partial: true, reason: moved.reason };
+      cur = { ...cur, root: moved.path, name: v.name, also: v.name };
+      set(state, reason);
+      return { ok: true, root: cur.root, name: cur.name };
     },
 
     /** Close. Work that is only held (unsaved or paused) keeps the project open unless `discard` is said out loud. */

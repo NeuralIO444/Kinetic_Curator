@@ -15,8 +15,10 @@
 // instrument state, like the loot folder's path, never part of a project.
 import { createProjectSession } from '../state/projectSession.mjs';
 import { serializeProject } from '../state/projectDocument.js';
+import { parseRecents, touchRecents, removeRecent, renameRecent } from './projectRecents.mjs';
 
 export const LAST_PROJECT_KEY = 'kc:project-folder:last';
+export const RECENTS_KEY = 'kc:project-folder:recents';
 
 /**
  * @param fs        a projectFs backend (projectTauri on desktop; memory in the selfcheck)
@@ -35,6 +37,23 @@ export function createProjectFolderLive({ fs, getState, now, mintId, storage = n
       /* the folder still opens; only the next launch will not reopen it */
     }
   };
+  // The recents list (#1711): instrument state in the same storage, same failure posture — a storage hiccup never
+  // breaks opening a project; the list just does not learn.
+  const loadRecents = () => {
+    try {
+      return parseRecents(storage?.getItem(RECENTS_KEY));
+    } catch {
+      return [];
+    }
+  };
+  const saveRecents = (list) => {
+    try {
+      storage?.setItem(RECENTS_KEY, JSON.stringify(list));
+    } catch {
+      /* the project still opened; only the list did not learn */
+    }
+  };
+  const noteOpened = (name, root) => saveRecents(touchRecents(loadRecents(), { name, root }, now()));
   const docNow = () => serializeProject(getState());
   // What the folder holds now, as text: an autosave of an unchanged scene writes nothing. That is what keeps OPEN
   // write-free — applyProject wakes the autosave, and the scene it would write is the one just read.
@@ -75,6 +94,7 @@ export function createProjectFolderLive({ fs, getState, now, mintId, storage = n
           onDisk = JSON.stringify(doc);
         }
         remember(r.root);
+        noteOpened(r.name, r.root);
       }
       return r;
     },
@@ -97,6 +117,32 @@ export function createProjectFolderLive({ fs, getState, now, mintId, storage = n
       getState().applyProject(r.doc);
       onDisk = JSON.stringify(docNow());
       remember(target);
+      noteOpened(session.status().name, target);
+      return r;
+    },
+
+    /** The recent-projects list, most-recent-first (#1711). Unreachable folders stay listed; the row marks them. */
+    recents: () => loadRecents(),
+
+    /** Is this folder there right now? (The row checks each recent; the folder itself is never touched.) */
+    async recentReachable(root) {
+      const r = await fs.reachable(root);
+      return !!(r && r.ok && r.reachable);
+    },
+
+    /** Remove a recents entry. The folder on disk is untouched. */
+    forgetRecent(root) {
+      saveRecents(removeRecent(loadRecents(), root));
+    },
+
+    /** Rename the open project (#1711): folder, manifest and session files take the new name together. */
+    async rename(name) {
+      const before = session.status().root;
+      const r = await session.rename(name);
+      if (r.ok) {
+        remember(r.root);
+        saveRecents(renameRecent(loadRecents(), before, { name: r.name, root: r.root }));
+      }
       return r;
     },
 

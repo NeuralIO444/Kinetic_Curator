@@ -63,6 +63,10 @@ function nativeOver(mem, calls) {
       const r = await mem.makeSubfolder(root, rel);
       return r.ok ? null : fail(r);
     },
+    project_rename: async ({ root, from, to }) => {
+      const r = await mem.rename(root, from, to);
+      return r.ok ? null : fail(r);
+    },
     project_rename_folder: async ({ root, newName }) => {
       const r = await mem.renameFolder(root, newName);
       return r.ok ? r.path : fail(r);
@@ -75,7 +79,7 @@ function nativeOver(mem, calls) {
 }
 
 await ok('every command it calls exists in project.rs, is registered, and gets exactly its arguments', async () => {
-  assert.equal(Object.keys(NATIVE).length, 8, `the eight native commands (${Object.keys(NATIVE)})`);
+  assert.equal(Object.keys(NATIVE).length, 9, `the nine native commands (${Object.keys(NATIVE)})`);
   for (const cmd of Object.keys(NATIVE)) assert.ok(main.includes(`project::${cmd},`), `${cmd} registered in main.rs`);
   assert.ok(main.includes('mod project;'));
   const calls = [];
@@ -88,6 +92,7 @@ await ok('every command it calls exists in project.rs, is registered, and gets e
   await fs.write(path, 'sessions/X_01.kcproject', 'a', { create: true });
   await fs.read(path, 'sessions/X_01.kcproject');
   await fs.list(path, 'sessions');
+  await fs.rename(path, 'sessions/X_01.kcproject', 'sessions/X_02.kcproject');
   await fs.renameFolder(path, 'KC1_Loot_Y');
   assert.deepEqual([...new Set(calls.map((c) => c[0]))].sort(), Object.keys(NATIVE).sort(), 'every command exercised');
   for (const [cmd, args] of calls)

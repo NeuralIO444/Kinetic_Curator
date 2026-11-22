@@ -13,6 +13,7 @@
 //   read(root, rel)                       → { ok, text }
 //   write(root, rel, text, { create })    → { ok }   atomic (whole file or nothing); `create` refuses an existing file
 //   makeSubfolder(root, relDir)           → { ok }   idempotent inside the project
+//   rename(root, relFrom, relTo)          → { ok }   renames a file inside the project (#1711); refuses an existing name
 //   renameFolder(root, newName)           → { ok, path }   renames the project folder in its parent; refuses an existing name
 // Every failure that means "the folder is not there" carries `unreachable: true` — that is the signal pause-and-protect
 // (Matt, #1567) acts on. `rel` is always inside the project: no '..', no leading '/', no empty segment.
@@ -147,6 +148,20 @@ export function createMemoryProjectFs({ folders = ['/'], files = {} } = {}) {
         writes.push({ op: 'mkdir', path: r.path });
         dirs.add(r.path);
       }
+      return { ok: true };
+    },
+    async rename(root, relFrom, relTo) {
+      const a = inRoot(root, relFrom);
+      if (a.err) return a.err;
+      const b = inRoot(root, relTo);
+      if (b.err) return b.err;
+      if (!data.has(a.path)) return { ok: false, missing: true, reason: 'no such file' };
+      if (data.has(b.path) || dirs.has(b.path))
+        return { ok: false, exists: true, reason: `${baseOf(relTo)} already exists` };
+      if (!isDir(parentOf(b.path))) return { ok: false, missing: true, reason: 'no such folder' };
+      writes.push({ op: 'rename-file', path: a.path, to: b.path });
+      data.set(b.path, data.get(a.path));
+      data.delete(a.path);
       return { ok: true };
     },
     async renameFolder(root, newName) {

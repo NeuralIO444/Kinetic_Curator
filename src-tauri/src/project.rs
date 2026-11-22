@@ -9,6 +9,8 @@
 //!   project_write(root, rel, text, create)  atomic: temp sibling, fsync, then rename (or, with `create`, a link that
 //!                                           fails if the target exists — never over another file)
 //!   project_make_subfolder(root, rel)       a folder inside the project (idempotent)
+//!   project_rename(root, from, to)          rename a file inside the project (#1711) — refuses an existing name,
+//!                                           never moves a folder, never leaves the project
 //!   project_rename_folder(root, new_name)   rename the project folder within its parent — refuses an existing name
 //!
 //! Every `rel` is resolved inside the canonical root and refused if it leaves it (`..`, an absolute path, a symlink that
@@ -221,6 +223,25 @@ pub fn make_subfolder(root: &str, rel: &str) -> Result<(), String> {
     }
 }
 
+/// Rename one file inside the project (#1711: session files follow a project rename). Both paths resolve inside the
+/// canonical root; the source must be a real file (never a folder, never a link), the target must not exist.
+pub fn rename(root: &str, from: &str, to: &str) -> Result<(), String> {
+    let root = folder(root)?;
+    let (from_parent, from_name) = inside(&root, from)?;
+    let (to_parent, to_name) = inside(&root, to)?;
+    let src = from_parent.join(&from_name);
+    let dst = to_parent.join(&to_name);
+    let m = fs::symlink_metadata(&src).map_err(|_| "no such file".to_string())?;
+    if !m.file_type().is_file() {
+        return Err("not a file".into());
+    }
+    if fs::symlink_metadata(&dst).is_ok() {
+        return Err(format!("{to_name} already exists"));
+    }
+    fs::rename(&src, &dst).map_err(|e| format!("could not rename: {e}"))?;
+    Ok(())
+}
+
 pub fn rename_folder(root: &str, new_name: &str) -> Result<String, String> {
     let root = folder(root)?;
     plain_name(new_name)?;
@@ -277,6 +298,10 @@ pub async fn project_write(
 #[tauri::command]
 pub async fn project_make_subfolder(root: String, rel: String) -> Result<(), String> {
     blocking!("make folder", make_subfolder(&root, &rel))
+}
+#[tauri::command]
+pub async fn project_rename(root: String, from: String, to: String) -> Result<(), String> {
+    blocking!("rename", rename(&root, &from, &to))
 }
 #[tauri::command]
 pub async fn project_rename_folder(root: String, new_name: String) -> Result<String, String> {
@@ -416,6 +441,25 @@ mod tests {
             !Path::new(&root).exists(),
             "nothing was recreated at the old place"
         );
+    }
+
+    #[test]
+    fn rename_a_file_inside_the_project() {
+        let t = Tmp::new("renf");
+        let root = make_folder(&t.s(), "KC1_Loot_P").unwrap();
+        make_subfolder(&root, "sessions").unwrap();
+        write(&root, "sessions/P_01.kcproject", "one\n", true).unwrap();
+        rename(&root, "sessions/P_01.kcproject", "sessions/Q_01.kcproject").unwrap();
+        assert_eq!(read(&root, "sessions/Q_01.kcproject").unwrap(), "one\n");
+        assert!(read(&root, "sessions/P_01.kcproject").is_err());
+        // an existing target is refused, a folder is not a file, nothing leaves the root
+        write(&root, "sessions/Q_02.kcproject", "two\n", true).unwrap();
+        assert!(rename(&root, "sessions/Q_01.kcproject", "sessions/Q_02.kcproject")
+            .unwrap_err()
+            .contains("already exists"));
+        assert!(rename(&root, "sessions", "sessions2").is_err());
+        assert!(rename(&root, "sessions/Q_01.kcproject", "../outside").is_err());
+        assert!(rename(&root, "sessions/nope", "sessions/Q_03.kcproject").is_err());
     }
 
     #[test]

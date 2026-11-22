@@ -111,6 +111,11 @@ export function createTauriProjectFs({ invoke = null, pick = null, isDesktop = i
       const r = await call('project_make_subfolder', { root, rel });
       return r.ok ? { ok: true } : r;
     },
+    async rename(root, from, to) {
+      if (!validPath(root) || !relOk(from) || !relOk(to)) return bad;
+      const r = await call('project_rename', { root, from, to });
+      return r.ok ? { ok: true } : r;
+    },
     async renameFolder(root, newName) {
       if (!validPath(root) || typeof newName !== 'string' || !newName) return bad;
       const r = await call('project_rename_folder', { root, newName });
