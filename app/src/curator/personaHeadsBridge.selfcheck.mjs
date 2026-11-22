@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   personasOverlayFromStoreText,
+  relationsOverlayFromStoreText,
   mergePersonasSection,
   headsFingerprint,
   changedHeadEntries,
@@ -227,6 +228,34 @@ await ok('the note is written on a change, stands on a quiet boot, and is replac
   assert.equal((await loadPersonaHeadsAtBoot(deps(storeV2))).ok, true);
   assert.equal(getLaunchNote({ storage }), 'COVER learned from 480 turns');
   assert.equal(storage._map.get(LAUNCH_NOTE_KEY), 'COVER learned from 480 turns');
+});
+
+// ── #2398 (A5): the relations overlay rides the same bridge ──
+
+await ok('the relations overlay: per-entry cleaning, and a relations-only store still loads', async () => {
+  const text = JSON.stringify({
+    kind: 'kc-taste',
+    version: 1,
+    relations: { 'davis->lois': 0.25, 'bogus->pair': 1, 'lois->davis': 99 },
+  });
+  assert.deepEqual(relationsOverlayFromStoreText(text), { 'davis->lois': 0.25 });
+  assert.equal(relationsOverlayFromStoreText('{"personas":{}}'), null);
+  let appliedRelations = null;
+  const taste = { kind: 'kc-taste', version: 1 };
+  const r = await loadPersonaHeadsAtBoot({
+    isDesktop: () => true,
+    appDataDir: async () => '/data',
+    join: async (...p) => p.join('/'),
+    readTextFile: async () => text,
+    getTaste: () => taste,
+    overlay: () => false,
+    overlayRelations: (o) => {
+      appliedRelations = o;
+      return true;
+    },
+  });
+  assert.equal(r.ok, true, 'relations alone are a loadable store');
+  assert.deepEqual(appliedRelations, { 'davis->lois': 0.25 });
 });
 
 console.log(

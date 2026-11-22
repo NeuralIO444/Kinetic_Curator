@@ -556,4 +556,43 @@ try:
 except ImportError:
     print("  [xgb] xgboost not installed here — real-fit section skipped (CI shape)")
 
+# ── A5 (#2398): chemistry — fresh recompute, normalization, shrinkage, the section fold ─────────
+def trade_row(pid, caller, weight):
+    return {"id": pid, "kind": "trade", "takeSeed": 1,
+            "features": {"caller": caller, "num": {}}, "label": 1 if weight > 0 else 0, "weight": weight}
+
+
+# 50 labeled trades, all good (+1): full strength, offset +1 * (50/50) = +1
+offs = T.chemistry_offsets([trade_row("davis", "lois", 1.0) for _ in range(50)])
+check(offs == {"davis->lois": 1.0}, f"chemistry: full evidence, all good -> +1: {offs}")
+# 25 trades all good: shrinkage halves it
+offs = T.chemistry_offsets([trade_row("davis", "lois", 1.0) for _ in range(25)])
+check(offs == {"davis->lois": 0.5}, f"chemistry: shrinkage scales with evidence: {offs}")
+# strong-bad (-2) normalizes by its side: mean -2 -> raw -1; 50 trades -> -1
+offs = T.chemistry_offsets([trade_row("lois", "davis", -2.0) for _ in range(50)])
+check(offs == {"lois->davis": -1.0}, f"chemistry: the negative side normalizes by 2: {offs}")
+# mixed verdicts average; solos, weightless rows, self-pairs and strangers never count
+offs = T.chemistry_offsets([
+    trade_row("davis", "lois", 1.0), trade_row("davis", "lois", -1.0),
+    {"id": "davis", "kind": "solo", "takeSeed": 1, "features": {"num": {}}, "label": 1, "weight": 1.0},
+    trade_row("davis", "lois", 0),
+    trade_row("davis", "davis", 1.0),
+    trade_row("davis", "nobody", 1.0),
+])
+check(offs == {"davis->lois": 0.0}, f"chemistry: only labeled directed trades count: {offs}")
+
+# the fold: a changed section writes + logs history once; an identical recompute is silent;
+# an empty recompute removes the section (back to no-offsets)
+store_c = tempfile.mkdtemp()
+taste_c = {}
+res = T.chemistry(rows_artifact([trade_row("davis", "lois", 1.0) for _ in range(50)]), taste_c, store_c, now="2026-11-21T00:00:00Z")
+check(res["changed"] and taste_c["relations"] == {"davis->lois": 1.0}, "chemistry: the section lands in the taste")
+hist = T.read_history(store_c)
+check(len(hist) == 1 and hist[0]["action"] == "chemistry" and hist[0]["pairs"] == 1,
+      f"chemistry: one history record for the change: {hist}")
+res = T.chemistry(rows_artifact([trade_row("davis", "lois", 1.0) for _ in range(50)]), taste_c, store_c, now="2026-11-21T01:00:00Z")
+check(not res["changed"] and len(T.read_history(store_c)) == 1, "chemistry: a fresh recompute of the same rows changes nothing")
+res = T.chemistry(rows_artifact([]), taste_c, store_c, now="2026-11-21T02:00:00Z")
+check(res["changed"] and "relations" not in taste_c, "chemistry: no labeled trades -> the section is removed")
+
 print("train_persona_heads_selfcheck: all blocks passed")

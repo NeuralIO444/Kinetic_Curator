@@ -10,6 +10,7 @@
 // validated one at a time here); (3) boot-only — the caller reads once at app start, never again, so heads
 // written mid-session take effect at the next launch, never between takes.
 import { validatePersonasSection, PERSONA_HEAD_IDS } from './tasteHead.js';
+import { relationsOverlay } from '../personas/chemistry.mjs';
 
 /**
  * How a head is named on a surface: by callsign, always (the A4 launch note is callsigns only).
@@ -74,6 +75,22 @@ export function launchNoteLine(changed) {
  * carries nothing loadable. Entries are validated one at a time through the A1 validator, so a single
  * damaged entry falls back alone (ruling 2) instead of neutralizing the whole section.
  */
+/**
+ * #2398 (Adapters A5) — the same store file's relations section as a boot overlay: the learned
+ * chemistry offsets, cleaned per entry by chemistry.mjs's lenient read (a bad pair or value
+ * falls back alone, as a bad head entry does). Null when the file carries nothing usable.
+ */
+export function relationsOverlayFromStoreText(text) {
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  return relationsOverlay(raw.relations);
+}
+
 export function personasOverlayFromStoreText(text) {
   let raw;
   try {

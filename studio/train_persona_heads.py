@@ -5,6 +5,8 @@
         [--store <dir>] [--force] [--now <iso8601>] [--report <report.json>]
     python3 studio/train_persona_heads.py rollback --id <persona> --kind <solo|trade|cut>
         --taste <taste.json> [--store <dir>] [--now <iso8601>]
+    python3 studio/train_persona_heads.py chemistry --rows <rows.json> --taste <taste.json>
+        [--store <dir>] [--now <iso8601>]
 
 personaRows.mjs turns A0's labeled turns into encoded rows; this trainer fits one gradient-boosted
 tree head per persona per decision kind and ships it into taste.json's `personas` section (A1's
@@ -510,6 +512,59 @@ def _log_train(store, now, entry):
     )
 
 
+# ── chemistry (A5, #2398) ─────────────────────────────────────────────────────────────────────────
+#: The tuning table's seats (personas/tuning.mjs TUNING_SEATS) — pairs are directed, "a->b".
+SEATS = ("lois", "davis", "queen", "governor", "carson", "greiman", "ashworth")
+#: Labeled trades for one pair at which its offset reaches full strength (the shrinkage
+#: denominator — strength scales with evidence below it; no floor, no cliff).
+CHEMISTRY_FULL_AT = 50
+
+
+def chemistry_offsets(rows):
+    """Learned relation offsets from the labeled trade rows, recomputed fresh from ALL of them
+    (A5 ruling 1 — no accumulator; a corrected label, latest verdict per A0, fixes the chemistry).
+    Per directed pair (answerer -> caller): the mean label weight, normalized from the A0 ladder's
+    range ([-2, +1]) onto the bias domain ([-1, +1]) by side, shrunk by the pair's evidence
+    (ruling 2), clamped to [-1, 1]. Pairs with no labeled trades are absent — no offset, no shift."""
+    sums, counts = {}, {}
+    for row in rows or []:
+        if not isinstance(row, dict) or row.get("kind") != "trade":
+            continue
+        w = row.get("weight")
+        if not isinstance(w, (int, float)) or isinstance(w, bool) or w == 0:
+            continue
+        answerer = row.get("id")
+        caller = (row.get("features") or {}).get("caller")
+        if answerer not in SEATS or caller not in SEATS or answerer == caller:
+            continue
+        key = f"{answerer}->{caller}"
+        sums[key] = sums.get(key, 0.0) + float(w)
+        counts[key] = counts.get(key, 0) + 1
+    out = {}
+    for key, n in counts.items():
+        mean = sums[key] / n
+        raw = mean if mean >= 0 else mean / 2.0
+        shrink = min(1.0, n / CHEMISTRY_FULL_AT)
+        out[key] = max(-1.0, min(1.0, raw * shrink))
+    return out
+
+
+def chemistry(rows_artifact, taste, store, now=None):
+    """Fold the recomputed offsets into `taste` (mutated): a non-empty section replaces
+    `relations`; an empty one removes it (back to no-offsets). A history record is appended only
+    when the section actually changed. Returns {offsets, changed}."""
+    rows = rows_artifact.get("rows") if isinstance(rows_artifact, dict) else rows_artifact
+    offsets = chemistry_offsets(rows)
+    changed = taste.get("relations") != (offsets or None)
+    if offsets:
+        taste["relations"] = offsets
+    else:
+        taste.pop("relations", None)
+    if changed:
+        append_history(store, {"ts": now or utc_now_iso(), "action": "chemistry", "pairs": len(offsets)})
+    return {"offsets": offsets, "changed": changed}
+
+
 # ── rollback (Q5) ────────────────────────────────────────────────────────────────────────────────
 
 def rollback(taste, pid, kind, store, now=None):
@@ -573,6 +628,11 @@ def main(argv=None):
     r.add_argument("--taste", required=True)
     r.add_argument("--store")
     r.add_argument("--now")
+    c = sub.add_parser("chemistry")
+    c.add_argument("--rows", required=True)
+    c.add_argument("--taste", required=True)
+    c.add_argument("--store")
+    c.add_argument("--now")
     args = ap.parse_args(argv)
 
     store = args.store or default_store(args.taste)
@@ -603,6 +663,15 @@ def main(argv=None):
                 ) + ")"
             print(f"[train] {e['id']}|{e['kind']}: {e['verdict']}{extra}")
         print(f"[train] taste.json {'updated' if result['shipped'] else 'unchanged'}")
+    elif args.cmd == "chemistry":
+        result = chemistry(load_json(args.rows), taste, store, now=args.now)
+        if result["changed"]:
+            with open(args.taste, "w", encoding="utf-8") as fh:
+                fh.write(canonical(taste))
+        print(
+            f"[chemistry] {len(result['offsets'])} pairs; "
+            f"taste.json {'updated' if result['changed'] else 'unchanged'}"
+        )
     else:
         record = rollback(taste, args.id, args.kind, store, now=args.now)
         with open(args.taste, "w", encoding="utf-8") as fh:

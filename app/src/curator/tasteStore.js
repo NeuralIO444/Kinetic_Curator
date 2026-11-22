@@ -51,6 +51,18 @@ export function overlayPersonasSection(overlay) {
   return true;
 }
 
+/**
+ * #2398 (Adapters A5) — overlay the nightly store's learned relation offsets onto the loaded
+ * taste, in memory only, under the boot bridge's law: the store wins per pair, pairs the store
+ * does not carry keep whatever the taste already had, and the stored taste is never rewritten.
+ * Returns false (changing nothing) when no taste is loaded or the overlay is empty.
+ */
+export function overlayRelationsSection(overlay) {
+  if (!overlay || !Object.keys(overlay).length || !current) return false;
+  current = { ...current, relations: { ...(current.relations || {}), ...overlay } };
+  return true;
+}
+
 export function clearTaste() {
   current = null;
   try {
