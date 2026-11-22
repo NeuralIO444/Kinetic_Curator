@@ -18,33 +18,36 @@
 //       --report <report.json> [--tol 1e-6]
 //
 // Exit 0 = pass; exit 1 = a named failure.
-import { readFileSync } from 'node:fs';
+import { readFileSync } from "node:fs";
 import {
   scoreTreeHeadWith,
   steeringHeads,
   validatePersonasSection,
   validateTaste,
-} from '../app/src/curator/tasteHead.js';
+} from "../app/src/curator/tasteHead.js";
+import { validateRelationsSection } from "../app/src/personas/chemistry.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : fallback;
 };
-const tastePath = opt('--taste', null);
-const rowsPath = opt('--rows', null);
-const reportPath = opt('--report', null);
-const TOL = Number(opt('--tol', '1e-6'));
+const tastePath = opt("--taste", null);
+const rowsPath = opt("--rows", null);
+const reportPath = opt("--report", null);
+const TOL = Number(opt("--tol", "1e-6"));
 
 const fail = (msg) => {
   console.error(`verify_persona_heads: FAIL — ${msg}`);
   process.exit(1);
 };
 if (!tastePath || !rowsPath || !reportPath)
-  fail('usage: --taste <taste.json> --rows <rows.json> --report <report.json> [--tol 1e-6]');
+  fail(
+    "usage: --taste <taste.json> --rows <rows.json> --report <report.json> [--tol 1e-6]",
+  );
 const readJson = (p, what) => {
   try {
-    return JSON.parse(readFileSync(p, 'utf8'));
+    return JSON.parse(readFileSync(p, "utf8"));
   } catch (e) {
     fail(`cannot read ${what} at ${p}: ${e.message}`);
   }
@@ -85,39 +88,63 @@ function spearman(a, b) {
   return cov / Math.sqrt(va * vb);
 }
 
-const rawTaste = readJson(tastePath, 'taste');
-const rowsArtifact = readJson(rowsPath, 'rows');
-const report = readJson(reportPath, 'report');
+const rawTaste = readJson(tastePath, "taste");
+const rowsArtifact = readJson(rowsPath, "rows");
+const report = readJson(reportPath, "report");
 
 const v = validateTaste(rawTaste);
 if (!v.ok) fail(`validateTaste rejected the trainer's taste.json: ${v.error}`);
 const taste = v.taste;
-if (rawTaste.personas !== undefined && validatePersonasSection(rawTaste.personas) === null)
-  fail('the personas section does not survive validatePersonasSection');
-if (!rowsArtifact || rowsArtifact.format !== 'kc-persona-rows')
-  fail('rows artifact is not kc-persona-rows');
-if (!report || report.format !== 'kc-persona-train-report') fail('report is not kc-persona-train-report');
+if (
+  rawTaste.personas !== undefined &&
+  validatePersonasSection(rawTaste.personas) === null
+)
+  fail("the personas section does not survive validatePersonasSection");
+if (
+  rawTaste.relations !== undefined &&
+  validateRelationsSection(rawTaste.relations) === null
+)
+  fail("the relations section does not survive validateRelationsSection");
+if (!rowsArtifact || rowsArtifact.format !== "kc-persona-rows")
+  fail("rows artifact is not kc-persona-rows");
+if (!report || report.format !== "kc-persona-train-report")
+  fail("report is not kc-persona-train-report");
 
 const rows = rowsArtifact.rows || [];
 let checked = 0;
 for (const e of report.entries || []) {
-  if (e.verdict !== 'shipped') continue;
-  const entry = taste.personas && taste.personas[e.id] && taste.personas[e.id][e.kind];
-  if (!entry) fail(`${e.id}|${e.kind}: report says v${e.version} shipped but taste.json has no such entry`);
+  if (e.verdict !== "shipped") continue;
+  const entry =
+    taste.personas && taste.personas[e.id] && taste.personas[e.id][e.kind];
+  if (!entry)
+    fail(
+      `${e.id}|${e.kind}: report says v${e.version} shipped but taste.json has no such entry`,
+    );
   if (entry.version !== e.version)
-    fail(`${e.id}|${e.kind}: taste carries v${entry.version}, the report shipped v${e.version}`);
+    fail(
+      `${e.id}|${e.kind}: taste carries v${entry.version}, the report shipped v${e.version}`,
+    );
   if (entry.labeledTurns !== e.labeledTurns)
-    fail(`${e.id}|${e.kind}: labeledTurns mismatch — taste ${entry.labeledTurns}, report ${e.labeledTurns}`);
+    fail(
+      `${e.id}|${e.kind}: labeledTurns mismatch — taste ${entry.labeledTurns}, report ${e.labeledTurns}`,
+    );
   if (Math.abs(entry.heldOut - e.heldOut) > 1e-9)
-    fail(`${e.id}|${e.kind}: heldOut mismatch — taste ${entry.heldOut}, report ${e.heldOut}`);
+    fail(
+      `${e.id}|${e.kind}: heldOut mismatch — taste ${entry.heldOut}, report ${e.heldOut}`,
+    );
   const entryRows = rows.filter((r) => r.id === e.id && r.kind === e.kind);
   const heldIdx = e.heldOutRows || [];
   const pyScores = e.pythonScores || [];
   if (!heldIdx.length || heldIdx.length !== pyScores.length)
-    fail(`${e.id}|${e.kind}: the report carries no held-out slice to verify against`);
+    fail(
+      `${e.id}|${e.kind}: the report carries no held-out slice to verify against`,
+    );
   const jsScores = heldIdx.map((i) => {
     const row = entryRows[i];
-    if (!row) fail(`${e.id}|${e.kind}: held-out row index ${i} is outside the entry's rows`);
+    if (!row)
+      fail(
+        `${e.id}|${e.kind}: held-out row index ${i} is outside the entry's rows`,
+      );
     return scoreTreeHeadWith(entry.head, row.features);
   });
   for (let k = 0; k < jsScores.length; k++) {
@@ -132,7 +159,9 @@ for (const e of report.entries || []) {
     heldIdx.map((i) => entryRows[i].weight),
   );
   if (Math.abs(rho - entry.heldOut) > 1e-6)
-    fail(`${e.id}|${e.kind}: JS Spearman ${rho} does not reproduce the stamped heldOut ${entry.heldOut}`);
+    fail(
+      `${e.id}|${e.kind}: JS Spearman ${rho} does not reproduce the stamped heldOut ${entry.heldOut}`,
+    );
   checked++;
   console.log(
     `verify_persona_heads: ${e.id}|${e.kind} v${entry.version} — ${heldIdx.length} held-out rows, ` +
@@ -142,9 +171,11 @@ for (const e of report.entries || []) {
 
 const bundle = steeringHeads(taste);
 const admitted = bundle
-  ? Object.entries(bundle).flatMap(([id, kinds]) => Object.keys(kinds).map((k) => `${id}|${k}`))
+  ? Object.entries(bundle).flatMap(([id, kinds]) =>
+      Object.keys(kinds).map((k) => `${id}|${k}`),
+    )
   : [];
 console.log(
-  `verify_persona_heads: PASS — ${checked} shipped entr${checked === 1 ? 'y' : 'ies'} verified; ` +
-    `steeringHeads admits: ${admitted.length ? admitted.join(', ') : '(none — earn-in gate)'}`,
+  `verify_persona_heads: PASS — ${checked} shipped entr${checked === 1 ? "y" : "ies"} verified; ` +
+    `steeringHeads admits: ${admitted.length ? admitted.join(", ") : "(none — earn-in gate)"}`,
 );

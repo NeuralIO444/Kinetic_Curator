@@ -83,6 +83,7 @@ import { startBand, bandOn } from './personas/bandLive.js'; // #2387: the band p
 import { getTaste } from './curator/tasteStore.js'; // #2394: the loaded taste carries the personas heads
 import { loadPersonaHeadsAtBoot } from './curator/personaHeadsLive.js'; // #2439: the boot bridge to the trained heads
 import { steeringHeads } from './curator/tasteHead.js'; // #2394: only earned-in heads steer the band
+import { tuningWithChemistry } from './personas/chemistry.mjs'; // #2398: learned relation offsets shift the band's tuning
 import { replayRhythmFrame, endRhythmReplay } from './personas/rhythmRecord.mjs'; // #2389: a take replays the rhythm section's timing and looks
 import { createRhythmEyes } from './personas/rhythmVisionLive.js'; // #2389: the rhythm section's eyes (local vision model; at most once a phrase)
 import { startWire, stopWire, wireReader } from './personas/wireLive.js'; // #2390: the Wire (opt-in, off by default, nothing renders)
@@ -239,6 +240,10 @@ function AppInner() {
       // that have earned in (≥200 labeled turns, held-out ≥ 0.3); no taste, no section, or no
       // earned-in head reads null here and the band plays on rules exactly as before.
       getHeads: () => steeringHeads(getTaste()),
+      // #2398 — Adapters A5: the band plays on the session tuning with its relation biases shifted
+      // by the loaded taste's learned chemistry offsets; no offsets on the taste, and the tuning
+      // is the identical object it was before (chemistry.mjs law 3).
+      getTuning: () => tuningWithChemistry(getTaste()),
       // #2389 — P9 the rhythm section's seat: her timing lean on each turn (when, never who or what) and her eyes, at
       // most once a phrase through a local vision model. Unruled (null) shares and cadence: nothing leans, nothing looks.
       getTiming: bandTimingStep,

@@ -1,18 +1,20 @@
 // personaHeadsLive — #2439: the desktop half of the boot bridge. Reads the adapters canonical taste
 // (<app data>/adapters/taste.json, the file the A3 nightly owns) ONCE at app start and overlays its persona
 // heads onto the loaded taste, in memory — the app's own taste (localStorage) is never rewritten, and the
-// store stays the trainer's. Every failure is silent by ruling (Matt, 2026-11-21): not the desktop build, no
+// store stays the trainer's. #2398 (A5): the same read also overlays the store's learned relation offsets
+// (the taste's `relations` section) under the same law. Every failure is silent by ruling (Matt, 2026-11-21): not the desktop build, no
 // store, an unreadable file, no taste loaded — no notice, no log, no readout entry; the band simply plays on
 // rules exactly as it did before the bridge existed. The Queen's head (A6, #2399) rides this same bridge
 // when it exists; nothing here surfaces any head anywhere.
 import { isTauriRuntime } from '../platform/desktop.mjs';
 import {
   personasOverlayFromStoreText,
+  relationsOverlayFromStoreText,
   headsFingerprint,
   changedHeadEntries,
   launchNoteLine,
 } from './personaHeadsBridge.mjs';
-import { getTaste, overlayPersonasSection } from './tasteStore.js';
+import { getTaste, overlayPersonasSection, overlayRelationsSection } from './tasteStore.js';
 
 export const ADAPTERS_DIR = 'adapters';
 export const ADAPTERS_TASTE_FILE = 'taste.json';
@@ -81,12 +83,18 @@ export async function loadPersonaHeadsAtBoot(deps = {}) {
     const readTextFile = deps.readTextFile || fsApi.readTextFile;
     const readTaste = deps.getTaste || getTaste;
     const apply = deps.overlay || overlayPersonasSection;
+    const applyRelations = deps.overlayRelations || overlayRelationsSection;
     const path = await join(await appDataDir(), ADAPTERS_DIR, ADAPTERS_TASTE_FILE);
-    const overlay = personasOverlayFromStoreText(await readTextFile(path));
-    if (!overlay) return { ok: false, reason: 'the store carries no loadable heads' };
+    const storeText = await readTextFile(path);
+    const overlay = personasOverlayFromStoreText(storeText);
+    const relOverlay = relationsOverlayFromStoreText(storeText);
+    if (!overlay && !relOverlay) return { ok: false, reason: 'the store carries no loadable heads' };
     if (!readTaste()) return { ok: false, reason: 'no taste loaded' };
-    if (!apply(overlay)) return { ok: false, reason: 'no taste loaded' };
-    noteHeadChanges(overlay, deps);
+    let landed = false;
+    if (overlay) landed = apply(overlay) || landed;
+    if (relOverlay) landed = applyRelations(relOverlay) || landed;
+    if (!landed) return { ok: false, reason: 'no taste loaded' };
+    if (overlay) noteHeadChanges(overlay, deps);
     return { ok: true };
   } catch (e) {
     return { ok: false, reason: short(e) };

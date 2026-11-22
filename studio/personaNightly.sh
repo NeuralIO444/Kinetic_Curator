@@ -155,6 +155,8 @@ run_chain() {
   "$NODE_BIN" "$CHECKOUT/studio/personaRows.mjs" --labeled "$labeled" --takes "$TAKES_DIR" --out "$rows" || return $?
   echo "+ train_persona_heads train"
   "$PYTHON_BIN" "$CHECKOUT/studio/train_persona_heads.py" train --rows "$rows" --taste "$taste" --report "$report" || return $?
+  echo "+ train_persona_heads chemistry"
+  "$PYTHON_BIN" "$CHECKOUT/studio/train_persona_heads.py" chemistry --rows "$rows" --taste "$taste" || return $?
   echo "+ verify_persona_heads (alarm only — Q4)"
   "$NODE_BIN" "$CHECKOUT/studio/verify_persona_heads.mjs" --taste "$taste" --rows "$rows" --report "$report"
   rc=$?

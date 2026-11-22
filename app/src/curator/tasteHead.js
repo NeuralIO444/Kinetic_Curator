@@ -17,6 +17,7 @@
 import { recipeFeatures, FEATURES_VERSION } from './recipeFeatures.js';
 import { validateChapterMemory } from './chapterMemory.mjs';
 import { decisionFeatureNames, DECISION_FEATURES_VERSION, PERSONA_DECISION_KINDS } from './decisionFeatures.mjs';
+import { validateRelationsSection } from '../personas/chemistry.mjs';
 
 export const TASTE_KIND = 'kc-taste';
 export const TASTE_VERSION = 1;
@@ -162,6 +163,14 @@ export function validateTaste(raw) {
   if (raw.personas != null) {
     const personas = validatePersonasSection(raw.personas);
     if (personas) taste.personas = personas;
+  }
+  // Persona Adapters A5 (#2398) — the optional relations section: the learned chemistry offsets
+  // ({ "answerer->caller": offset }) the nightly recomputes from the labeled trades. Same law as
+  // the personas section: additive learning over a working instrument, so an unreadable section
+  // neutralizes and the taste stands. Absent (every pre-A5 file) stays absent.
+  if (raw.relations != null) {
+    const relations = validateRelationsSection(raw.relations);
+    if (relations) taste.relations = relations;
   }
   return { ok: true, taste };
 }
