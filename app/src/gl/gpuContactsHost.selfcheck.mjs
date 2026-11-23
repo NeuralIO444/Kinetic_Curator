@@ -78,7 +78,7 @@ const table = (nb) => ({ nb });
   const gpu = fake({ contacts: [], overflow: 0 });
   const h = createGpuContactsHost(null, { gpu });
   assert.equal(h.stats.cap, CONTACTS_CAP_BODIES);
-  assert.equal(CONTACTS_CAP_BODIES, 1024, 'cap ladder step 1 (350 -> 1,024 -> 2,048; each raise = Matt merges)');
+  assert.equal(CONTACTS_CAP_BODIES, 2048, 'cap ladder step 2 (350 -> 1,024 -> 2,048; each raise = Matt merges)');
   h.submit(table(CONTACTS_CAP_BODIES + 1));
   assert.equal(gpu.submits, 0);
   assert.equal(h.stats.skippedOverCap, 1);
