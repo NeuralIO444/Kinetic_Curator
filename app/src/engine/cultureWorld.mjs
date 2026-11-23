@@ -124,12 +124,45 @@
 //               and the law composition above does not change. With no pairs,
 //               no statics, and no links it is a bit-exact no-op (the parent
 //               issue's inherited parity law, restated for the world).
+//
+//   THE FIELDS  Phase 3, slice A (the parent issue 2178, world side): the
+//               dish's standing fields (engine/cultureFields.mjs) — forces,
+//               never bodies, never drawn. The QUEEN owns them (spec §4 Q4):
+//               she places and moves them under the Governor's direction, and
+//               the doors below (deal / move / retire / resolve) are the only
+//               write path — recipes and personas may only REQUEST, through
+//               the request log the Queen's resolution door drains. The one
+//               kind dealt in this slice is the magnet, the ferro's pull on
+//               bodies under its ruled law (the parent issue, 2026-11-15):
+//               toward the magnet, field-gated — the pull at a body scales
+//               with the medium's published density at the body's cell, read
+//               at the fluid's last completed state like every coupling read
+//               in this world. Fields act on the swarm's cadence, inside the
+//               same world step, immediately before the swarm's integrator:
+//               forces first, then the core integrates, then the solver
+//               resolves. The hand's current (the parent issue 2153) is the
+//               next slice's field, not this one's. The fields are
+//               resolver-class — CPU JS, no stamp of their own; the law
+//               composition above does not change. Born empty: no scene has
+//               dealt a field yet, and an empty table is the parity position
+//               (a field step over no fields moves nothing).
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
 import { createCulture, stepCulture, seedRandom, cultureHash, CULTURE_RULE } from './dishLife.mjs';
 import { injectFluidBirths } from './dishFluidCouple.mjs';
 import { stepCultureSwarm, cultureContactPairs, cultureSwarmHash } from './cultureSwarm.mjs';
 import { stepCultureSolver, createCultureStatics, createCultureLinks, cultureSolverHash } from './cultureSolver.mjs';
+import {
+  createCultureFields,
+  createCultureFieldRequests,
+  stepCultureFields,
+  cultureFieldsHash,
+  normalizeCultureFieldSpec,
+  CULTURE_FIELD_KIND_NAMES,
+  CULTURE_FIELD_REQUEST_PENDING,
+  CULTURE_FIELD_REQUEST_APPLIED,
+  CULTURE_FIELD_REQUEST_DECLINED,
+} from './cultureFields.mjs';
 import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
 
 /** The backend id this world stamps, in the simBackends vocabulary: JS, versioned. */
@@ -278,6 +311,18 @@ export function createCultureWorld({ seed = 0 } = {}) {
     links: createCultureLinks(),
     /** The solver's own step counter: floor(world.step / CULTURE_SWARM_STEP_DIVISOR), the swarm's cadence. */
     solver: { step: 0 },
+    /**
+     * The standing fields (Phase 3, slice A): the Queen's placed forces —
+     * magnets in this slice. Empty at birth: no scene has dealt a field yet.
+     * Written only through the Queen's doors below.
+     */
+    fields: createCultureFields(),
+    /**
+     * The field-request log (Phase 3, slice A): what recipes and personas
+     * have asked the Queen for, and what she answered. Born empty; a request
+     * stands here until the Queen's resolution door applies or declines it.
+     */
+    fieldRequests: createCultureFieldRequests(),
   };
 }
 
@@ -297,8 +342,12 @@ export function cultureWorldSimTimeS(world) {
  * is world.bodies.step — over an empty table the step still counts: the kernel ran)
  * and the solver immediately resolves the contacts that step produced (its own
  * step counter is world.solver.step, the same cadence — a solver step per swarm
- * step, never a stale or skipped snapshot). The scheduler law around all of this
- * does not change.
+ * step, never a stale or skipped snapshot). On that same cadence, immediately
+ * before the swarm's integrator, the standing fields write their forces into
+ * the bodies' velocities (their own step counter is world.fields.step — forces
+ * first, then the core integrates, then the solver resolves; the fields read
+ * the medium's published density at its last completed state). The scheduler
+ * law around all of this does not change.
  */
 export function stepCultureWorld(world) {
   world.step += 1;
@@ -308,6 +357,7 @@ export function stepCultureWorld(world) {
     stepCulture(world.life);
   }
   if (world.step % CULTURE_SWARM_STEP_DIVISOR === 0) {
+    stepCultureFields(world.bodies, world.fields, cultureFluidDensity(world));
     stepCultureSwarm(world.bodies);
     stepCultureSolver(world.bodies, world.statics, world.links);
     world.solver.step += 1;
@@ -361,6 +411,124 @@ export function addCultureLink(world, a, b, rest) {
   links.rest[i] = r;
   links.count += 1;
   return i;
+}
+
+/**
+ * THE QUEEN'S DOORS — the only write path to the standing fields (spec §4
+ * Q4). The Queen deals, moves, and retires fields under the Governor's
+ * direction; direction arrives as calls here, because there is no other hand
+ * to write through. Every door validates in the stamp doors' refuse-loudly
+ * idiom, through the one spec reading (normalizeCultureFieldSpec) the deal,
+ * request, and apply paths all share.
+ */
+
+/**
+ * Deal one standing field into the world — the Queen's hand. The spec is
+ * validated and normalized (defaults filled) before anything is written; a
+ * field past the table's ceiling is refused. Returns the field's index,
+ * which names this field for its whole life (indices are never reused).
+ */
+export function dealCultureField(world, spec) {
+  const fields = world.fields;
+  if (fields.count >= fields.capacity) throw new Error(`cultureWorld: fields table full (${fields.capacity})`);
+  const s = normalizeCultureFieldSpec(spec);
+  const i = fields.count;
+  fields.kind[i] = s.kind;
+  fields.active[i] = 1;
+  fields.x[i] = s.x;
+  fields.y[i] = s.y;
+  fields.strength[i] = s.strength;
+  fields.radius[i] = s.radius;
+  fields.count += 1;
+  return i;
+}
+
+/**
+ * Move one standing field — the Queen's hand again. The field must be dealt
+ * and standing (a retired field is gone; it does not move), and the
+ * destination must be finite. Returns the field's index.
+ */
+export function moveCultureField(world, index, to) {
+  const fields = world.fields;
+  if (!Number.isInteger(index) || index < 0 || index >= fields.count || !fields.active[index])
+    throw new Error(`cultureWorld: no standing field at index "${String(index)}" — a dealt, unretired field`);
+  const { x, y } = to || {};
+  if (!Number.isFinite(x) || !Number.isFinite(y))
+    throw new Error(`cultureWorld: bad field move "${String(x)}", "${String(y)}" — finite coordinates`);
+  fields.x[index] = x;
+  fields.y[index] = y;
+  return index;
+}
+
+/**
+ * Retire one standing field — the Queen removes it from the dish. The slot
+ * stands (its index is never reused or shifted); the field simply exerts
+ * nothing from this step on. Returns the field's index.
+ */
+export function retireCultureField(world, index) {
+  const fields = world.fields;
+  if (!Number.isInteger(index) || index < 0 || index >= fields.count || !fields.active[index])
+    throw new Error(`cultureWorld: no standing field at index "${String(index)}" — a dealt, unretired field`);
+  fields.active[index] = 0;
+  return index;
+}
+
+/**
+ * Request a field — the ONLY door recipes and personas get (spec §4 Q4: they
+ * may only request). The spec is validated exactly as a deal would be (the
+ * log holds no request the Queen could not deal), normalized, and entered in
+ * the request log as pending. A request writes NOTHING to the fields table:
+ * no field exists, no body feels anything, until the Queen resolves it.
+ * Returns the request's index in the log.
+ */
+export function requestCultureField(world, spec) {
+  const requests = world.fieldRequests;
+  if (requests.count >= requests.capacity)
+    throw new Error(`cultureWorld: field request log full (${requests.capacity})`);
+  const s = normalizeCultureFieldSpec(spec);
+  const i = requests.count;
+  requests.status[i] = CULTURE_FIELD_REQUEST_PENDING;
+  requests.field[i] = -1;
+  requests.kind[i] = s.kind;
+  requests.x[i] = s.x;
+  requests.y[i] = s.y;
+  requests.strength[i] = s.strength;
+  requests.radius[i] = s.radius;
+  requests.count += 1;
+  return i;
+}
+
+/**
+ * Resolve one pending request — the Queen's answer, and the only path from
+ * request to field. With `apply` true, the requested field is dealt verbatim
+ * (through dealCultureField, so a fields table that filled since the request
+ * refuses loudly and the request stays pending); with `apply` false, the
+ * request is declined and deals nothing. Resolving a request that is not
+ * pending is refused. Returns the dealt field's index, or −1 when declined.
+ */
+export function resolveCultureFieldRequest(world, requestIndex, apply) {
+  const requests = world.fieldRequests;
+  if (
+    !Number.isInteger(requestIndex) ||
+    requestIndex < 0 ||
+    requestIndex >= requests.count ||
+    requests.status[requestIndex] !== CULTURE_FIELD_REQUEST_PENDING
+  )
+    throw new Error(`cultureWorld: no pending field request at index "${String(requestIndex)}"`);
+  if (!apply) {
+    requests.status[requestIndex] = CULTURE_FIELD_REQUEST_DECLINED;
+    return -1;
+  }
+  const fieldIndex = dealCultureField(world, {
+    kind: CULTURE_FIELD_KIND_NAMES[requests.kind[requestIndex]],
+    x: requests.x[requestIndex],
+    y: requests.y[requestIndex],
+    strength: requests.strength[requestIndex],
+    radius: requests.radius[requestIndex],
+  });
+  requests.status[requestIndex] = CULTURE_FIELD_REQUEST_APPLIED;
+  requests.field[requestIndex] = fieldIndex;
+  return fieldIndex;
 }
 
 /**
@@ -498,8 +666,10 @@ function mixFloat(mix, v) {
  * (its backend id and the kernel's own quantized fingerprint), the culture (its backend
  * id and the core's own state fingerprint), the body table (its count, the swarm's
  * backend id, and the swarm core's own fingerprint of the dealt prefix — step, alive,
- * position, velocity, mass, radius), and the solver's standing state (its step count
- * and the solver core's fingerprint of the statics and links). Same feed sequence =>
+ * position, velocity, mass, radius), the solver's standing state (its step count
+ * and the solver core's fingerprint of the statics and links), and the Queen's
+ * standing state (the fields core's fingerprint of the fields table and the
+ * request log). Same feed sequence =>
  * same hash, on any device (all arithmetic here is IEEE-exact JS). FNV-1a, the
  * dishWet.selfcheck precedent.
  */
@@ -536,6 +706,7 @@ export function cultureWorldHash(world) {
   mixU32(cultureSwarmHash(world.bodies));
   mixU32(world.solver.step);
   mixU32(cultureSolverHash(world.statics, world.links));
+  mixU32(cultureFieldsHash(world.fields, world.fieldRequests));
   return h >>> 0;
 }
 
