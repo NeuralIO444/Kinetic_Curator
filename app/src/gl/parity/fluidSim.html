@@ -35,6 +35,29 @@ window.__kcFluidRun = (p) => {
   const { u, v } = g.read();
   return { u: Array.from(u), v: Array.from(v), samples };
 };
+// window.__kcFluidSession* — a SEGMENTED run (CULTURE Phase 3B): one seeded GPU fluid stepped in
+// segments, each segment optionally re-dealing the culture texture first. This is how a parity
+// scenario mirrors a world whose fluid reads a culture level that changes at generation
+// boundaries mid-run: same seed, same per-segment inputs, same step counts as the JS world took.
+window.__kcFluidSessions = new Map();
+let __kcFluidSessionSeq = 0;
+window.__kcFluidSessionOpen = (p) => {
+  const g = createGpuFluid(gl, p.cols, p.rows);
+  g.seed(Float32Array.from(p.u), Float32Array.from(p.v));
+  const id = ++__kcFluidSessionSeq;
+  window.__kcFluidSessions.set(id, g);
+  return id;
+};
+window.__kcFluidSessionStep = (id, p) => {
+  const g = window.__kcFluidSessions.get(id);
+  if (p.culture) g.setCulture(Float32Array.from(p.culture.level), p.culture.cw, p.culture.ch);
+  g.step(p.steps, p.opts);
+  return true;
+};
+window.__kcFluidSessionRead = (id) => {
+  const { u, v } = window.__kcFluidSessions.get(id).read();
+  return { u: Array.from(u), v: Array.from(v) };
+};
 window.__kcReady = true;
 </script>
 </body>

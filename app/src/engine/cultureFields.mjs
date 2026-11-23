@@ -71,7 +71,7 @@
 // WebGL program's standing law, a pure function of world state, js-exact,
 // and they stamp nothing of their own. The world's law composition is
 // unchanged by this phase.
-import { MAGNET_RADIUS } from './dishFluid.mjs';
+import { MAGNET_RADIUS, MAX_MAGNETS } from './dishFluid.mjs';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H } from './cultureSwarm.mjs';
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 
@@ -230,6 +230,44 @@ export function stepCultureFields(bodies, fields, density) {
   }
   fields.step += 1;
   return bodies;
+}
+
+/**
+ * The pull dial the world's medium reads its magnet bias at: the kernel's own
+ * standing default (the sanitizeFluidDial / stepFluid default, 0.7), so a
+ * default-strength field biases the medium's growth exactly as a stage magnet
+ * at the dial's standing position. The per-field variation rides in each
+ * magnet's weight (below), not in the dial — the world has no PULL dial, the
+ * field's dealt strength is its pull (slice A's design call, carried through).
+ */
+export const CULTURE_FIELD_FLUID_PULL = 0.7;
+
+/**
+ * The fields table read as the fluid kernel's magnet list — the magnet growth
+ * bias (Phase 3B; the parent issue's stage law: stamped magnets bias feed/kill
+ * so the dark phase grows toward a magnet). Active magnet fields, in dealt
+ * order, at most the kernel's own MAX_MAGNETS (the ceiling its GPU mirror's
+ * uniform array is sized by — the bias reads the first magnets dealt, the
+ * kernel's reading everywhere). Each entry is dish-normalized { x, y, w }:
+ * the position in the kernel's space, and the weight w = the field's strength
+ * over the standing default strength, so a default-strength field weighs
+ * exactly 1 — a stage magnet. A zero-strength field is inert here as it is in
+ * the body pull, and a retired field biases nothing. A fresh list each call —
+ * read it the step you get it. Pure.
+ */
+export function cultureFieldMagnets(fields) {
+  const out = [];
+  for (let f = 0; f < fields.count && out.length < MAX_MAGNETS; f++) {
+    if (!fields.active[f] || fields.kind[f] !== CULTURE_FIELD_KIND_MAGNET) continue;
+    const strength = fields.strength[f];
+    if (!(strength > 0)) continue;
+    out.push({
+      x: fields.x[f] / CULTURE_SWARM_WORLD_W,
+      y: fields.y[f] / CULTURE_SWARM_WORLD_H,
+      w: strength / CULTURE_FIELD_MAGNET_STRENGTH,
+    });
+  }
+  return out;
 }
 
 const _f64 = new DataView(new ArrayBuffer(8));

@@ -19,7 +19,8 @@
 // Two halves: the pure scheduler (planCultureFluidSteps — node-testable) and the GL half
 // (createCultureFluidHost).
 import { createFluid, fluidSeedKey, FLUID_GRID_COLS, FLUID_GRID_ROWS } from '../engine/dishFluid.mjs';
-import { CULTURE_FLUID_GPU_BACKEND } from '../engine/cultureWorld.mjs';
+import { CULTURE_FLUID_GPU_BACKEND, CULTURE_COUPLING, CULTURE_WORLD_ASPECT_HW } from '../engine/cultureWorld.mjs';
+import { cultureFieldMagnets, CULTURE_FIELD_FLUID_PULL } from '../engine/cultureFields.mjs';
 import { createGpuFluid } from './fluidSim.mjs';
 import { densityFromRGBA } from './gpuFluidHost.mjs';
 
@@ -107,9 +108,20 @@ export function createCultureFluidHost(gl) {
         epoch++;
       }
       if (plan.steps > 0) {
-        // The world's stepFluid runs under the kernel defaults (no magnets, no culture field,
-        // the dial defaults) — fluidStepUniforms({}) sanitizes to exactly those.
-        sim.step(plan.steps, {});
+        // The world's stepFluid runs under the world's standing couplings (Phase 3B): the
+        // culture's published field at the standing coupling strength, and the Queen's dealt
+        // magnets as the kernel's growth bias, under the dish's own aspect — the same inputs
+        // stepCultureWorld hands the JS kernel, mirrored here. The culture texture is the
+        // world's CURRENT published level for the whole catch-up burst: the mirror is Tier S
+        // (character-faithful, async readback), not a step-for-step replay — the parity
+        // suite proves the kernels agree when fed the world's exact per-generation reads.
+        sim.setCulture(world.life.field.level, world.life.field.cols, world.life.field.rows);
+        sim.step(plan.steps, {
+          couple: CULTURE_COUPLING,
+          magnets: cultureFieldMagnets(world.fields),
+          pull: CULTURE_FIELD_FLUID_PULL,
+          aspectHW: CULTURE_WORLD_ASPECT_HW,
+        });
         held.step = plan.from + plan.steps;
         const pbo = acquirePbo();
         sim.readInto(pbo);
