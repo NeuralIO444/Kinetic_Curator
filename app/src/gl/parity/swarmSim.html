@@ -6,6 +6,8 @@
 <script type="module">
 import { createGpuSwarm } from '../swarmSim.mjs';
 import { createGpuSwarmHost } from '../gpuSwarmHost.mjs';
+import { createCultureSwarmHost } from '../cultureSwarmHost.mjs';
+import { createCultureWorld, stepCultureWorld } from '../../engine/cultureWorld.mjs';
 import { ParticleSystem } from '../../engine/particles.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../../data/layout-modes.js';
 import { createScentField } from '../../engine/kernel/field/scent.js';
@@ -110,6 +112,41 @@ window.__kcShadowRun = (p) => {
   const out = { ...host.stats, toks, drift, speedMax, finite, slow };
   host.dispose();
   return out;
+};
+// window.__kcCultureSwarmHostRun({ seed, deal: { x, y, vx, vy, mass, radius }, worldSteps })
+//   -> { world: {x,y,vx,vy}, mirror: {x,y,vx,vy} | null, swarmStep, backend }
+// CULTURE Phase 1 K3: deals the population into a fresh culture world, steps the world
+// through its own scheduler with the GPU culture-swarm host mirroring every frame, and
+// returns the world's JS state and the mirror's state at the end.
+window.__kcCultureSwarmHostRun = (p) => {
+  const w = createCultureWorld({ seed: p.seed });
+  const b = w.bodies;
+  const n = p.deal.x.length;
+  for (let i = 0; i < n; i++) {
+    b.alive[i] = 1;
+    b.x[i] = p.deal.x[i];
+    b.y[i] = p.deal.y[i];
+    b.vx[i] = p.deal.vx[i];
+    b.vy[i] = p.deal.vy[i];
+    b.mass[i] = p.deal.mass[i];
+    b.radius[i] = p.deal.radius[i];
+  }
+  b.count = n;
+  const host = createCultureSwarmHost(gl);
+  let mirror = null;
+  for (let s = 0; s < p.worldSteps; s++) {
+    stepCultureWorld(w);
+    mirror = host.frame(w);
+  }
+  host.dispose();
+  const take = (arr) => Array.from(arr.subarray(0, n));
+  return {
+    world: { x: take(b.x), y: take(b.y), vx: take(b.vx), vy: take(b.vy) },
+    mirror: mirror ? { x: Array.from(mirror.state.x), y: Array.from(mirror.state.y), vx: Array.from(mirror.state.vx), vy: Array.from(mirror.state.vy) } : null,
+    swarmStep: b.step,
+    mirrorStep: mirror ? mirror.swarmStep : -1,
+    backend: mirror ? mirror.backend : null,
+  };
 };
 window.__kcReady = true;
 </script>
