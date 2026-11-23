@@ -246,4 +246,4 @@ The ruled foundation is:
 - looted limbs attaching under socket and upkeep limits;
 - the old motion systems preserved as loot and re-expressed as recipes or presets on the new base.
 
-**End of spec. The specification is complete as of 2026-11-22; build phasing and the build itself proceed on Matt's order.**
+**End of spec. The specification is complete as of 2026-11-22. Build phasing lives in `culture-phasing.md` (companion doc); the build was authorized fully auto by Matt on 2026-11-22.**
