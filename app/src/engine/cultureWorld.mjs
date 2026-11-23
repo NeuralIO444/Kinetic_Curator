@@ -184,6 +184,23 @@
 //               fluid parity style. With no fields dealt the magnet list is
 //               empty (the bias is zero); the culture read stands from birth,
 //               as the forward coupling always has.
+//
+//   THE GROUND  Phase 4 (spec §5.2; the parent issue 2152's law): Life IS the
+//               soil (engine/cultureSoil.mjs). The culture's published field is
+//               this world's ground — never drawn, read only through its
+//               published face. Living ground feeds the ecology: the read door
+//               (cultureSoilAt) hands a citizen the ground at a point —
+//               living, level, fertility, decay, fortune — for Phase 5/6's laws
+//               to read. Dead ground kills: on EVERY world step, after
+//               everything that grows the culture or moves a body, the soil
+//               judges each living body by the ground under its centre — a
+//               body standing on dead ground sustained for
+//               CULTURE_SOIL_WITHER_STEPS (4 s at the 120 Hz clock) withers and
+//               is gone (alive 0); a step on living ground restarts its clock.
+//               The soil reads the last completed generation and its verdict
+//               reaches every mover one step behind. Resolver-class, no stamp:
+//               the law composition does not change. Over an empty table the
+//               soil kills nothing and moves nothing — the parity position.
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
 import { createCulture, stepCulture, seedRandom, cultureHash, CULTURE_RULE } from './dishLife.mjs';
@@ -217,6 +234,13 @@ import {
   cultureHandDealSlot,
   writeCultureHandCurrent,
 } from './cultureHand.mjs';
+import {
+  createCultureSoil,
+  stepCultureSoil,
+  cultureSoilHash,
+  cultureSoilSample,
+  CULTURE_SOIL_WITHER_S,
+} from './cultureSoil.mjs';
 import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
 
 /** The backend id this world stamps, in the simBackends vocabulary: JS, versioned. */
@@ -286,6 +310,14 @@ export const CULTURE_SWARM_STEP_DIVISOR = 2;
 export const CULTURE_SWARM_BACKEND = 'js.swarm.v1';
 /** The swarm kernel's GPU backend id (simBackends vocabulary): gl/swarmSim.mjs, Tier S device-dependent. */
 export const CULTURE_SWARM_GPU_BACKEND = 'gpu.swarm.v1';
+
+/**
+ * The dead-ground kill in world steps (Phase 4): CULTURE_SOIL_WITHER_S (4 s, the
+ * phasing defaults table) at the 120 Hz world clock — 480 steps of sustained
+ * standing on dead ground, and the body is gone. The soil runs on every world
+ * step, so its step count is world.step, always.
+ */
+export const CULTURE_SOIL_WITHER_STEPS = Math.round(CULTURE_SOIL_WITHER_S * CULTURE_STEP_HZ);
 
 /** Is the dish gate on in a store state or a project document? Only exactly `true` is on. */
 export function cultureDishOn(holder) {
@@ -391,6 +423,14 @@ export function createCultureWorld({ seed = 0 } = {}) {
      * (or fully retired) table is the parity position.
      */
     hand: createCultureHandCurrents(),
+    /**
+     * The soil's state (Phase 4): the ground's judgement on the bodies — one
+     * wither clock per body slot (world steps stood on dead ground, sustained),
+     * the kill count, and the soil's step. The ground itself is the culture
+     * above (`life`), read through its published field; the soil holds no
+     * second copy of it.
+     */
+    soil: createCultureSoil(cap),
   };
 }
 
@@ -419,7 +459,10 @@ export function cultureWorldSimTimeS(world) {
  * world.hand.step — the performer's force last among forces). The medium, on
  * its own cadence, reads the culture's published field and the Queen's dealt
  * magnets as they last stood (Phase 3B — the reverse coupling and the growth
- * bias). The scheduler law around all of this does not change.
+ * bias). Last, on EVERY world step, the soil judges the living bodies by the
+ * ground under them (Phase 4 — its own step counter is world.soil.step, equal
+ * to world.step): sustained dead ground withers a body and it is gone. The
+ * scheduler law around all of this does not change.
  */
 export function stepCultureWorld(world) {
   world.step += 1;
@@ -447,6 +490,12 @@ export function stepCultureWorld(world) {
     stepCultureSolver(world.bodies, world.statics, world.links);
     world.solver.step += 1;
   }
+  // The ground judges last (Phase 4): every world step, after the culture has
+  // grown and the bodies have moved, the soil reads the published field — the
+  // last completed generation — under each living body's centre; sustained
+  // dead ground withers a body and it is gone. Every mover sees the verdict
+  // one step behind.
+  stepCultureSoil(world.bodies, world.soil, world.life.field, CULTURE_SOIL_WITHER_STEPS);
   return world;
 }
 
@@ -725,6 +774,34 @@ export function cultureLifeField(world) {
 }
 
 /**
+ * THE SOIL'S READ DOOR (Phase 4) — the ground at a body-space point, read from
+ * the soil's published face (the culture's field as the last completed
+ * generation left it): { gen, cell, living, level, fertility, decay, fortune }
+ * (engine/cultureSoil.mjs, THE READINGS). The door Phase 5/6 citizens call; a
+ * fresh object, safe to hold. Read-only: asking the ground changes nothing. A
+ * non-finite point is refused, loudly — a citizen with no position stands on no
+ * ground, and a silent dead reading would be a lie.
+ */
+export function cultureSoilAt(world, x, y) {
+  if (!Number.isFinite(x) || !Number.isFinite(y))
+    throw new Error(`cultureWorld: bad soil point "${String(x)}", "${String(y)}" — finite coordinates`);
+  return cultureSoilSample(world.life.field, x, y);
+}
+
+/**
+ * How far a dealt body has withered (Phase 4): its wither clock over the kill
+ * span, 0..1 — 0 on living ground (or dead: a dead body has no clock), rising
+ * while it stands on dead ground; the body is gone at 1. A read for later
+ * phases' laws, never drawn here. An index outside the dealt population is
+ * refused, loudly.
+ */
+export function cultureSoilWither(world, index) {
+  if (!Number.isInteger(index) || index < 0 || index >= world.bodies.count)
+    throw new Error(`cultureWorld: no dealt body at index "${String(index)}"`);
+  return world.soil.wither[index] / CULTURE_SOIL_WITHER_STEPS;
+}
+
+/**
  * The bodies' published face for contacts: the touching pairs over the world's
  * living discs right now, in the shipped detector's shape and canonical order
  * (engine/cultureSwarm.mjs cultureContactPairs — detection only; a fresh list,
@@ -775,8 +852,9 @@ function mixFloat(mix, v) {
  * position, velocity, mass, radius), the solver's standing state (its step count
  * and the solver core's fingerprint of the statics and links), the Queen's
  * standing state (the fields core's fingerprint of the fields table and the
- * request log), and the hand's standing state (the hand core's fingerprint of
- * the currents table). Same feed sequence =>
+ * request log), the hand's standing state (the hand core's fingerprint of
+ * the currents table), and the soil's standing state (the soil core's
+ * fingerprint of its step, kill count, and the dealt bodies' wither clocks). Same feed sequence =>
  * same hash, on any device (all arithmetic here is IEEE-exact JS). FNV-1a, the
  * dishWet.selfcheck precedent.
  */
@@ -815,6 +893,7 @@ export function cultureWorldHash(world) {
   mixU32(cultureSolverHash(world.statics, world.links));
   mixU32(cultureFieldsHash(world.fields, world.fieldRequests));
   mixU32(cultureHandHash(world.hand));
+  mixU32(cultureSoilHash(world.soil, world.bodies.count));
   return h >>> 0;
 }
 
