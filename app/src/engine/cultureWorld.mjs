@@ -34,7 +34,30 @@
 //               when a later phase wires the world into the resolver, the stamp rides the
 //               take header through the OPTIONAL_SIM_KERNELS pattern (the contacts
 //               precedent: absent = the JS-era header, byte-for-byte).
+//
+//   THE MEDIUM  Phase 1, slice K1 (the parent issue 2186): the dish fluid — the Gray-Scott
+//               kernel of engine/dishFluid.mjs, the codebase's math authority — lives in the
+//               world at the shared grid (the stage grid IS the fluid grid: 96×54 both, so
+//               the medium maps onto the soil cell-for-cell with no resampling; that identity
+//               is the resolution choice for this slice, and it is what the next kernel, K2,
+//               couples to in shader space). The world steps the fluid from its own fixed
+//               clock: one fluid step per CULTURE_FLUID_STEP_DIVISOR world steps, which at
+//               120 Hz is 60 steps/s — the exact tempo the live dish-grid instance already
+//               runs at (the 480 steps/s stamp rate over FLUID_GRID_STEP_DIVISOR). The fluid
+//               invents no clock of its own: its step count is a pure function of the
+//               world's step count. In this slice the medium stands unbiased — no magnets,
+//               no culture coupling: the dish's fields are Phase 3, the soil coupling is K2.
+//               BACKENDS — the fluid carries its own kernel stamp from the simBackends
+//               vocabulary: 'js.gs.v1' while the JS reference steps it (this module), or
+//               'gpu.gs.v1' when the GPU kernel host (gl/cultureFluidHost.mjs) drives it.
+//               The GPU kernel is Tier S (device-dependent, spec §5.4 as ruled for the Full
+//               WebGL program): the moment the fluid's backend is a gpu.* id, the world's
+//               law is 'decisions-exact', never 'js-exact' — setCultureFluidBackend is the
+//               only door, and it recomputes the law through simLawFor so the stamp cannot
+//               drift from the backend it names.
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
+import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
+import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
 
 /** The backend id this world stamps, in the simBackends vocabulary: JS, versioned. */
 export const CULTURE_WORLD_BACKEND = 'js.cultureWorld.v1';
@@ -52,6 +75,17 @@ export const CULTURE_BODY_CAP = 2048;
 /** Most steps one advance call may run (2 s of sim); whole steps past it are dropped + counted. */
 export const CULTURE_MAX_STEPS_PER_ADVANCE = 240;
 
+/**
+ * World steps per fluid step: at the 120 Hz world clock the medium steps at 60 steps/s —
+ * the tempo the live dish-grid fluid instance already runs at (480 steps/s stamp rate over
+ * FLUID_GRID_STEP_DIVISOR 8). The fluid's step count is floor(world.step / this), always.
+ */
+export const CULTURE_FLUID_STEP_DIVISOR = 2;
+/** The fluid kernel's JS backend id (simBackends vocabulary): the reference kernel in dishFluid.mjs. */
+export const CULTURE_FLUID_BACKEND = 'js.gs.v1';
+/** The fluid kernel's GPU backend id (simBackends vocabulary): gl/fluidSim.mjs, Tier S device-dependent. */
+export const CULTURE_FLUID_GPU_BACKEND = 'gpu.gs.v1';
+
 /** Is the dish gate on in a store state or a project document? Only exactly `true` is on. */
 export function cultureDishOn(holder) {
   return !!holder && holder[CULTURE_DISH_FIELD] === true;
@@ -66,10 +100,20 @@ export function cultureDishOn(holder) {
  */
 export function createCultureWorld({ seed = 0 } = {}) {
   const cap = CULTURE_BODY_CAP;
+  const seedU = seed >>> 0;
   return {
-    seed: seed >>> 0,
+    seed: seedU,
     backend: CULTURE_WORLD_BACKEND,
     simLaw: CULTURE_WORLD_SIM_LAW,
+    /**
+     * The dish fluid (Phase 1 K1): the Gray-Scott field the citizens will live in, born
+     * seeded from the world seed alone (fluidSeedKey(seed, 0) — no wake, no magnets) and
+     * stepped by stepCultureWorld at the cadence above. Its phases ARE world state: the
+     * world hash covers them.
+     */
+    fluid: createFluid({ cols: STAGE_COLS, rows: STAGE_ROWS, seedKey: fluidSeedKey(seedU, 0) }),
+    /** Which kernel steps the fluid — a simBackends fluid id. JS at birth, always. */
+    fluidBackend: CULTURE_FLUID_BACKEND,
     /** Whole fixed steps run since birth. Sim time is exactly step * CULTURE_STEP_S. */
     step: 0,
     /** Carried remainder: fed time not yet a whole step, always in [0, CULTURE_STEP_S). */
@@ -93,13 +137,49 @@ export function cultureWorldSimTimeS(world) {
 }
 
 /**
- * One fixed step. Phase 0's world is empty — no bodies to move, no soil to grow — so a
- * step advances the world's clock and nothing else. Later phases put the solver here;
- * the scheduler law around it does not change.
+ * One fixed step. No bodies exist yet to move and the soil grows nothing, but the medium
+ * moves: on every CULTURE_FLUID_STEP_DIVISOR-th world step the dish fluid takes one
+ * Gray-Scott step (its own step counter is world.fluid.step). Later phases put the
+ * solver here; the scheduler law around it does not change.
  */
 export function stepCultureWorld(world) {
   world.step += 1;
+  if (world.step % CULTURE_FLUID_STEP_DIVISOR === 0) stepFluid(world.fluid);
   return world;
+}
+
+/**
+ * The law this world's stamps honestly carry, composed through the codebase's own
+ * simLawFor over the kernel backends the world runs: the fluid under its recorded
+ * backend, the culture and swarm kernels still JS (they are not in the world yet).
+ * 'js-exact' while every kernel is a js.* id; 'decisions-exact' the moment one is not.
+ */
+export function cultureWorldSimLaw(world) {
+  return simLawFor({ ...DEFAULT_SIM_BACKENDS, fluid: world.fluidBackend });
+}
+
+/**
+ * Record which kernel backend steps the world's fluid — the ONLY door for that change,
+ * so the backend and the law stamped on the world can never disagree. A GPU host that
+ * takes the medium over (gl/cultureFluidHost.mjs) names 'gpu.gs.v1' here and the world's
+ * law becomes 'decisions-exact' in the same motion; handing it back to the JS reference
+ * restores 'js-exact'. An id the simBackends vocabulary does not know is refused.
+ */
+export function setCultureFluidBackend(world, backend) {
+  if (!KNOWN_SIM_BACKENDS.fluid.includes(backend))
+    throw new Error(`cultureWorld: unknown fluid backend "${String(backend)}"`);
+  world.fluidBackend = backend;
+  world.simLaw = cultureWorldSimLaw(world);
+  return world;
+}
+
+/**
+ * The medium's published face: the dark-phase density at the shared grid (a fresh
+ * Float32Array, read it the step you get it) — what the culture coupling reads on the
+ * live stage today, and what K2 will read in this world next.
+ */
+export function cultureFluidDensity(world) {
+  return fluidDensity(world.fluid);
 }
 
 /**
@@ -134,9 +214,10 @@ function mixFloat(mix, v) {
 
 /**
  * A canonical hash of everything that makes this world THIS world: seed, stamp, step
- * count, carried remainder (bit-exact), dropped count, the soil grid, and the body
- * table's living prefix. Same feed sequence => same hash, on any device (all arithmetic
- * here is IEEE-exact JS). FNV-1a, the dishWet.selfcheck precedent.
+ * count, carried remainder (bit-exact), dropped count, the soil grid, the fluid medium
+ * (its backend id and the kernel's own quantized fingerprint), and the body table's
+ * living prefix. Same feed sequence => same hash, on any device (all arithmetic here is
+ * IEEE-exact JS). FNV-1a, the dishWet.selfcheck precedent.
  */
 export function cultureWorldHash(world) {
   let h = 0x811c9dc5;
@@ -162,6 +243,8 @@ export function cultureWorldHash(world) {
   mixU32(world.droppedSteps);
   const cells = world.grid.cells;
   for (let i = 0; i < cells.length; i++) mix(cells[i]);
+  mixStr(world.fluidBackend);
+  mixU32(fluidHash(world.fluid));
   mixU32(world.bodies.count);
   const n = Math.min(world.bodies.count, world.bodies.capacity);
   for (let i = 0; i < n; i++) {
