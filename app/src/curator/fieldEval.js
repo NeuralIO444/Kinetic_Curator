@@ -45,6 +45,9 @@ export function step(state, input, rng) {
     // serif face's and the plate break's room).
     bauhausContext: input.lookFamily === 'bauhaus',
     soloContext: verdict === 'OVERLAP ALONE',
+    // #2151 — hot-tempo variety: the caller (the Director's dealPoet, off
+    // the store's tempo flag) affirms it; the step just passes it through.
+    variety: input.variety === true,
   });
   const nextRoom = preferredNext(verdict, rng);
   const nextState = {

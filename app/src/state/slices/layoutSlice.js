@@ -46,6 +46,7 @@ import {
   POEM_DOCTRINE_PRESS_BASE,
   keepPoem as bankPoem,
   isPoemKept,
+  poemFormKey,
 } from '../../poets/poemRow.mjs'; // #1918
 import { RAYGUN_MODES } from '../../poets/rayGunForm.js'; // #2003
 import { FEEL_PRESETS } from '../../data/feels.js';
@@ -76,7 +77,8 @@ import { scopeDecks, sanitizeScope, CURATED_SETS, SCOPE_CYCLE } from '../kinetic
 import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapterWalk.mjs'; // #1855: the landing
 import { openRound, openJudgement, passCut, spendCut, settle, absorbWarmTap, closeRound } from '../roundTable.mjs'; // #1856: the round (BOOK S3)
 import { judgeDeal } from '../../curator/loisCut.mjs'; // #1856: LOIS judges the round's deal
-import { reviewLanding } from '../../curator/fieldReview.mjs'; // #2006 slice 1: the shadow review of a landed poem
+import { reviewLanding, reviewExemption } from '../../curator/fieldReview.mjs'; // #2006 slice 1: the shadow review of a landed poem
+import { pickRevisionDecision, FIELD_REVISION_KNOBS } from '../../curator/fieldRevision.mjs'; // #2151: the standing poem's critical pass
 import { runReviewLadder } from '../../curator/fieldReviewLadder.mjs'; // #2006 slice 3: the ladder acts on a janky landing
 import { sanitizeReviewVoice } from '../../curator/fieldReviewVoice.mjs'; // #2006 slice 2: the voice's extension shape
 import { openNarrowing, narrow, poolFor } from '../chapterNarrow.mjs'; // #1857: the funnel (BOOK S4)
@@ -469,7 +471,7 @@ function doctrineArm(state, lp, form, streamIndex, reviewOpts) {
 function landPoem(
   state,
   layoutParams,
-  { avoidPieceId = null, review = true, buildSeed = null, buildEnabledAssets = null } = {},
+  { avoidPieceId = null, review = true, buildSeed = null, buildEnabledAssets = null, decision = null } = {},
 ) {
   const lp = { ...layoutParams };
   const n = state.poemDeal | 0;
@@ -484,12 +486,23 @@ function landPoem(
       fieldReview: state.fieldReview ?? null,
     };
   }
-  const poet = getDirector().dealPoet({
-    fieldRng: rngForIndex(state.seed, CH.curate, POEM_PICK_BASE + n, state.seedOffsets),
-    avoidPieceId,
-    // #1932 — the poem will stand with THESE params: their look's family is the gate's read.
-    lookFamily: lookFamilyOf(layoutParams.composition ?? state.layoutParams.composition),
-  });
+  // #2151 — variety is the store's tempo flag (the pressure law's hot
+  // mode, written by the revision driver off the honest feed): while it
+  // stands, the Director's pick ranges across the register line.
+  const variety = state.fieldVariety === true;
+  // #2151 — a caller may name the deal outright (the revision answer:
+  // the poem system's own re-deal toward the other pole). The named
+  // deal goes through every seam below exactly as a Director deal does —
+  // the gate, the doctrine arm, the review, the ladder, the counter.
+  const poet =
+    decision ??
+    getDirector().dealPoet({
+      fieldRng: rngForIndex(state.seed, CH.curate, POEM_PICK_BASE + n, state.seedOffsets),
+      avoidPieceId,
+      // #1932 — the poem will stand with THESE params: their look's family is the gate's read.
+      lookFamily: lookFamilyOf(layoutParams.composition ?? state.layoutParams.composition),
+      variety,
+    });
   // #1905 (S4) — the deal reports its stillborn-gate verdict: a refused deal
   // lands as silence AND banks the refusal on the commit (fieldGateRefusal),
   // so the gate's decision is in the record, never a silent clear.
@@ -546,6 +559,7 @@ function landPoem(
           fieldRng: rngForIndex(state.seed, CH.curate, POEM_PICK_BASE + n + 1, state.seedOffsets),
           avoidPieceId: form.pieceId,
           lookFamily: lookFamilyOf(layoutParams.composition ?? state.layoutParams.composition),
+          variety,
         });
         if (!poet2) return null;
         const rep2 = fieldDealReport(
@@ -828,6 +842,29 @@ export const createLayoutSlice = (set) => ({
    * own fields are never rewritten by the voice.
    */
   fieldReview: null,
+  /**
+   * #2151 — the standing poem's critical pass, last word: null, or the
+   * revision record the pass banks ({ status: 'pending' | 'answered' |
+   * 'silenced', formKey, poetId, pieceId, register, read, doctrine,
+   * deal, knobs, outcome?, answerPoetId?, answerPieceId? }). A request
+   * fires only in the watching tempo (the pressure law), names the
+   * standing form by its materialization key, and is answered by the
+   * poem system alone — a re-deal toward the other pole through
+   * landPoem. A user change silences a pending request (the record
+   * keeps the outcome: the tempo that took the wheel, a moved form, an
+   * exemption, a hold). One bite per form: a record whose formKey still
+   * names the standing form is never judged again. Session-only, never
+   * serialized, never undo-managed — in fieldReview's discipline.
+   */
+  fieldRevision: null,
+  /**
+   * #2151 — the pressure law's hot flag: true while the user's tempo is
+   * HOT (smashing KINETIC), written by the revision driver off the
+   * honest feed and read by landPoem — while it stands, poem deals
+   * range across the register line for variety and no revision request
+   * fires. Session-only, never serialized.
+   */
+  fieldVariety: false,
   paletteId: 'praystation',
   /** null | { swatches?: string[], bg?: string, ink?: string } — never mutates catalog */
   paletteOverrides: null,
@@ -1395,6 +1432,112 @@ export const createLayoutSlice = (set) => ({
         poemDeal: poem.poemDeal,
         fieldGateRefusal: poem.fieldGateRefusal,
         fieldReview: null,
+      };
+    }),
+
+  /**
+   * #2151 — the revision driver writes the pressure law's hot flag (see
+   * fieldVariety in the state). A flag flip is a machine note, not an
+   * artist action: no undo step, no record.
+   */
+  setFieldVariety: (hot) => set((state) => (state.fieldVariety === !!hot ? {} : { fieldVariety: !!hot })),
+
+  /**
+   * #2151 — a revision request lands (the driver's judgment, re-validated
+   * here against the standing form itself): the named form must still
+   * stand, unheld, and must not already have had its bite — a form the
+   * standing record names is never requested twice. The record is a
+   * session note, never an undo step: nothing on stage has moved yet.
+   */
+  requestFieldRevision: (req) =>
+    set((state) => {
+      const form = state.layoutParams.fieldForm;
+      if (!form || poemHeld(state)) return {};
+      if (!req || typeof req !== 'object') return {};
+      if (req.read !== 'empty' && req.read !== 'crowded') return {};
+      if (typeof req.formKey !== 'string' || req.formKey !== poemFormKey(form)) return {};
+      const standing = state.fieldRevision;
+      if (standing && standing.formKey === req.formKey) return {};
+      return {
+        fieldRevision: {
+          status: 'pending',
+          formKey: req.formKey,
+          poetId: form.poetId,
+          pieceId: form.pieceId,
+          register: typeof req.register === 'string' ? req.register : null,
+          read: req.read,
+          doctrine: typeof req.doctrine === 'string' ? req.doctrine : null,
+          deal: state.poemDeal | 0,
+          knobs: FIELD_REVISION_KNOBS,
+        },
+      };
+    }),
+
+  /**
+   * #2151 — a pending request is silenced: the user's hand (a tempo
+   * change, a moved form, a hold, an exemption) overrode it before the
+   * poem answered. The record keeps the outcome; the form it named is
+   * done being judged (one bite per form).
+   */
+  cancelFieldRevision: (outcome) =>
+    set((state) => {
+      const rec = state.fieldRevision;
+      if (!rec || rec.status !== 'pending') return {};
+      return {
+        fieldRevision: {
+          ...rec,
+          status: 'silenced',
+          outcome: typeof outcome === 'string' ? outcome : 'overridden',
+        },
+      };
+    }),
+
+  /**
+   * #2151 — the poem answers its request: a re-deal toward the other
+   * pole from the standing poet's register stock, through landPoem
+   * itself — the same gate, doctrine arm, shadow review, ladder and
+   * seeded streams as any deal, one undo step like the performer's own
+   * re-deal. Everything is re-validated at the commit: no pending
+   * request, a moved form, a hold, or an exemption landed since the
+   * request silences it instead (the user's change overrides). The
+   * answer's pick draws off the deal index's own pick stream, so the
+   * commit's place in the take log is the whole of its provenance.
+   */
+  answerFieldRevision: () =>
+    set((state) => {
+      const rec = state.fieldRevision;
+      if (!rec || rec.status !== 'pending') return {};
+      const form = state.layoutParams.fieldForm;
+      const silenced = (outcome) => ({ fieldRevision: { ...rec, status: 'silenced', outcome } });
+      if (!form) return silenced('form-moved');
+      if (poemHeld(state)) return silenced('held');
+      if (poemFormKey(form) !== rec.formKey) return silenced('form-moved');
+      if (reviewExemption(form, state.layoutParams.poemKeeps)) return silenced('exempt');
+      const n = state.poemDeal | 0;
+      const decision = pickRevisionDecision(
+        form,
+        rngForIndex(state.seed, CH.curate, POEM_PICK_BASE + n, state.seedOffsets),
+      );
+      if (!decision) return silenced('no-stock');
+      const poem = landPoem(state, state.layoutParams, { decision });
+      const landed = poem.layoutParams.fieldForm ?? null;
+      const answered = {
+        ...rec,
+        status: 'answered',
+        outcome: landed ? 'redealt' : 'silence',
+        answerPoetId: landed ? landed.poetId : null,
+        answerPieceId: landed ? landed.pieceId : null,
+        deal: poem.poemDeal,
+      };
+      if (Object.is(landed, form ?? null))
+        return { poemDeal: poem.poemDeal, fieldGateRefusal: poem.fieldGateRefusal, fieldRevision: answered };
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: poem.layoutParams,
+        poemDeal: poem.poemDeal,
+        fieldGateRefusal: poem.fieldGateRefusal,
+        fieldReview: poem.fieldReview,
+        fieldRevision: answered,
       };
     }),
 

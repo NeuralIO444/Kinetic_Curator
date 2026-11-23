@@ -14,7 +14,7 @@
 // standing, no group. All writes go through the store; the group only reads. RAY GUN's tap goes through the treatments surface (#2010),
 // which writes through the store and lets the bus announce the act.
 import { useStore } from '../state/store.js';
-import { poemIdentity, isPoemKept } from '../poets/poemRow.mjs';
+import { poemIdentity, poemFormKey, isPoemKept } from '../poets/poemRow.mjs';
 import { treatments } from '../curator/treatmentsLive.mjs'; // #2010: the gun fires through the treatments surface
 
 // #2383 (R6 callsign sweep): the chip names the armed treatment by its surface callsign. The mode id on the
@@ -25,6 +25,7 @@ export function PoemRow() {
   const fieldForm = useStore((s) => s.layoutParams.fieldForm);
   const held = useStore((s) => !!s.lockedParams?.fieldForm);
   const poemKeeps = useStore((s) => s.layoutParams.poemKeeps);
+  const fieldRevision = useStore((s) => s.fieldRevision);
   const redealPoem = useStore((s) => s.redealPoem);
   const togglePoemHold = useStore((s) => s.togglePoemHold);
   const togglePoemWhisper = useStore((s) => s.togglePoemWhisper);
@@ -32,6 +33,14 @@ export function PoemRow() {
 
   const id = poemIdentity(fieldForm);
   if (!id) return null;
+  // #2151 — a pending revision request names this standing poem by its
+  // form key (poet + piece + exact materialization): the chip rides
+  // only the exact form the request judged — a re-dealt same piece is a
+  // different form and never wears a stale chip. The chip says what the
+  // critics read, and the poem's answer — or the user's overriding
+  // hand — clears it.
+  const revision =
+    fieldRevision?.status === 'pending' && fieldRevision.formKey === poemFormKey(fieldForm) ? fieldRevision : null;
   const kept = isPoemKept(poemKeeps, fieldForm);
   const whisper = fieldForm.register === 'whisper';
   const raygun = fieldForm.raygun;
@@ -70,6 +79,19 @@ export function PoemRow() {
         <span className="chip-btn poem-form" title={`Form: ${id.form}`} aria-label={`Form ${id.form}`}>
           {id.form}
         </span>
+        {revision ? (
+          <span
+            className="chip-btn poem-revision"
+            title={
+              revision.read === 'empty'
+                ? 'Too empty — this poem stands at the cover register, and a revision has been requested. The poem answers with a fuller piece in a moment, unless you change something first: your hand overrides the request.'
+                : 'Too crowded — this poem stands at the interior register, and a revision has been requested. The poem answers with a lighter piece in a moment, unless you change something first: your hand overrides the request.'
+            }
+            aria-label={revision.read === 'empty' ? 'Revision requested: too empty' : 'Revision requested: too crowded'}
+          >
+            {revision.read === 'empty' ? 'too empty' : 'too crowded'}
+          </span>
+        ) : null}
         <button
           type="button"
           className={`chip-btn poem-act${raygun ? ' active' : ''}`}

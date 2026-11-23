@@ -121,6 +121,12 @@ export const DETERMINISM_ALLOWLIST = {
       why: '#2006 slice 2: the same injectable now seam\u2019s fallback when performance is unavailable — ask-latency measurement only, never sim input',
     },
   },
+  'curator/fieldRevisionLive.js': {
+    'Date.now': {
+      count: 1,
+      why: '#2151: the revision driver\u2019s injectable now seam, defaulting to the wall clock — it times only the standing dwell and the pending grace of a live critic; judgments are the pure core\u2019s, answer deals draw from the seeded poem streams, the driver is muted during take playback, and the clock never feeds the sim or a take; tests inject now',
+    },
+  },
   'curator/mindPresenceLive.js': {
     'Date.now': {
       count: 1,

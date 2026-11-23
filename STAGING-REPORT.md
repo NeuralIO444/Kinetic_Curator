@@ -1,126 +1,148 @@
-# STAGING REPORT — #2384 Persona Kernel P4: Persona Archive (text shelves + MegaMind retrieval + Mind context)
+# STAGING REPORT — #2151 FIELD: LOIS and DAVIS request revisions when a standing poem reads empty or crowded
 
-Branch `kc-2384-persona-archive`, based on origin/main `33bf4474` (P3 merged). One PR, not merged by
-the builder (it wires a new path into Mind's model asks → Matt's review lane): **PR #2418 — https://github.com/NeuralIO444/Kinetic_Curator/pull/2418**
+Branch `feat/2151-field-revision-requests`, based on origin/main `b605edd9` (#2437). One PR, **not merged by
+the builder** — a feel feature in Matt's review lane: **PR pending** (opened at the end of this build; the PR
+body carries the same summary).
 
-Spec: `docs/design/persona-kernel-spec.md` §3 (the Archive, Q7: text only) + §4b (the dossier).
-Issue acceptance: a persona ask includes cited Archive snippets; rules fallback unchanged when no
-model; selfcheck: no image files under `archive/`.
+Spec: issue #2151 body + comments — the register ruling (2026-11-12: empty = the COVER register, crowded =
+the INTERIOR register; CARSON reads the cover pole, ASHWORTH the interior/grit side), the pressure law
+(2026-11-12: HOT = variety mode, no requests; LINGERING/FIDDLING = requests stand down; requests fire only
+in between, poem standing, user watching; a user change overrides), the supply and minimum rulings
+(2026-11-17: poets write the pole pieces — landed as PR #2310's per-poet register caches; one-word poems
+exempt from `FIELD_POEM_MIN_STAMPS`; Japanese covers deal in the native face whatever their length), and
+the acceptance checklist in the body plus the comments' additions.
 
 ## What was built
 
-### The shelves — `app/src/personas/archive/<id>/*.md` (90 files: 18 personas × 5)
+### The critical pass — `app/src/curator/fieldRevision.mjs` (new, pure)
+- `judgeStandingPoem(form)` — reads the standing form's piece in the supply and judges its REGISTER TAG:
+  `cover` → `{ read: 'empty', doctrine: 'carson' }`, `interior` → `{ read: 'crowded', doctrine: 'ashworth' }`,
+  `between` or an untagged deck piece → fine. Not letter counts, not share of frame — the piece's own
+  typographic register, as ruled. Unknown piece → null (nothing to judge).
+- `classifyTempo(snapshot)` — the pressure law as a pure read of the loisActivity snapshot: `hot`
+  (rollsLastMinute ≥ `REVISION_HOT_ROLLS_PER_MIN`), `fiddling` (a settings tweak inside
+  `REVISION_FIDDLE_WINDOW_MS`, or a live undo burst), `away` (the feed's own away line, or no feed),
+  else `watching`.
+- `pickRevisionDecision(form, rng)` — the poem's answer: a deal decision naming a piece from the SAME
+  poet's register cache, toward the other pole — the middle band first, the far pole as fallback — never
+  the standing piece; a form standing in the native face is answered in the native face.
+- `FIELD_REVISION_KNOBS` — every threshold/band/gate of the pass as named constants in one frozen object,
+  banked into each request record as provenance (the fieldReview gates discipline). No tuning surface.
 
-Every persona in the registry carries the five shelves the issue names: `backstory.md` (sourced,
-with a front-matter provenance block naming its sources and check date), `brief.md` (the creative
-brief — objective, principle, what it never does, the one-line big idea — marked **UNSIGNED** in a
-banner until Matt signs it), `inspiration.md` (works and methods in our own words; no quotation
-beyond a short line), `canon.md` (Canon pointers: where its lexicon, taste vector, Canon style and
-modes actually live), `rulings.md` (Matt's rulings touching the persona, plus the standing laws).
+### The driver — `app/src/curator/fieldRevisionLive.js` (new), wired in `App.jsx`
+Ticks once a second; owns all the clocks (dwell, grace) so the slice never reads one (#806 law). Per tick:
+the store's `fieldVariety` flag follows the hot tempo; a pending request is silenced the moment the form
+moves, the poem is held, an exemption lands (the review loop's own table — kept/plate/raygun/whisper), or
+the tempo leaves watching; after `REVISION_ANSWER_DELAY_MS` of watching grace it calls the store's answer
+action. A poem is judged only after standing `REVISION_STAND_DWELL_MS` in the watching tempo, unheld and
+unexempt. Muted while a take plays back. All faults swallowed — a critic never breaks the stage.
+Its one `Date.now` (the injectable seam's default) carries an exact-count entry in
+`eslint-rules/determinism-allowlist.mjs` with the written reason, on the loisActivity precedent.
 
-Content discipline: everything derives from the `kc-persona/1` records, `docs/characters/*.md` and
-the spec — nothing invented. Where the record carries no data, the shelf says so instead of
-filling the gap: the doctrines' dates are "not stated in the repo"; Greiman's shelf follows her
-record and supplies no full name; the voices (Molnár, Mohr, Benjamin, Reas, Haeckel, Oxman, Stock,
-Anadol, Menkman) carry their distillation (the record's taste rationale) as their method, and say
-plainly that a voice is a measure, not a character. The Queen's inspiration shelf carries the
-Art of Seduction ideas in our own words, as spec §4 (Q11 follow-up) directs. Her shelves are
-Archive-internal text like all the others — nothing about her surfaces anywhere (Q2 stands).
+### The store — `app/src/state/slices/layoutSlice.js`
+- New session state beside `fieldReview`: `fieldRevision` (the pass's record) and `fieldVariety` (the hot
+  flag). Neither is serialized or undo-managed (fieldReview's discipline).
+- Actions: `setFieldVariety`, `requestFieldRevision` (re-validates the named form still stands, unheld,
+  and hasn't had its bite), `cancelFieldRevision` (records the silencing outcome), `answerFieldRevision`
+  (re-validates everything — pending, form unmoved, unheld, unexempt — then deals through `landPoem`).
+- `landPoem` gains two seams, both defaulting to today's behaviour: a caller-named `decision` (the
+  revision answer — it then flows through the gate, the doctrine arm, the shadow review, the ladder and
+  the counter exactly as a Director deal does) and variety read off `state.fieldVariety` into `dealPoet`
+  (including the ladder's own re-deal).
 
-### The pure core — `app/src/personas/personaArchive.mjs`
+### The supply deals — `app/src/poets/fieldForm.js`, `placement.js`, `poemRow.mjs`
+- `POET_REGISTERS` + `findPoetPiece` — the supply: deck first, then the poet's register cache. `POET_DECKS`
+  is untouched (the #2310 suite's pins hold byte-for-byte).
+- `fieldDealReport` serves the whole supply and applies the two ruled exceptions to the #1932 minimum,
+  judged on the face actually dealt: a one-word deal is exempt; a `register: 'cover'` piece on a kana deal
+  is exempt. Every other piece keeps the minimum (pinned: Teijo's `t9` in the native face — 5 stamps,
+  between — still silences; its Latin face deals as always).
+- The one-word push (`placement.js`, `PUSH_*` constants beside the plate family): a one-word deal is sized
+  to 0.84 of the dish width, capped at em 0.28 (under the document door's 0.3 stamp ceiling), with
+  per-glyph em/rotation jitter drawn off the placement stream after the module origin — deterministic per
+  (piece, seed), gate-judged and door-fixed like every form (pinned across seeds, both faces).
+- `poemIdentity` reads the supply, so the poem row names register poems — and a pushed one-word poem's
+  identity chip shows the clean transcription off the piece, per FIELD law. `poemFormKey` is exported
+  (poet + piece + exact materialization) as the pass's form key.
+- The pending request shows on the poem row as a small chip — `too empty` / `too crowded` — beside the
+  FORM chip, only while the request names the standing piece (`PoemRow.jsx`). No new panel.
 
-- `parseArchiveFile` / `parseFrontMatter`: front matter (provenance) + `## ` section chunking.
-  The file's frame (title, the brief's UNSIGNED banner) never becomes a snippet. Chunks are
-  truncated at the named snippet cap (600 chars, word boundary, marked with …).
-- `buildArchiveCorpus`: the whole Archive as one flat chunk list, each chunk carrying its citation
-  (`archive/<id>/<file>.md · <section>`), plus a problems list in the registry idiom (missing
-  shelf, front matter disagreeing with its path, missing provenance, an UNSIGNED-less brief,
-  an empty shelf) — data, asserted empty by the selfcheck, so drift fails CI.
-- `archiveQueryText`: the ask's query, a deterministic composition over the buildContext summary
-  (persona, palette, verdict, intensity, band, room states, tier, keeps) — the same room always
-  asks the same question, so the embed cache can answer it.
-- `rankPersonaChunks` / `fitArchiveSnippets` / `retrieveSnippets`: ranking reuses the embeddings
-  slot's own `nearestNeighbours` over the persona's OWN chunks only; fitting spends the base
-  context's estimated tokens first and admits whole snippets in rank order while the estimate
-  stays inside Mind's 4,096-token window (named constants: `MIND_TOKEN_WINDOW`,
-  `ARCHIVE_MAX_SNIPPETS` = 4, `ARCHIVE_SNIPPET_MAX_CHARS` = 600, `CHARS_PER_TOKEN` = 4).
-- `withArchiveSnippets`: the seam of the fallback law — an empty snippet list returns the context
-  object itself (same reference); otherwise a shallow copy carrying `archive: [{ cite, text }]`.
+### Variety — `fieldDirector.js` / `fieldEval.js` / `director.js`
+`choosePoet` gains `variety`: the piece pick ranges over deck + register cache for the chosen poet. Off,
+the pick is the deck alone, exactly as shipped (pinned both ways).
 
-### The live driver — `app/src/personas/personaArchiveLive.js`
+## Decisions taken under the coordinator's standing recommendation (flagged per the brief)
 
-In the megamindEmbedLive idiom. Bundles the shelves via Vite's `import.meta.glob` raw imports
-(verified in the production bundle), and:
+1. **Push hardness** (the one question the issue's first comment left open — asked once and dropped, or
+   standing?): a request stands as a PENDING record for a short grace (`REVISION_ANSWER_DELAY_MS`, 6 s of
+   watching tempo), during which any user change silences it; then the poem answers. One bite per form —
+   answered or silenced, that exact materialization is never judged again.
+2. **The answer targets the middle band first** ("re-deals TOWARD the other pole"): a cover poem is
+   answered from `between` (the far pole only when the middle has no stock), so an answered poem lands
+   between the poles and cannot draw the opposite request next.
+3. **The answer stays with the standing poet** — the register caches were built per poet precisely so
+   each poet spans the line; the poem answers in its own voice, in its standing face (script included).
+4. **Exemptions reuse the review loop's table** (`reviewExemption`: kept, plate, raygun, whisper; held
+   forms likewise) — a poem the performer has claimed or treated is beyond critics, on the #2006
+   precedent.
+5. **The answer is a reviewed landing** (it rides `landPoem` whole, ladder included), not a
+   performer-style unreviewed re-deal: it is the poem system's own deal, and the ladder's re-deal inside
+   it can only land deck pieces (which read fine), so the pass cannot loop.
+6. **Away is a fourth tempo**: the feed's own idle line means nobody is watching, so nothing fires —
+   the watching state the ruling names requires a watcher.
 
-- **Measured, never assumed:** retrieval runs only while the embed driver's own view carries a
-  slot record that `semanticEnabled` grades clean. On a machine whose Ollama serves only the
-  House model (qwen3-vl — chat/vision, no embeddings; the known house inventory), no record
-  exists, `snippetsFor` returns [] forever, and no network call is ever made (pinned in the
-  selfcheck, E1/E2).
-- **Embedded at build/idle, never per frame:** `scheduleArchiveIndexing` (requestIdleCallback,
-  timer fallback) indexes the shelf after the mind boots; indexing is cache-first per chunk
-  (the slot's own vector cache, keyed by model + SHA-256 of the chunk's embed text, so a model
-  swap or an edited shelf can never serve a stale vector) with misses batched by `EMBED_BATCH`.
-  The only per-ask embed is the single query text, itself cache-first — the slot's own search
-  press idiom. Nothing embeds inside a frame, a bar, or a render.
-- **Failure is []:** any gate, throw or timeout inside the retriever resolves to no snippets;
-  the ask proceeds exactly as before.
+## Verification (this tree, this build)
 
-### The Mind seam — `app/src/curator/mindLive.js`, `app/src/App.jsx`
+- New suite `src/curator/fieldRevision.selfcheck.mjs` (14 cases, added to `app/selfcheck.manifest`):
+  the judge, the tempo table, the answer pick, the supply exceptions (one-word, Japanese covers across
+  12 seeds × both faces — dealt, gate-clean, door-fixed), the push (scale, per-glyph treatment, replay),
+  identity, variety both ways, the store actions (request/answer/hold/one-bite), and the driver against
+  a fake stage (dwell, grace, hot, fiddling-silence, fine-poem silence).
+- Targeted neighbours all green: poemRegister, poemRow, fieldLatin/Kana/Kanji/Plate/StampPath,
+  poemLife, fieldSilence, fieldReview, fieldReviewLadder, fieldReviewQuiet, fieldReviewVoice,
+  fieldDirector, fieldLiveDeal, fieldBattery, doctrines, doctrineLayout, buildPlacements.
+- Dice-driven poem suites run 20× each, all 20/20: poemRow, fieldLiveDeal, fieldReviewLadder,
+  fieldReview, poemRegister, fieldRevision, fieldSilence, fieldReviewQuiet.
+- `npm run lint` — 0 errors (11 warnings, the project's pre-existing baseline; the changed files add
+  none beyond pre-existing App.jsx hook notes). `npm run format:check` — clean. `npm run build` — green.
+- Full manifest sweep (continue-on-error, per-suite log): **793 pass / 3 fail** of 796. The only
+  failures are the known sandbox-environmental trio — `swarmWasm`, `rollSafety`, `accum` — the same
+  three that fail on this main in the sandbox (WASM bake + WebGL/browser-dependent suites); every
+  FIELD/poem suite passed inside the sweep, the new `fieldRevision` suite included.
 
-`startMind` gains an optional `archive` parameter (absent = the pre-Archive instrument, exactly).
-When present, the ask wrapper — after the `mind:req` telemetry emit, which still hashes the
-ORIGINAL context — awaits `archive.snippetsFor(persona, context)` off the bar and hands
-`model.ask` the enriched copy. The thinker and the rules never see the enrichment: they keep the
-untouched context object on every bar, model-answered or not. App.jsx constructs the singleton
-retriever, passes it in, and schedules idle indexing next to `startMind`.
+## What this does not do
+- No MegaMind/Mind tuning surface (the knobs are gathered and readable; tuning is a later slice, as ruled).
+- No new poems — the supply is #2310's cache, dealt as written.
+- The CURATOR press's own first deal (its private path in layoutSlice) does not take the variety flag;
+  variety rides every `landPoem` deal (KINETIC passes, the identity chip, round landings, ladder re-deals).
+- No change to the review loop's judgments: #2151 judges register, #2006 judges jank; they share the
+  exemption table and the deal path, nothing else.
 
-## Not changed
+## QA fix pass (post-review, same branch)
 
-- `mindRules.js`, `mindContext.js`, `mindThinker.js`, `mindContract.js` — untouched (the fallback
-  proof below rests on this plus the startMind A/B).
-- The embeddings slot (`megamindEmbed.mjs` / `megamindEmbedLive.js`) — reused as-is; no new
-  endpoint, no CSP change, no cloud anything. Prompts (megamindVoice etc.) untouched: snippets
-  ride the context object the existing prompt builders already serialize.
-- No surface renders Archive text. Snippets enter the model's context only, through the same
-  display policy the context already travels under (P3 callsign law is about surfaces; the shelf
-  texts are lineage, like the records and lore).
-- The Wire (§3a) is not part of this issue and was not built.
+The QA review returned no blockers, one should-fix and four notes; all five are fixed in this pass:
 
-## Verification
+- **F1 (should-fix) — driver-level replay coverage.** The acceptance line "takes replay identically"
+  rested on code-reading for the driver half. The `fieldRevision` suite now carries two fake-stage
+  replay cases: with `isReplaying: () => true`, a pole-register poem standing past the dwell draws
+  no request and no variety write; and a request already pending when playback starts never answers
+  mid-replay — the grace restarts when playback ends and the poem answers then.
+- **F3 (note; coordinator ruled: fix the code, not the wording) — the dwell clock.** The driver
+  timed the 20 s dwell from the form's first appearance in ANY tempo, so a poem that stood 20 s
+  while hot was judged the instant the tempo cooled. The dwell now accumulates only in the
+  watching tempo (hot/fiddling/away time never counts), and a new suite case pins it: a form
+  standing twice the dwell while hot still waits a full watching dwell before it is judged.
+- **F5-chip (note) — stale chip.** `PoemRow.jsx` matched a pending request to the standing form
+  by poet+piece, so a re-dealt same piece could wear the chip for ~a tick. It matches by formKey
+  now: the chip rides only the exact materialization the request judged.
+- **F2 / F4 (notes) — paperwork.** The sweep was re-run on the final tree with the complete
+  per-suite log kept as an artifact; its summary is posted as a comment on the PR and the PR
+  body's verification section points at that comment. The PR body's files-touched list now names
+  this report.
 
-- **New suite** `app/src/personas/personaArchive.selfcheck.mjs` (registered in
-  `app/selfcheck.manifest`): **18 checks passed** — shelf structure + no-image law (A1–A3),
-  parsing/citation/cap (B1–B3), query determinism (C1), retrieval against a stub embeddings
-  model: batched idle indexing, own-shelf cited snippets inside the window, cache-served
-  identical repeat (D1–D3), the no-model path making zero network calls (E1–E2), window fitting
-  (F1–F3), and the fallback law (G1–G3).
-- **Fallback proof (byte-identical):** a 54-case battery over `rulesReply` (3 personas × 3 room
-  snapshots × 3 seeds × 2 bars) run against this branch and against a fresh detached worktree at
-  origin/main `33bf4474` — outputs byte-identical (`cmp` clean). The battery is also pinned as a
-  golden inside the new suite (G1). G2 drives `startMind` twice (no archive vs archive wired but
-  returning []): the model is handed deep-equal contexts and the decisions are deep-equal. G3
-  confirms snippets land only on the model-bound copy.
-- **Targeted suites** (every selfcheck naming a touched file): mind, mindApple, mindConduct.apple,
-  mindFace, mindPresence, backendIndicator, canonBus, directorRoom, trioAcceptance, megamindLink,
-  megamindVoice, megamindEmbed, personaKernel, personaTuning, callsignSweep — **15/15 PASS**.
-- **Full manifest sweep:** **760 pass / 3 fail of 763**. The 3 failures (swarmWasm, rollSafety,
-  accum) were A/B-run standalone against a fresh detached worktree at origin/main `33bf4474`:
-  swarmWasm exits 1 on both trees (the sandbox `build-wasm.sh --verify` toolchain), rollSafety
-  crashes to the Node banner on both (exit 1, no verdict line on either tree), accum aborts on
-  both with the identical V8 frame `0x19f0c41` (exit 134). Sandbox-environmental, not Archive-caused;
-  CI is the authority for those three.
-- `npm run lint`: 0 errors (11 warnings, pre-existing). `npm run format:check`: clean.
-  `npm run build`: green; the shelf texts verified present in the production bundle.
-
-## Open questions (not silently decided)
-
-1. **The briefs are drafts.** All 18 `brief.md` files carry the UNSIGNED banner, per the issue.
-   Signing them (or editing the drafts) is Matt's act; nothing in the code treats a brief as
-   signed copy.
-2. **DAVIS vs OVERLAP** stays marked OPEN in davis/rulings.md, as the spec leaves it — the P3
-   sweep set the surfaces; the underlying question is Matt's to close.
-3. **Greiman's identity:** her record states her full name and dates are not in the repo ("the
-   Archive phase sources them"). This build did NOT source them from outside the repo — the shelf
-   follows the record and says so. If Matt wants them sourced, that's a research act with
-   provenance to record, separate from this PR.
+Verification for this pass: `fieldRevision` suite **17 cases passed** (14 + the 3 new ones above);
+poemRow 5× all pass (16 checks each); the field family and fieldReview family neighbours all pass;
+full manifest sweep on this tree: **793 pass / 3 fail of 796** — the known sandbox-environmental
+trio (`swarmWasm`, `rollSafety`, `accum`), complete per-suite log kept as an artifact, summary
+posted as a comment on the PR; `npm run lint` 0 errors (11 warnings, the pre-existing baseline);
+`npm run format:check` clean; `npm run build` green.
