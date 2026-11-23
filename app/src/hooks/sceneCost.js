@@ -42,6 +42,7 @@ export const FX_KIND_TO_COST_ID = {
   sharpen: 'fx/sharpen',
   haze: 'fx/haze',
   grade: 'fx/grade',
+  gradientMap: 'fx/gradientMap', // #2443 — the gradient map's registered tier (gl/effects/fxShaders.mjs)
   // #1490 — the feedback warp is not a chain pass: its cost is the spectral
   // warp's CPU step, registered as gl/spectrum-warp (gl/spectrumWarp.mjs).
   feedbackWarp: 'gl/spectrum-warp',

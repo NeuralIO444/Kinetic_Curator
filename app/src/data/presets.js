@@ -307,6 +307,16 @@ export const COMPOSITION_PRESETS = [
     categories: ['crystalline', 'geometric'],
     styles: ['techno'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
+    // #2443 — this Look's gradient-map recipe: a deep ember ramp for the
+    // GRADIENT MAP FX item (fx/gradientMap.mjs) — near-black warmth,
+    // brick shadows, an ember-red middle, amber highlights.
+    gradientMap: {
+      blackPoint: '#0d0b09',
+      shadows: '#3d1710',
+      midtones: '#a83218',
+      highlights: '#d98a2b',
+      whitePoint: '#f3e6cf',
+    },
     params: {
       // SPARSE and LARGE are the whole brief: chiaroscuro is mostly dark, and
       // a high count tiles the plate until there is no dark left for the light
@@ -353,6 +363,16 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic', 'biosynthetic', 'dots'],
     styles: ['organic', 'techno'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
+    // #2443 — this Look's gradient-map recipe: a verdigris ramp for the
+    // GRADIENT MAP FX item (fx/gradientMap.mjs) — black-green depths, a
+    // saturated teal middle, chartreuse highlights.
+    gradientMap: {
+      blackPoint: '#0a0f0e',
+      shadows: '#123a34',
+      midtones: '#1f9e7a',
+      highlights: '#c9d13a',
+      whitePoint: '#eef3e2',
+    },
     params: {
       mode: 'hype',
       count: 240,
@@ -801,6 +821,16 @@ export const COMPOSITION_PRESETS = [
     categories: ['radial', 'linework'],
     styles: ['engraved'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
+    // #2443 — this Look's gradient-map recipe: a bone ramp for the
+    // GRADIENT MAP FX item (fx/gradientMap.mjs) — muted sepia all the
+    // way up, the quiet map for plate material.
+    gradientMap: {
+      blackPoint: '#171310',
+      shadows: '#4a3826',
+      midtones: '#96754a',
+      highlights: '#cbb489',
+      whitePoint: '#f7f1e3',
+    },
     params: {
       mode: 'hype',
       count: 160,

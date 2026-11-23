@@ -22,6 +22,7 @@
  */
 
 import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
+import { withGradientStops } from '../fx/gradientMap.mjs'; // #2443 — resolve the gradient map's per-Look stops into the chain
 import { contractDistort, distortError } from './itemDistort.mjs'; // #2010 P3: the shared distortion channel
 import { sanitizeMathEffects, MATH_OP_KINDS, mathTrackWetCeiling } from '../fx/mathFilters.js';
 import { sanitizeStratumRotation } from '../state/stratumRotation.js'; // #2038 — per-stratum rotation detents
@@ -598,7 +599,11 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         visible: true, // resolved layers are pre-filtered for visibility
         opacity: clamp01(rl.layerOpacity ?? rl.layer?.layerOpacity ?? 1),
         blend: 'normal', // FX wrap groups carry no blend mode (buildLayerStack)
-        fx: sanitizeFxEffects(rl.layer?.effects), // top-down, #185 order preserved
+        // #2443 — a gradientMap step carries the standing Look's resolved
+        // stops (per-Look recipe constants, attached here so the take
+        // records the exact stops it renders with; a no-op for every
+        // other kind, so contracts without the item stay byte-identical).
+        fx: withGradientStops(sanitizeFxEffects(rl.layer?.effects), doc.layoutParams?.composition), // top-down, #185 order preserved
         matte: sanitizeMatte(rl.layer?.matte),
         // #2038 — rotation detent, carried only while non-zero (the
         // wrap carries it too; this is the layer's own record of it).

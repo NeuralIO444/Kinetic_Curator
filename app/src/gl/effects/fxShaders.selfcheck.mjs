@@ -21,6 +21,7 @@ import {
   __clearTemplateRegistry,
 } from './template.mjs';
 import { FX_EFFECT_DEFS } from '../../fx/fxFilters.js';
+import { GRADIENT_STOP_PARAMS } from '../../fx/gradientMap.mjs';
 import {
   FX_SHADER_EFFECTS,
   FX_SHADER_KINDS,
@@ -182,11 +183,14 @@ ok('all template kinds are declared', () => {
   // template effect, its GLSL living in engine/risoFinish.mjs).
   // Re-pinned for #2038 (cause: the stipple dot screen ships as a
   // template effect alongside dither).
+  // Re-pinned for #2443 (cause: the gradient map ships as a template
+  // effect in EF-3 Tonal).
   assert.deepEqual([...FX_SHADER_KINDS].sort(), [
     'displace',
     'dither',
     'edge',
     'grade',
+    'gradientMap',
     'halo',
     'haze',
     'riso',
@@ -211,7 +215,28 @@ ok('descriptors validate and mirror the SVG-side FX catalog', () => {
       assert.equal(tp.max, p.max, `${kind}.${pname}: max`);
       assert.equal(tp.def, p.def, `${kind}.${pname}: def`);
     }
-    assert.equal(Object.keys(d.params).length, Object.keys(svgDef.params).length, `${kind}: no extra params`);
+    // #2443 — gradientMap is the one deliberate exception to "no extra
+    // params": its five stop colours are per-Look recipe constants the
+    // scene contract attaches to the chain step (fx/gradientMap.mjs),
+    // never catalog params — so the descriptor carries exactly the
+    // catalog's strength plus the five named stop params, each
+    // color-typed. Every other kind still mirrors the catalog exactly.
+    const extra = Object.keys(d.params).filter((k) => !(k in svgDef.params));
+    if (kind === 'gradientMap') {
+      assert.deepEqual(
+        extra.sort(),
+        [...GRADIENT_STOP_PARAMS].sort(),
+        'gradientMap: extras are exactly the stop params',
+      );
+      for (const k of extra) assert.equal(d.params[k].type, 'color', `gradientMap.${k}: color-typed`);
+    } else {
+      assert.deepEqual(extra, [], `${kind}: no extra params`);
+    }
+    assert.equal(
+      Object.keys(d.params).length,
+      Object.keys(svgDef.params).length + extra.length,
+      `${kind}: param count is the catalog plus its declared extras`,
+    );
     assert.equal(d.pad, 0, `${kind}: pad 0 (padded routing is Phase-3 work)`);
     assert.equal(d.animated, false, `${kind}: not animated`);
   }

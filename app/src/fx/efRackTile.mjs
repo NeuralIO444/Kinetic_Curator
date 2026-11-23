@@ -23,6 +23,7 @@ export const KIND_FACE = {
   solarize: { abbr: 'SOL', word: 'solar' },
   invert: { abbr: 'INV', word: 'invert' },
   grade: { abbr: 'GRD', word: 'grade' },
+  gradientMap: { abbr: 'GRM', word: 'gradient' }, // #2443 — the luminance gradient map's face
   grain: { abbr: 'GRN', word: 'grain' },
   feedbackWarp: { abbr: 'FBW', word: 'feedback' },
   scanlines: { abbr: 'SCN', word: 'scan' },

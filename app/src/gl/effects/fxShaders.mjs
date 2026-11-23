@@ -44,6 +44,7 @@
 
 import { sanitizeParams, getTemplateEffect, registerTemplateEffect } from './template.mjs';
 import { RISO_GLSL } from '../../engine/risoFinish.mjs'; // #2008 — the riso finish's GPU mirror (law + CPU reference beside it)
+import { gradientStopParams } from '../../fx/gradientMap.mjs'; // #2443 — the gradient map's law + default stops (fx/gradientMap.mjs)
 import { chunksUsedBy } from './chunks.mjs';
 import { registerCostTier } from '../costTiers.mjs';
 
@@ -759,6 +760,112 @@ export const FX_GRADE_DESCRIPTOR = {
   },
 };
 
+// #2443 — GRADIENT MAP (EF-3 Tonal): the frame re-colored by its own
+// luminance through a five-stop gradient. Spectral-law declaration
+// (#2361): a per-tone RECOLOR — no pigment mixing, no added light; the
+// tone decides the colour, in place. The stops are per-Look recipe
+// constants: the scene contract resolves them from the standing Look
+// and attaches them to the chain step as the five colour params below
+// (fx/gradientMap.mjs: withGradientStops); their defaults are the
+// default gradient, so a step that arrives without stops still maps
+// sensibly. Premultiplied discipline like grade/haze: un-premultiply
+// before the tone math, restore after, alpha untouched; strength 0
+// returns the source byte-for-byte. The hat-weight sampling below is
+// the same formula as the CPU reference (fx/gradientMap.mjs
+// sampleGradient) — the selfcheck pins the two together.
+const GRADIENT_MAP_DEFAULT_STOPS = gradientStopParams(null);
+
+export const FX_GRADIENT_MAP_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_tex;
+uniform vec2 u_res;
+uniform float u_strength;
+uniform vec4 u_black_point;
+uniform vec4 u_shadows;
+uniform vec4 u_midtones;
+uniform vec4 u_highlights;
+uniform vec4 u_white_point;
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  vec4 c = texture(u_tex, v_cuv);
+  o = c; // strength 0 returns the source byte-for-byte
+  if (u_strength > 0.0 && c.a > 1e-6) {
+    vec3 s = clamp(c.rgb / c.a, 0.0, 1.0);
+    float lum = dot(s, vec3(0.2126, 0.7152, 0.0722));
+    vec3 stops[5];
+    stops[0] = u_black_point.rgb;
+    stops[1] = u_shadows.rgb;
+    stops[2] = u_midtones.rgb;
+    stops[3] = u_highlights.rgb;
+    stops[4] = u_white_point.rgb;
+    vec3 mapped = vec3(0.0);
+    for (int i = 0; i < 5; i++) {
+      float w = clamp(1.0 - abs(lum - float(i) * 0.25) * 4.0, 0.0, 1.0);
+      mapped += stops[i] * w;
+    }
+    o = vec4(mix(s, mapped, clamp(u_strength, 0.0, 1.0)) * c.a, c.a);
+  }
+}
+`;
+
+export const FX_GRADIENT_MAP_DESCRIPTOR = {
+  label: 'Gradient Map',
+  hint: 'Re-colors the stage by its own luminance through the standing Look’s gradient: shadows, midtones and highlights take the gradient’s colours. Strength is the guard — on flat material a full map goes extreme fast.',
+  pad: 0,
+  animated: false,
+  params: {
+    strength: {
+      type: 'float',
+      label: 'Strength',
+      min: 0,
+      max: 1,
+      step: 0.05,
+      def: 0.6,
+      ui: 'slider',
+      hint: 'How far the gradient takes over. 0 is the stage untouched; 1 is the full map.',
+    },
+    // The five stops: Look-recipe constants attached by the scene
+    // contract, never performer-edited (the #2252 knob home). Defaults
+    // are the default gradient (fx/gradientMap.mjs DEFAULT_GRADIENT_STOPS).
+    black_point: {
+      type: 'color',
+      label: 'Black Point',
+      def: GRADIENT_MAP_DEFAULT_STOPS.black_point,
+      ui: 'color',
+      hint: 'The colour shadows take (the Look’s recipe, not a performer control).',
+    },
+    shadows: {
+      type: 'color',
+      label: 'Shadows',
+      def: GRADIENT_MAP_DEFAULT_STOPS.shadows,
+      ui: 'color',
+      hint: 'The colour low tones take (the Look’s recipe, not a performer control).',
+    },
+    midtones: {
+      type: 'color',
+      label: 'Midtones',
+      def: GRADIENT_MAP_DEFAULT_STOPS.midtones,
+      ui: 'color',
+      hint: 'The colour mid tones take — where the saturated colour lives (the Look’s recipe).',
+    },
+    highlights: {
+      type: 'color',
+      label: 'Highlights',
+      def: GRADIENT_MAP_DEFAULT_STOPS.highlights,
+      ui: 'color',
+      hint: 'The colour high tones take — the hue shift against the midtones lives here (the Look’s recipe).',
+    },
+    white_point: {
+      type: 'color',
+      label: 'White Point',
+      def: GRADIENT_MAP_DEFAULT_STOPS.white_point,
+      ui: 'color',
+      hint: 'The colour highlights take (the Look’s recipe, not a performer control).',
+    },
+  },
+};
+
 export const FX_SHADER_EFFECTS = [
   // 2x fbm-3 noise lookups: the costliest template FX — a quality scaler.
   [
@@ -891,6 +998,20 @@ export const FX_SHADER_EFFECTS = [
         memoryBytes: 1920 * 1080 * 8,
         timeMs: 0.45,
         notes: 'OKLCH round trip: 2 matrices + cbrt/cube, pure ALU, no taps',
+      },
+    },
+  ],
+  [
+    'gradientMap',
+    {
+      fs: FX_GRADIENT_MAP_FS,
+      descriptor: FX_GRADIENT_MAP_DESCRIPTOR,
+      file: 'fxShaders.mjs:gradientMap',
+      cost: {
+        tier: 3,
+        memoryBytes: 1920 * 1080 * 8,
+        timeMs: 0.25,
+        notes: 'single tap, luminance + 5-stop hat-weight ramp, pure ALU',
       },
     },
   ],
