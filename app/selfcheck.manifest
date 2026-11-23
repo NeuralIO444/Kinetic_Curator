@@ -215,6 +215,7 @@ node src/engine/cultureLife.selfcheck.mjs
 node src/engine/cultureSwarm.selfcheck.mjs
 node src/engine/cultureSolver.selfcheck.mjs
 node src/engine/cultureFields.selfcheck.mjs
+node src/engine/cultureHand.selfcheck.mjs
 node src/engine/dishFluid.selfcheck.mjs
 node src/engine/dishFluidCouple.selfcheck.mjs
 node src/engine/dishFluidStage.selfcheck.mjs

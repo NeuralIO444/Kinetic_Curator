@@ -143,6 +143,10 @@ export function sanitizeFluidDial(d) {
 /**
  * The stamped magnet list, sanitized: at most MAX_MAGNETS {x, y} points with finite
  * coordinates clamped into the dish (0..1, y down). Non-array junk reads as no magnets. Pure.
+ * An entry may carry a weight `w` (CULTURE Phase 3B: the culture world deals its Queen's
+ * magnet fields into the kernel with each field's strength as its weight); a finite w is
+ * preserved, clamped to zero or more, and an entry without one stays exactly {x, y} — every
+ * stamped stage magnet is weightless and reads at weight 1, today's law bit-for-bit.
  */
 export function sanitizeMagnets(list) {
   if (!Array.isArray(list)) return [];
@@ -152,7 +156,9 @@ export function sanitizeMagnets(list) {
     const x = Number(m.x);
     const y = Number(m.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    out.push({ x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) });
+    const o = { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
+    if (m.w !== undefined && Number.isFinite(Number(m.w))) o.w = Math.max(0, Number(m.w));
+    out.push(o);
     if (out.length >= MAX_MAGNETS) break;
   }
   return out;
@@ -166,9 +172,11 @@ export function fluidSeedKey(seed, wakeMs) {
 }
 
 /**
- * The magnet field at a dish-normalized point: Σ exp(−(d/R)²) over the magnets, distance
+ * The magnet field at a dish-normalized point: Σ w·exp(−(d/R)²) over the magnets, distance
  * aspect-corrected (dy scaled by aspectHW = canvasH/canvasW, so the falloff is round on the
  * canvas). NOT clamped — overlapping magnets add up; the step's gains keep the effect bounded.
+ * The weight w is 1 unless an entry carries one (a missing or non-finite w reads as 1, so
+ * every weightless caller — the whole live stage — is bit-identical to the unweighted law).
  * Pure.
  */
 export function magnetFieldAt(magnets, nx, ny, aspectHW = 0.7) {
@@ -178,7 +186,8 @@ export function magnetFieldAt(magnets, nx, ny, aspectHW = 0.7) {
   for (const m of magnets) {
     const dx = nx - m.x;
     const dy = (ny - m.y) * aspectHW;
-    f += Math.exp(-(dx * dx + dy * dy) / r2);
+    const w = m.w === undefined ? 1 : Number.isFinite(Number(m.w)) ? Math.max(0, Number(m.w)) : 1;
+    f += w * Math.exp(-(dx * dx + dy * dy) / r2);
   }
   return f;
 }
@@ -238,7 +247,8 @@ export function createFluid({ cols, rows, seedKey = 0, magnets = [] } = {}) {
 
 /**
  * Advance the fluid one Gray-Scott step, in place. `opts`:
- *   magnets    — the stamped magnet list (dish-normalized); pull scales their bias.
+ *   magnets    — the stamped magnet list (dish-normalized); pull scales their bias, and an
+ *                entry's optional weight w scales its own gaussian (absent = 1).
  *   pull       — the PULL dial 0..1 (magnet strength).
  *   flow       — the FLOW dial 0..1 (global feed multiplier).
  *   couple     — the COUPLE dial 0..1 (how hard the culture field biases the feed).

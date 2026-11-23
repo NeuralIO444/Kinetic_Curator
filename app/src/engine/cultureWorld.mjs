@@ -45,8 +45,9 @@
 //               120 Hz is 60 steps/s — the exact tempo the live dish-grid instance already
 //               runs at (the 480 steps/s stamp rate over FLUID_GRID_STEP_DIVISOR). The fluid
 //               invents no clock of its own: its step count is a pure function of the
-//               world's step count. In this slice the medium stands unbiased — no magnets,
-//               no culture coupling: the dish's fields are Phase 3, the soil coupling is K2.
+//               world's step count. K1 stood the medium unbiased — no magnets,
+//               no culture coupling: the dish's fields were Phase 3, the soil coupling
+//               was K2. Phase 3B deals the biases in (below, THE DISH TALKS BACK).
 //               BACKENDS — the fluid carries its own kernel stamp from the simBackends
 //               vocabulary: 'js.gs.v1' while the JS reference steps it (this module), or
 //               'gpu.gs.v1' when the GPU kernel host (gl/cultureFluidHost.mjs) drives it.
@@ -74,10 +75,9 @@
 //               stream at the world seed. The deal is a pure function of (culture,
 //               density, strength, seed), so the JS path stays js-exact. The reverse
 //               direction — the culture's level biasing the fluid's feed, which the
-//               live stage carries in stepFluid — is NOT wired in this slice: the
-//               world's medium keeps the exact character K1 proved, and wiring the
-//               level in is a later slice's work (it needs the level published to the
-//               fluid's readers with its own parity proof). The GPU mirror
+//               live stage carries in stepFluid — was deliberately NOT wired by K2
+//               (the world's medium kept the exact character K1 proved); Phase 3B
+//               wires it, below (THE DISH TALKS BACK). The GPU mirror
 //               (gl/cultureLifeHost.mjs) deals the same births in shader space from
 //               the fluid mirror's texture — both fields GPU-resident, no readback —
 //               which is the parent issue's coupling shape. The culture carries its
@@ -140,29 +140,83 @@
 //               in this world. Fields act on the swarm's cadence, inside the
 //               same world step, immediately before the swarm's integrator:
 //               forces first, then the core integrates, then the solver
-//               resolves. The hand's current (the parent issue 2153) is the
-//               next slice's field, not this one's. The fields are
+//               resolves. The fields are
 //               resolver-class — CPU JS, no stamp of their own; the law
 //               composition above does not change. Born empty: no scene has
 //               dealt a field yet, and an empty table is the parity position
 //               (a field step over no fields moves nothing).
+//
+//   THE HAND    Phase 3, slice B (the parent issue 2153, dish-side): the
+//               performer's hand enters as a CURRENT (engine/cultureHand.mjs)
+//               — a transient gust dealt through the performer door below,
+//               never through the Queen's doors and never as a request: the
+//               hand is the user's own, and a user act outranks personas.
+//               A current is dealt with a position, a flow, a reach, a
+//               strength, and a short life; it travels with its flow, pushes
+//               the bodies in its reach along the flow's direction, and
+//               retires itself when its life is spent. Force, never a body
+//               (§4 Q3): no mass, no contacts, never seen by the solver. It
+//               steps on the swarm's cadence with the fields, after them in
+//               the force composition, before the integrator. Born empty and
+//               dealt only through its door; device-side tracking and the
+//               take's input recording are the shell's, not the world's.
+//
+//   THE DISH TALKS BACK
+//               Phase 3, slice B: the medium now reads the world back. On
+//               every fluid step, stepFluid is handed (a) the culture's
+//               published field — level at the shared grid, read as the last
+//               completed generation left it — at the world's standing
+//               coupling strength CULTURE_COUPLING, the same constant the
+//               birth seam reads (the live stage's one COUPLE dial drives
+//               both directions; the world keeps that shape): living culture
+//               raises the medium's feed and lowers its kill where it stands,
+//               the kernel's standing CULTURE_FEED_GAIN / CULTURE_KILL_DROP
+//               law; and (b) the Queen's dealt magnets (cultureFieldMagnets:
+//               dish-normalized, each weighted by its field strength over the
+//               standing default, at most the kernel's MAX_MAGNETS) at the
+//               kernel's standing pull, under the dish's own aspect — the
+//               growth bias the parent issue's stage kernel carries: the dark
+//               phase grows toward a dealt magnet and stands there. Both
+//               reads are one-step-behind published state, both are pure
+//               functions of the world, and the JS path stays js-exact; the
+//               GPU fluid mirror (gl/cultureFluidHost.mjs) is fed the same
+//               inputs, and the fluid parity suite proves the pair in the
+//               fluid parity style. With no fields dealt the magnet list is
+//               empty (the bias is zero); the culture read stands from birth,
+//               as the forward coupling always has.
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
 import { createCulture, stepCulture, seedRandom, cultureHash, CULTURE_RULE } from './dishLife.mjs';
 import { injectFluidBirths } from './dishFluidCouple.mjs';
-import { stepCultureSwarm, cultureContactPairs, cultureSwarmHash } from './cultureSwarm.mjs';
+import {
+  stepCultureSwarm,
+  cultureContactPairs,
+  cultureSwarmHash,
+  CULTURE_SWARM_WORLD_W,
+  CULTURE_SWARM_WORLD_H,
+} from './cultureSwarm.mjs';
 import { stepCultureSolver, createCultureStatics, createCultureLinks, cultureSolverHash } from './cultureSolver.mjs';
 import {
   createCultureFields,
   createCultureFieldRequests,
   stepCultureFields,
   cultureFieldsHash,
+  cultureFieldMagnets,
   normalizeCultureFieldSpec,
+  CULTURE_FIELD_FLUID_PULL,
   CULTURE_FIELD_KIND_NAMES,
   CULTURE_FIELD_REQUEST_PENDING,
   CULTURE_FIELD_REQUEST_APPLIED,
   CULTURE_FIELD_REQUEST_DECLINED,
 } from './cultureFields.mjs';
+import {
+  createCultureHandCurrents,
+  stepCultureHandCurrents,
+  cultureHandHash,
+  normalizeCultureHandSpec,
+  cultureHandDealSlot,
+  writeCultureHandCurrent,
+} from './cultureHand.mjs';
 import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
 
 /** The backend id this world stamps, in the simBackends vocabulary: JS, versioned. */
@@ -214,6 +268,13 @@ export const CULTURE_LIFE_SEED_DENSITY = 0.3;
  * performer dial yet, so it stands at that same 0.5 until a later phase hands it one.
  */
 export const CULTURE_COUPLING = 0.5;
+/**
+ * The dish's own aspect (height over width) in body space — the magnet
+ * falloff's aspect correction for THIS dish (1080 / 1920), so the kernel's
+ * growth bias is round in the space bodies move in, matching the fields' own
+ * gaussian. Not the live stage canvas's 0.7: the world is not the canvas.
+ */
+export const CULTURE_WORLD_ASPECT_HW = CULTURE_SWARM_WORLD_H / CULTURE_SWARM_WORLD_W;
 
 /**
  * World steps per swarm step: at the 120 Hz world clock the swarm runs at 60 steps/s —
@@ -323,6 +384,13 @@ export function createCultureWorld({ seed = 0 } = {}) {
      * stands here until the Queen's resolution door applies or declines it.
      */
     fieldRequests: createCultureFieldRequests(),
+    /**
+     * The performer's hand currents (Phase 3, slice B): transient gusts the
+     * hand deals through the performer door below — never born, never
+     * standing; the table stands empty until a gesture arrives, and an empty
+     * (or fully retired) table is the parity position.
+     */
+    hand: createCultureHandCurrents(),
   };
 }
 
@@ -346,18 +414,35 @@ export function cultureWorldSimTimeS(world) {
  * before the swarm's integrator, the standing fields write their forces into
  * the bodies' velocities (their own step counter is world.fields.step — forces
  * first, then the core integrates, then the solver resolves; the fields read
- * the medium's published density at its last completed state). The scheduler
- * law around all of this does not change.
+ * the medium's published density at its last completed state), and the hand's
+ * living currents push right after them (their own step counter is
+ * world.hand.step — the performer's force last among forces). The medium, on
+ * its own cadence, reads the culture's published field and the Queen's dealt
+ * magnets as they last stood (Phase 3B — the reverse coupling and the growth
+ * bias). The scheduler law around all of this does not change.
  */
 export function stepCultureWorld(world) {
   world.step += 1;
-  if (world.step % CULTURE_FLUID_STEP_DIVISOR === 0) stepFluid(world.fluid);
+  if (world.step % CULTURE_FLUID_STEP_DIVISOR === 0) {
+    // The medium reads its couplings at its last completed states (Phase 3B):
+    // the culture's published field as the last generation left it, and the
+    // Queen's dealt magnets as the fields table stands — both one-step-behind
+    // reads, the dish's discipline, and both pure functions of world state.
+    stepFluid(world.fluid, {
+      culture: world.life.field,
+      couple: CULTURE_COUPLING,
+      magnets: cultureFieldMagnets(world.fields),
+      pull: CULTURE_FIELD_FLUID_PULL,
+      aspectHW: CULTURE_WORLD_ASPECT_HW,
+    });
+  }
   if (world.step % CULTURE_LIFE_STEP_DIVISOR === 0) {
     injectFluidBirths(world.life, cultureFluidDensity(world), CULTURE_COUPLING, world.seed);
     stepCulture(world.life);
   }
   if (world.step % CULTURE_SWARM_STEP_DIVISOR === 0) {
     stepCultureFields(world.bodies, world.fields, cultureFluidDensity(world));
+    stepCultureHandCurrents(world.bodies, world.hand);
     stepCultureSwarm(world.bodies);
     stepCultureSolver(world.bodies, world.statics, world.links);
     world.solver.step += 1;
@@ -532,6 +617,27 @@ export function resolveCultureFieldRequest(world, requestIndex, apply) {
 }
 
 /**
+ * THE PERFORMER'S DOOR — deal one hand current into the world (Phase 3,
+ * slice B; the parent issue 2153, dish-side). This is the hand's own door:
+ * NOT the Queen's (her doors deal standing fields, and her spec reading
+ * refuses the current kind by name) and NOT a request (no one resolves it —
+ * the user's own hand outranks personas and acts at once, the override law).
+ * The spec is validated and normalized through the hand's own reading
+ * (normalizeCultureHandSpec); the current takes the first retired slot or
+ * the next fresh one, and a table full of living gestures refuses loudly.
+ * The current lives exactly its dealt life of current steps, then retires
+ * itself in the step — nothing else can retire it, move it, or extend it:
+ * a gesture is dealt whole. Returns the current's slot index, which names
+ * it for its life (a later gesture may take the slot once it retires).
+ */
+export function dealCultureHandCurrent(world, spec) {
+  const s = normalizeCultureHandSpec(spec);
+  const slot = cultureHandDealSlot(world.hand);
+  if (slot < 0) throw new Error(`cultureWorld: hand currents full (${world.hand.capacity} living gestures)`);
+  return writeCultureHandCurrent(world.hand, slot, s);
+}
+
+/**
  * The law this world's stamps honestly carry, composed through the codebase's own
  * simLawFor over the kernel backends the world runs: the fluid, the culture, and the
  * swarm under their recorded backends (the optional contacts kernel stays unnamed —
@@ -667,9 +773,10 @@ function mixFloat(mix, v) {
  * id and the core's own state fingerprint), the body table (its count, the swarm's
  * backend id, and the swarm core's own fingerprint of the dealt prefix — step, alive,
  * position, velocity, mass, radius), the solver's standing state (its step count
- * and the solver core's fingerprint of the statics and links), and the Queen's
+ * and the solver core's fingerprint of the statics and links), the Queen's
  * standing state (the fields core's fingerprint of the fields table and the
- * request log). Same feed sequence =>
+ * request log), and the hand's standing state (the hand core's fingerprint of
+ * the currents table). Same feed sequence =>
  * same hash, on any device (all arithmetic here is IEEE-exact JS). FNV-1a, the
  * dishWet.selfcheck precedent.
  */
@@ -707,6 +814,7 @@ export function cultureWorldHash(world) {
   mixU32(world.solver.step);
   mixU32(cultureSolverHash(world.statics, world.links));
   mixU32(cultureFieldsHash(world.fields, world.fieldRequests));
+  mixU32(cultureHandHash(world.hand));
   return h >>> 0;
 }
 

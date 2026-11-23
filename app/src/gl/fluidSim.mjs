@@ -3,9 +3,10 @@
 // proof harness. State is one RG32F texture (R = U ground, G = V dark phase), cols x rows, double-buffered.
 //
 // Law transcribed from stepFluid: 8-neighbour laplacian (edge 0.2, corner 0.05, centre -1), missing rim neighbours
-// read as ground (U 1, V 0 — the dish wall), feed/kill biased by the magnet field (Gaussian sum) and the culture level
-// (nearest-sampled), results clamped to [0, 1]. Floats are float32 on the GPU as in the JS Float32Arrays; Tier S per
-// K0 — same-device reproducible, not bit-exact against the JS record, and judged on character + stability.
+// read as ground (U 1, V 0 — the dish wall), feed/kill biased by the magnet field (per-magnet-weighted Gaussian sum)
+// and the culture level (nearest-sampled), results clamped to [0, 1]. Floats are float32 on the GPU as in the JS
+// Float32Arrays; Tier S per K0 — same-device reproducible, not bit-exact against the JS record, and judged on
+// character + stability.
 import {
   GS_DU,
   GS_DV,
@@ -36,6 +37,7 @@ uniform float u_couple;
 uniform float u_aspect;
 uniform int u_nMagnets;
 uniform vec2 u_magnets[${MAX_MAGNETS}];
+uniform float u_magnetW[${MAX_MAGNETS}]; // per-magnet weight (1 = a weightless stage magnet)
 in vec2 v_cuv;
 out vec4 o;
 vec2 at(ivec2 p) {
@@ -57,7 +59,7 @@ void main() {
       if (i >= u_nMagnets) break;
       float dx = n.x - u_magnets[i].x;
       float dy = (n.y - u_magnets[i].y) * u_aspect;
-      mf += exp(-(dx * dx + dy * dy) / ${(MAGNET_RADIUS * MAGNET_RADIUS).toFixed(8)});
+      mf += u_magnetW[i] * exp(-(dx * dx + dy * dy) / ${(MAGNET_RADIUS * MAGNET_RADIUS).toFixed(8)});
     }
     if (mf > 0.001) {
       feed += ${MAGNET_FEED_GAIN.toFixed(6)} * u_pull * mf;
@@ -95,7 +97,10 @@ export function fluidStepUniforms(opts = {}) {
   const couple = clampFluidDial(opts.couple === undefined ? 0.5 : opts.couple);
   const aspect = Number.isFinite(Number(opts.aspectHW)) && Number(opts.aspectHW) > 0 ? Number(opts.aspectHW) : 0.7;
   const feedBase = FERRO_FEED * (FLOW_FEED_MIN + (FLOW_FEED_MAX - FLOW_FEED_MIN) * flow);
-  return { magnets, pull, couple, aspect, feedBase };
+  // Per-magnet weights, parallel to `magnets`: sanitizeMagnets has already clamped a carried
+  // w to zero or more; an entry without one weighs 1, the JS magnetFieldAt reading exactly.
+  const magnetWeights = magnets.map((m) => (m.w === undefined ? 1 : m.w));
+  return { magnets, magnetWeights, pull, couple, aspect, feedBase };
 }
 
 /**
@@ -151,6 +156,7 @@ export function createGpuFluid(gl, cols, rows) {
   let cur = 0;
   const vao = gl.createVertexArray();
   const mags = new Float32Array(MAX_MAGNETS * 2);
+  const magW = new Float32Array(MAX_MAGNETS).fill(1);
   return {
     cols,
     rows,
@@ -187,11 +193,14 @@ export function createGpuFluid(gl, cols, rows) {
       gl.uniform1f(U('u_aspect'), s.aspect);
       gl.uniform1i(U('u_nMagnets'), s.magnets.length);
       mags.fill(0);
+      magW.fill(1);
       s.magnets.forEach((m, i) => {
         mags[i * 2] = m.x;
         mags[i * 2 + 1] = m.y;
+        magW[i] = s.magnetWeights[i];
       });
       gl.uniform2fv(U('u_magnets[0]'), mags);
+      gl.uniform1fv(U('u_magnetW[0]'), magW);
       gl.uniform1i(U('u_state'), 0);
       gl.uniform1i(U('u_culture'), 1);
       gl.activeTexture(gl.TEXTURE1);
