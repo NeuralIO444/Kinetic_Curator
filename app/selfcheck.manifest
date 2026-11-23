@@ -211,6 +211,7 @@ node src/engine/dishLifeReseed.selfcheck.mjs
 node src/engine/dishLifeControls.selfcheck.mjs
 node src/engine/cultureWorld.selfcheck.mjs
 node src/engine/cultureFluid.selfcheck.mjs
+node src/engine/cultureLife.selfcheck.mjs
 node src/engine/dishFluid.selfcheck.mjs
 node src/engine/dishFluidCouple.selfcheck.mjs
 node src/engine/dishFluidStage.selfcheck.mjs
@@ -779,6 +780,7 @@ node src/gl/fieldRecon.selfcheck.mjs
 node src/gl/parity/fluidSim.selfcheck.mjs
 node src/gl/parity/cultureFluidSim.selfcheck.mjs
 node src/gl/parity/cultureSim.selfcheck.mjs
+node src/gl/parity/cultureLifeSim.selfcheck.mjs
 node src/gl/gpuCultureHost.selfcheck.mjs
 node src/gl/parity/swarmSim.selfcheck.mjs
 node src/gl/parity/gpuSwarmHost.selfcheck.mjs
@@ -790,6 +792,7 @@ node src/gl/parity/dishContactsResolve.selfcheck.mjs
 node src/gl/simBackends.selfcheck.mjs
 node src/gl/gpuFluidHost.selfcheck.mjs
 node src/gl/cultureFluidHost.selfcheck.mjs
+node src/gl/cultureLifeHost.selfcheck.mjs
 node src/engine/dishFluidCells.selfcheck.mjs
 node src/engine/dishCultureCells.selfcheck.mjs
 node src/engine/gait.selfcheck.mjs
