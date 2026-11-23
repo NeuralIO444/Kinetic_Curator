@@ -1,6 +1,6 @@
 # CULTURE — a physics-creature foundation for KC-1 (draft spec)
 
-> **Status: DRAFT — design conversation, 2026-11-19. Building is paused. Nothing in this document is built.**
+> **Status: SPEC COMPLETE — design conversation 2026-11-19; final rulings 2026-11-22. Nothing in this document is built yet; building follows the phasing on Matt's order.**
 >
 > This draft records the direction Matt ruled during the design conversation that followed the audit of KC-1's 52 motion and animation systems. Decisions in **Ruled** are Matt's. Items in **Proposed** are Ember's recommendations and remain proposals until Matt rules on them. Items in **Open questions** have not been decided.
 
@@ -186,16 +186,16 @@ The motion audit found frame-counted and per-frame behaviour that makes the same
 
 This is an engineering recommendation, not yet a ruled implementation choice.
 
-## 4. Open questions
+## 4. Rulings on the former open questions (Matt, 2026-11-22)
 
-The following questions remain open and require Matt's ruling before a buildable specification can settle them:
+The questions that stood open in the 2026-11-19 draft are all ruled:
 
-1. **What kills besides starvation?** Can creatures die from age, injury, overcrowding, predation, failed upkeep, a persona's intervention, or other causes?
-2. **How does a take seed its starting population?** Who or what chooses the initial creatures, bodies, recipes, numbers, ages, and placement?
-3. **What is the performer's hand in the zoo?** How does the human performer enter or affect this world, especially in relation to finger painting and issue #2153?
-4. **Who controls dish fields under the new foundation?** Magnets and other fields are central to a no-gravity dish. Are they set by recipes, personas, the performer, the Queen under the Governor's direction, or some combination?
+1. **What kills besides starvation?** — **Predation.** Creatures can kill each other. Death therefore comes by starvation and by predation. (Age and upkeep failure were considered and not chosen; they are out unless Matt reopens them.)
+2. **How does a take seed its starting population?** — **The Lab casts fresh each take.** KINETIC assembles the bodies, DAVIS writes the recipes, LOIS gates the cast. A take does not inherit a standing zoo population.
+3. **What is the performer's hand in the zoo?** — **A force, never a body.** The hand stirs and scatters; finger painting (#2153) enters the dish as a current the creatures feel, not as a physical object they collide with.
+4. **Who controls dish fields under the new foundation?** — **The Queen owns the fields.** She places and moves the dish's standing fields under the Governor's direction; recipes and personas may only request.
 
-Other details — including the exact physics solver, collision shapes, behaviour scheduler, sensory ranges, fat accounting, decay timing, breeding eligibility, and growth tables — remain build-time specification work after the open rulings above.
+Other details — including the exact physics solver, collision shapes, behaviour scheduler, sensory ranges, fat accounting, decay timing, breeding eligibility, and growth tables — remain build-time specification work, now unblocked by the rulings above.
 
 ## 5. Relation to existing law
 
@@ -207,11 +207,7 @@ This foundation is an architectural expression of KC-1's existing one-dish direc
 
 Issue #2152 rules that Life is never drawn: it computes underneath and reaches the stage as an invisible force.
 
-This draft does **not** silently merge that Life layer into the new foundation. An open tension remains:
-
-> **Is the #2152 Life layer the dish's soil under this foundation — the living ground that fields, fertility, decay, or creature fortune read — or is it a separate underlying system that remains distinct from the physics-creature ecology?**
-
-That relationship needs an explicit ruling.
+**Ruled (Matt, 2026-11-22): Life is the soil.** The CULTURE dish grows in the #2152 Life layer: living ground feeds the ecology — fertility, decay, and creature fortune read it — and dead ground kills, exactly as the #2152 ruling already provides. The Life layer is not a separate system running beneath a different world; it is this world's ground.
 
 ### 5.3 Type exclusivity
 
@@ -250,4 +246,4 @@ The ruled foundation is:
 - looted limbs attaching under socket and upkeep limits;
 - the old motion systems preserved as loot and re-expressed as recipes or presets on the new base.
 
-**End of draft. Building remains paused.**
+**End of spec. The specification is complete as of 2026-11-22; build phasing and the build itself proceed on Matt's order.**
