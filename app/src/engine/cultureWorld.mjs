@@ -83,10 +83,33 @@
 //               which is the parent issue's coupling shape. The culture carries its
 //               own stamp door (setCultureLifeBackend), composed into the world law
 //               exactly like the fluid's.
+//
+//   THE BODIES  Phase 1, slice K3 (the parent issue 2188): the swarm/contacts kernel
+//               reaches the world's body table. The table gains the swarm's state
+//               columns (velocity, mass, disc radius) and stepCultureWorld steps the
+//               swarm over the living bodies on the JS reference core
+//               (engine/cultureSwarm.mjs — particles.js's cloud core as a pure
+//               function) at half the world clock: one swarm step per
+//               CULTURE_SWARM_STEP_DIVISOR world steps is one 60 fps frame, the live
+//               swarm's tempo, and the step count is again a pure function of the
+//               world's step count. The table is also where contact DETECTION reads:
+//               cultureSwarmContactPairs deals the pair list in the shipped
+//               detector's shape over the living discs (resolution is the Phase 2
+//               solver's work, on this same table). Bodies themselves are still
+//               nobody's to create — Phase 5 deals the citizens; in this slice the
+//               table stands empty in the app (count 0) and the suites prove the
+//               engine over dealt test populations. The swarm carries its own stamp
+//               door (setCultureSwarmBackend), composed into the world law exactly
+//               like the fluid's and the culture's; the GPU mirror is
+//               gl/cultureSwarmHost.mjs. Contacts detection runs on the JS
+//               predicate in this slice, so the optional contacts kernel stays
+//               unnamed in the world's stamp — its door arrives with a GPU producer
+//               in the world, the live stage's producer pattern.
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
 import { createCulture, stepCulture, seedRandom, cultureHash, CULTURE_RULE } from './dishLife.mjs';
 import { injectFluidBirths } from './dishFluidCouple.mjs';
+import { stepCultureSwarm, cultureContactPairs, cultureSwarmHash } from './cultureSwarm.mjs';
 import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
 
 /** The backend id this world stamps, in the simBackends vocabulary: JS, versioned. */
@@ -139,6 +162,17 @@ export const CULTURE_LIFE_SEED_DENSITY = 0.3;
  */
 export const CULTURE_COUPLING = 0.5;
 
+/**
+ * World steps per swarm step: at the 120 Hz world clock the swarm runs at 60 steps/s —
+ * one swarm step is one 60 fps frame (the reference core's dtFrames = 1), the tempo the
+ * live swarm steps at. The swarm's step count is floor(world.step / this), always.
+ */
+export const CULTURE_SWARM_STEP_DIVISOR = 2;
+/** The swarm kernel's JS backend id (simBackends vocabulary): the reference core in cultureSwarm.mjs. */
+export const CULTURE_SWARM_BACKEND = 'js.swarm.v1';
+/** The swarm kernel's GPU backend id (simBackends vocabulary): gl/swarmSim.mjs, Tier S device-dependent. */
+export const CULTURE_SWARM_GPU_BACKEND = 'gpu.swarm.v1';
+
 /** Is the dish gate on in a store state or a project document? Only exactly `true` is on. */
 export function cultureDishOn(holder) {
   return !!holder && holder[CULTURE_DISH_FIELD] === true;
@@ -185,6 +219,8 @@ export function createCultureWorld({ seed = 0 } = {}) {
     }),
     /** Which kernel steps the culture — a simBackends culture id. JS at birth, always. */
     lifeBackend: CULTURE_LIFE_BACKEND,
+    /** Which kernel steps the swarm — a simBackends swarm id. JS at birth, always. */
+    swarmBackend: CULTURE_SWARM_BACKEND,
     /** Whole fixed steps run since birth. Sim time is exactly step * CULTURE_STEP_S. */
     step: 0,
     /** Carried remainder: fed time not yet a whole step, always in [0, CULTURE_STEP_S). */
@@ -195,9 +231,18 @@ export function createCultureWorld({ seed = 0 } = {}) {
     bodies: {
       capacity: cap,
       count: 0,
+      /** Whole swarm steps run over this table (Phase 1 K3): floor(world.step / CULTURE_SWARM_STEP_DIVISOR). */
+      step: 0,
       alive: new Uint8Array(cap),
       x: new Float32Array(cap),
       y: new Float32Array(cap),
+      /** The swarm's velocity columns (Phase 1 K3): the kernel's state channels beside position. */
+      vx: new Float32Array(cap),
+      vy: new Float32Array(cap),
+      /** Per-body mass (Phase 1 K3): the kernel's static channel, 1 at birth — a dealt body may carry its own. */
+      mass: new Float32Array(cap).fill(1),
+      /** Per-body contact disc radius (Phase 1 K3): 0 at birth — no disc, no contact pair (the dish law). */
+      radius: new Float32Array(cap),
     },
   };
 }
@@ -208,13 +253,15 @@ export function cultureWorldSimTimeS(world) {
 }
 
 /**
- * One fixed step. No bodies exist yet to move, but the medium moves and the soil grows:
- * on every CULTURE_FLUID_STEP_DIVISOR-th world step the dish fluid takes one Gray-Scott
- * step (its own step counter is world.fluid.step), and on every
- * CULTURE_LIFE_STEP_DIVISOR-th world step the culture takes one generation — the
- * medium's published density first deals its births into the culture (the #1997 seam,
- * read at the fluid's last completed state), then the rule steps. Later phases put the
- * solver here; the scheduler law around it does not change.
+ * One fixed step. The medium moves, the soil grows, and the bodies swim: on every
+ * CULTURE_FLUID_STEP_DIVISOR-th world step the dish fluid takes one Gray-Scott step
+ * (its own step counter is world.fluid.step); on every CULTURE_LIFE_STEP_DIVISOR-th
+ * world step the culture takes one generation — the medium's published density first
+ * deals its births into the culture (the #1997 seam, read at the fluid's last
+ * completed state), then the rule steps; and on every CULTURE_SWARM_STEP_DIVISOR-th
+ * world step the swarm takes one step over the living bodies (its own step counter
+ * is world.bodies.step — over an empty table the step still counts: the kernel ran).
+ * Later phases put the solver here; the scheduler law around it does not change.
  */
 export function stepCultureWorld(world) {
   world.step += 1;
@@ -223,17 +270,25 @@ export function stepCultureWorld(world) {
     injectFluidBirths(world.life, cultureFluidDensity(world), CULTURE_COUPLING, world.seed);
     stepCulture(world.life);
   }
+  if (world.step % CULTURE_SWARM_STEP_DIVISOR === 0) stepCultureSwarm(world.bodies);
   return world;
 }
 
 /**
  * The law this world's stamps honestly carry, composed through the codebase's own
- * simLawFor over the kernel backends the world runs: the fluid and the culture under
- * their recorded backends, the swarm kernel still JS (it is not in the world yet).
- * 'js-exact' while every kernel is a js.* id; 'decisions-exact' the moment one is not.
+ * simLawFor over the kernel backends the world runs: the fluid, the culture, and the
+ * swarm under their recorded backends (the optional contacts kernel stays unnamed —
+ * its detection runs on the JS predicate in this slice, which is the absent = JS
+ * reading simLawFor already gives it). 'js-exact' while every kernel is a js.* id;
+ * 'decisions-exact' the moment one is not.
  */
 export function cultureWorldSimLaw(world) {
-  return simLawFor({ ...DEFAULT_SIM_BACKENDS, fluid: world.fluidBackend, culture: world.lifeBackend });
+  return simLawFor({
+    ...DEFAULT_SIM_BACKENDS,
+    fluid: world.fluidBackend,
+    culture: world.lifeBackend,
+    swarm: world.swarmBackend,
+  });
 }
 
 /**
@@ -268,6 +323,24 @@ export function setCultureLifeBackend(world, backend) {
 }
 
 /**
+ * Record which kernel backend steps the world's swarm — the ONLY door for that
+ * change, the fluid and culture doors' twin: a GPU host that takes the bodies over
+ * (gl/cultureSwarmHost.mjs) names 'gpu.swarm.v1' here and the world's law becomes
+ * 'decisions-exact' in the same motion (the swarm is Tier S — its outcomes are the
+ * recording device's own); handing it back to the JS reference restores 'js-exact'
+ * (provided the fluid and the culture are also JS). An id the simBackends
+ * vocabulary does not know is refused — including the contacts kernel's ids: that
+ * kernel is not the swarm, and its stamp is not this door's to give.
+ */
+export function setCultureSwarmBackend(world, backend) {
+  if (!KNOWN_SIM_BACKENDS.swarm.includes(backend))
+    throw new Error(`cultureWorld: unknown swarm backend "${String(backend)}"`);
+  world.swarmBackend = backend;
+  world.simLaw = cultureWorldSimLaw(world);
+  return world;
+}
+
+/**
  * The medium's published face: the dark-phase density at the shared grid (a fresh
  * Float32Array, read it the step you get it) — what the culture coupling reads on the
  * live stage today, and what K2 will read in this world next.
@@ -286,6 +359,18 @@ export function cultureFluidDensity(world) {
  */
 export function cultureLifeField(world) {
   return world.life.field;
+}
+
+/**
+ * The bodies' published face for contacts: the touching pairs over the world's
+ * living discs right now, in the shipped detector's shape and canonical order
+ * (engine/cultureSwarm.mjs cultureContactPairs — detection only; a fresh list,
+ * read it the step you get it). This is the read the Phase 2 solver resolves and
+ * a GPU detection producer would one day record, exactly as the stage records
+ * its pair lists as inputs.
+ */
+export function cultureSwarmContactPairs(world) {
+  return cultureContactPairs(world.bodies);
 }
 
 /**
@@ -322,9 +407,10 @@ function mixFloat(mix, v) {
  * A canonical hash of everything that makes this world THIS world: seed, stamp, step
  * count, carried remainder (bit-exact), dropped count, the soil grid, the fluid medium
  * (its backend id and the kernel's own quantized fingerprint), the culture (its backend
- * id and the core's own state fingerprint), and the body table's living prefix. Same
- * feed sequence => same hash, on any device (all arithmetic here is IEEE-exact JS).
- * FNV-1a, the dishWet.selfcheck precedent.
+ * id and the core's own state fingerprint), and the body table (its count, the swarm's
+ * backend id, and the swarm core's own fingerprint of the dealt prefix — step, alive,
+ * position, velocity, mass, radius). Same feed sequence => same hash, on any device
+ * (all arithmetic here is IEEE-exact JS). FNV-1a, the dishWet.selfcheck precedent.
  */
 export function cultureWorldHash(world) {
   let h = 0x811c9dc5;
@@ -354,13 +440,9 @@ export function cultureWorldHash(world) {
   mixU32(fluidHash(world.fluid));
   mixStr(world.lifeBackend);
   mixU32(cultureHash(world.life));
+  mixStr(world.swarmBackend);
   mixU32(world.bodies.count);
-  const n = Math.min(world.bodies.count, world.bodies.capacity);
-  for (let i = 0; i < n; i++) {
-    mix(world.bodies.alive[i]);
-    mixFloat(mix, world.bodies.x[i]);
-    mixFloat(mix, world.bodies.y[i]);
-  }
+  mixU32(cultureSwarmHash(world.bodies));
   return h >>> 0;
 }
 
