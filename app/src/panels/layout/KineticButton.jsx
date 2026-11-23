@@ -3,9 +3,10 @@
 // Tap routing (#1772): every tap runs through the heat model (routeKineticTapHeat in kineticHeat.mjs), and the run
 // sweeps left to right. A fresh tap is a LOOK pass — a fresh Look + a pool coherent with it. The next warm tap (~2s)
 // is a VOICE pass — a fresh voice's motion + palette over the standing look. Every further warm tap is a CURATOR
-// pass — Davis nudges a few params by a capped amount, or keeps the piece. Sustained rapid tapping (each tap <600ms
-// after the last) builds heat; past the curator it breaks the CHAOS ceiling — the full kitchen-sink re-roll
-// (kineticRoll) — in one undo step. The armed roll scope (#964) is the ceiling over every pass.
+// pass — Davis nudges a few params by a capped amount, or keeps the piece. Sustained rapid tapping (each tap <1000ms
+// after the last, #2452) builds heat; past the curator it breaks the CHAOS ceiling — the full kitchen-sink re-roll
+// (kineticRoll) — in one undo step, at every START scope (#2452: the scope sizes the decks, it no longer caps the
+// size of the change). The armed roll scope (#964) is the ceiling over every pass.
 //
 // Heat lives here in the component, not the store: tap timestamps are human
 // gestures (like #268's swell envelope and #944's warm window), and the #806
@@ -28,7 +29,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { useStore } from '../../state/store.js';
 import { useHotkeys } from '../../hooks/useHotkeys.js';
-import { scopeDecks } from '../../state/kineticScope.mjs';
 import {
   routeKineticTapHeat,
   decayHeat,
@@ -50,7 +50,6 @@ export function KineticButton() {
   const kineticVoicePass = useStore((s) => s.kineticVoicePass);
   const kineticCuratorPass = useStore((s) => s.kineticCuratorPass);
   const kineticRoll = useStore((s) => s.kineticRoll);
-  const scopeChaos = useStore((s) => scopeDecks(s.startupMode).chaos); // #1772 — hammering reaches CHAOS only at KOZ
   // Heat run state (#945): heat/taps as of the last tap + its timestamp.
   // The router returns the next run; the cooling interval below decays the
   // *displayed* heat between taps. All wall-clock stays in this component.
@@ -110,7 +109,7 @@ export function KineticButton() {
 
   const tap = () => {
     const now = Date.now();
-    const r = routeKineticTapHeat(runRef.current, now, { chaos: scopeChaos });
+    const r = routeKineticTapHeat(runRef.current, now);
     runRef.current = { heat: r.heat, taps: r.taps, lastTapAt: r.lastTapAt };
     setRunSnap(runRef.current); // #2050 — keep the render mirror in step
     publishShownHeat(r.heat);
@@ -137,11 +136,11 @@ export function KineticButton() {
 
   const level = heatLevel(heat);
   // #2050 — the detent, derived in render from the router's standing state:
-  // the run (via its state mirror), the detent clock, and the scope's chaos
-  // gate — the same inputs the next real tap routes on, so a scope change
-  // mid-run re-derives it in the same commit (below KOZ it can never read
-  // CHAOS).
-  const nextLayer = nextKineticLayer(runSnap, nowMs, { chaos: scopeChaos });
+  // the run (via its state mirror) and the detent clock — the same inputs
+  // the next real tap routes on. #2452: there is no scope gate in the
+  // router any more, so at full heat the detent honestly reads CHAOS at
+  // every scope.
+  const nextLayer = nextKineticLayer(runSnap, nowMs);
   return (
     <button
       type="button"

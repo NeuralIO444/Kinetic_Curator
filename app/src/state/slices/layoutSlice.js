@@ -73,6 +73,7 @@ import {
 } from '../rollPool.mjs'; // #1767: the full-library deal; #1944: kits
 import { kitsById } from '../../data/kits.js';
 import { lookPass, voicePass, curatorPass, ACCUM_KEYS } from '../kineticSweep.mjs'; // #1772: look → voice → curator
+import { shownHeat } from '../../panels/layout/kineticHeat.mjs'; // #2452: the run's standing heat, published by the KINETIC button (the davisSlice keep-bands read the same holder)
 import { scopeDecks, sanitizeScope, CURATED_SETS, SCOPE_CYCLE } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
 import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapterWalk.mjs'; // #1855: the landing
 import { openRound, openJudgement, passCut, spendCut, settle, absorbWarmTap, closeRound } from '../roundTable.mjs'; // #1856: the round (BOOK S3)
@@ -2331,13 +2332,15 @@ export const createLayoutSlice = (set) => ({
 
   /**
    * #1772 — KINETIC CURATOR pass (tap 3+): Davis weighs the piece as it stands against a few capped nudges
-   * (≤ NUDGE_MAX_KEYS params, each ≤ NUDGE_SPREAD of its dice range) and keeps one. Keeping the standing piece is a
+   * (≤ NUDGE_MAX_KEYS params, each ≤ the spread of its dice range) and keeps one. Keeping the standing piece is a
    * real outcome: no change, no undo entry, and `kineticNudge.moves` reads empty. The record is the backstage signal.
+   * #2452 — the cap scales with the run's standing heat (shownHeat: the button published this tap's post-route
+   * heat before dispatching the pass), and at/above the CHAOS line the curator may not keep.
    */
   kineticCuratorPass: () =>
     set((state) => {
       const curator = getActiveCurator();
-      const r = curatorPass(state, curator, dieRng, pickCurated);
+      const r = curatorPass(state, curator, dieRng, pickCurated, { heat: shownHeat() });
       const kineticNudge = { curator: curator?.name ?? null, index: r.index, moves: r.moves };
       // #1856 — a warm tap lands on the table and is absorbed (roundTable.absorbWarmTap): the settled
       // round is the board this pass plays on, and the record provably does not move.

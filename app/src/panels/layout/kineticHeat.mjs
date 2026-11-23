@@ -8,11 +8,13 @@
 //
 // Model:
 // - heat ∈ [0, 1]. A tap within KINETIC_HEAT_TAP_MS of the last adds
-//   KINETIC_HEAT_PER_TAP (~3 rapid taps to max). Idle heat decays with
-//   KINETIC_HEAT_HALF_LIFE_MS half-life.
+//   KINETIC_HEAT_PER_TAP (two heat-adding rapid taps cross the CHAOS line).
+//   Idle heat decays with KINETIC_HEAT_HALF_LIFE_MS half-life.
 // - Run: consecutive taps with gaps < KINETIC_WARM_MS (the #944 warm window).
 //   #1772 — the run is a filter sweeping left to right (Matt, 2026-10-27): tap 1 → LOOK, 2 → VOICE, ≥3 → CURATOR
-//   (a small capped nudge); a ≥3rd tap at heat ≥ KINETIC_CHAOS_HEAT still breaks into CHAOS (hammering).
+//   (a capped nudge, scaled by heat since #2452); a ≥3rd tap at heat ≥ KINETIC_CHAOS_HEAT breaks into CHAOS
+//   (hammering) — at EVERY scope since #2452 (Matt's law: hit it a lot, it changes more, not less; the
+//   scope sizes the decks, it no longer caps the size of the change — the KOZ-only gate is retired).
 //   Heat picks how far the run has swept, not how violent a re-roll is — until hammering.
 // - A stale tap (gap ≥ warm window) starts a fresh run: LOOK, heat 0.
 //
@@ -21,14 +23,14 @@
 /** A second KINETIC tap within this window finds the button "warm" (#944). */
 export const KINETIC_WARM_MS = 2000;
 
-/** A tap within this window of the last tap adds heat (rapid tapping). */
-export const KINETIC_HEAT_TAP_MS = 600;
+/** A tap within this window of the last tap adds heat (rapid tapping). #2452: 600 → 1000 — a human hammer counts as rapid. */
+export const KINETIC_HEAT_TAP_MS = 1000;
 
-/** Idle heat half-life — tune by feel. */
-export const KINETIC_HEAT_HALF_LIFE_MS = 2000;
+/** Idle heat half-life — tune by feel. #2452: 2000 → 3500 — heat survives a human pause between presses. */
+export const KINETIC_HEAT_HALF_LIFE_MS = 3500;
 
-/** Heat added per rapid tap: ~3 rapid taps to reach max. */
-export const KINETIC_HEAT_PER_TAP = 0.34;
+/** Heat added per rapid tap. #2452: 0.34 → 0.5 — two rapid presses to hot. */
+export const KINETIC_HEAT_PER_TAP = 0.5;
 
 /** Heat at/above which a 3rd+ tap in the run breaks into CHAOS. */
 export const KINETIC_CHAOS_HEAT = 0.6;
@@ -49,7 +51,9 @@ export function addHeat(heat) {
 }
 
 // #1124 — the heat the KIN button is SHOWING right now, published by the button so a keep can freeze it into its
-// bands. A plain holder: the button is the only writer, a keep the only reader.
+// bands. A plain holder: the button is the only writer; the readers are the keep's bands, the room readout,
+// and — since #2452 — the store's curator pass, which scales its nudge by this standing heat (the button
+// publishes the tap's post-route heat before it dispatches the pass, so the pass reads its own tap's heat).
 let shown = 0;
 export function publishShownHeat(h) {
   shown = Number.isFinite(h) ? Math.max(0, Math.min(1, h)) : 0;
@@ -80,13 +84,17 @@ export function heatLevel(heat) {
  * @param {{ heat: number, taps: number, lastTapAt: number }} run — heat and
  *   tap count as of the previous tap (heat at last tap, not decayed).
  * @param {number} now — Date.now() at this tap.
- * @param {{ chaos?: boolean }} [scope] — #1772: may hammering break into CHAOS? Only at START: KOZ
- *   (kineticScope.mjs); below it a hot run keeps advancing the curator.
  * @returns {{ layer: 'look'|'voice'|'curator'|'chaos', heat: number, taps: number,
  *   lastTapAt: number }} heat is post-tap heat (decayed then added); taps is
  *   the run length; lastTapAt echoes `now` so runs thread through calls.
+ *
+ * #2452 — there is no scope gate here any more: at/above the CHAOS line a
+ * 3rd+ tap breaks into the full re-roll at every START scope. The scope
+ * (kineticScope.mjs) still sizes the decks the passes deal from; it no
+ * longer caps the SIZE of the change. (The gate was the #1772 rule; this
+ * supersedes it in that one respect.)
  */
-export function routeKineticTapHeat(run, now, { chaos = true } = {}) {
+export function routeKineticTapHeat(run, now) {
   const lastTapAt = run.lastTapAt || 0;
   const dt = now - lastTapAt;
   if (dt >= KINETIC_WARM_MS || lastTapAt === 0) {
@@ -96,7 +104,7 @@ export function routeKineticTapHeat(run, now, { chaos = true } = {}) {
   let heat = decayHeat(run.heat || 0, dt);
   const taps = (run.taps || 0) + 1;
   if (dt < KINETIC_HEAT_TAP_MS) heat = addHeat(heat);
-  if (chaos && taps >= 3 && heat >= KINETIC_CHAOS_HEAT) {
+  if (taps >= 3 && heat >= KINETIC_CHAOS_HEAT) {
     return { layer: 'chaos', heat, taps, lastTapAt: now };
   }
   return { layer: taps >= 3 ? 'curator' : taps === 2 ? 'voice' : 'look', heat, taps, lastTapAt: now };
@@ -117,12 +125,12 @@ export function kineticLayerLabel(layer) {
  * The router is pure and never mutates `run`, so asking costs nothing and
  * can never disagree with the tap that follows at the same `now`: stale run
  * → 'look'; a live run's 2nd tap → 'voice'; 3rd+ → 'curator', or 'chaos'
- * only when the scope allows it and the decayed-then-added heat clears the
- * CHAOS line. Below KOZ the answer is never 'chaos', by the router's own
- * gate — not by a second check here.
+ * when the decayed-then-added heat clears the CHAOS line — at every scope
+ * since #2452, so a full-heat detent honestly reads CHAOS wherever the
+ * START pill stands.
  */
-export function nextKineticLayer(run, now, { chaos = true } = {}) {
-  return routeKineticTapHeat(run, now, { chaos }).layer;
+export function nextKineticLayer(run, now) {
+  return routeKineticTapHeat(run, now).layer;
 }
 
 /** #2050 — the TE detent words for the NEXT pass (the spec's table): full words, one per layer. */

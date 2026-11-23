@@ -2,16 +2,19 @@
 //
 //   OFF → WEAK → MED → KOZ → OFF …   (one pill, tap to advance, the same gesture as the shape-mix chips)
 //
-// The state sets BOTH what a cold launch opens on AND the ceiling over every KINETIC tap:
+// The state sets BOTH what a cold launch opens on AND the decks every KINETIC tap deals from:
 //   OFF   the smallest decks — the 19 curated 4-shape sets (49 assets), the 33 original looks, the 4 + 15 voices.
 //         Launch: the deterministic factory opener (what FIXED was).
 //   WEAK  one notch wider — pools dealt from the whole library (S1), the same 33 looks and 19 voices.
 //         Launch: one look + voice pass under this deck.
 //   MED   the expanded decks — the whole library, the 69 looks (S4) and the 72 voices (S5).
 //         Launch: one look + voice pass under this deck.
-//   KOZ   everything at full width, plus the chaos roll (kineticRoll) when the button is hammered.
+//   KOZ   everything at full width.
 //         Launch: one full wild roll (what K.O.Z. was).
 // The curator's cap is identical at every state. The armed roll scope (#964) still pins mode / motion inside it.
+// #2452 — the scope no longer gates CHAOS: hammering the KINETIC button breaks into the full re-roll at EVERY
+// state (Matt's law: hit it a lot, it changes more, not less). The scope still sizes the decks the passes
+// deal from; the retired KOZ-only gate was the one part of the #1772 ceiling that capped the SIZE of a change.
 //
 // Pure data: no store, no clock. Legacy values ('fixed', 'chaos' — #946) sanitize to OFF and KOZ.
 import { COMPOSITION_PRESETS } from '../data/presets.js';
@@ -61,13 +64,13 @@ const LIBRARY_ASSETS = dealableRecords(ASSETS).length;
 const ROLL_LOOKS = Object.freeze(COMPOSITION_PRESETS.filter((p) => p.id !== RISO_FIELD_LOOK_ID));
 
 const DECKS = {
-  off: { looks: ORIGINAL_LOOKS, voices: SMALL_VOICES, pool: 'sets', chaos: false, launch: 'factory' },
-  weak: { looks: ORIGINAL_LOOKS, voices: SMALL_VOICES, pool: 'library', chaos: false, launch: 'open' },
-  med: { looks: ROLL_LOOKS, voices: VOICE_DECK, pool: 'library', chaos: false, launch: 'open' },
-  koz: { looks: ROLL_LOOKS, voices: VOICE_DECK, pool: 'library', chaos: true, launch: 'roll' },
+  off: { looks: ORIGINAL_LOOKS, voices: SMALL_VOICES, pool: 'sets', launch: 'factory' },
+  weak: { looks: ORIGINAL_LOOKS, voices: SMALL_VOICES, pool: 'library', launch: 'open' },
+  med: { looks: ROLL_LOOKS, voices: VOICE_DECK, pool: 'library', launch: 'open' },
+  koz: { looks: ROLL_LOOKS, voices: VOICE_DECK, pool: 'library', launch: 'roll' },
 };
 
-/** What a scope lets a tap deal: { looks, voices, pool: 'sets'|'library', chaos, launch: 'factory'|'open'|'roll' }. */
+/** What a scope lets a tap deal: { looks, voices, pool: 'sets'|'library', launch: 'factory'|'open'|'roll' }. */
 export function scopeDecks(mode) {
   return DECKS[sanitizeScope(mode)];
 }

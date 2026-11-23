@@ -12,10 +12,13 @@ import {
   paramDiff,
   nudgeWithinCap,
   nudgeFits,
+  nudgeSpreadForHeat,
   NUDGE_MAX_KEYS,
   NUDGE_SPREAD,
+  NUDGE_SPREAD_HOT,
   ACCUM_KEYS,
 } from './kineticSweep.mjs';
+import { KINETIC_CHAOS_HEAT } from '../panels/layout/kineticHeat.mjs';
 import { MOTION_KEYS } from './rollScope.mjs';
 import { RANDOMIZABLE_KEYS } from './paramUtils.js';
 import { COMPOSITION_PRESETS } from '../data/presets.js';
@@ -260,13 +263,66 @@ const snap = () => {
   }
 }
 
-// coarse keys sit out: their smallest move is already over the cap
+// coarse keys sit out at the calm spread: their smallest move is already over the cap
 assert.equal(nudgeFits('zTiers'), false, 'zTiers: one step is 11% of its range');
 assert.equal(nudgeFits('damping'), false, 'damping: one rounding step is 12.5% of its range');
-assert.ok(['count', 'scale', 'alpha', 'lifeDrift', 'noiseFreq'].every(nudgeFits));
+assert.ok(['count', 'scale', 'alpha', 'lifeDrift', 'noiseFreq'].every((k) => nudgeFits(k)));
 
 // ── 7. the real taste-weighted pick is what the store uses ────────────────────────────────────────────────────────
 assert.equal(typeof pickCurated, 'function');
-assert.ok(Math.abs(NUDGE_SPREAD - 0.08) < EPS && NUDGE_MAX_KEYS === 3, 'the cap is 3 params × 8% of range');
+assert.ok(Math.abs(NUDGE_SPREAD - 0.08) < EPS && NUDGE_MAX_KEYS === 3, 'the calm cap is 3 params × 8% of range');
 
-console.log('kineticSweep.selfcheck: ok (#1772 — look → voice → curator, param-diff audit, cap, locks, armed scope)');
+// ── 8. #2452 — the curator escalates with the run's heat ──────────────────────────────────────────────────────────
+// Matt's law: hit it a lot, it changes more, not less. The spread scales calm → hot; at/above the CHAOS
+// line the curator may not keep the piece — a hot press always moves something real.
+{
+  assert.equal(nudgeSpreadForHeat(0), NUDGE_SPREAD, 'a cool run nudges at the calm spread');
+  assert.equal(nudgeSpreadForHeat(1), NUDGE_SPREAD_HOT, 'a pegged run nudges at the hot spread');
+  assert.ok(
+    Math.abs(NUDGE_SPREAD_HOT - 0.2) < EPS,
+    "the hot spread is 20% of range — the mutation door's own MAX_SPREAD (#1144 lock), the widest it can deliver",
+  );
+  assert.ok(
+    nudgeSpreadForHeat(0.25) < nudgeSpreadForHeat(0.5) && nudgeSpreadForHeat(0.5) < nudgeSpreadForHeat(0.75),
+    'the spread climbs with heat',
+  );
+  assert.equal(nudgeSpreadForHeat(7), NUDGE_SPREAD_HOT, 'heat clamps at 1');
+  assert.equal(nudgeSpreadForHeat(-2), NUDGE_SPREAD, 'heat clamps at 0');
+  // the wider spread admits the coarse keys it fits: their smallest move is inside a hot nudge
+  assert.equal(nudgeFits('zTiers', NUDGE_SPREAD_HOT), true, 'zTiers fits at the hot spread (11% ≤ 20%)');
+  assert.equal(nudgeFits('damping', NUDGE_SPREAD_HOT), true, 'damping fits at the hot spread (12.5% ≤ 20%)');
+
+  const st = { layoutParams: { ...S().layoutParams }, lockedParams: {}, armedMode: null, armedMotion: null };
+  const hotCapOk = (m) => nudgeWithinCap(m.key, m.from, m.to, NUDGE_SPREAD_HOT);
+  // a judge that always keeps: calm, the keep stands; hot, it is not on the table
+  const calmKeep = curatorPass(st, null, mkRng(5), () => ({ index: 0 }), { heat: 0 });
+  assert.equal(calmKeep.layoutParams, null, 'calm: the curator may still keep the piece');
+  for (let i = 0; i < 40; i++) {
+    const r = curatorPass(st, null, mkRng(31000 + i), () => ({ index: 0 }), { heat: 1 });
+    assert.ok(r.layoutParams, `hot ${i}: a keep-demanding judge still lands a nudge`);
+    assert.ok(r.moves.length >= 1 && r.moves.length <= NUDGE_MAX_KEYS, `hot ${i}: the nudge is real and capped`);
+    assert.ok(r.moves.every(hotCapOk), `hot ${i}: within the hot cap: ${JSON.stringify(r.moves)}`);
+    assert.deepEqual(paramDiff(st.layoutParams, r.layoutParams), r.moves.map((m) => m.key).sort());
+  }
+  // at exactly the CHAOS line, a uniform judge never lands a keep either
+  for (let i = 0; i < 100; i++) {
+    const rng = mkRng(41000 + i);
+    const r = curatorPass(st, null, rng, (c, _cur, g) => ({ index: Math.floor(g() * c.length) }), {
+      heat: KINETIC_CHAOS_HEAT,
+    });
+    assert.ok(r.layoutParams && r.moves.length >= 1, `at the line ${i}: no keep`);
+  }
+  // and the escalation is real, not just relabeled: hot nudges break the calm cap, inside the hot one
+  let brokeCalm = 0;
+  for (let i = 0; i < 200; i++) {
+    const rng = mkRng(51000 + i);
+    const r = curatorPass(st, null, rng, (c, _cur, g) => ({ index: Math.floor(g() * c.length) }), { heat: 1 });
+    assert.ok(r.moves.every(hotCapOk), `hot nudge ${i} within the hot cap`);
+    if (r.moves.some((m) => !nudgeWithinCap(m.key, m.from, m.to))) brokeCalm++;
+  }
+  assert.ok(brokeCalm > 20, `hot nudges move further than a calm nudge may (${brokeCalm}/200 broke the calm cap)`);
+}
+
+console.log(
+  'kineticSweep.selfcheck: ok (#1772 — look → voice → curator, param-diff audit, cap, locks, armed scope; #2452 — heat-scaled curator)',
+);

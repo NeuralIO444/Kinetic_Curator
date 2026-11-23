@@ -49,11 +49,14 @@ ok('TASTE: no state of the judge button carries VOI or VOICE any more', () => {
 });
 
 // ── Item 2: KIN's next pass, from the router itself ────────────────────────
+// #2452 re-pin (cause: the scope's chaos gate is retired — the router takes
+// no gate, so the detent and the tap call it with no scope argument). The
+// single-source law itself is unchanged: the detent still IS the router.
 ok('KIN detent: nextKineticLayer IS the router (structural single-source pin)', () => {
   const body = heat.slice(heat.indexOf('export function nextKineticLayer'));
   assert.match(
     body.slice(0, body.indexOf('\n}')),
-    /return routeKineticTapHeat\(run, now, \{ chaos \}\)\.layer;/,
+    /return routeKineticTapHeat\(run, now\)\.layer;/,
     'the detent delegates to routeKineticTapHeat — no parallel prediction to drift',
   );
 });
@@ -61,8 +64,8 @@ ok('KIN detent: nextKineticLayer IS the router (structural single-source pin)', 
 ok('KIN detent: the button renders the next pass and retired the post-hoc label', () => {
   assert.match(
     kin,
-    /nextKineticLayer\(runSnap, nowMs, \{ chaos: scopeChaos \}\)/,
-    'derived from the standing run (state mirror), the detent clock and the scope gate',
+    /nextKineticLayer\(runSnap, nowMs\)/,
+    'derived from the standing run (state mirror) and the detent clock — no scope gate since #2452',
   );
   assert.match(kin, /setRunSnap\(runRef\.current\)/, 'the mirror is written wherever the ref is');
   assert.match(kin, /className="tb-micro kin-next" data-next=\{nextLayer\}/, 'the detent stands on the button');
@@ -70,7 +73,7 @@ ok('KIN detent: the button renders the next pass and retired the post-hoc label'
   assert.ok(!kin.includes('lastLayer'), 'the last-pass state is gone');
   assert.ok(!kin.includes('last tap ran'), 'the post-hoc label is retired');
   // The tap path itself is untouched: same router call, same four passes.
-  assert.match(kin, /routeKineticTapHeat\(runRef\.current, now, \{ chaos: scopeChaos \}\)/);
+  assert.match(kin, /routeKineticTapHeat\(runRef\.current, now\)/);
   for (const pass of ['kineticLookPass()', 'kineticVoicePass()', 'kineticCuratorPass()', 'kineticRoll()']) {
     assert.ok(kin.includes(pass), `the tap still fires ${pass}`);
   }

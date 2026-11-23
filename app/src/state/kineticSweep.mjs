@@ -4,8 +4,12 @@
 //   tap 2 — VOICE pass:   a fresh voice (S5's 64) over the standing look: motion + palette, and the glow ONLY when
 //                         the voice declares accumulation (S2's law, #1768). Costume.
 //   tap 3+ — CURATOR:     Davis nudges a few params by a capped amount, or passes when nothing beats the piece as it
-//                         stands. Small percentage.
-//   hammering — CHAOS:    the full kineticRoll (#942), unchanged — Matt's ruling 2026-10-27: hammering still reaches it.
+//                         stands. Small percentage — scaled by the run's heat since #2452 (Matt's law: hit it a
+//                         lot, it changes more, not less): the cap runs from NUDGE_SPREAD calm to NUDGE_SPREAD_HOT
+//                         at full heat, and at/above the CHAOS line the pass may NOT keep — a hot press always
+//                         moves something real.
+//   hammering — CHAOS:    the full kineticRoll (#942), unchanged — Matt's ruling 2026-10-27: hammering still
+//                         reaches it; #2452: at every scope, not only KOZ.
 //
 // Each pass owns its axes and leaves the others alone, so a param-diff audit can name what a tap moved
 // (kineticSweep.selfcheck). The ceiling over the sweep is the ARMED ROLL SCOPE (#964), per Matt 2026-10-27: an armed
@@ -24,10 +28,27 @@ import { REFINE_RANGES, mutateKey } from '../curator/refineMutate.js';
 import { MOTION_KEYS, pinRollScope } from './rollScope.mjs';
 import { dealPoolFor, poolToEnabled, isComplexAsset } from './rollPool.mjs';
 import { leadWithConstructs } from '../engine/constructLead.js'; // #2108: constructs lead (the CONSTRUCTS gate)
+import { KINETIC_CHAOS_HEAT } from '../panels/layout/kineticHeat.mjs'; // #2452: the line a hot curator answers to
 
-/** The curator pass's cap: at most this many params move, each by at most NUDGE_SPREAD of its dice range. */
+/** The curator pass's cap: at most this many params move, each by at most the spread of its dice range. */
 export const NUDGE_MAX_KEYS = 3;
+/** The calm spread: a cool run's nudge moves each param by at most this fraction of its dice range. */
 export const NUDGE_SPREAD = 0.08;
+/**
+ * #2452 — the spread at full heat: hitting KINETIC a lot must change MORE, not less, so the cap scales with
+ * the run's heat from NUDGE_SPREAD (calm) to this (heat 1) — 2.5× the calm cap. The issue's ask was ~0.30;
+ * the mutation door itself (curator/refineMutate.js) trims every mutation to its MAX_SPREAD of 0.2 — Matt's
+ * #1144 lock, set so a single mutation can never be a "jump" — so 0.2 is the widest spread the door can
+ * lawfully deliver, and the cap the curator weighs against is stated at the true delivered number rather
+ * than an ask the door would silently trim. Raising the door's own cap is a separate ruling.
+ */
+export const NUDGE_SPREAD_HOT = 0.2;
+
+/** The curator's spread for a run at `heat` ∈ [0, 1]: NUDGE_SPREAD calm, NUDGE_SPREAD_HOT at full heat. */
+export function nudgeSpreadForHeat(heat) {
+  const h = Number.isFinite(heat) ? Math.min(1, Math.max(0, heat)) : 0;
+  return NUDGE_SPREAD + (NUDGE_SPREAD_HOT - NUDGE_SPREAD) * h;
+}
 /** Candidates the curator weighs: the piece as it stands (index 0) + nudged variants. */
 export const NUDGE_CANDIDATES = 6;
 
@@ -139,28 +160,29 @@ const step = (spec) => (spec.int ? 1 : spec.dec != null ? 10 ** -spec.dec : 0);
 const ranges = (spec) => (spec.pair ? spec.pair : [[spec.lo, spec.hi]]);
 /**
  * A key whose smallest possible move (one integer / one rounding step) is already bigger than the cap can never be
- * nudged by a small percentage — zTiers (1 step = 11% of its range) and damping (12.5%) sit out the curator pass.
+ * nudged by a small percentage — at the calm spread zTiers (1 step = 11% of its range) and damping (12.5%) sit out
+ * the curator pass; a hot run's wider spread (#2452) admits them, because at that spread their smallest move fits.
  */
-export function nudgeFits(key) {
+export function nudgeFits(key, spread = NUDGE_SPREAD) {
   const spec = REFINE_RANGES[key];
-  return !!spec && ranges(spec).every(([lo, hi]) => step(spec) <= NUDGE_SPREAD * (hi - lo));
+  return !!spec && ranges(spec).every(([lo, hi]) => step(spec) <= spread * (hi - lo));
 }
 
-/** The cap, exactly: each element moved ≤ NUDGE_SPREAD of its dice range, plus half the key's rounding step. */
-export function nudgeWithinCap(key, from, to) {
+/** The cap, exactly: each element moved ≤ spread of its dice range, plus half the key's rounding step. */
+export function nudgeWithinCap(key, from, to, spread = NUDGE_SPREAD) {
   const spec = REFINE_RANGES[key];
   if (!spec) return false;
   const a = spec.pair ? from : [from];
   const b = spec.pair ? to : [to];
-  return ranges(spec).every(([lo, hi], i) => Math.abs(b[i] - a[i]) <= NUDGE_SPREAD * (hi - lo) + step(spec) / 2 + 1e-9);
+  return ranges(spec).every(([lo, hi], i) => Math.abs(b[i] - a[i]) <= spread * (hi - lo) + step(spec) / 2 + 1e-9);
 }
 
 /** The keys the curator may nudge right now: dice-rollable, fine-grained enough, unlocked, not armed, usable. */
-export function nudgeableKeys(state) {
+export function nudgeableKeys(state, spread = NUDGE_SPREAD) {
   const lp = state.layoutParams || {};
   const locked = state.lockedParams || {};
   return RANDOMIZABLE_KEYS.filter((k) => {
-    if (locked[k] || !nudgeFits(k)) return false;
+    if (locked[k] || !nudgeFits(k, spread)) return false;
     if (state.armedMotion && MOTION_KEYS.includes(k)) return false;
     const v = lp[k];
     return Number.isFinite(v) || (Array.isArray(v) && v.length === 2 && v.every(Number.isFinite));
@@ -171,10 +193,17 @@ export function nudgeableKeys(state) {
  * CURATOR pass. `pick` is curate.js's pickCurated (injected so the pure module stays engine-free).
  * Returns { layoutParams, moves: [{ key, from, to }], index } — or { layoutParams: null, moves: [], index } when the
  * curator keeps the piece as it stands (index 0) or nothing is nudgeable: the pass can pass.
+ *
+ * #2452 — `heat` is the run's standing heat (the button publishes it; the store action reads it in). The
+ * nudge spread scales with it (nudgeSpreadForHeat), and at/above the CHAOS line the curator may NOT keep:
+ * if the weighed pick is the standing piece, the nudged candidates are weighed again without it, and the
+ * landed nudge is guaranteed real (a weighed candidate that rounds to no move falls through to the first
+ * candidate that moves). Nothing nudgeable is still a pass — there is nothing lawful to move.
  */
-export function curatorPass(state, curator, rng, pick) {
+export function curatorPass(state, curator, rng, pick, { heat = 0 } = {}) {
   const lp = state.layoutParams || {};
-  const keys = nudgeableKeys(state);
+  const spread = nudgeSpreadForHeat(heat);
+  const keys = nudgeableKeys(state, spread);
   if (!keys.length) return { layoutParams: null, moves: [], index: 0 };
   const candidates = [{ ...lp }];
   for (let n = 1; n < NUDGE_CANDIDATES; n++) {
@@ -183,13 +212,31 @@ export function curatorPass(state, curator, rng, pick) {
     const m = 1 + pickIndex(rng, Math.min(NUDGE_MAX_KEYS, left.length));
     for (let i = 0; i < m; i++) {
       const k = left.splice(pickIndex(rng, left.length), 1)[0];
-      rp[k] = mutateKey(k, lp[k], rng, NUDGE_SPREAD);
+      rp[k] = mutateKey(k, lp[k], rng, spread);
     }
     candidates.push(rp);
   }
-  const { index } = pick(candidates, curator, rng, { refine: true });
+  let { index } = pick(candidates, curator, rng, { refine: true });
+  const hot = heat >= KINETIC_CHAOS_HEAT;
+  if (hot && !(index > 0) && candidates.length > 1) {
+    // the keep is not on the table at this heat: weigh the nudges alone
+    const sub = pick(candidates.slice(1), curator, rng, { refine: true });
+    index = (Number.isInteger(sub?.index) && sub.index >= 0 && sub.index < candidates.length - 1 ? sub.index : 0) + 1;
+  }
   if (!(index > 0)) return { layoutParams: null, moves: [], index: Math.max(0, index | 0) };
-  const landed = validateLayoutParams(candidates[index]).params;
-  const moves = paramDiff(lp, landed).map((key) => ({ key, from: lp[key], to: landed[key] }));
+  let landed = validateLayoutParams(candidates[index]).params;
+  let moves = paramDiff(lp, landed).map((key) => ({ key, from: lp[key], to: landed[key] }));
+  if (hot && !moves.length) {
+    // the weighed nudge rounded to nothing: a hot press still lands — take the first candidate that moves
+    for (let i = 1; i < candidates.length && !moves.length; i++) {
+      const alt = validateLayoutParams(candidates[i]).params;
+      const altMoves = paramDiff(lp, alt).map((key) => ({ key, from: lp[key], to: alt[key] }));
+      if (altMoves.length) {
+        landed = alt;
+        moves = altMoves;
+        index = i;
+      }
+    }
+  }
   return moves.length ? { layoutParams: landed, moves, index } : { layoutParams: null, moves: [], index };
 }
