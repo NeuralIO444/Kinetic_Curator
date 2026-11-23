@@ -105,11 +105,31 @@
 //               predicate in this slice, so the optional contacts kernel stays
 //               unnamed in the world's stamp — its door arrives with a GPU producer
 //               in the world, the live stage's producer pattern.
+//
+//   THE SOLVER  Phase 2 (the parent issue 1598): the in-house solver
+//               (engine/cultureSolver.mjs) resolves the contacts the swarm's
+//               integrator produces — on the swarm's own cadence, inside the
+//               same world step, immediately after the swarm step: detect (the
+//               K3 pair dealer), impulse (mass-weighted, restitution 0 — the
+//               dish clumps, §2.3), project (positional, iterated). The shapes
+//               are the parent issue's ruling: the disc is the dynamic shape,
+//               and the one static shape is the AABB — scenery at infinite
+//               mass, dealt into world.statics, empty until a scene deals one.
+//               Distance links (world.links) are the solver's joints: a
+//               compound body at this layer is discs plus links (§2.4);
+//               assembling them from rigs is Phase 5's dealing, not the
+//               solver's. The solver is resolver-class — CPU JS by the Full
+//               WebGL program's standing law — and carries NO stamp of its
+//               own: it is part of the world's own step, like the scheduler,
+//               and the law composition above does not change. With no pairs,
+//               no statics, and no links it is a bit-exact no-op (the parent
+//               issue's inherited parity law, restated for the world).
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
 import { createCulture, stepCulture, seedRandom, cultureHash, CULTURE_RULE } from './dishLife.mjs';
 import { injectFluidBirths } from './dishFluidCouple.mjs';
 import { stepCultureSwarm, cultureContactPairs, cultureSwarmHash } from './cultureSwarm.mjs';
+import { stepCultureSolver, createCultureStatics, createCultureLinks, cultureSolverHash } from './cultureSolver.mjs';
 import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
 
 /** The backend id this world stamps, in the simBackends vocabulary: JS, versioned. */
@@ -244,6 +264,20 @@ export function createCultureWorld({ seed = 0 } = {}) {
       /** Per-body contact disc radius (Phase 1 K3): 0 at birth — no disc, no contact pair (the dish law). */
       radius: new Float32Array(cap),
     },
+    /**
+     * The static scenery (Phase 2): AABB boxes at infinite mass — the parent
+     * issue's one added shape. Empty at birth: no scene has dealt a box yet,
+     * and an empty table is the parity position (the solver reads it as air).
+     */
+    statics: createCultureStatics(),
+    /**
+     * The solver's joints (Phase 2): distance links between body indices.
+     * Empty at birth — compound bodies are dealt by their assemblers
+     * (Phase 5), never born linked.
+     */
+    links: createCultureLinks(),
+    /** The solver's own step counter: floor(world.step / CULTURE_SWARM_STEP_DIVISOR), the swarm's cadence. */
+    solver: { step: 0 },
   };
 }
 
@@ -260,8 +294,11 @@ export function cultureWorldSimTimeS(world) {
  * deals its births into the culture (the #1997 seam, read at the fluid's last
  * completed state), then the rule steps; and on every CULTURE_SWARM_STEP_DIVISOR-th
  * world step the swarm takes one step over the living bodies (its own step counter
- * is world.bodies.step — over an empty table the step still counts: the kernel ran).
- * Later phases put the solver here; the scheduler law around it does not change.
+ * is world.bodies.step — over an empty table the step still counts: the kernel ran)
+ * and the solver immediately resolves the contacts that step produced (its own
+ * step counter is world.solver.step, the same cadence — a solver step per swarm
+ * step, never a stale or skipped snapshot). The scheduler law around all of this
+ * does not change.
  */
 export function stepCultureWorld(world) {
   world.step += 1;
@@ -270,8 +307,60 @@ export function stepCultureWorld(world) {
     injectFluidBirths(world.life, cultureFluidDensity(world), CULTURE_COUPLING, world.seed);
     stepCulture(world.life);
   }
-  if (world.step % CULTURE_SWARM_STEP_DIVISOR === 0) stepCultureSwarm(world.bodies);
+  if (world.step % CULTURE_SWARM_STEP_DIVISOR === 0) {
+    stepCultureSwarm(world.bodies);
+    stepCultureSolver(world.bodies, world.statics, world.links);
+    world.solver.step += 1;
+  }
   return world;
+}
+
+/**
+ * Deal one static AABB into the world — the ONLY door for scenery, in the stamp
+ * doors' refuse-loudly idiom: a non-finite or inverted box is refused, and so is
+ * a box past the table's ceiling. Returns the box's index. Scenery is dealt by
+ * scenes (a later phase's call); the world is born with none.
+ */
+export function addCultureStatic(world, box) {
+  const statics = world.statics;
+  if (statics.count >= statics.capacity) throw new Error(`cultureWorld: statics table full (${statics.capacity})`);
+  const { minX, minY, maxX, maxY } = box || {};
+  if (![minX, minY, maxX, maxY].every(Number.isFinite) || minX > maxX || minY > maxY)
+    throw new Error(`cultureWorld: bad static box "${JSON.stringify(box)}" — finite corners, min no greater than max`);
+  const i = statics.count;
+  statics.minX[i] = minX;
+  statics.minY[i] = minY;
+  statics.maxX[i] = maxX;
+  statics.maxY[i] = maxY;
+  statics.count += 1;
+  return i;
+}
+
+/**
+ * Deal one distance link between two dealt bodies — the ONLY door for joints.
+ * `rest` defaults to the bodies' current distance (a link dealt at rest length
+ * holds the shape it was dealt in). A self-link, an endpoint outside the dealt
+ * population, a negative or non-finite rest, and a link past the table's
+ * ceiling are all refused, loudly. Returns the link's index.
+ */
+export function addCultureLink(world, a, b, rest) {
+  const links = world.links;
+  if (links.count >= links.capacity) throw new Error(`cultureWorld: links table full (${links.capacity})`);
+  const n = world.bodies.count;
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a === b || a < 0 || b < 0 || a >= n || b >= n)
+    throw new Error(`cultureWorld: bad link endpoints "${a}", "${b}" — two distinct dealt bodies`);
+  const r =
+    rest === undefined
+      ? Math.sqrt((world.bodies.x[b] - world.bodies.x[a]) ** 2 + (world.bodies.y[b] - world.bodies.y[a]) ** 2)
+      : rest;
+  if (!Number.isFinite(r) || r < 0)
+    throw new Error(`cultureWorld: bad link rest "${String(rest)}" — a finite length, zero or more`);
+  const i = links.count;
+  links.a[i] = a;
+  links.b[i] = b;
+  links.rest[i] = r;
+  links.count += 1;
+  return i;
 }
 
 /**
@@ -407,10 +496,12 @@ function mixFloat(mix, v) {
  * A canonical hash of everything that makes this world THIS world: seed, stamp, step
  * count, carried remainder (bit-exact), dropped count, the soil grid, the fluid medium
  * (its backend id and the kernel's own quantized fingerprint), the culture (its backend
- * id and the core's own state fingerprint), and the body table (its count, the swarm's
+ * id and the core's own state fingerprint), the body table (its count, the swarm's
  * backend id, and the swarm core's own fingerprint of the dealt prefix — step, alive,
- * position, velocity, mass, radius). Same feed sequence => same hash, on any device
- * (all arithmetic here is IEEE-exact JS). FNV-1a, the dishWet.selfcheck precedent.
+ * position, velocity, mass, radius), and the solver's standing state (its step count
+ * and the solver core's fingerprint of the statics and links). Same feed sequence =>
+ * same hash, on any device (all arithmetic here is IEEE-exact JS). FNV-1a, the
+ * dishWet.selfcheck precedent.
  */
 export function cultureWorldHash(world) {
   let h = 0x811c9dc5;
@@ -443,6 +534,8 @@ export function cultureWorldHash(world) {
   mixStr(world.swarmBackend);
   mixU32(world.bodies.count);
   mixU32(cultureSwarmHash(world.bodies));
+  mixU32(world.solver.step);
+  mixU32(cultureSolverHash(world.statics, world.links));
   return h >>> 0;
 }
 
