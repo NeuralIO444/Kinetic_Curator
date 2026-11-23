@@ -215,6 +215,7 @@ export function serializeProject(state) {
   const constructs = sanitizeConstructRecords(state.constructRecords);
   if (constructs.length) doc.constructRecords = constructs;
   if (state.constructLead === true) doc.constructLead = true; // #2108 — only when on: an off project serializes as before
+  if (state.cultureDish === true) doc.cultureDish = true; // CULTURE Phase 0 — the dish gate, only when on: a gate-off project serializes as before
   // #2328 — gait records. Written only when there are some: a project with none exports as before.
   const gaits = sanitizeGaitRecords(state.gaitRecords);
   if (gaits.length) doc.gaitRecords = gaits;
@@ -298,6 +299,7 @@ export const DOC_FIELD_CLASS = Object.freeze({
   shapeShelf: 'scene',
   constructRecords: 'scene',
   constructLead: 'scene',
+  cultureDish: 'scene', // CULTURE Phase 0 — the dish gate is a property of the world the scene runs in, so it travels with the scene
   gaitRecords: 'scene', // #2328 (gait-spec: scene, so share links carry gaits)
   gaitLocks: 'scene', // #2329 follow-up — the user's gait locks travel with the scene (and so with recipes)
   kitTriad: 'scene',
@@ -424,6 +426,7 @@ export function parseProject(raw) {
       shapeShelf: sanitizeShapeShelf(raw.shapeShelf), // #2280
       constructRecords: sanitizeConstructRecords(raw.constructRecords), // #2108
       constructLead: raw.constructLead === true, // #2108 — the CONSTRUCTS gate
+      cultureDish: raw.cultureDish === true, // CULTURE Phase 0 — the dish gate; absent = off
       gaitRecords: sanitizeGaitRecords(raw.gaitRecords), // #2328
       gaitLocks: sanitizeGaitLocks(raw.gaitLocks), // #2329 follow-up — {} when the file has none
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
@@ -494,6 +497,7 @@ export function parseProject(raw) {
     shapeShelf: sanitizeShapeShelf(raw.shapeShelf), // #2280
     constructRecords: sanitizeConstructRecords(raw.constructRecords), // #2108
     constructLead: raw.constructLead === true, // #2108 — the CONSTRUCTS gate
+    cultureDish: raw.cultureDish === true, // CULTURE Phase 0 — the dish gate; absent = off
     gaitRecords: sanitizeGaitRecords(raw.gaitRecords), // #2328
     gaitLocks: sanitizeGaitLocks(raw.gaitLocks), // #2329 follow-up — {} when the file has none
     audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790

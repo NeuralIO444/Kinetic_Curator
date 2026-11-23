@@ -446,6 +446,8 @@ export const createGlobalSlice = (set, get) => ({
   creatureRecords: [], // #1849 — creature records assembled in the wet lab; #1850: each one's pool tile lives in customAssets
   constructLead: false, // #2108 — the CONSTRUCTS gate: on, KIN/CHAOS pools are led by the house constructs (default off = every roll as before)
   setConstructLead: (on) => set({ constructLead: !!on }),
+  cultureDish: false, // CULTURE Phase 0 — the dish gate: on, the shell runs the CULTURE world behind the gate (default off = the stage exactly as before; engine/cultureWorld.mjs)
+  setCultureDish: (on) => set({ cultureDish: !!on }),
   constructRecords: [], // #2108 — construct records (recipes); their tiles are drawn from them, never saved
   gaitRecords: [], // #2328 — gait records (kc-gait/1); assigned only by a test until M3
   /** #2329 (gait M3) — { target: { gaitId, by, locked } }: the gait each construct wears now. Session-only (not in the

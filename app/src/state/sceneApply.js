@@ -136,6 +136,7 @@ export function sceneFieldsFromDoc(doc, state, { kits = [] } = {}) {
   next.shapeShelf = sanitizeShapeShelf(doc.shapeShelf); // #2280 — a doc without a shelf has an empty one
   next.constructRecords = sanitizeConstructRecords(doc.constructRecords); // #2108 — a doc without constructs has none
   next.constructLead = doc.constructLead === true; // #2108 — the gate rides the project; absent = off
+  next.cultureDish = doc.cultureDish === true; // CULTURE Phase 0 — the dish gate rides the project; absent = off
   next.gaitRecords = sanitizeGaitRecords(doc.gaitRecords); // #2328 — a doc without gaits has none
   // #2329 follow-up — the document's gait locks stand up as the user's locks; a doc without them clears them. A QUEEN
   // pick is a session claim on the OLD scene and never survives a scene change (she re-picks at the next phrase).

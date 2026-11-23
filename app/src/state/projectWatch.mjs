@@ -33,6 +33,7 @@ export const PROJECT_STATE_KEYS = Object.freeze([
   'shapeShelf', // #2280
   'constructRecords', // #2108
   'constructLead', // #2108
+  'cultureDish', // CULTURE Phase 0 — the dish gate is saved (only while on), so flipping it must wake the autosave
   'gaitRecords', // #2328
   'gaitAssignments', // #2329 follow-up — a user lock is saved (doc.gaitLocks); a QUEEN pick only re-saves the same doc
   'audioRoutes',
