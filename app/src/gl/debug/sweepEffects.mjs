@@ -62,6 +62,7 @@ import { UNIFORMS as BUILTIN_UNIFORMS } from '../bridge/builtinEffects.mjs';
 import { ACCUM_PROGRAMS } from '../accum.mjs';
 import { CONTACT_SHADOW_PROGRAMS, SHADOW_LIFT, SHADOW_MAX_OFFSET, SHADOW_SOFT } from '../contactShadow.mjs';
 import { FX_SHADER_EFFECTS } from '../effects/fxShaders.mjs';
+import { gradientStopParams } from '../../fx/gradientMap.mjs'; // #2443 — hostile cases feed raw values, so they must carry the stops explicitly
 import { MATH_SHADER_EFFECTS } from '../effects/mathShaders.mjs';
 import { createSweepLab, runEffectSweep, locMap } from './sweep.mjs';
 
@@ -547,6 +548,21 @@ export const SWEEP_EFFECTS = [
       H('hostile negative chroma', { hue: 0, chroma: -3, lift: 1 }),
       H('hostile huge hue', { hue: 1e6, chroma: 1, lift: 1 }),
       H('hostile zero lift', { hue: 0, chroma: 1, lift: 0 }),
+    ],
+  },
+  {
+    ...templateEffectDef('gradientMap'),
+    cases: [
+      // #2443 — strength 0 must return the source byte-for-byte; the stops
+      // ride at their descriptor defaults (the default gradient) — the
+      // sweep measures the map's shape, not any one Look's recipe.
+      C('identity → no-op', { strength: 0 }, { noop: true }),
+      C('default', { strength: 0.6 }),
+      C('max', { strength: 1 }, { costly: true }),
+      // Hostile cases bypass the sanitizer (raw values by design), so the
+      // five stop colours ride explicitly — the shader reads them raw.
+      H('hostile negative strength', { strength: -2, ...gradientStopParams(null) }),
+      H('hostile huge strength', { strength: 1e6, ...gradientStopParams(null) }),
     ],
   },
   {

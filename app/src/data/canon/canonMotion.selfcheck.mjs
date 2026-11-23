@@ -266,7 +266,7 @@ const ids = (rs) => rs.map((r) => r.id);
     paths: [PATH_FAMILIES, '0f847ab0be755a83'],
     curves: [BALLISTICS_CURVES, 'e006154defd5974a'],
     defaults: [DEFAULT_LAYOUT_PARAMS, '1c2ddc28c7769673'],
-    looks: [COMPOSITION_PRESETS, '6c07105fd66d9e64'], // #2107 re-pin: + 12 looks (techno, pixel, organic, 4 each); every earlier record unchanged · #1838: dusk-flock trailFresh
+    looks: [COMPOSITION_PRESETS, '545ab8774a087f95'], // #2107 re-pin: + 12 looks (techno, pixel, organic, 4 each); every earlier record unchanged · #1838: dusk-flock trailFresh · #2443 re-pin: 3 of 82 records gained ONLY a `gradientMap` recipe field (verified per-record vs e0a8ab77)
     deck: [VOICE_DECK, '598906ab25e64b27'], // #2107 re-pin: + 19 family voices appended, the first 72 unchanged · #2150 re-pin: glyph losses + wardrobe re-draws over the narrowed pool (17 of 72 voices, verified per-voice)
   };
   for (const [name, [value, hash]] of Object.entries(pins)) assert.equal(sha(value), hash, `${name}: byte-identical`);

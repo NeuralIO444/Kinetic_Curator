@@ -133,9 +133,12 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   assert.equal(COMPOSITION_PRESETS.length, 82); // #2107: + 12 looks, inserted before the Riso field Look
   // #1838 re-pin: the hash moved exactly one field — dusk-flock gained `trailFresh: 0.6`
   // (the trail drive's declared fresh pole). Verified per-record: 1 of 70 differs, that field only.
+  // #2443 re-pin: the hashes moved on the gradient-map recipe field — verified per-record
+  // against e0a8ab77: 3 of 82 records differ (chiaroscuro, neon-brood, bio-plate-sepia),
+  // each gaining ONLY a `gradientMap` field; no field changed or removed anywhere.
   const before2107 = [...COMPOSITION_PRESETS.slice(0, 69), COMPOSITION_PRESETS.at(-1)];
-  assert.equal(sha(before2107), '61c50037062a6337', 'the 70 looks are byte-identical');
-  assert.equal(sha(COMPOSITION_PRESETS), '6c07105fd66d9e64', '#2107: + 12 looks (techno, pixel, organic)');
+  assert.equal(sha(before2107), 'd22a58ccd0031d29', 'the 70 looks are byte-identical');
+  assert.equal(sha(COMPOSITION_PRESETS), '545ab8774a087f95', '#2107: + 12 looks (techno, pixel, organic)');
   const groupsBefore2107 = PRESET_GROUPS.filter((g) => !['techno', 'pixel', 'organic'].includes(g.id));
   assert.equal(sha(groupsBefore2107), '309f106f646c7efe', 'the 16 look groups are byte-identical');
   assert.equal(PRESET_GROUPS.length, 19, '#2107: + techno, pixel, organic');
