@@ -205,7 +205,7 @@ const firstLookOf = (style) => look(canonStyle(style).looks[0]);
     '6e68b51da1b48757', // #2107 re-pin: the Now deck gains the 12 looks and 19 voices (techno, pixel, organic); no other chapter moves (verified per chapter against main) · #2150: chapter decks differ by exactly the glyph membership (swiss −36, grunge −3, now −47)
     'every chapter deck is byte-identical',
   );
-  assert.equal(sha(COMPOSITION_PRESETS), '6c07105fd66d9e64'); // #2107 re-pin: + 12 looks, every earlier record unchanged · #1838: dusk-flock gained `trailFresh: 0.6` (1 of 70 records, that field only)
+  assert.equal(sha(COMPOSITION_PRESETS), '545ab8774a087f95'); // #2107 re-pin: + 12 looks, every earlier record unchanged · #1838: dusk-flock gained `trailFresh: 0.6` (1 of 70 records, that field only) · #2443 re-pin: 3 of 82 records gained ONLY a `gradientMap` recipe field (verified per-record vs e0a8ab77)
   assert.equal(sha(VOICE_DECK), '598906ab25e64b27'); // #2107 re-pin: + 19 family voices appended, the first 72 unchanged (556e0e2b3e55fe04) · #2150 re-pin: 17 of 72 voices differ (glyph losses + wardrobe re-draws over the narrowed pool); no voice wears a glyph
   // extractFeatures moved to a leaf — taste.js still exports the same function
   assert.equal(taste.extractFeatures, extractFeatures);

@@ -25,6 +25,8 @@
  *   (renderScale) before anything visible is cut.
  */
 
+import { gradientStopsFromParams, sampleGradient } from './gradientMap.mjs';
+
 const r3 = (v) => Math.round(Number(v) * 1000) / 1000;
 
 /** Effect catalog: the single source of truth for compiler, UI, and docs. */
@@ -115,6 +117,31 @@ export const FX_EFFECT_DEFS = {
         step: 0.01,
         def: 1,
         hint: 'Scale perceptual lightness. 1 is unchanged.',
+      },
+    },
+  },
+  // #2443 — GRADIENT MAP: the stage re-colored by its own luminance
+  // through a five-stop gradient (the Photoshop gradient-map move).
+  // Spectral-law declaration (#2361): a per-tone RECOLOR — it neither
+  // mixes matter as pigment nor adds light as light; it re-assigns
+  // colour by tone (fx/gradientMap.mjs carries the law + CPU reference).
+  // The stops are per-Look recipe constants, resolved by the scene
+  // contract from the standing Look and attached to the chain step —
+  // never document params — so the only catalog param is the strength
+  // dial, the guard against the map going extreme on flat material.
+  // The GL shader grades the composited stage below the FX stratum
+  // (the chain input, #227), at this item's own slot position.
+  gradientMap: {
+    label: 'Gradient Map',
+    hint: 'Re-colors the stage by its own luminance through the standing Look’s gradient: shadows, midtones and highlights take the gradient’s colours. Strength is the guard — on flat material a full map goes extreme fast.',
+    params: {
+      strength: {
+        label: 'Strength',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        def: 0.6,
+        hint: 'How far the gradient takes over. 0 is the stage untouched; 1 is the full map.',
       },
     },
   },
@@ -354,7 +381,7 @@ export const FX_RACK = [
   // #1022 — EF-1 holds real effects again; the two stubs it promised are built.
   { slot: 'EF-1', label: 'Blur / Focus', kinds: ['sharpen', 'haze'], stubs: [] },
   { slot: 'EF-2', label: 'Distort', kinds: ['displace', 'tear', 'rgbSplit', 'edge', 'feedbackWarp'], stubs: [] },
-  { slot: 'EF-3', label: 'Tonal', kinds: ['posterize', 'solarize', 'invert', 'grade'], stubs: [] },
+  { slot: 'EF-3', label: 'Tonal', kinds: ['posterize', 'solarize', 'invert', 'grade', 'gradientMap'], stubs: [] },
   // #2038 — stipple is built: EF-4's stub list is empty, the rack holds no
   // planned kinds any more.
   { slot: 'EF-4', label: 'Finish', kinds: ['grain', 'scanlines', 'halo', 'dither', 'riso', 'stipple'], stubs: [] },
@@ -696,6 +723,53 @@ function buildGrade(params, ctx, rid, src) {
   return out;
 }
 
+/**
+ * #2443 — the SVG half of GRADIENT MAP, an honest approximation like
+ * grade/halo: the luminance is folded into all three channels
+ * (feColorMatrix), then each channel is re-cut through a 16-point table
+ * sampled from the gradient (feComponentTransfer type=table), and the
+ * result is mixed with the source by strength (feComposite arithmetic —
+ * alpha passes through unchanged, since both sides carry the source
+ * alpha). Two known drifts from the GL pass: SVG works on the
+ * premultiplied chain, so the table reads a·lum rather than the straight
+ * luminance the shader un-premultiplies to; and a raw document layer
+ * carries no resolved stops (the scene contract attaches them only to
+ * the GL chain), so the print path falls back to the default gradient
+ * when the standing Look authored its own. Kept in sync for the
+ * standing reason: an unknown kind is DROPPED by sanitizeFxEffects, so
+ * a GL-only gradient map would silently vanish from the print path.
+ * Strength 0 emits the identity pass-through the other builders use.
+ */
+function buildGradientMap(params, ctx, rid, src) {
+  const strength = Math.min(1, Math.max(0, Number(params.strength) || 0));
+  if (strength <= 0) return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
+  const stops = gradientStopsFromParams(params);
+  const SAMPLES = 16;
+  const table = (ch) =>
+    Array.from({ length: SAMPLES }, (_, i) => r3(sampleGradient(stops, i / (SAMPLES - 1))[ch])).join(' ');
+  const lum = rid();
+  const mapped = rid();
+  const LUM_ROW = '0.2126 0.7152 0.0722 0 0';
+  return [
+    {
+      prim: 'feColorMatrix',
+      attrs: { in: src, type: 'matrix', values: `${LUM_ROW}  ${LUM_ROW}  ${LUM_ROW}  0 0 0 1 0`, result: lum },
+    },
+    {
+      prim: 'feComponentTransfer',
+      attrs: { in: lum, result: mapped },
+      children: [0, 1, 2].map((ch) => ({
+        prim: `feFunc${'RGB'[ch]}`,
+        attrs: { type: 'table', tableValues: table(ch) },
+      })),
+    },
+    {
+      prim: 'feComposite',
+      attrs: { in: mapped, in2: src, operator: 'arithmetic', k1: 0, k2: r3(strength), k3: r3(1 - strength), k4: 0 },
+    },
+  ];
+}
+
 function buildTear(params, ctx, rid, src) {
   // Stretched noise: varies along Y (bands across the height), near-constant
   // along X. Y displacement is flattened to exactly 0 via feFuncG so the
@@ -952,6 +1026,7 @@ const BUILDERS = {
   displace: buildDisplace,
   halo: buildHalo,
   grade: buildGrade,
+  gradientMap: buildGradientMap,
   tear: buildTear,
   grain: buildGrain,
   scanlines: buildScanlines,

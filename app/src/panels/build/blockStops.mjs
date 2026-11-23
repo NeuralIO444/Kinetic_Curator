@@ -63,6 +63,10 @@ export const FX_PARAM_STOPS = {
   // effect, not an off. The detents run in the op's working direction.
   'grade.chroma': { stops: [1, 1.3, 1.6, 2], identity: true },
   'grade.lift': { stops: [1, 1.15, 1.3, 1.5], identity: true },
+  // #2443 — gradientMap strength: a plain magnitude from OFF (0 = the
+  // stage untouched); its stops (the gradient itself) are the standing
+  // Look's recipe constants, never a param, so they have no entry here.
+  'gradientMap.strength': { stops: [0, 0.3, 0.6, 1] },
   // EF-4 · Finish
   'grain.amount': { stops: [0, 0.4, 0.7, 1] },
   // #1610 — dither: cell is a setting (pattern pitch, the halo.radius

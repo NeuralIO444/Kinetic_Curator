@@ -72,9 +72,11 @@ test('#1046 an effect with almost nothing to set says so, and an empty slot offe
     'these read "no controls"',
   );
   // #1490 — feedbackWarp has exactly one control (its amount) on purpose: it joins this list deliberately.
+  // #2443 — gradientMap has exactly one control (its strength) on purpose: its stops are the
+  // standing Look's recipe constants, attached by the scene contract — never catalog params.
   assert.deepEqual(
     kinds.filter((k) => countOf(k) === 1).sort(),
-    ['feedbackWarp', 'grain', 'posterize', 'rgbSplit'],
+    ['feedbackWarp', 'gradientMap', 'grain', 'posterize', 'rgbSplit'],
     'these read "no other controls"',
   );
   assert.ok(kinds.filter((k) => countOf(k) > 1).length >= 6, 'everything else shows its sliders and no note');

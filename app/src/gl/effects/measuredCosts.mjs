@@ -58,6 +58,13 @@ export const MEASURED_COSTS = {
   // informational. Re-bless with `npm run measure-costs` on a real GPU.
   'fx/sharpen': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/haze': { ms: 0.3, method: 'wall', draws: 90 },
+  // #2443 — added by hand, same precedent as #1022, but measured first:
+  // the wall method on the sandbox rig read 26.9 ms/draw against grade's
+  // 29.9 in the same run (a single tap + a 5-stop ramp of pure ALU —
+  // fx/grade's class, at/below its cost), which supports this file's 0.3
+  // floor against grade's 0.3333. Re-bless with `npm run measure-costs`
+  // on a real GPU.
+  'fx/gradientMap': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/scanlines': { ms: 0.3, method: 'wall', draws: 90 },
   // #1610 — added by hand, same precedent as #1022: a pure-ALU tier-3 pass
   // (one tap, a bit-formula threshold — fx/edge's class). Re-bless with

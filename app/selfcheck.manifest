@@ -296,6 +296,7 @@ node src/state/showrunner.selfcheck.mjs
 node src/fx/fxFilters.selfcheck.mjs
 node src/fx/dither.selfcheck.mjs
 node src/fx/stipple.selfcheck.mjs
+node src/fx/gradientMap.selfcheck.mjs
 node src/fx/mathFilters.selfcheck.mjs
 node src/fx/rollSafety.selfcheck.mjs
 node src/fx/rollGuard.selfcheck.mjs
