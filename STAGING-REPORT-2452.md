@@ -124,3 +124,39 @@ kineticSweep.selfcheck with the reason quoted.
 - One-writer files (liveLoop.mjs, liveResolve.mjs, particles.js): untouched.
 - Not staged by the builder: a screenshot of the hot detent. The change is timing/feel; the
   coordinator's review lane presents visual evidence with the PR.
+
+## 7. QA loop round 1 — the one defect, fixed
+
+QA verdict on the original build: CLEAN on every charge except one defect — a survivor of the
+retired gate in the e2e layer, which the build's re-pin sweep (selfchecks + source shapes) did not
+cover. Fixed in a follow-up commit on this branch; no production code changed.
+
+- **The defect:** `app/e2e/topbar-expand.spec.js` still pinned the retired KOZ-only gate — the test
+  "KIN detent: … never promises CHAOS below KOZ" booted at scope MED, hammered K, and asserted the
+  detent NEVER reads CHAOS and ends at `data-next="curator"`. Under the #2452 law that assertion is
+  backwards. The `bootPaused` header comment in the same file also still read "(CHAOS only at KOZ,
+  the default)".
+- **The fix (same file, test + comments only):** the test is renamed "KIN detent: the next pass
+  stands at rest, steps with the run, and full heat promises CHAOS at MED too" and re-pinned to the
+  new law, mirroring the KOZ detent test below it: rest reads LOOK, tap 1 steps the detent to VOICE,
+  tap 2 (two rapid taps — heat ≈ 0.97 for the would-be third tap) already promises CHAOS with
+  `data-next="chaos"`, a 5-tap hammer keeps the promise, and the lapsed run still returns to LOOK.
+  The line-39 comment now states the pill sizes the decks and caps nothing. One more stale figure
+  in the same file's header: the fake-clock rationale said "a 600 ms rapid window" — now 1000 ms
+  (the "2 s warm window" beside it is unchanged law: `KINETIC_WARM_MS` is still 2000).
+- **Survivor sweep (grep over all of `app/e2e/` and `app/src/`):** patterns "below KOZ", "CHAOS
+  only", "only at KOZ", `scopeChaos`, a `.chaos` deck field, the old constants (600 / 0.34 / 2000)
+  in heat contexts, and every CHAOS/detent mention in e2e. Result: the only genuine survivors were
+  the ones in `topbar-expand.spec.js` above (test at old line 443, comments at old lines 39, 446,
+  458, and the 600 ms figure at line 25) — all fixed here. Everything else is honest history or a
+  different feature: the "#2452: 600 → 1000" change-notes in kineticHeat.mjs, the "retired 600ms"
+  mention in kineticHeat.selfcheck, the "ceiling" prose for the pill's surviving deck-sizing role
+  (kineticScope.mjs's own comment frames the retired gate as only the size-capping part of that
+  ceiling), the armed-scope detents in roll-scope.spec.js, and the mode-row detent cells in
+  pattern-controls/slider-tones. kineticScope.selfcheck already pins "no deck carries a chaos
+  gate"; no `scopeChaos` shape survives anywhere.
+- **Verification:** the re-pinned spec RAN in the sandbox harness (Playwright bundled chromium,
+  vite preview): `npx playwright test e2e/topbar-expand.spec.js -g "KIN detent"` → **2 passed**
+  (the re-pinned MED test and the untouched KOZ test). Detent selfchecks as backup evidence:
+  kineticHeat 5/5, kineticScope 5/5, topbarLegibility 5/5 runs green. `npm run lint`: 0 errors
+  (11 pre-existing warnings). `npm run format:check`: clean.

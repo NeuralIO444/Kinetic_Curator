@@ -22,7 +22,7 @@ async function boot(page, { settle = true, hold = 1 } = {}) {
       timeout: 6000 * hold,
     });
 }
-// A KIN tap re-rolls the stage on the main thread, and the heat model reads wall-clock gaps between taps (a 600 ms rapid
+// A KIN tap re-rolls the stage on the main thread, and the heat model reads wall-clock gaps between taps (a 1000 ms rapid
 // window, a 2 s warm window). On a slow or loaded runner a tap alone outlasts them, so the same keys heat the button on
 // a fast machine and not on a slow one. These specs run the page on a paused fake clock instead: boot at real speed, then
 // pause, and every gap is exactly the one the spec advances with `tick`, whatever the machine is doing.
@@ -36,7 +36,8 @@ async function bootPaused(page, { scope = null } = {}) {
   await expect(page.locator('.kc-topbar-curator .kinetic-btn')).not.toHaveAttribute('data-open', 'true', {
     timeout: 30_000,
   });
-  // the START pill is the ceiling over every pass (CHAOS only at KOZ, the default): a spec that cares says which
+  // the START pill sizes the decks each pass deals from — since #2452 it is no ceiling (CHAOS is reachable at
+  // every scope at full heat): a spec that cares says which scope it stands at
   if (scope) await page.evaluate((m) => window.__kcStore.getState().setStartupMode(m), scope);
   await page.clock.pauseAt(new Date(Date.now() + 1000));
 }
@@ -440,10 +441,10 @@ test('TASTE: the readout names the standing taster, and DICE when off', async ({
   await expect(taste).toHaveAttribute('aria-label', /^Taste: cover — /);
 });
 
-test('KIN detent: the next pass stands at rest, steps with the run, and never promises CHAOS below KOZ', async ({
+test('KIN detent: the next pass stands at rest, steps with the run, and full heat promises CHAOS at MED too', async ({
   page,
 }) => {
-  await bootPaused(page, { scope: 'med' }); // below KOZ, so CHAOS is not on the table
+  await bootPaused(page, { scope: 'med' }); // below KOZ — since #2452 the scope sizes the decks, not the promise
   const kin = group(page).locator('.kinetic-btn');
   const next = kin.locator('.kin-next');
   await expect(next).toHaveText('LOOK');
@@ -454,14 +455,15 @@ test('KIN detent: the next pass stands at rest, steps with the run, and never pr
   await expect(next, 'after tap 1 the next tap is the voice pass').toHaveText('VOICE');
   await page.keyboard.press('k');
   await tick(page, 300);
-  await expect(next, 'after tap 2 the next tap is the curator pass').toHaveText('CUR');
-  // Hammer: heat pegs, but below KOZ the detent must never say CHAOS.
+  await expect(next, 'after tap 2 the run is already hot: the next tap is the chaos pass').toHaveText('CHAOS');
+  await expect(next).toHaveAttribute('data-next', 'chaos');
+  // Hammer: heat pegs, and the detent keeps promising CHAOS — at MED exactly as at KOZ.
   for (let i = 0; i < 5; i++) {
     await page.keyboard.press('k');
     await tick(page, 90);
-    await expect(next).not.toHaveText('CHAOS');
+    await expect(next).toHaveText('CHAOS');
   }
-  await expect(next).toHaveAttribute('data-next', 'curator');
+  await expect(next).toHaveAttribute('data-next', 'chaos');
   // The run lapses: the detent returns to LOOK on the router's own clock.
   await leap(page, 6000);
   await expect(next, 'the lapsed run reads LOOK again').toHaveText('LOOK');
