@@ -2,8 +2,10 @@
 // #1772 follow-up — the START pill cycles OFF → WEAK → MED → KOZ and is the ceiling over every KINETIC tap. Pins the
 // cycle and legacy reads, the decks and readout per state, and — through the real store — that each state's taps deal
 // only from its decks: OFF a curated 4-shape set + the 33 looks + 19 voices, WEAK the whole library with the same
-// looks/voices, MED/KOZ the 69/72; hammering reaches CHAOS only at KOZ; the curator's cap is the same everywhere; and
+// looks/voices, MED/KOZ the 69/72; the curator's cap is the same everywhere; and
 // WEAK/MED's launch opener is one look + voice pass in ONE undo entry.
+// #2452 re-pin (cause: Matt's law — hit it a lot, it changes more, not less): the decks no longer carry a chaos
+// gate at all, and hammering breaks into CHAOS at every state; what the scope still governs is deck SIZE.
 import assert from 'node:assert/strict';
 import { useStore } from './store.js';
 import {
@@ -46,37 +48,32 @@ assert.equal(CURATED_SETS.length, 19);
 const styleIds = new Set(STYLE_LOOKS.map((l) => l.id));
 assert.ok(!scopeDecks('weak').looks.some((l) => styleIds.has(l.id)), 'WEAK deals no S4 style look');
 assert.ok(!scopeDecks('weak').voices.some((v) => v.kind === 'family'), 'WEAK deals no S5 family voice');
-assert.deepEqual(
-  SCOPE_CYCLE.map((m) => scopeDecks(m).chaos),
-  [false, false, false, true],
-  'only KOZ reaches chaos',
+assert.ok(
+  SCOPE_CYCLE.every((m) => !('chaos' in scopeDecks(m))),
+  '#2452: no deck carries a chaos gate — the breakthrough is the heat law, at every state',
 );
 assert.deepEqual(
   SCOPE_CYCLE.map((m) => scopeDecks(m).launch),
   ['factory', 'open', 'open', 'roll'],
 );
 
-// 3. hammering: CHAOS only when the ceiling allows it
-const hammer = (chaos) => {
+// 3. hammering: CHAOS at every state (#2452 — the router takes no scope gate; the decks above size what
+//    the breakthrough deals, they no longer cap whether it fires)
+const hammer = () => {
   let run = { heat: 0, taps: 0, lastTapAt: 0 };
   let now = 1e6;
   const out = [];
   for (let i = 0; i < 6; i++) {
     now += i === 0 ? 5000 : 300;
-    run = routeKineticTapHeat(run, now, { chaos });
+    run = routeKineticTapHeat(run, now);
     out.push(run.layer);
   }
   return out;
 };
 assert.deepEqual(
-  hammer(true),
+  hammer(),
   ['look', 'voice', 'chaos', 'chaos', 'chaos', 'chaos'],
-  'KOZ: hammering breaks into chaos',
-);
-assert.deepEqual(
-  hammer(false),
-  ['look', 'voice', 'curator', 'curator', 'curator', 'curator'],
-  'below KOZ: the curator holds',
+  'hammering breaks into chaos — the same table at OFF, WEAK, MED and KOZ',
 );
 
 // 4. through the store: each state's taps deal only from its decks; the curator cap is the same everywhere
@@ -164,5 +161,5 @@ for (const m of ['weak', 'med']) {
 S().setStartupMode('koz');
 
 console.log(
-  'kineticScope.selfcheck: ok (#1772 — OFF/WEAK/MED/KOZ cycle, decks + readout, chaos only at KOZ, one-undo opener)',
+  'kineticScope.selfcheck: ok (#1772 — OFF/WEAK/MED/KOZ cycle, decks + readout, one-undo opener; #2452 — chaos at every scope)',
 );
