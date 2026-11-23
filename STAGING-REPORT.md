@@ -117,3 +117,32 @@ the pick is the deck alone, exactly as shipped (pinned both ways).
   variety rides every `landPoem` deal (KINETIC passes, the identity chip, round landings, ladder re-deals).
 - No change to the review loop's judgments: #2151 judges register, #2006 judges jank; they share the
   exemption table and the deal path, nothing else.
+
+## QA fix pass (post-review, same branch)
+
+The QA review returned no blockers, one should-fix and four notes; all five are fixed in this pass:
+
+- **F1 (should-fix) — driver-level replay coverage.** The acceptance line "takes replay identically"
+  rested on code-reading for the driver half. The `fieldRevision` suite now carries two fake-stage
+  replay cases: with `isReplaying: () => true`, a pole-register poem standing past the dwell draws
+  no request and no variety write; and a request already pending when playback starts never answers
+  mid-replay — the grace restarts when playback ends and the poem answers then.
+- **F3 (note; coordinator ruled: fix the code, not the wording) — the dwell clock.** The driver
+  timed the 20 s dwell from the form's first appearance in ANY tempo, so a poem that stood 20 s
+  while hot was judged the instant the tempo cooled. The dwell now accumulates only in the
+  watching tempo (hot/fiddling/away time never counts), and a new suite case pins it: a form
+  standing twice the dwell while hot still waits a full watching dwell before it is judged.
+- **F5-chip (note) — stale chip.** `PoemRow.jsx` matched a pending request to the standing form
+  by poet+piece, so a re-dealt same piece could wear the chip for ~a tick. It matches by formKey
+  now: the chip rides only the exact materialization the request judged.
+- **F2 / F4 (notes) — paperwork.** The sweep was re-run on the final tree with the complete
+  per-suite log kept as an artifact; its summary is posted as a comment on the PR and the PR
+  body's verification section points at that comment. The PR body's files-touched list now names
+  this report.
+
+Verification for this pass: `fieldRevision` suite **17 cases passed** (14 + the 3 new ones above);
+poemRow 5× all pass (16 checks each); the field family and fieldReview family neighbours all pass;
+full manifest sweep on this tree: **793 pass / 3 fail of 796** — the known sandbox-environmental
+trio (`swarmWasm`, `rollSafety`, `accum`), complete per-suite log kept as an artifact, summary
+posted as a comment on the PR; `npm run lint` 0 errors (11 warnings, the pre-existing baseline);
+`npm run format:check` clean; `npm run build` green.

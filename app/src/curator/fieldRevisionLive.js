@@ -57,7 +57,8 @@ export function startFieldRevision({
   }
   let stopped = false;
   let standingKey = null; // the form the dwell clock is timing, by its materialization key
-  let standingSince = 0;
+  let standingDwellMs = 0; // dwell accumulated in the WATCHING tempo only — time hot/fiddling/away never counts
+  let lastTickAt = null; // the previous tick's clock read, the dwell accumulator's other end
   let pendingSince = 0; // when THIS driver saw the pending request appear (the grace clock)
   let variety = null; // the last hot flag written to the store
 
@@ -66,6 +67,8 @@ export function startFieldRevision({
     try {
       if (isReplaying()) {
         standingKey = null; // dwell restarts after playback: a replay proves nothing about standing
+        standingDwellMs = 0;
+        lastTickAt = null;
         return;
       }
       const state = getState();
@@ -80,8 +83,11 @@ export function startFieldRevision({
       const key = form ? standingPoemKey(form) : null;
       if (key !== standingKey) {
         standingKey = key;
-        standingSince = at;
+        standingDwellMs = 0;
+      } else if (key !== null && tempo === 'watching' && lastTickAt !== null) {
+        standingDwellMs += at - lastTickAt; // the clock runs only while the user is watching
       }
+      lastTickAt = at;
       const held = !!state.lockedParams?.fieldForm && !!form;
       const rec = state.fieldRevision ?? null;
 
@@ -110,7 +116,7 @@ export function startFieldRevision({
       if (!form || held) return;
       if (rec && rec.formKey === key) return; // one bite per form — this materialization was already judged
       if (tempo !== 'watching') return;
-      if (at - standingSince < REVISION_STAND_DWELL_MS) return;
+      if (standingDwellMs < REVISION_STAND_DWELL_MS) return;
       if (reviewExemption(form, state.layoutParams?.poemKeeps)) return;
       const judged = judgeStandingPoem(form);
       if (!judged || judged.read === 'fine') return;

@@ -285,7 +285,7 @@ ok("store: the variety flag is the driver's note, nothing more", () => {
 });
 
 // ---------------------------------------------------------------- the driver
-function fakeStage({ form, tempo }) {
+function fakeStage({ form, tempo, replaying = false }) {
   const calls = { variety: [], requests: [], cancels: [], answers: 0 };
   const state = {
     layoutParams: { fieldForm: form, poemKeeps: [] },
@@ -312,15 +312,18 @@ function fakeStage({ form, tempo }) {
     },
   };
   let at = 100000;
+  let currentTempo = tempo;
+  let replayingNow = replaying;
   const snap = () =>
-    tempo === 'hot'
+    currentTempo === 'hot'
       ? { away: false, rollsLastMinute: 30, lastTweak: null, undoBurstSize: 0, now: at }
-      : tempo === 'fiddling'
+      : currentTempo === 'fiddling'
         ? { away: false, rollsLastMinute: 0, lastTweak: { ts: at - 500, key: 'count' }, undoBurstSize: 0, now: at }
         : { away: false, rollsLastMinute: 0, lastTweak: null, undoBurstSize: 0, now: at };
   let tickFn = null;
   const stop = startFieldRevision({
     getState: () => state,
+    isReplaying: () => replayingNow,
     now: () => at,
     snapshot: snap,
     setInterval: (fn) => {
@@ -333,6 +336,12 @@ function fakeStage({ form, tempo }) {
     calls,
     state,
     stop,
+    setTempo: (t) => {
+      currentTempo = t;
+    },
+    setReplaying: (r) => {
+      replayingNow = r;
+    },
     tick: (advanceMs = 0) => {
       at += advanceMs;
       tickFn();
@@ -384,6 +393,51 @@ ok('driver: a fine poem standing forever draws nothing', () => {
   stage.tick(0);
   stage.tick(FIELD_REVISION_KNOBS.standDwellMs * 3);
   assert.equal(stage.calls.requests.length, 0);
+  stage.stop();
+});
+
+ok('driver: replay mutes the pass — a pole poem standing past the dwell draws no request, no variety write', () => {
+  const stage = fakeStage({ form: deal('gibson', 'w5', 4), tempo: 'watching', replaying: true });
+  stage.tick(0);
+  stage.tick(FIELD_REVISION_KNOBS.standDwellMs * 3);
+  assert.equal(stage.calls.requests.length, 0, 'no request fires while a take plays back');
+  assert.equal(stage.calls.variety.length, 0, 'no variety write occurs during replay');
+  assert.equal(stage.calls.answers, 0, 'nothing answers during replay');
+  assert.equal(stage.calls.cancels.length, 0, 'nothing is silenced during replay either — the pass is mute');
+  stage.stop();
+});
+
+ok('driver: a pending request never answers mid-replay — the grace restarts when playback ends', () => {
+  const stage = fakeStage({ form: deal('gibson', 'w5', 4), tempo: 'watching' });
+  stage.tick(0);
+  stage.tick(FIELD_REVISION_KNOBS.standDwellMs + 1);
+  assert.equal(stage.calls.requests.length, 1, 'the request fired live');
+  stage.setReplaying(true);
+  stage.tick(FIELD_REVISION_KNOBS.answerDelayMs * 3);
+  assert.equal(stage.calls.answers, 0, 'no answer commits during replay');
+  assert.equal(stage.calls.cancels.length, 0, 'replay does not silence the request — the pass simply does not speak');
+  stage.setReplaying(false);
+  stage.tick(0); // the pass sees the pending request again: the grace clock restarts from here
+  assert.equal(stage.calls.answers, 0, 'the grace has not run yet');
+  stage.tick(FIELD_REVISION_KNOBS.answerDelayMs + 1);
+  assert.equal(stage.calls.answers, 1, 'after playback the grace runs and the poem answers');
+  stage.stop();
+});
+
+ok('driver: the dwell clock runs only while watching — hot standing does not bank time toward judgment', () => {
+  const stage = fakeStage({ form: deal('gibson', 'w5', 4), tempo: 'hot' });
+  stage.tick(0); // first sight of the form
+  stage.tick(FIELD_REVISION_KNOBS.standDwellMs * 2); // the poem stands twice the dwell while hot
+  assert.equal(stage.calls.requests.length, 0, 'hot draws no requests');
+  stage.setTempo('watching');
+  stage.tick(FIELD_REVISION_KNOBS.standDwellMs - 1);
+  assert.equal(
+    stage.calls.requests.length,
+    0,
+    'the hot standing banked no dwell: judgment still waits for a full watching dwell',
+  );
+  stage.tick(2);
+  assert.equal(stage.calls.requests.length, 1, 'a full dwell stood in the watching tempo draws the request');
   stage.stop();
 });
 
