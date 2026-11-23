@@ -233,6 +233,16 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // inside its vibe. A rhythm decision (motion), so the noise stream; no offsets are passed (identity), and the
   // composer only runs while the band is on, so no existing draw moves.
   'beat-compose': 'noise',
+  // CULTURE Phase 5A — the Lab's cast (engine/cultureLab.mjs): where each citizen enters the dish, its heading and its
+  // body's scale. Placement, so the spatial stream. The Lab passes no offsets (identity); it only runs behind the
+  // cultureDish gate, so no existing draw moves.
+  'culture-cast': 'spatial',
+  // CULTURE Phase 5A — DAVIS's recipe deal (engine/cultureLab.mjs): each dial's lean and the stroke's birth phase. A
+  // motion decision, so the noise stream, like the gait; no offsets are passed (identity).
+  'culture-recipe': 'noise',
+  // CULTURE Phase 5A — the wander drive (engine/cultureMotion.mjs): a citizen's seeded drift, a motion decision on the
+  // noise stream; no offsets are passed (identity).
+  'culture-wander': 'noise',
 });
 
 const OFFSET_GROUP_OF = new Map([

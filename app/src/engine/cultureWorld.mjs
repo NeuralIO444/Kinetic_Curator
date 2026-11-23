@@ -201,6 +201,31 @@
 //               reaches every mover one step behind. Resolver-class, no stamp:
 //               the law composition does not change. Over an empty table the
 //               soil kills nothing and moves nothing — the parity position.
+//
+//   THE CITIZENS
+//               Phase 5, slice A (Motion Core's CULTURE seam, the parent issue
+//               2109; rig spawning, the parent issue 2168): creatures live in
+//               the dish. The Lab casts FRESH, once per world (spec §4 Q2 —
+//               a take inherits no standing zoo): castCultureTake is the only
+//               door — CURATOR directs, KINETIC assembles each body
+//               (engine/cultureBody.mjs: head, spine, limbs, declared sockets,
+//               a look per part), DAVIS writes each recipe (drives, physics
+//               dials, 12-principles seasoning), LOIS gates and ranks
+//               (engine/cultureLab.mjs) — and the door deals each admitted
+//               body into the ordinary tables: its parts as contiguous body
+//               slots at their rest pose, still, at the recipe's masses; its
+//               joints as ordinary solver links at their declared rests. The
+//               first citizen is the dish creature. On the swarm's cadence,
+//               after the Queen's fields and before the hand, each living
+//               citizen's MUSCLE acts (engine/cultureMotion.mjs: senses →
+//               drives → feel → velocity on its own parts; its own step
+//               counter is world.citizens.step); after the swarm integrates
+//               and before the solver joins, each citizen's parts are rehomed
+//               across the swarm's wrap seam (one body crosses whole). A
+//               citizen is its head: when the soil withers the head, the
+//               citizen is dead (seen one step behind). Resolver-class, no
+//               stamp: the law composition does not change. Born uncast and
+//               empty — an uncast world steps exactly as before.
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
 import { createCulture, stepCulture, seedRandom, cultureHash, CULTURE_RULE } from './dishLife.mjs';
@@ -241,6 +266,17 @@ import {
   cultureSoilSample,
   CULTURE_SOIL_WITHER_S,
 } from './cultureSoil.mjs';
+import {
+  createCultureCitizens,
+  enrolCultureCitizen,
+  stepCultureCitizens,
+  rehomeCultureCitizens,
+  cultureCitizensHash,
+  cultureCitizenLayout,
+} from './cultureCitizens.mjs';
+import { curatorCast, CULTURE_CAST_SHEET } from './cultureLab.mjs';
+import { cultureBodyRestPose } from './cultureBody.mjs';
+import { cultureRecipeMasses, ensureCultureFeelSource } from './cultureMotion.mjs';
 import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
 
 /** The backend id this world stamps, in the simBackends vocabulary: JS, versioned. */
@@ -431,6 +467,13 @@ export function createCultureWorld({ seed = 0 } = {}) {
      * second copy of it.
      */
     soil: createCultureSoil(cap),
+    /**
+     * The citizens (Phase 5, slice A): the creatures the Lab cast into this
+     * world — born uncast and empty; castCultureTake is the only door, and
+     * it opens once per world (the take casts fresh). A citizen's parts and
+     * joints live in the ordinary body and link tables above.
+     */
+    citizens: createCultureCitizens(),
   };
 }
 
@@ -462,6 +505,9 @@ export function cultureWorldSimTimeS(world) {
  * bias). Last, on EVERY world step, the soil judges the living bodies by the
  * ground under them (Phase 4 — its own step counter is world.soil.step, equal
  * to world.step): sustained dead ground withers a body and it is gone. The
+ * citizens (Phase 5A) act on the swarm's cadence too: their muscle after the
+ * fields and before the hand (world.citizens.step counts it), and their parts
+ * rehomed across the wrap seam after the swarm and before the solver. The
  * scheduler law around all of this does not change.
  */
 export function stepCultureWorld(world) {
@@ -485,8 +531,14 @@ export function stepCultureWorld(world) {
   }
   if (world.step % CULTURE_SWARM_STEP_DIVISOR === 0) {
     stepCultureFields(world.bodies, world.fields, cultureFluidDensity(world));
+    // The citizens' muscle (Phase 5A): after the Queen's standing fields, before
+    // the performer's hand — the hand stays last among forces (the override).
+    stepCultureCitizens(world.bodies, world.citizens, world.life.field, world.step);
     stepCultureHandCurrents(world.bodies, world.hand);
     stepCultureSwarm(world.bodies);
+    // One body across the seam (Phase 5A): the swarm wraps each disc alone;
+    // a citizen's parts are brought to its anchor's side before the solver joins.
+    rehomeCultureCitizens(world.bodies, world.citizens);
     stepCultureSolver(world.bodies, world.statics, world.links);
     world.solver.step += 1;
   }
@@ -687,6 +739,77 @@ export function dealCultureHandCurrent(world, spec) {
 }
 
 /**
+ * THE LAB'S DOOR — cast this world's citizens (Phase 5, slice A; spec §4 Q2:
+ * "The Lab casts fresh each take … A take does not inherit a standing zoo
+ * population"). The only way a citizen enters the dish. Runs the Lab
+ * (engine/cultureLab.mjs curatorCast) over the world's seed and the soil's
+ * published field — CURATOR directs, KINETIC assembles, DAVIS writes, LOIS
+ * gates — then deals every admitted member: its parts appended to the body
+ * table as contiguous slots at the body's rest pose (alive, still, each at
+ * its part radius and the recipe's mass), its joints dealt through the link
+ * door at their declared rests, and the citizen enrolled with its recipe
+ * instilled. Refused loudly: a second cast in the same world (a new take is
+ * a new world), and a cast whose parts or joints would pass the tables'
+ * ceilings (checked whole before anything is written — a cast is dealt whole
+ * or not at all). Registers the feel layer with Motion Core on first use.
+ * Returns { cast, refused } — how many citizens were dealt, and LOIS's
+ * refusals by slot.
+ */
+export function castCultureTake(world, sheet = CULTURE_CAST_SHEET) {
+  const citizens = world.citizens;
+  if (citizens.cast) throw new Error('cultureWorld: this world is already cast — the Lab casts fresh each take');
+  const { members, refused } = curatorCast(world.seed, world.life.field, sheet);
+  const bodies = world.bodies;
+  const nParts = members.reduce((n, m) => n + m.body.parts.length, 0);
+  const nLinks = members.reduce((n, m) => n + m.body.links.length, 0);
+  if (bodies.count + nParts > bodies.capacity)
+    throw new Error(
+      `cultureWorld: the cast needs ${nParts} bodies; the table holds ${bodies.capacity - bodies.count} more`,
+    );
+  if (world.links.count + nLinks > world.links.capacity)
+    throw new Error(
+      `cultureWorld: the cast needs ${nLinks} links; the table holds ${world.links.capacity - world.links.count} more`,
+    );
+  ensureCultureFeelSource();
+  members.forEach((m, slot) => {
+    const first = bodies.count;
+    const pose = cultureBodyRestPose(m.body, m.x, m.y, m.heading);
+    const masses = cultureRecipeMasses(m.body, m.recipe);
+    m.body.parts.forEach((p, k) => {
+      const i = first + k;
+      bodies.alive[i] = 1;
+      bodies.x[i] = pose[k].x;
+      bodies.y[i] = pose[k].y;
+      bodies.vx[i] = 0;
+      bodies.vy[i] = 0;
+      bodies.mass[i] = masses[k];
+      bodies.radius[i] = p.radius;
+    });
+    bodies.count += m.body.parts.length;
+    for (const l of m.body.links) addCultureLink(world, first + l.a, first + l.b, l.rest);
+    const seed = (world.seed ^ Math.imul(slot + 1, 0x9e3779b9)) >>> 0;
+    enrolCultureCitizen(citizens, { ...m, seed }, first, world.step);
+  });
+  citizens.cast = 1;
+  return { cast: members.length, refused };
+}
+
+/**
+ * THE CITIZENS' READ DOOR — one citizen as its assembled layout (Phase 5A;
+ * engine/cultureCitizens.mjs cultureCitizenLayout): per part its look,
+ * centre, radius, rotation, life and the feel layer's pose delta, the
+ * wither fade read from the soil's clock. A fresh object, safe to hold;
+ * read-only. An index outside the cast is refused, loudly. There is no
+ * render path in the world yet — this is the data one would draw.
+ */
+export function cultureCitizenAt(world, index) {
+  const list = world.citizens.list;
+  if (!Number.isInteger(index) || index < 0 || index >= list.length)
+    throw new Error(`cultureWorld: no citizen at index "${String(index)}"`);
+  return cultureCitizenLayout(world.bodies, list[index], (i) => world.soil.wither[i] / CULTURE_SOIL_WITHER_STEPS);
+}
+
+/**
  * The law this world's stamps honestly carry, composed through the codebase's own
  * simLawFor over the kernel backends the world runs: the fluid, the culture, and the
  * swarm under their recorded backends (the optional contacts kernel stays unnamed —
@@ -854,7 +977,9 @@ function mixFloat(mix, v) {
  * standing state (the fields core's fingerprint of the fields table and the
  * request log), the hand's standing state (the hand core's fingerprint of
  * the currents table), and the soil's standing state (the soil core's
- * fingerprint of its step, kill count, and the dealt bodies' wither clocks). Same feed sequence =>
+ * fingerprint of its step, kill count, and the dealt bodies' wither clocks), and the
+ * citizens' standing state (the citizens core's fingerprint of the cast, each
+ * citizen's body, recipe and life). Same feed sequence =>
  * same hash, on any device (all arithmetic here is IEEE-exact JS). FNV-1a, the
  * dishWet.selfcheck precedent.
  */
@@ -894,6 +1019,7 @@ export function cultureWorldHash(world) {
   mixU32(cultureFieldsHash(world.fields, world.fieldRequests));
   mixU32(cultureHandHash(world.hand));
   mixU32(cultureSoilHash(world.soil, world.bodies.count));
+  mixU32(cultureCitizensHash(world.citizens));
   return h >>> 0;
 }
 
