@@ -22,6 +22,7 @@ import { usePhraseLoop } from './hooks/usePhraseLoop.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useVoiceMixDriver } from './hooks/useVoiceMixDriver.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
+import { useCultureWorld } from './hooks/useCultureWorld.js';
 import { useRollGuard } from './hooks/useRollGuard.js'; // #1107
 import { useEarnedVoices } from './hooks/useEarnedVoices.js'; // #1153
 import { useCuratorIPC } from './hooks/useCuratorIPC.js';
@@ -551,6 +552,7 @@ function AppInner() {
   useEarnedVoices(); // #1153: a find (Davis's BLOOM) is shelved as an earned voice
   useRollGuard(glLoopRef); // before the autosave/boot effect, so the cold-open roll finds its listener
   useProjectAutosave();
+  useCultureWorld(); // CULTURE Phase 0 — the dish gate: inert unless the project carries cultureDish on
 
   const [showHotkeys, setShowHotkeys] = useState(false);
   const [helpTab, setHelpTab] = useState('help');

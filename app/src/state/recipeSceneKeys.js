@@ -23,6 +23,7 @@ export const SCENE_BLOCK_KEYS = Object.freeze([
   'shapeShelf',
   'constructRecords',
   'constructLead',
+  'cultureDish', // CULTURE Phase 0 — the dish gate is a scene key, so a recipe link carries it like the CONSTRUCTS gate
   'gaitRecords',
   'gaitLocks',
   'kitTriad',
