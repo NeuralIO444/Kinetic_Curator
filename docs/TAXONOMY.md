@@ -115,7 +115,7 @@ Do not edit PERF/POLISH/session roadmaps for this. Those docs are frozen or hist
 
 | Say | Means | Lives in |
 |-----|-------|----------|
-| **Recipe** (the scene recipe) | The portable text or link that restores a scene: `kc-recipe/1\|2` text and `kc-r/1\|2` URL fragments, plus the layer-stack block. Audited in [`design/recipes-v3-spec.md`](design/recipes-v3-spec.md). | `state/recipes.js`, `state/recipeUrls.js`, `state/recipeStack.js` |
+| **Recipe** (the scene recipe) | The portable text or link that restores a scene: `kc-recipe/1\|2\|3` text and `kc-r/1\|2\|3` URL fragments, plus the layer-stack block. Writers emit v3 (the whole scene: world, light, kinemes, constructs, assets, canvas; links are deflated and may carry a frame-0 proof); readers accept all three. Audited in [`design/recipes-v3-spec.md`](design/recipes-v3-spec.md). | `state/recipes.js`, `state/recipeUrls.js`, `state/recipeStack.js` |
 | **ACCUM frame params** | The per-frame parameter bag the ACCUM trail pass is run with. Built by `accumRecipeParams()`; it is a render input, not something a person saves or shares. | `gl/accum.mjs` |
 | **Variant recipe** | The curator's breeding record for a new mark: `{ parents, op, seed, params }`. The same record plus the same library gives the same SVG string. It makes an asset, not a scene. | `curator/variants.mjs` |
 | **Construct record** | The data record the construct assembler deals for a design shape built from one style's simple shapes (`kc-construct/1`). Its pieces are its recipe for the construct, but the record is called a construct record. | `engine/constructAssembler.js`, [`design/constructs-spec.md`](design/constructs-spec.md) |

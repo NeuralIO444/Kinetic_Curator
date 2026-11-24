@@ -1,6 +1,6 @@
 # RECIPES_V3 — scene recipe audit + upgrade spec
 
-Status: spec only, needs Matt's rulings on §5 before R2. Audited at `da11434`; recipe sources unchanged at `a399ead` (2026-11-17).
+Status: **shipped** (R0–R6, #2320–#2326). §5 is ruled; §3.5 notes below record where the build differs from this text. Audited at `da11434`; recipe sources unchanged at `a399ead` (2026-11-17).
 Scope: the scene recipe — `kc-recipe/1|2` text (`state/recipes.js`), `kc-r/1|2` links (`state/recipeUrls.js`),
 the layer-stack block (`state/recipeStack.js`), and its entry points (`RecipeRow`, `SnapshotGallery`,
 `FavoritesTray`, `bootFromHash`). Not in scope: ACCUM frame params, variant recipes, construct records.
@@ -89,6 +89,11 @@ stays for real document loads.
   diagnostic only; it never blocks.
 - E2E: dress a scene (light, world, kineme, construct, overrides, a non-default asset set) → copy link → open in
   a **fresh context** → compare the frame-0 placement hash and a downscaled canvas checksum.
+- **As built (#2358):** the hash is not from the kernel replayer (it replays seed + events and never sees the store
+  scene). It is `frameHash` over a fresh live resolver on the doc plus `buildSceneContract` (`state/recipeFidelity.js`).
+  The e2e (`e2e/recipe-fidelity.spec.js`) asserts the hash and the dressed fields in a fresh context, and was shown to
+  fail when each carried field is dropped. The canvas checksum is **not** asserted: the live loop is too uneven in
+  headless GL for a pixel gate; it needs a still-render path.
 
 ## 4. Issues (hand-off: `queue:now` + model label)
 
@@ -105,7 +110,7 @@ stays for real document loads.
 Order: R0 → R1 → R2 (stops the data loss) → R3 → R4 → R5. R6 can go any time.
 One PR per issue, with QA and an independent review; Matt merges.
 
-## 5. Rulings needed (recommendations given)
+## 5. Rulings (all taken as recommended)
 1. **Audio routes: scene or rig?** Recommend **rig**. Routes belong to the performer's setup, and a shared scene
    shouldn't rewire their audio.
 2. **Canvas on the recipe?** Recommend **size + preset ride; fps + stageMode don't**. Aspect changes the picture;
@@ -113,3 +118,8 @@ One PR per issue, with QA and an independent review; Matt merges.
 3. **Custom assets in links?** Recommend **embed up to 8 KB compressed, badge above**.
 4. **Apply = undoable edit (not a new document)?** Recommend **yes**. That's what makes F1 recoverable even if
    classification misses a key later.
+
+Outcomes as built: (1) audio routes are **rig**; (2) canvas size + preset ride, fps and stageMode do not; (3) custom assets
+embed up to 8 KB deflated, above that all are left out and apply says "N custom assets not in link" (a notice, not a
+badge); (4) apply is one undoable edit (`applyScene`, `UNDO_KIND_SCENE`). A v3 recipe also **replaces** the scene
+(omitted scene keys clear, never the cast or rig); v1/v2 still merge.
