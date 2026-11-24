@@ -49,6 +49,7 @@ import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; /
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
 import { getStressState } from '../curator/stressLive.js'; // Phase 2 S5: the band reader's latest filtered reading, stamped on the frame input below
+import { poolWithConstructs } from '../engine/constructPool.js'; // #2337: banked constructs' tiles ride the stage pool, drawn from their records
 import { poolWithBirths } from '../engine/kineticBirths.mjs'; // #2037: stage-born children's tiles ride the resolver pool beside the overlay
 import { noteBirthPopulation } from '../curator/birthLive.mjs'; // #2037: the pre-made hand re-derives when the parent population changes
 import { nextSurgeStamp } from '../curator/director.js'; // #1576 Q3: the Queen's surge stamp decision, hosted with the pull — read at the frame input below; the stamp is recorded input data, never a surface
@@ -561,6 +562,22 @@ export function createLiveLoop(
 
   function setBgMode(m) {
     bgMode = m === 'transparent' ? 'transparent' : m === 'white' ? 'white' : 'palette';
+  }
+
+  // #2337 — the pool the stage places from AND bakes: the overlay, the stage-born tiles (#2037), then a tile for each
+  // banked construct drawn from its record (never saved). `catalogueSvg` reads a primitive's drawing from ASSETS.
+  let catalogueSvgMap = null;
+  const catalogueSvg = (id) => {
+    if (!catalogueSvgMap) catalogueSvgMap = new Map(ASSETS.map((a) => [a.id, a.svg]));
+    return catalogueSvgMap.get(id);
+  };
+  function stagePool(s) {
+    return poolWithConstructs(poolWithBirths(s.customAssets, s.stageBirths), s.constructRecords, catalogueSvg);
+  }
+  // Test hook (the `__KC_EXPOSE_STORE` convention; inert in production): the ids of the pool THIS loop hands its
+  // resolver and baker right now, so the e2e proves the running instrument's call chain, not a unit.
+  if (typeof window !== 'undefined' && window.__KC_EXPOSE_STORE === true) {
+    window.__kcStagePoolIds = () => stagePool(getState()).map((a) => a.id);
   }
 
   function getPool(customAssets) {
@@ -1097,7 +1114,7 @@ export function createLiveLoop(
       assetWeightOverrides: s.assetWeightOverrides,
       // #2037 — the pool the resolver places from carries the stage-born children's tiles beside
       // the overlay; the merged list is what the take records, so a kept take replays its births.
-      customAssets: poolWithBirths(s.customAssets, s.stageBirths),
+      customAssets: stagePool(s),
       quality: s.quality,
       // #425 — resolver-side life drift: per-layer locks + batch gate;
       // slowRender below already folds !running. focusSwap tells the
@@ -1643,7 +1660,7 @@ export function createLiveLoop(
     const token = ++buildToken;
     try {
       const st = getState();
-      const svgById = getPool(poolWithBirths(st.customAssets, st.stageBirths)); // #2037: the baker's pool carries the stage-born tiles too
+      const svgById = getPool(stagePool(st)); // #2037 + #2337: the baker's pool carries the stage-born and banked-construct tiles too
       // #265 — rebake only what changed: the atlas is resolution-
       // independent, so a renderScale step skips the heavy sequential-SVG
       // bake entirely (#1079: the grain LUT bake is gone).
