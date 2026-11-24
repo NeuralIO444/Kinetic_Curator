@@ -148,6 +148,11 @@ ok('no UI-surface file references the channel', () => {
     'curator/queenDeniability.selfcheck.mjs', // the import-graph guard names the modules it guards
     'curator/director.js', // the Director hosts the pull (it runs at pick time and never renders)
     'curator/directorRank.selfcheck.mjs',
+    // #2461 slice 3: the persona surface registry names the channel as DATA (a source pointer in a
+    // descriptive registry). It imports nothing from the channel, is imported by nothing live, is
+    // never rendered and never saved — the deniability law guards surfaces, and this is not one.
+    'personas/surfaceRegistry.mjs',
+    'personas/surfaceRegistry.selfcheck.mjs', // the registry's drift pin names the modules it pins
   ]);
   const hits = [];
   const walk = (dir) => {
