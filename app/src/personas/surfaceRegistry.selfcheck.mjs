@@ -190,8 +190,11 @@ ok('E1 nothing in src imports the registry — it is not a call path and changes
       return statSync(p).isDirectory() ? walk(p) : [p];
     });
   // An import edge is the claim — two deniability selfchecks legitimately NAME these files in
-  // their allowlists (#2461 slice 3 re-pins), which is text, not an import.
-  const importOf = /from\s+['"][^'"]*surfaceRegistry(?:\.mjs)?['"]|import\(\s*['"][^'"]*surfaceRegistry/;
+  // their allowlists (#2461 slice 3 re-pins), which is text, not an import. Every form that can
+  // create an edge is matched: `... from '...'` (named/default/namespace imports AND re-exports),
+  // a bare side-effect `import '...'`, and a dynamic `import('...')` in any quote style.
+  const importOf =
+    /\bfrom\s+['"][^'"]*surfaceRegistry(?:\.mjs)?['"]|\bimport\s*['"][^'"]*surfaceRegistry(?:\.mjs)?['"]|\bimport\s*\(\s*['"`][^'"`]*surfaceRegistry(?:\.mjs)?['"`]/;
   const offenders = walk(SRC)
     .filter((p) => /\.(mjs|js|jsx)$/.test(p))
     .filter((p) => !p.endsWith('surfaceRegistry.mjs') && !p.endsWith('surfaceRegistry.selfcheck.mjs'))

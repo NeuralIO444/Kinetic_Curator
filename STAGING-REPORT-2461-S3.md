@@ -119,6 +119,36 @@ the import graph (the actual claim) — a stricter, truer pin, not a weaker one.
 - No re-pin outside the two deniability allowlists above; no dice-driven suite is affected (all
   targeted suites are deterministic).
 
+## QA fix (post-review, one defect)
+
+QA reviewed the PR and found one defect — in the pin, not the tree: E1's import matcher only
+recognised `... from '...'` and `import('...')` shapes, so a **bare side-effect import**
+(`import './surfaceRegistry.mjs';`) would have created an edge to the registry while slipping
+past the no-behaviour-change pin silently. The current tree genuinely has no importers; the hole
+was in the guarantee's strength.
+
+The fix touches only `surfaceRegistry.selfcheck.mjs`: E1's matcher now covers every import form
+that can create an edge — `... from '...'` (named/default/namespace imports **and** re-exports),
+a bare side-effect `import '...'`, and a dynamic `import('...')` in any quote style (single,
+double, backtick). The registry module itself, the deniability suites, and every other suite are
+untouched.
+
+Proof, both directions:
+
+- **Passes on the tree as-is:** the suite runs green, 12 checks, with the tightened matcher —
+  the deniability allowlists that merely *name* the files still do not trip it.
+- **Fails on every form:** an uncommitted scratch file was dropped into `src/personas/` one form
+  at a time and the suite failed naming it, for each of: bare side-effect import, named import,
+  default import, namespace import, dynamic `import('...')`, dynamic import with a backtick
+  specifier, named re-export, and star re-export. The scratch file was deleted after each run;
+  `git status` at commit time shows no scratch.
+
+Verification for this fix: `npm run lint` and `npm run format:check` clean; surfaceRegistry
+suite green (12 checks); neighbouring suites personaKernel, personaAdapters, queenChannel,
+queenLean, queenDeniability, callsignSweep still green; `npm run build` green. A full manifest
+sweep was **not** re-run for this fix — the diff is one selfcheck file — the original build's
+sweep above stands.
+
 ## Not in this slice
 
 The generated manifest and its drift selfcheck (slice 4) and the standalone MCP server (slice 5)
