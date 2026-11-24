@@ -107,6 +107,53 @@ ok('energy: low / mid / high with hysteresis; a level jittering at a threshold d
   assert.ok(evs.slice(before).filter((e) => e.type === 'energy').length <= 1, 'no flicker at the HIGH threshold');
 });
 
+ok('energy by fullness (#2158): a sparse track with clear notes reads low, though its loudness mean is mid', () => {
+  // Two bands carry clear, present notes; the rest of the spectrum is floor. The retired loudness-mean read
+  // (low below 0.12) called this mid — its mean is 0.157 — and low was never reached in the 2026-11-12 session.
+  const sparse = { sub: 0.03, bass: 0.03, mud: 0.03, mids: 0.55, edge: 0.4, pres: 0.03, air: 0.03 };
+  const mean = BANDS.reduce((s, k) => s + sparse[k], 0) / BANDS.length;
+  assert.ok(mean > 0.12, `the fixture is mid by loudness (mean ${mean.toFixed(3)}) — the case the ruling answers`);
+  const { evs } = play(() => sparse, 3000);
+  assert.deepEqual(
+    evs.filter((e) => e.type === 'energy').map((e) => e.level),
+    ['low'],
+    'few bands active, lots of space: low, and it stays low',
+  );
+});
+
+ok('energy by fullness (#2158): a bass-heavy track never reads low — the 2026-11-10 misread stays dead', () => {
+  // Loud bass-heavy: the bottom block is full. It charges through low while the read warms up, settles mid,
+  // and never falls back — fullness counts the filled bottom as presence, so loudness in few bands is not low.
+  const bassLoud = { sub: 0.95, bass: 0.9, mud: 0.55, mids: 0.2, edge: 0.08, pres: 0.03, air: 0.01 };
+  const loud = play(() => bassLoud, 3000)
+    .evs.filter((e) => e.type === 'energy')
+    .map((e) => e.level);
+  assert.deepEqual(loud, ['low', 'mid'], 'settles mid, never low again');
+  // The quiet bass-heavy shape of the 2026-11-10 session (loudness mean ~0.30): lowering the low threshold
+  // (the declined option B) would have read this low; the fullness read does not.
+  const bassQuiet = { sub: 0.8, bass: 0.75, mud: 0.4, mids: 0.1, edge: 0.05, pres: 0.02, air: 0.01 };
+  const quiet = play(() => bassQuiet, 3000)
+    .evs.filter((e) => e.type === 'energy')
+    .map((e) => e.level);
+  assert.deepEqual(quiet, ['low', 'mid'], 'settles mid, never low again');
+});
+
+ok('energy by fullness (#2158): when a sparse track fills up, the read climbs — fullness decides, not loudness', () => {
+  const sparse = { sub: 0.03, bass: 0.03, mud: 0.03, mids: 0.55, edge: 0.4, pres: 0.03, air: 0.03 };
+  const { evs } = play((t) => (t < 2000 ? sparse : flat(0.3)), 4500);
+  assert.deepEqual(
+    evs.filter((e) => e.type === 'energy').map((e) => e.level),
+    ['low', 'mid'],
+    'the same notes over a broad moderate bed read mid',
+  );
+  // A loud, full spectrum still reads high.
+  const fullLoud = { sub: 0.7, bass: 0.75, mud: 0.65, mids: 0.6, edge: 0.55, pres: 0.5, air: 0.45 };
+  const seq = play(() => fullLoud, 3000)
+    .evs.filter((e) => e.type === 'energy')
+    .map((e) => e.level);
+  assert.equal(seq[seq.length - 1], 'high', 'loud and full: high');
+});
+
 ok('silence: after SILENCE_MS of quiet it starts, and when sound returns it ends with how long it lasted', () => {
   const { evs, det } = play((t) => (t < 3000 ? flat(0.4) : flat(0)), 9000);
   const starts = evs.filter((e) => e.type === 'silenceStart');

@@ -5,7 +5,7 @@
 //   input     { source }            the input changed (mic | file | none)
 //   onset     { strength, band }    a hit: a sudden rise of energy across the spectrum (spectral flux)
 //   tempo     { bpm, confidence }   the estimate moved by more than TEMPO_STEP bpm
-//   energy    { level }             low | mid | high, with hysteresis so it does not flicker
+//   energy    { level }             low | mid | high by fullness (#2158), with hysteresis so it does not flicker
 //   silence   start { ms } / end { ms }   quiet for SILENCE_MS, then sound again
 //
 // Time is the caller's loop time (ms), never a wall clock: the same samples give the same events. Hand-rolled first
@@ -22,10 +22,10 @@ export const TEMPO_MAX = 170;
 export const TEMPO_STEP = 2; // publish a new estimate only when it moves by more than this
 export const TEMPO_MIN_ONSETS = 6;
 export const TEMPO_WINDOW = 24; // most recent onsets considered
-export const ENERGY_LOW = 0.12; // enter 'low' below LOW - HYST, leave it above LOW + HYST
-export const ENERGY_HIGH = 0.4;
+export const ENERGY_LOW = 0.35; // fullness gates (#2158): enter 'low' below LOW - HYST, leave it above LOW + HYST
+export const ENERGY_HIGH = 0.63;
 export const ENERGY_HYST = 0.03;
-export const LEVEL_EMA = 0.12; // smoothing of the overall level for the energy and silence tests
+export const LEVEL_EMA = 0.12; // smoothing of the fullness read (energy) and of the overall level (silence test)
 export const SILENCE_LEVEL = 0.02;
 export const SOUND_LEVEL = 0.04; // sound is back above this (hysteresis over SILENCE_LEVEL)
 export const SILENCE_MS = 2000;
@@ -74,7 +74,8 @@ export function createAudioEventDetector() {
   let lastOnset = -Infinity;
   const onsets = [];
   let lastTempo = null;
-  let level = 0; // smoothed overall level
+  let level = 0; // smoothed overall level (the silence test only — the energy read no longer uses it, #2158)
+  let full = 0; // smoothed fullness — the energy read (#2158)
   let energy = null; // 'low' | 'mid' | 'high'
   let quietSince = null;
   let silent = false;
@@ -99,12 +100,14 @@ export function createAudioEventDetector() {
         if (src === 'none') {
           prev = null;
           level = 0;
+          full = 0;
           quietSince = null;
         }
       }
       if (!bands) return out;
 
       let sum = 0;
+      let presence = 0;
       let flux = 0;
       let top = 0;
       let topBand = BANDS[0];
@@ -113,6 +116,7 @@ export function createAudioEventDetector() {
         const v = clamp01(bands[k]);
         cur[k] = v;
         sum += v;
+        presence += Math.sqrt(v);
         const rise = prev ? Math.max(0, v - prev[k]) : 0;
         flux += rise;
         if (rise > top) {
@@ -122,6 +126,7 @@ export function createAudioEventDetector() {
       }
       flux /= BANDS.length;
       const overall = sum / BANDS.length;
+      const fullness = presence / BANDS.length;
       prev = cur;
 
       // ── onset: flux over an adaptive threshold, with a refractory period ─────────────────────────────────────
@@ -145,17 +150,25 @@ export function createAudioEventDetector() {
       fluxDev += FLUX_EMA * (Math.abs(flux - fluxMean) - fluxDev);
       fluxMean += FLUX_EMA * (flux - fluxMean);
 
-      // ── energy: low | mid | high with hysteresis ─────────────────────────────────────────────────────────────
+      // ── energy: low | mid | high by fullness, with hysteresis ────────────────────────────────────────────────
+      // #2158 (ruling of record on the source issue 2069, Matt 2026-11-12): the energy level is read by FULLNESS —
+      // how much of the spectrum is present — not by a plain mean of loudness, which is retired from this path.
+      // A band's presence is sqrt(level): a quiet band still counts, a loud one saturates, so a few clear notes
+      // cannot stand in for a full spectrum and a sparse track (few bands active, lots of space) reads low even
+      // when its notes are clear and present. On a uniform signal fullness is sqrt(level), so the gates sit at
+      // sqrt of the retired loudness gates (0.12 → 0.35, 0.40 → 0.63): full-spectrum material crosses where it
+      // always did, and only sparse material moves — down to the low the ruling makes reachable.
       level += LEVEL_EMA * (overall - level);
+      full += LEVEL_EMA * (fullness - full);
       let next = energy;
-      if (energy === null) next = level < ENERGY_LOW ? 'low' : level > ENERGY_HIGH ? 'high' : 'mid';
-      else if (energy === 'low' && level > ENERGY_LOW + ENERGY_HYST)
-        next = level > ENERGY_HIGH + ENERGY_HYST ? 'high' : 'mid';
-      else if (energy === 'high' && level < ENERGY_HIGH - ENERGY_HYST)
-        next = level < ENERGY_LOW - ENERGY_HYST ? 'low' : 'mid';
+      if (energy === null) next = full < ENERGY_LOW ? 'low' : full > ENERGY_HIGH ? 'high' : 'mid';
+      else if (energy === 'low' && full > ENERGY_LOW + ENERGY_HYST)
+        next = full > ENERGY_HIGH + ENERGY_HYST ? 'high' : 'mid';
+      else if (energy === 'high' && full < ENERGY_HIGH - ENERGY_HYST)
+        next = full < ENERGY_LOW - ENERGY_HYST ? 'low' : 'mid';
       else if (energy === 'mid') {
-        if (level < ENERGY_LOW - ENERGY_HYST) next = 'low';
-        else if (level > ENERGY_HIGH + ENERGY_HYST) next = 'high';
+        if (full < ENERGY_LOW - ENERGY_HYST) next = 'low';
+        else if (full > ENERGY_HIGH + ENERGY_HYST) next = 'high';
       }
       if (next !== energy) {
         energy = next;
@@ -191,6 +204,7 @@ export function createAudioEventDetector() {
       onsets.length = 0;
       lastTempo = null;
       level = 0;
+      full = 0;
       energy = null;
       quietSince = null;
       silent = false;
