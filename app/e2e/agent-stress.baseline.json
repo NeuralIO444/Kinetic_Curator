@@ -1,6 +1,6 @@
 {
   "schema": "kc-agent-stress-baseline/1",
-  "build": "f260b748",
+  "build": "845b50c4",
   "results": {
     "topbar.start-scope": "pass",
     "topbar.kinetic": "probe",

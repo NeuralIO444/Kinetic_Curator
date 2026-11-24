@@ -205,6 +205,7 @@ async function main() {
           await walk(entry, retry);
           if (retry.status !== 'fail') {
             Object.assign(record, retry, {
+              passedOnRetry: true,
               detail: `${retry.detail} (passed on retry; first attempt: ${firstDetail})`,
             });
           } else {
@@ -433,6 +434,11 @@ async function main() {
   }
   md.push('');
   md.push('## B — observations');
+  md.push('');
+  const retried = results.filter((r) => r.passedOnRetry);
+  md.push(`Passed only on retry (${retried.length}):`);
+  if (retried.length === 0) md.push('None.');
+  retried.forEach((r) => md.push(`- ${r.id} — ${r.detail}`));
   md.push('');
   md.push(`Console error signatures (${errorSigs.length}):`);
   errorSigs.forEach((s) => md.push(`- ${s}`));

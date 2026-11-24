@@ -43,12 +43,33 @@
 //
 // Payload/args templates: '$value' = the actuation value, '$toggle' = negation of the first
 // read, '$param' = the family instance key, '$param.a.b' / 'x$param' for composed templates.
+//
+// Value lists: wherever the app keeps a control's options as a module export, the entry
+// IMPORTS that export (KINEME_PATTERNS, DOCTRINE_IDS, SCOPE_CYCLE, BLEND_MODES, …) — never
+// a copied literal. Layout-param stops and ranges are pinned against the app's own
+// PARAM_STOPS / PARAM_SPEC tables by uiRegistry.selfcheck.mjs. The few remaining literals
+// are enumerations that exist only inside the control's own source component (covered by
+// the source pin), or panel-offered subsets of a module list, noted on the entry.
 
-import { LAYOUT_MODES, SYMMETRY_MODES, BEHAVE_MODES } from '../data/layout-modes.js';
+import { LAYOUT_MODES, SYMMETRY_MODES, BEHAVE_MODES, MIRROR_STATES, BLEND_MODES } from '../data/layout-modes.js';
 import { MOTION_MODES } from '../data/voices.js';
-import { CANVAS_PRESETS, CANVAS_FPS } from '../data/canvasPresets.js';
+import { CANVAS_PRESETS, CANVAS_FPS, STAGE_MODES } from '../data/canvasPresets.js';
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { QUEUE_SECONDS_MIN, QUEUE_SECONDS_MAX, QUEUE_BEATS_MIN, QUEUE_BEATS_MAX } from '../state/queueTransport.js';
+import { KINEME_PATTERNS, TRANSPORT_MODES, PATH_FAMILIES } from '../engine/kineme.js';
+import { DOCTRINE_IDS } from '../curator/doctrines.mjs';
+import { SCOPE_CYCLE } from '../state/kineticScope.mjs';
+import { BEAT_PRESETS } from '../gl/beatClock.mjs';
+import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
+import { SCHEME_IDS } from '../engine/harmony.js';
+import { FIELDMAP_FIELDS, FIELDMAP_CHANNELS } from '../engine/fieldMap.mjs';
+import { FIELD_CYCLE_DETENTS } from '../engine/dishLifeField.mjs';
+import { STRATUM_ROTATIONS } from '../state/stratumRotation.js';
+import { RECIPE_OFFSET_CHANNELS } from '../state/recipes.js';
+import { FEEL_PRESETS } from '../data/feels.js';
+import { LIGHT_SLOTS } from '../data/light.js';
+import { WET_STOPS } from '../panels/build/blockStops.mjs';
+import { STAGE_MAPPINGS } from '../panels/pipeline/stageMapping.mjs';
 
 export const AGENT_UI_SCHEMA = 'kc-agent-ui/1';
 
@@ -135,7 +156,7 @@ const UI_CONTROLS_1 = Object.freeze([
     'Cycles how much of the instrument the startup deal may touch: off, weak, medium, chaos.',
     {
       channel: bus('STARTUP_MODE', { mode: '$value' }),
-      options: Object.freeze(['off', 'weak', 'med', 'koz']),
+      options: SCOPE_CYCLE,
       reads: R('startupMode'),
       source: 'panels/layout/CuratorBar.jsx',
     },
@@ -200,7 +221,7 @@ const UI_CONTROLS_1 = Object.freeze([
   ctl('topbar.beat-preset', 'topbar', 'Beat presets', 'segmented', 'Sets the beat clock to a preset tempo.', {
     family: true,
     channel: bus('BEAT_BPM', { bpm: '$param' }),
-    options: Object.freeze([60, 90, 120, 150, 180, 210]),
+    options: BEAT_PRESETS,
     reads: R('beatBpm'),
     source: 'components/BeatButton.jsx',
     note: 'act param = the preset bpm.',
@@ -313,7 +334,7 @@ const UI_CONTROLS_1 = Object.freeze([
     'Shuffles the palette through a harmony scheme.',
     {
       channel: bus('PALETTE_HARMONY', { scheme: '$value' }),
-      options: Object.freeze(['analogous', 'complementary', 'triadic', 'split', 'tetradic', 'monochrome']),
+      options: SCHEME_IDS,
       reads: R('paletteOverrides'),
       source: 'components/PaletteStrip.jsx',
       note: 'value = the harmony scheme; on the panel the scheme comes from the lab select beside the button.',
@@ -555,7 +576,7 @@ const UI_CONTROLS_1 = Object.freeze([
     'Cycles how many generations a dish-life cycle runs.',
     {
       channel: store('setDishLifeCycleGens', ['$value']),
-      options: Object.freeze([24, 48, 96]),
+      options: FIELD_CYCLE_DETENTS,
       reads: R('dishLifeCycleGens'),
       source: 'components/DishLifeChip.jsx',
     },
@@ -1192,7 +1213,7 @@ export const UI_CONTROLS_3 = Object.freeze([
   ),
   ctl('build.mirror', 'build', 'Mirror', 'segmented', 'Mirrors the layout across an axis.', {
     channel: lp('mirror'),
-    options: Object.freeze(['off', 'x', 'y', 'xy']),
+    options: MIRROR_STATES,
     reads: R('layoutParams.mirror'),
     source: 'panels/layout/ChipRows.jsx',
   }),
@@ -1423,7 +1444,7 @@ export const UI_CONTROLS_3 = Object.freeze([
     {
       family: true,
       channel: bus('LAYER_SET_BLEND_MODE', { id: '$param', mode: '$value' }),
-      options: Object.freeze(['normal', 'screen', 'multiply', 'overlay', 'difference', 'plus-lighter', 'soft-light']),
+      options: BLEND_MODES,
       reads: R('layers'),
       source: 'panels/build/LayerStack.jsx',
     },
@@ -1443,7 +1464,7 @@ export const UI_CONTROLS_3 = Object.freeze([
     {
       family: true,
       channel: bus('LAYER_SET_OPACITY', { id: '$param', opacity: '$value' }),
-      options: Object.freeze([0, 0.35, 0.65, 1]),
+      options: WET_STOPS,
       reads: R('layers'),
       source: 'panels/build/LayerStack.jsx',
       note: 'On the panel the stops scale by the stratum’s wet cap; the values here are the full-cap stops the row emits at cap 1.',
@@ -1458,7 +1479,7 @@ export const UI_CONTROLS_3 = Object.freeze([
     {
       family: true,
       channel: bus('LAYER_SET_ROTATION', { id: '$param', rotation: '$value' }),
-      options: Object.freeze([0, 15, 45, 90]),
+      options: STRATUM_ROTATIONS,
       reads: R('layers'),
       source: 'panels/build/LayerStack.jsx',
     },
@@ -1765,18 +1786,7 @@ export const UI_CONTROLS_3 = Object.freeze([
   }),
   ctl('build.sun-colour', 'build', 'Sun colour', 'segmented', 'The sun’s colour: white, ink, or a palette swatch.', {
     channel: bus('LIGHT_SET', { slot: '$value' }),
-    options: Object.freeze([
-      'white',
-      'ink',
-      'swatch0',
-      'swatch1',
-      'swatch2',
-      'swatch3',
-      'swatch4',
-      'swatch5',
-      'swatch6',
-      'swatch7',
-    ]),
+    options: LIGHT_SLOTS,
     reads: R('light.slot'),
     stress: 'probe',
     source: 'panels/layout/SunControls.jsx',
@@ -1803,7 +1813,7 @@ export const UI_CONTROLS_3 = Object.freeze([
   // field map
   ctl('build.map-field', 'build', 'Map — field', 'segmented', 'Which field the map reads: noise or density.', {
     channel: lp('fieldMapField'),
-    options: Object.freeze(['off', 'noise', 'density']),
+    options: FIELDMAP_FIELDS,
     reads: R('layoutParams.fieldMapField'),
     source: 'panels/layout/MapRow.jsx',
   }),
@@ -1815,7 +1825,7 @@ export const UI_CONTROLS_3 = Object.freeze([
     'Which mark channel the field drives: weight, saturation, or scale.',
     {
       channel: lp('fieldMapChannel'),
-      options: Object.freeze(['off', 'weight', 'saturation', 'scale']),
+      options: FIELDMAP_CHANNELS,
       reads: R('layoutParams.fieldMapChannel'),
       source: 'panels/layout/MapRow.jsx',
     },
@@ -2243,7 +2253,7 @@ export const UI_CONTROLS_4 = Object.freeze([
     'Where the stage output goes: preview, fullscreen, or syphon.',
     {
       channel: bus('STAGE_MODE', { mode: '$value' }),
-      options: Object.freeze(['preview', 'fullscreen', 'syphon']),
+      options: STAGE_MODES,
       walk: Object.freeze(['syphon', 'preview']),
       reads: R('stageMode'),
       source: 'panels/pipeline/StageBlock.jsx',
@@ -2258,7 +2268,7 @@ export const UI_CONTROLS_4 = Object.freeze([
     'How the stage maps to the output: fit, fill, or 1:1.',
     {
       channel: bus('STAGE_MAPPING', { mapping: '$value' }),
-      options: Object.freeze(['fit', 'fill', '1:1']),
+      options: STAGE_MAPPINGS,
       reads: R('stageMapping'),
       source: 'panels/pipeline/StageBlock.jsx',
       note: 'Mapping renders in the desktop (Tauri) stage window; the store value lands in every build.',
@@ -2444,7 +2454,7 @@ export const UI_CONTROLS_5 = Object.freeze([
     'Applies a reactivity feel: gentle, punchy, or violent (rewrites the reactivity params as a set).',
     {
       channel: bus('FEEL_APPLY', { id: '$value' }),
-      options: Object.freeze(['gentle', 'punchy', 'violent']),
+      options: ids(FEEL_PRESETS),
       source: 'panels/stimulus/FeelPicker.jsx',
       note: 'A feel rewrites many layout params at once and has no inverse; the walk applies one and records the stage, it does not restore (a performer’s deal, like a KINETIC press).',
     },
@@ -2535,7 +2545,7 @@ export const UI_CONTROLS_5 = Object.freeze([
   }),
   ctl('stimuli.response', 'stimuli', 'Reactivity RESPONSE', 'segmented', 'The audio response curve.', {
     channel: lp('audioResponse'),
-    options: Object.freeze(['linear', 'exponential', 'logarithmic', 'peak-hold']),
+    options: BALLISTICS_CURVES,
     reads: R('layoutParams.audioResponse'),
     source: 'panels/stimulus/ReactivityControls.jsx',
   }),
@@ -2639,7 +2649,7 @@ export const UI_CONTROLS_5 = Object.freeze([
     'Mutates one stream of the current look.',
     {
       channel: bus('DAVIS_MUTATE_STREAM', { group: '$value' }),
-      options: Object.freeze(['spatial', 'color', 'asset', 'noise']),
+      options: RECIPE_OFFSET_CHANNELS,
       reads: R('seedOffsets'),
       source: 'panels/DavisPanel.jsx',
     },
@@ -2722,7 +2732,7 @@ export const UI_CONTROLS_5 = Object.freeze([
   }),
   ctl('directors.motion', 'directors', 'TRAILS — motion', 'segmented', 'The kineme motion pattern the trails ride.', {
     channel: lp('kinemePattern'),
-    options: Object.freeze(['DRIFT', 'SWELL', 'THUMP', 'ORGANIC', 'CADENCE']),
+    options: KINEME_PATTERNS,
     reads: R('layoutParams.kinemePattern'),
     source: 'panels/DavisPanel.jsx',
   }),
@@ -2734,7 +2744,7 @@ export const UI_CONTROLS_5 = Object.freeze([
     'Sets the standing poem doctrine; tapping the lit one clears it.',
     {
       channel: recipe('setDoctrine'),
-      options: Object.freeze(['carson', 'ashworth', 'greiman']),
+      options: DOCTRINE_IDS,
       reads: R('poemDoctrine'),
       source: 'panels/DavisPanel.jsx',
       note: 'The bridge recipe calls the same treatments driver the panel calls, with by: "performer" — the panel’s own attribution.',
@@ -2742,13 +2752,13 @@ export const UI_CONTROLS_5 = Object.freeze([
   ),
   ctl('directors.travel', 'directors', 'Travel mode', 'segmented', 'How the stage travels: still, flow, or path.', {
     channel: lp('transport'),
-    options: Object.freeze(['still', 'flow', 'path']),
+    options: TRANSPORT_MODES,
     reads: R('layoutParams.transport'),
     source: 'panels/DavisPanel.jsx',
   }),
   ctl('directors.travel-path', 'directors', 'Travel path', 'segmented', 'The path shape when travel is on path mode.', {
     channel: lp('transportPath'),
-    options: Object.freeze(['orbit', 'spiral', 'sweep', 'lissajous']),
+    options: PATH_FAMILIES,
     reads: R('layoutParams.transportPath'),
     source: 'panels/DavisPanel.jsx',
   }),

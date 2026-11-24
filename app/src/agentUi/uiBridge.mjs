@@ -12,7 +12,10 @@
 //                               parallel write path; no authority the panels don't have.
 //   __KC_UI__.read(id, param?)  the control's registered read paths, resolved live
 //   __KC_UI__.stage()           fps / node count / tape / watchdog / build, from the store
-//   __KC_UI__.state(keys?)       a JSON-safe snapshot of store data (functions stripped)
+//   __KC_UI__.state(keys?)       a JSON-safe snapshot of the REGISTERED read surface only:
+//                               every read path the registry names (plus the module reads),
+//                               nothing else. Unregistered keys are refused, never dumped —
+//                               the whole store is not a read surface (QA fix, issue 2509).
 //
 // act() answers { ok, id, before, after } — the read paths snapshotted around the call,
 // so a caller can verify the change landed. Errors are reported, never thrown across
@@ -32,7 +35,7 @@ import { captureFavorite } from '../state/slices/davisSlice.js';
 import { nextRoute } from '../data/audioRoutes.js';
 import { getPresetsByGroup } from '../data/presets.js';
 import { treatments } from '../curator/treatmentsLive.mjs';
-import { AGENT_UI_SCHEMA, buildManifest, controlById } from './uiRegistry.mjs';
+import { AGENT_UI_SCHEMA, UI_CONTROLS, buildManifest, controlById } from './uiRegistry.mjs';
 
 // Module channels: keyed exactly as the registry names them ('<module>#<export>').
 // The selfcheck pins every registry module channel has an entry here, and vice versa.
@@ -235,10 +238,36 @@ export function stage() {
   };
 }
 
+// The state() allowlist: exactly the registry's read surface — every read path any
+// control registers (dotted store paths, heads included where a control reads a whole
+// head) plus the bridge's module reads under their 'module:' keys. Derived from the
+// registry, so a new registered read extends it and nothing else can. The selfcheck
+// pins this set in both directions and refuses known unregistered keys by name.
+export const STATE_READ_PATHS = Object.freeze(
+  [
+    ...new Set([...UI_CONTROLS.flatMap((c) => c.reads ?? []), ...Object.keys(MODULE_READS).map((k) => `module:${k}`)]),
+  ].sort(),
+);
+const STATE_READ_SET = new Set(STATE_READ_PATHS);
+
 export function stateSnapshot(keys) {
-  const st = useStore.getState();
-  const pick = keys && keys.length > 0 ? Object.fromEntries(keys.map((k) => [k, st[k]])) : st;
-  return JSON.parse(JSON.stringify(pick, (k, v) => (typeof v === 'function' ? undefined : v)));
+  const requested = keys && keys.length > 0 ? keys : null;
+  if (requested) {
+    for (const k of requested) {
+      if (!STATE_READ_SET.has(k)) return { ok: false, error: `unregistered read path: ${k}` };
+    }
+  }
+  const out = {};
+  for (const p of requested ?? STATE_READ_PATHS) {
+    try {
+      out[p] = readOne(p, { param: undefined });
+    } catch {
+      out[p] = undefined;
+    }
+  }
+  // JSON-safe: functions stripped; undefined (a registered path with no live value,
+  // e.g. light.* while the sun is off) serializes as null so the key set is stable.
+  return JSON.parse(JSON.stringify(out, (k, v) => (typeof v === 'function' ? undefined : v === undefined ? null : v)));
 }
 
 const MANIFEST = Object.freeze({ ...buildManifest(), build: import.meta.env?.VITE_BUILD_ID || 'dev' });
