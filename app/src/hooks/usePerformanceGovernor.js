@@ -249,6 +249,17 @@ export function usePerformanceGovernor() {
   // the future, every perf trip path below holds off (the slice arms it
   // in setRunning when a resume clears a watchdog stop).
   const watchdogGraceUntil = useStore((s) => s.watchdogGraceUntil);
+  // #2482 — the measured display ceiling and the pair reconcile. When
+  // the meter's first estimate lands (or a better one replaces it), the
+  // stored pair is re-derived under it: a recover written before any
+  // measurement existed — the one moment the absolute cap alone bound
+  // it — is corrected by the measurement itself, so it cannot sit
+  // above the screen's reach for the rest of the session.
+  const displayMaxFps = useStore((s) => s.displayMaxFps);
+  const reconcileGovernorThresholds = useStore((s) => s.reconcileGovernorThresholds);
+  useEffect(() => {
+    if (displayMaxFps != null) reconcileGovernorThresholds();
+  }, [displayMaxFps, reconcileGovernorThresholds]);
 
   const lowSinceRef = useRef(null);
   const lastActionRef = useRef(0);
