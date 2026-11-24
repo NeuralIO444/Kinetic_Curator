@@ -24,9 +24,10 @@
 // push. With no desire the crank stops, and a crank that stops is a beast that stands.
 //
 // STANDING ON THE SOIL. The feet stand on the ground (Life is the soil, spec §5.2): a foot in its stance band reads
-// the soil under it, and a planted foot on living ground grips fully, on dead ground it slips (CULTURE_BEAST_DEAD_GRIP).
-// The grip is how hard the frame is held to the stance stroke this step: velocity is eased toward the closed-form
-// target by grip × the recipe's tone, so with no foot down the frame coasts (the swarm's damping) — a limp is a look
+// the soil under it, and a planted foot on living ground grips fully, on dead ground it slips (CULTURE_BEAST_DEAD_GRIP):
+// the planted feet transmit their mean grip's share of the stance stroke (and of the turn), and the frame's velocity is
+// eased toward that by the recipe's tone — so on dead ground a beast walks at a third of its pace, and with no foot down
+// nothing holds it and the frame coasts (the swarm's damping) — a limp is a look
 // (the epic's law 3). The soil still judges the frame's discs like every body's: a withered hip is a lost leg (its
 // bones go and its foot no longer plants), a withered head is a dead beast.
 //
@@ -249,26 +250,6 @@ export function cultureBeastBones(bodies, c) {
   return out;
 }
 
-/** The frame's axis heading as the body stands: head minus the mean of its living spine hubs (null when none lives). */
-function frameAxis(bodies, c, fr) {
-  const h = c.first;
-  let sx = 0;
-  let sy = 0;
-  let n = 0;
-  const hubs = new Set(fr.legs.map((L) => c.body.parts[L.hip].parent));
-  for (const k of hubs) {
-    if (k === 0 || !bodies.alive[h + k]) continue;
-    sx += bodies.x[h + k];
-    sy += bodies.y[h + k];
-    n++;
-  }
-  if (!n) return null;
-  const dx = bodies.x[h] - sx / n;
-  const dy = bodies.y[h] - sy / n;
-  if (dx * dx + dy * dy < 1e-18) return null;
-  return Math.atan2(dy, dx);
-}
-
 /**
  * The steering command for a heading error: −1..1, full lock at the recipe's ARCS lock angle. Pure.
  */
@@ -307,16 +288,17 @@ export function cultureBeastMotion(fr, recipe, rA, rB) {
 
 /**
  * ONE STRANDBEEST'S MUSCLE for one swarm step — the seam's write for a linkage plan (the dish and the moth swim through
- * cultureMotion.mjs stepCultureCitizenMuscle; the beast walks here). Reads the frame's axis as the body stands, sums
- * the drives (the shared registry), turns the heading error into a steering command, eases each bank's crank rate
+ * cultureMotion.mjs stepCultureCitizenMuscle; the beast walks here). The HEADING is the crank's, in closed form — it
+ * turns only by the banks' differential through planted feet (never by an outside twist; the chassis hold brings the
+ * body back to it: probed, the chassis axis stands within 0.6° of it on average, 5° at worst, over 10 seeds × 60 s).
+ * Sums the drives (the shared registry), turns the heading error into a steering command, eases each bank's crank rate
  * toward its target, advances the banks' phases, reads the feet (planted ones grip by the soil under them), and eases
  * every living part's velocity toward the rigid frame motion the banks command — by grip. Velocity only. Mutates the
  * citizen's crank state (pA, pB, rA, rB) and returns its new heading.
  */
 export function stepCultureBeastMuscle(bodies, field, c) {
   const fr = cultureBeastFrame(c.body);
-  const axis = frameAxis(bodies, c, fr);
-  const h0 = axis === null ? c.heading : axis;
+  const h0 = c.heading;
   const senses = cultureSenses(bodies, field, { ...c, heading: h0 });
   const desire = cultureDesire(senses, c);
   const s =
@@ -327,8 +309,7 @@ export function stepCultureBeastMuscle(bodies, field, c) {
   c.rB += (tgt.rB - c.rB) * ease;
   c.pA += c.rA * CULTURE_BEAST_STEP_S;
   c.pB += c.rB * CULTURE_BEAST_STEP_S;
-  // the feet, at the new phases, laid at the measured heading: the planted ones grip by the ground under them
-  c.heading = h0;
+  // the feet, at the new phases, laid at the heading: the planted ones grip by the ground under them
   const feet = cultureBeastFeet(bodies, c);
   let planted = 0;
   let grip = 0;
@@ -337,9 +318,12 @@ export function stepCultureBeastMuscle(bodies, field, c) {
     planted++;
     grip += cultureSoilSample(field, f.x, f.y).living ? 1 : CULTURE_BEAST_DEAD_GRIP;
   }
-  const g = planted ? (grip / planted) * Math.min(1, c.recipe.physics.tone) : 0;
+  // the share of the stroke the planted feet transmit (1 on living ground, the slip share on dead), and how hard the
+  // frame is held to it this step (the recipe's tone) — with no foot down, nothing holds it: it coasts
+  const share = planted ? grip / planted : 0;
+  const g = planted ? Math.min(1, c.recipe.physics.tone) : 0;
   const { v, w } = cultureBeastMotion(fr, c.recipe, c.rA, c.rB);
-  const turn = w * CULTURE_BEAST_STEP_S * (planted ? grip / planted : 0);
+  const turn = w * CULTURE_BEAST_STEP_S * share;
   const h1 = wrapAngle(h0 + turn);
   if (g > 0) {
     const { x, y, vx, vy, alive } = bodies;
@@ -355,7 +339,7 @@ export function stepCultureBeastMuscle(bodies, field, c) {
     }
     cx /= n;
     cy /= n;
-    const along = v * CULTURE_BEAST_STEP_S;
+    const along = v * CULTURE_BEAST_STEP_S * share;
     const ux = Math.cos(h1);
     const uy = Math.sin(h1);
     const damp = CULTURE_SWARM_PARAMS.damping;
