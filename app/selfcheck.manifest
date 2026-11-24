@@ -223,6 +223,9 @@ node src/engine/cultureCitizens.selfcheck.mjs
 node src/engine/cultureMoth.selfcheck.mjs
 node src/engine/cultureGait.selfcheck.mjs
 node src/hooks/useCultureWorld.selfcheck.mjs
+node src/engine/cultureBeast.selfcheck.mjs
+node src/engine/cultureTestDrive.selfcheck.mjs
+node src/curator/cultureRoomLive.selfcheck.mjs
 node src/engine/dishFluid.selfcheck.mjs
 node src/engine/dishFluidCouple.selfcheck.mjs
 node src/engine/dishFluidStage.selfcheck.mjs
