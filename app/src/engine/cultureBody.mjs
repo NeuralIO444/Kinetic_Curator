@@ -44,6 +44,24 @@
 // how often it beats per stroke): the dish's single kind is called 'limb' (as before), the moth's
 // are 'wing' and 'antenna'. The wingbeat is anatomy (a plan constant), the recipe's paddle dial is
 // its amplitude, so DAVIS's dials and bounds are the same ones the dish creature has.
+//
+// THE STRANDBEEST PLAN (slice C; the parent epic 1863 as a CULTURE body). An assembled walking
+// STRUCTURE: a beam of crank hubs (the head is the front hub, two more down the spine, an accent
+// tail) and six HIPS — one small disc on each side of each hub, the crank throw a leg hangs from.
+// Those are its physical parts, an ordinary tree of overlap-rule joints like every plan's. The LEGS
+// are not discs: each is a Jansen linkage (engine/jansenSolver.js — the epic's law: closed form,
+// five circle intersections, no physics runtime) whose bars are INVISIBLE BONES posed from the
+// crank's phase, each carrying a look (Matt, 2026-11-03: "the bars are invisible bones, and the
+// asset pool attaches to them"; the CULTURE look is the plan's fixed shape set, the per-stage dealt
+// look being ruled to the render path). The plan carries the linkage: how many legs (one per hip)
+// and the bone looks; KINETIC deals the thirteen measure genes onto each body (engine/cultureLab.mjs),
+// and a measure set the linkage cannot assemble is a STILLBIRTH — a body fault, never a low score
+// (the epic's law 2: feasibility before scoring). Sockets: one per hip, cap 6, all born occupied —
+// every socket is a crank throw on the one crank (the epic's law 4), so the plan declares no free one.
+
+import { evaluateGenome } from './jansenSolver.js';
+import { sanitizeMeasures } from './beastBuilder.js';
+import { JANSEN_RELATIVE, MEASURE_IDS } from './jansenMeasures.js';
 
 /** A socket that accepts any limb kind its plan declares (the moth's one free socket). */
 export const CULTURE_SOCKET_ANY = 'any';
@@ -52,6 +70,8 @@ export const CULTURE_SOCKET_ANY = 'any';
 export const CULTURE_PLAN_DISH = 'dish';
 /** The moth plan's id: the flagship, the second citizen. */
 export const CULTURE_PLAN_MOTH = 'moth';
+/** The strandbeest plan's id: the assembled walking structure (slice C, the parent epic 1863). */
+export const CULTURE_PLAN_STRANDBEEST = 'strandbeest';
 
 /** The graphic vocabulary a part's look may use. Frozen: a new shape is a deliberate addition. */
 export const CULTURE_LOOK_SHAPES = Object.freeze(['ring', 'square', 'bar', 'dot']);
@@ -122,9 +142,51 @@ const MOTH_PLAN = Object.freeze({
   socketCap: 5,
 });
 
-const PLANS = Object.freeze({ [CULTURE_PLAN_DISH]: DISH_PLAN, [CULTURE_PLAN_MOTH]: MOTH_PLAN });
+/**
+ * The strandbeest plan, declared (slice C). A beam of three crank hubs — the head (16) leads, then
+ * two spine hubs (15, 14) and a small accent tail (9) — and six hips (5 each), one on either side of
+ * each hub at ±90°, each the root of one LEG. The legs are the linkage's bones (not discs): the plan
+ * says how many and how each bar looks. Bank A is the left side (even legs), bank B the right (odd
+ * legs) — engine/beastRig.js's own banks, laid flat into the dish (see engine/cultureBeast.mjs).
+ */
+const STRANDBEEST_PLAN = Object.freeze({
+  id: CULTURE_PLAN_STRANDBEEST,
+  head: Object.freeze({ radius: 16, look: lookOf('ring', 'main') }),
+  spine: Object.freeze([15, 14, 9]),
+  spineLooks: Object.freeze([lookOf('square', 'ink'), lookOf('square', 'ink'), lookOf('dot', 'accent')]),
+  limbs: Object.freeze({
+    // a single-disc limb: the hip wears the tip look; it does not paddle (the beast walks, it never swims)
+    leg: limbKind([5], lookOf('dot', 'ink'), lookOf('dot', 'ink'), 0, 1),
+  }),
+  sockets: Object.freeze([
+    Object.freeze({ id: 'head.l', part: 'head', angle: 90 * DEG, limb: 'leg', born: 'l0' }),
+    Object.freeze({ id: 'head.r', part: 'head', angle: -90 * DEG, limb: 'leg', born: 'r0' }),
+    Object.freeze({ id: 'spine.0.l', part: 'spine.0', angle: 90 * DEG, limb: 'leg', born: 'l1' }),
+    Object.freeze({ id: 'spine.0.r', part: 'spine.0', angle: -90 * DEG, limb: 'leg', born: 'r1' }),
+    Object.freeze({ id: 'spine.1.l', part: 'spine.1', angle: 90 * DEG, limb: 'leg', born: 'l2' }),
+    Object.freeze({ id: 'spine.1.r', part: 'spine.1', angle: -90 * DEG, limb: 'leg', born: 'r2' }),
+  ]),
+  socketCap: 6,
+  linkage: Object.freeze({
+    /** One leg per hip, in socket order: leg i hangs from socket i (even = bank A, left; odd = bank B, right). */
+    legs: 6,
+    /** The bones' looks: the beam and the frame bars ink, the crank the accent, every moving bar main. */
+    boneLooks: Object.freeze({
+      beam: lookOf('bar', 'ink'),
+      crank: lookOf('bar', 'accent'),
+      frame: lookOf('bar', 'ink'),
+      bar: lookOf('bar', 'main'),
+    }),
+  }),
+});
 
-/** The plans KINETIC can assemble: the dish creature (slice A) and the moth (slice B). */
+const PLANS = Object.freeze({
+  [CULTURE_PLAN_DISH]: DISH_PLAN,
+  [CULTURE_PLAN_MOTH]: MOTH_PLAN,
+  [CULTURE_PLAN_STRANDBEEST]: STRANDBEEST_PLAN,
+});
+
+/** The plans KINETIC can assemble: the dish creature (slice A), the moth (slice B), the strandbeest (slice C). */
 export const CULTURE_BODY_PLANS = Object.freeze(Object.keys(PLANS));
 
 /** A plan's declaration, or a loud refusal for a plan that does not exist. */
@@ -137,6 +199,32 @@ export function cultureBodyPlan(planId) {
 const restOf = (ra, rb) => (ra + rb) * CULTURE_BODY_REST_OVERLAP;
 
 /**
+ * A linkage plan's measure set, read: the thirteen relative measure genes (wild type where absent), the
+ * plan's leg count, the genome scale gene held at 1 (KINETIC's body scale is the size), no per-leg phase
+ * keys (legs spread evenly round the crank, engine/beastRig.js's default). Out-of-range genes clamp to
+ * their legal ranges (engine/beastBuilder.js sanitizeMeasures — the trust boundary every linkage shares).
+ */
+function linkageMeasures(plan, measures) {
+  const src = measures && typeof measures === 'object' ? measures : JANSEN_RELATIVE;
+  const raw = {};
+  for (const id of MEASURE_IDS) raw[id] = src[id];
+  const m = sanitizeMeasures({ ...raw, legCount: plan.linkage.legs, scale: 1 });
+  return Object.freeze(m);
+}
+
+const _feasible = new WeakMap();
+/** Can this linkage assemble over the whole crank cycle (the 360-step sweep)? Memoised on the frozen linkage. */
+export function cultureLinkageFeasible(linkage) {
+  if (!linkage || !linkage.measures) return false;
+  let v = _feasible.get(linkage);
+  if (v === undefined) {
+    v = !!evaluateGenome(linkage.measures, linkage.measures.scale).feasible;
+    _feasible.set(linkage, v);
+  }
+  return v;
+}
+
+/**
  * KINETIC assembles a body from a plan at a scale: the parts (head first, then the spine head to
  * tail, then each born limb root to tip), the joints between them (declared rests, computed from
  * the radii — never latched from live positions, the dishLinks purity rule), the declared sockets
@@ -144,7 +232,7 @@ const restOf = (ra, rb) => (ra + rb) * CULTURE_BODY_REST_OVERLAP;
  * unit the sensory range is counted in). Frozen all the way down. A plan that does not exist, or a
  * scale outside KINETIC's band, is refused loudly.
  */
-export function assembleCultureBody(planId, { scale = 1 } = {}) {
+export function assembleCultureBody(planId, { scale = 1, measures = null } = {}) {
   const plan = cultureBodyPlan(planId);
   if (!Number.isFinite(scale) || scale < CULTURE_BODY_SCALE_MIN || scale > CULTURE_BODY_SCALE_MAX)
     throw new Error(
@@ -208,7 +296,7 @@ export function assembleCultureBody(planId, { scale = 1 } = {}) {
   const limbs = {};
   for (const k of Object.keys(plan.limbs))
     limbs[k] = Object.freeze({ paddle: plan.limbs[k].paddle, beat: plan.limbs[k].beat });
-  return Object.freeze({
+  const body = {
     plan: plan.id,
     scale,
     parts: Object.freeze(parts),
@@ -217,7 +305,10 @@ export function assembleCultureBody(planId, { scale = 1 } = {}) {
     socketCap: plan.socketCap,
     limbs: Object.freeze(limbs),
     length,
-  });
+  };
+  // a linkage plan's body carries its measure genes (KINETIC's deal; the wild type when none is handed in)
+  if (plan.linkage) body.linkage = Object.freeze({ measures: linkageMeasures(plan, measures), phase: 0 });
+  return Object.freeze(body);
 }
 
 /**
@@ -305,5 +396,24 @@ export function cultureBodyFaults(body) {
     }
   }
   if (new Set(parts.map((p) => p.look && p.look.shape)).size < 3) faults.push('a sticker: fewer than three shapes');
+  // a linkage plan (the strandbeest): its measure genes are legal, its legs are the plan's, and it ASSEMBLES —
+  // an unassemblable genome is a stillbirth, a hard fault, never a low score (the parent epic 1863's law 2)
+  if (plan && plan.linkage) {
+    const lk = body.linkage;
+    if (!lk || !lk.measures) faults.push('no linkage');
+    else {
+      const m = lk.measures;
+      const legal = sanitizeMeasures(m);
+      const lf = [];
+      if (MEASURE_IDS.some((id) => !(Number.isFinite(m[id]) && legal[id] === m[id])))
+        lf.push('linkage measures out of range');
+      if (m.legCount !== plan.linkage.legs) lf.push("linkage legs are not the plan's");
+      if (m.scale !== 1) lf.push('linkage scale gene is not 1');
+      if (lk.phase !== 0) lf.push('linkage phase is not 0');
+      // feasibility is asked only of a legal measure set (the sweep reads the genes as they stand)
+      if (!lf.length && !cultureLinkageFeasible(lk)) lf.push('a stillbirth: the linkage cannot assemble');
+      faults.push(...lf);
+    }
+  } else if (body.linkage) faults.push('a linkage on a plan that has none');
   return faults;
 }

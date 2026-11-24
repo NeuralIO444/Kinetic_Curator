@@ -117,10 +117,12 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 // 1 — the dish plan, assembled.
 {
   // RE-PIN (slice B, changed law: the moth is the second plan) — was: [CULTURE_PLAN_DISH], 'one plan in this slice'
+  // RE-PIN (slice C, changed law: the strandbeest is the third plan, the parent epic 1863 as a CULTURE body) — was:
+  // [CULTURE_PLAN_DISH, 'moth'], 'two plans: the dish creature, the flagship moth'
   assert.deepEqual(
     [...CULTURE_BODY_PLANS],
-    [CULTURE_PLAN_DISH, 'moth'],
-    'two plans: the dish creature, the flagship moth',
+    [CULTURE_PLAN_DISH, 'moth', 'strandbeest'],
+    'three plans: the dish creature, the flagship moth, the strandbeest',
   );
   const b = assembleCultureBody(CULTURE_PLAN_DISH);
   assert.ok(Object.isFrozen(b) && Object.isFrozen(b.parts) && Object.isFrozen(b.parts[0]), 'frozen all the way down');

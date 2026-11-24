@@ -266,11 +266,13 @@ const pathRests = (body) => {
   );
   assert.deepEqual(
     normalizeCultureCastRoster(CULTURE_TAKE_SHEET).map((e) => [e.plan, e.count]),
+    // RE-PIN (slice C, changed law: two strandbeests walk in after the swimmers) — was: [['dish', 3], ['moth', 2]]
     [
       ['dish', 3],
       ['moth', 2],
+      ['strandbeest', 2],
     ],
-    'the gate’s take sheet: the first citizen, then the flagship',
+    'the gate’s take sheet: the first citizen, then the flagship, then the strandbeests',
   );
   assert.throws(() => normalizeCultureCastRoster({ roster: [] }), /at least one entry/);
   assert.throws(() => normalizeCultureCastRoster({ roster: [{ plan: 'wasp', count: 1 }] }), /unknown body plan/);
@@ -308,7 +310,8 @@ const pathRests = (body) => {
       take.members.filter((m) => m.body.plan === 'moth').every((m) => m.slot >= 3),
       'moths take the later slots',
     );
-    assert.ok(take.members.length + take.refused.length === 5);
+    // RE-PIN (slice C, changed law: the take sheet casts 7 — two strandbeests after the moths) — was: === 5
+    assert.ok(take.members.length + take.refused.length === 7);
   }
   // fresh each take: another seed is another cast, never a standing zoo
   const a = curatorCast(7, liveField(), CULTURE_TAKE_SHEET).members.map((m) => [m.x, m.y]);
@@ -316,7 +319,8 @@ const pathRests = (body) => {
   assert.notDeepEqual(a, b);
   const w = createCultureWorld({ seed: 7 });
   const r = castCultureTake(w, CULTURE_TAKE_SHEET);
-  assert.equal(r.cast + r.refused.length, 5);
+  // RE-PIN (slice C, changed law: the take sheet casts 7) — was: 5
+  assert.equal(r.cast + r.refused.length, 7);
   assert.deepEqual(
     w.citizens.list.map((c) => c.plan),
     [...w.citizens.list.map((c) => c.plan)].sort((x, y) => (x === y ? 0 : x === 'dish' ? -1 : 1)),

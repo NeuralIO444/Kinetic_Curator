@@ -243,6 +243,10 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // CULTURE Phase 5A — the wander drive (engine/cultureMotion.mjs): a citizen's seeded drift, a motion decision on the
   // noise stream; no offsets are passed (identity).
   'culture-wander': 'noise',
+  // CULTURE Phase 5C — KINETIC's measure genes for a linkage body (engine/cultureLab.mjs): each of the thirteen Jansen
+  // measures leaned off the wild type. The body's build, like its scale on 'culture-cast' — but a channel of its own,
+  // so the dish and moth casts' draws do not move; spatial, the build's stream. No offsets are passed (identity).
+  'culture-linkage': 'spatial',
 });
 
 const OFFSET_GROUP_OF = new Map([

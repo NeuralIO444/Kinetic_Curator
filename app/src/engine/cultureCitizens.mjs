@@ -28,7 +28,15 @@
 // than half the wrap span from its anchor (the first living part, head first) is moved back by
 // exactly one wrap span — the body crosses the seam whole, with its anchor, or not at all.
 // Positions only; velocity and every other column untouched.
+//
+// THE STRANDBEEST (slice C). A citizen whose body carries a linkage (engine/cultureBody.mjs, the strandbeest plan)
+// walks instead of swimming: its muscle is engine/cultureBeast.mjs stepCultureBeastMuscle (the same senses and drives;
+// locomotion by the stance stroke, steering by the banks' crank-phase differential). Its crank is life state — each
+// bank's phase (pA, pB, turns) and rate (rA, rB, turns a second), born at rest at DAVIS's birth phase — and the hash
+// covers it and the measure genes. A citizen without a linkage carries none of it: its table entry and its hash bytes
+// are exactly slice B's.
 import { stepCultureCitizenMuscle, cultureFeelPose, cultureBodyDepths, cultureBodyBraces } from './cultureMotion.mjs';
+import { stepCultureBeastMuscle } from './cultureBeast.mjs';
 import { composePose } from './motionCore/index.js';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H, CULTURE_SWARM_WRAP_PAD } from './cultureSwarm.mjs';
 
@@ -69,7 +77,7 @@ export function enrolCultureCitizen(citizens, member, first, bornStep) {
     const kind = member.body.limbs[parts[i].limb];
     limbTips.push(Object.freeze({ part: i, side: sock.angle >= 0 ? 1 : -1, weight: kind.paddle, beat: kind.beat }));
   }
-  citizens.list.push({
+  const c = {
     plan: member.body.plan,
     body: member.body,
     recipe: member.recipe,
@@ -87,7 +95,16 @@ export function enrolCultureCitizen(citizens, member, first, bornStep) {
     alive: 1,
     diedStep: -1,
     cause: '',
-  });
+  };
+  if (member.body.linkage) {
+    // the crank: both banks at DAVIS's birth phase, at rest (the anchor law: a citizen is born still)
+    c.linkage = member.body.linkage;
+    c.pA = member.phase0;
+    c.pB = member.phase0;
+    c.rA = 0;
+    c.rB = 0;
+  }
+  citizens.list.push(c);
   return citizens.list.length - 1;
 }
 
@@ -107,7 +124,7 @@ export function stepCultureCitizens(bodies, citizens, field, worldStep) {
       citizens.died += 1;
       continue;
     }
-    c.heading = stepCultureCitizenMuscle(bodies, field, c);
+    c.heading = c.linkage ? stepCultureBeastMuscle(bodies, field, c) : stepCultureCitizenMuscle(bodies, field, c);
     c.age += 1;
   }
   citizens.step += 1;
@@ -197,6 +214,16 @@ export function cultureCitizensHash(citizens) {
     mix(c.alive);
     mixU32(c.diedStep | 0);
     mixStr(c.cause);
+    if (c.linkage) {
+      // slice C: a strandbeest's genes and crank (absent for every other plan — their bytes are slice B's)
+      const m = c.linkage.measures;
+      for (const k of Object.keys(m).sort()) mixFloat(m[k]);
+      mixFloat(c.linkage.phase);
+      mixFloat(c.pA);
+      mixFloat(c.pB);
+      mixFloat(c.rA);
+      mixFloat(c.rB);
+    }
   }
   return h >>> 0;
 }
