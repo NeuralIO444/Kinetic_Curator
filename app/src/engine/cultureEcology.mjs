@@ -5,7 +5,8 @@
 // THE LAW THIS BUILDS (spec §2.5, §2.9, §2.10, §3.1, §4 Q1; Matt's rulings):
 //   - Creatures EAT BEATS. The Queen's audible beats are the feeding: each beat the room makes audible lands as a
 //     MORSEL somewhere in the dish (§3.1). A citizen senses morsels within its sensory range (3 body-lengths), turns
-//     toward the nearest when it is not full, and eats one its head touches: +10 fat. With no room reading, a silent
+//     toward the nearest when it is not full, and eats one its head touches: +10 fat. RULED (Matt, 2026-11-24): a
+//     strandbeest's PLANTED feet (its existing stance band) eat too; the nearest mouth wins (cultureMouthReaching). With no room reading, a silent
 //     room, or an uncast dish, nothing lands.
 //   - FAT. Every citizen carries fat — born with CULTURE_FAT_BIRTH, never above CULTURE_FAT_MAX — and pays upkeep
 //     every world step (120 Hz): 1 fat/s for its body, 0.5 fat/s for every LOOTED limb it carries (§2.10: "every
@@ -47,6 +48,7 @@ import { cultureBodyPlan, cultureBodyFaults, CULTURE_SOCKET_ANY, CULTURE_BODY_RE
 import { cultureSenseRange } from './cultureMotion.mjs';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H } from './cultureSwarm.mjs';
 import { CULTURE_WRAP_SPAN_X, CULTURE_WRAP_SPAN_Y } from './cultureCitizens.mjs';
+import { cultureBeastFeet } from './cultureBeast.mjs';
 
 /** The ecology's clock: the world's fixed step, 120 Hz (pinned equal to cultureWorld's CULTURE_STEP_HZ). */
 export const CULTURE_ECOLOGY_STEP_HZ = 120;
@@ -77,6 +79,12 @@ export const CULTURE_MORSEL_LIFE_S = 10;
 export const CULTURE_MORSEL_CAP = 64;
 /** A morsel's reach: a head disc within this many px of the morsel's point eats it (builder's default). */
 export const CULTURE_MORSEL_RADIUS = 6;
+/**
+ * RULED (Matt, 2026-11-24): a strandbeest's PLANTED FEET EAT TOO. A foot in its stance band (engine/cultureBeast.mjs
+ * cultureBeastFeet `planted` — the existing band, never a new one) eats a morsel within its hip disc's radius + the
+ * morsel's reach; a swinging foot eats nothing. Same +10 as a head.
+ */
+export const CULTURE_FOOT_EATS = true;
 /** Morsels land at least this far inside the dish's border (the rim drive keeps citizens off the edge). */
 export const CULTURE_MORSEL_MARGIN = 240;
 /** The hunger pull's weight at an empty belly, in the drives' units (scaled by 1 − fat/max; builder's default). */
@@ -375,26 +383,61 @@ function retireSlot(world, i) {
 }
 
 /**
- * EATING (the settled frame, the swarm's cadence): each morsel, oldest first, goes to the hungry living citizen
- * (fat below the max) whose head disc reaches it, the nearest head winning (ties to the earlier citizen): +10 fat,
- * capped at the max. Returns how many were eaten.
+ * The mouths that can eat this step, in canonical order: per living citizen (cast order; a full one is passed over per
+ * morsel by cultureMouthReaching) its
+ * head disc, then — a strandbeest's, RULED — each PLANTED foot (leg order), reaching its hip disc's radius + the
+ * morsel's. Each { idx, x, y, reach, rank } (rank 0 a head, 1 a foot).
+ */
+export function cultureMouths(bodies, citizens, eco) {
+  const out = [];
+  citizens.list.forEach((c, idx) => {
+    if (!c.alive || !bodies.alive[c.first]) return;
+    lifeAt(eco, idx); // every mouth has a life (fullness is judged per morsel, cultureMouthReaching)
+    const h = c.first;
+    out.push({ idx, x: bodies.x[h], y: bodies.y[h], reach: bodies.radius[h] + CULTURE_MORSEL_RADIUS, rank: 0 });
+    if (!c.linkage || !CULTURE_FOOT_EATS) return;
+    // the feet in leg (socket) order; leg i's foot hangs from the hip born in socket i
+    for (const f of cultureBeastFeet(bodies, c)) {
+      if (!f.alive || !f.planted) continue;
+      const hip = c.body.sockets[f.leg].occupant;
+      out.push({ idx, x: f.x, y: f.y, reach: bodies.radius[c.first + hip] + CULTURE_MORSEL_RADIUS, rank: 1 });
+    }
+  });
+  return out;
+}
+
+/**
+ * Which citizen eats morsel m: the mouth (of `mouths`, cultureMouths' canonical order) that reaches it nearest; on an
+ * exact tie the first in that order — the earlier citizen, a citizen's head before its feet, an earlier leg before a
+ * later. A citizen already full (filled by an earlier morsel this step) does not eat. −1 when no mouth reaches it.
+ */
+export function cultureMouthReaching(mouths, eco, m) {
+  let who = -1;
+  let bd = Infinity;
+  for (const mo of mouths) {
+    if (eco.lives[mo.idx].fat >= CULTURE_FAT_MAX_TICKS) continue; // full (or filled by an earlier morsel this step)
+    const d2 = (m.x - mo.x) ** 2 + (m.y - mo.y) ** 2;
+    if (d2 < mo.reach * mo.reach && d2 < bd) {
+      who = mo.idx;
+      bd = d2;
+    }
+  }
+  return who;
+}
+
+/**
+ * EATING (the settled frame, the swarm's cadence): each morsel, oldest first, goes to the mouth that reaches it —
+ * a hungry living citizen's head disc, or (RULED) a strandbeest's planted foot — the NEAREST mouth winning; on an
+ * exact tie the earlier citizen, a citizen's head before its feet, the earlier leg (cultureMouthReaching).
+ * +10 fat to the mouth's citizen, capped at the max. Returns how many were eaten.
  */
 export function stepCultureEating(world) {
   const { bodies, citizens, ecology: eco } = world;
   let eaten = 0;
+  if (!eco.morsels.length) return 0;
+  const mouths = cultureMouths(bodies, citizens, eco);
   eco.morsels = eco.morsels.filter((m) => {
-    let who = -1;
-    let bd = Infinity;
-    citizens.list.forEach((c, idx) => {
-      if (!c.alive || !bodies.alive[c.first]) return;
-      if (lifeAt(eco, idx).fat >= CULTURE_FAT_MAX_TICKS) return;
-      const r = bodies.radius[c.first] + CULTURE_MORSEL_RADIUS;
-      const d2 = (m.x - bodies.x[c.first]) ** 2 + (m.y - bodies.y[c.first]) ** 2;
-      if (d2 < r * r && d2 < bd) {
-        who = idx;
-        bd = d2;
-      }
-    });
+    const who = cultureMouthReaching(mouths, eco, m);
     if (who < 0) return true;
     const life = eco.lives[who];
     life.fat = Math.min(CULTURE_FAT_MAX_TICKS, life.fat + CULTURE_MORSEL_TICKS);

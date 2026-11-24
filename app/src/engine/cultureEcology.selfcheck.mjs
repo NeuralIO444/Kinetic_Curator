@@ -22,6 +22,8 @@
 //      LOIS reads the worn body and an over-plan body is refused loudly
 //   9. determinism and the hash: twin fed worlds bit-identical over a minute; the hash covers every piece of new state;
 //      over four seeds a fed dish outlives an unfed one (which the new law empties within the minute)
+//  10. RULED (Matt, 2026-11-24): a strandbeest's planted feet eat too — a planted foot (the stance band) eats, a
+//      swinging foot never; the nearest mouth wins and a tie goes by the canonical order
 import assert from 'node:assert/strict';
 import {
   createCultureWorld,
@@ -68,7 +70,10 @@ import {
   cultureCitizenSize,
   cultureWornBody,
   cultureEcologyHash,
+  cultureMouths,
+  cultureMouthReaching,
 } from './cultureEcology.mjs';
+import { cultureBeastFeet } from './cultureBeast.mjs';
 import { cultureBodyRestPose, cultureBodyFaults, CULTURE_BODY_REST_OVERLAP } from './cultureBody.mjs';
 import { cultureSenses, cultureDesire, cultureSenseRange } from './cultureMotion.mjs';
 import { CULTURE_CITIZEN_CAUSES } from './cultureCitizens.mjs';
@@ -691,12 +696,36 @@ const fullAll = (w) => {
     ['starved tally', () => (e.starved += 1), () => (e.starved -= 1)],
     ['preyed tally', () => (e.preyed += 1), () => (e.preyed -= 1)],
   ];
-  if (e.morsels.length) {
-    const mo = e.morsels[0];
-    const x0 = mo.x;
-    touch.push(['morsel x', () => (mo.x = x0 + 1e-9), () => (mo.x = x0)]);
-    touch.push(['morsel born', () => (mo.born += 1), () => (mo.born -= 1)]);
-  }
+  assert.ok(e.morsels.length, 'the fixture: morsels stand');
+  const mo = e.morsels[0];
+  const x0 = mo.x;
+  const y0 = mo.y;
+  touch.push(['morsel x', () => (mo.x = x0 + 1e-9), () => (mo.x = x0)]);
+  touch.push(['morsel y', () => (mo.y = y0 + 1e-9), () => (mo.y = y0)]);
+  touch.push(['morsel born', () => (mo.born += 1), () => (mo.born -= 1)]);
+  touch.push(['morsel serial', () => (mo.serial += 1), () => (mo.serial -= 1)]);
+  // QA fix-forward: every socket column, including the slots and each carried part's radius and look (shape, tone)
+  const sk = life.sockets[0];
+  assert.ok(sk.slots.length && sk.parts.length, 'the fixture: a socket holding a limb');
+  const p0 = sk.parts[0];
+  touch.push(['socket slots', () => (sk.slots[0] += 1), () => (sk.slots[0] -= 1)]);
+  touch.push(['socket slot count', () => sk.slots.push(7), () => sk.slots.pop()]);
+  touch.push([
+    'carried part radius',
+    () => (sk.parts[0] = { ...p0, radius: p0.radius + 1e-9 }),
+    () => (sk.parts[0] = p0),
+  ]);
+  touch.push([
+    'carried part look shape',
+    () => (sk.parts[0] = { ...p0, look: { ...p0.look, shape: p0.look.shape === 'dot' ? 'ring' : 'dot' } }),
+    () => (sk.parts[0] = p0),
+  ]);
+  touch.push([
+    'carried part look tone',
+    () => (sk.parts[0] = { ...p0, look: { ...p0.look, tone: p0.look.tone === 'ink' ? 'main' : 'ink' } }),
+    () => (sk.parts[0] = p0),
+  ]);
+  touch.push(['socket id', () => (sk.id += 'x'), () => (sk.id = sk.id.slice(0, -1))]);
   for (const [what, set, undo] of touch) {
     set();
     assert.notEqual(cultureWorldHash(a), h, `the world hash covers ${what}`);
@@ -731,4 +760,62 @@ const fullAll = (w) => {
   );
 }
 
-console.log(`cultureEcology.selfcheck: ${checks}/9 groups OK`);
+// 10 — RULED (Matt, 2026-11-24): a strandbeest's planted feet eat too.
+{
+  const b = world(7, { plan: 'strandbeest', count: 2 });
+  place(b, 0, 900, 500, 0);
+  place(b, 1, 400, 800, 0);
+  const beast = b.citizens.list[0];
+  const life = b.ecology.lives[0];
+  b.ecology.lives[1].fat = CULTURE_FAT_MAX_TICKS;
+  // turn the crank until the feet show both bands
+  let feet = cultureBeastFeet(b.bodies, beast);
+  for (
+    let t = 0;
+    t < 400 && !(feet.some((f) => f.alive && f.planted) && feet.some((f) => f.alive && !f.planted));
+    t++
+  ) {
+    beast.pA += 0.013;
+    beast.pB += 0.017;
+    feet = cultureBeastFeet(b.bodies, beast);
+  }
+  const head = { x: b.bodies.x[beast.first], y: b.bodies.y[beast.first], r: b.bodies.radius[beast.first] };
+  const far = (f) => Math.hypot(f.x - head.x, f.y - head.y) > head.r + CULTURE_MORSEL_RADIUS + 20;
+  const planted = feet.find((f) => f.alive && f.planted && far(f));
+  const swinging = feet.find((f) => f.alive && !f.planted && far(f));
+  assert.ok(planted && swinging, 'the fixture: a planted foot and a swinging one, both away from the head');
+  const mouths = cultureMouths(b.bodies, b.citizens, b.ecology);
+  assert.deepEqual(
+    mouths.filter((m) => m.idx === 0).map((m) => m.rank),
+    [0, ...feet.filter((f) => f.alive && f.planted).map(() => 1)],
+    'its mouths: its head, then each planted foot in leg order — and no swinging foot',
+  );
+  life.fat = 1000;
+  b.ecology.morsels = [{ serial: 1, x: planted.x + 1, y: planted.y, born: b.step }];
+  assert.equal(stepCultureEating(b), 1, 'a planted foot eats');
+  assert.equal(life.fat, 3400, 'the same +10 as a head');
+  b.ecology.morsels = [{ serial: 2, x: swinging.x + 1, y: swinging.y, born: b.step }];
+  assert.equal(stepCultureEating(b), 0, 'a swinging foot eats nothing');
+  assert.equal(life.fat, 3400);
+  const hip = b.bodies.radius[beast.first + beast.body.sockets[planted.leg].occupant];
+  b.ecology.morsels = [{ serial: 3, x: planted.x + hip + CULTURE_MORSEL_RADIUS + 0.01, y: planted.y, born: b.step }];
+  assert.equal(stepCultureEating(b), 0, 'beyond the foot’s reach (its hip disc’s radius + the morsel’s), nothing');
+  // the order on a tie: the earlier citizen, a citizen's head before its feet, the earlier leg
+  const eco = { lives: [{ fat: 0 }, { fat: 0 }] };
+  const m = { x: 0, y: 0 };
+  const at = (idx, rank, x) => ({ idx, rank, x, y: 0, reach: 10 });
+  assert.equal(cultureMouthReaching([at(0, 1, 3), at(1, 0, -3)], eco, m), 0, 'a tie: the earlier citizen (its foot)');
+  assert.equal(
+    cultureMouthReaching([at(1, 0, -3), at(0, 1, 3)], eco, m),
+    1,
+    'the canonical order decides, never chance',
+  );
+  assert.equal(cultureMouthReaching([at(0, 1, 3), at(1, 0, -2)], eco, m), 1, 'the nearer mouth wins');
+  eco.lives[1].fat = CULTURE_FAT_MAX_TICKS;
+  assert.equal(cultureMouthReaching([at(1, 0, -2), at(0, 1, 3)], eco, m), 0, 'a full citizen’s mouth passes');
+  ok(
+    'RULED: a strandbeest’s planted feet eat too (+10), a swinging foot never; the nearest mouth wins, ties in canonical order',
+  );
+}
+
+console.log(`cultureEcology.selfcheck: ${checks}/10 groups OK`);
