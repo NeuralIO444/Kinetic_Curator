@@ -1,148 +1,145 @@
-# STAGING REPORT — #2151 FIELD: LOIS and DAVIS request revisions when a standing poem reads empty or crowded
+# Staging report — agent UI manifest + standing stress script (branch feat/2509-agent-ui-manifest)
 
-Branch `feat/2151-field-revision-requests`, based on origin/main `b605edd9` (#2437). One PR, **not merged by
-the builder** — a feel feature in Matt's review lane: **PR pending** (opened at the end of this build; the PR
-body carries the same summary).
+Base: origin/main f260b748 (the hosted build's commit). Local only; nothing pushed, no PR opened — the coordinator publishes.
 
-Spec: issue #2151 body + comments — the register ruling (2026-11-12: empty = the COVER register, crowded =
-the INTERIOR register; CARSON reads the cover pole, ASHWORTH the interior/grit side), the pressure law
-(2026-11-12: HOT = variety mode, no requests; LINGERING/FIDDLING = requests stand down; requests fire only
-in between, poem standing, user watching; a user change overrides), the supply and minimum rulings
-(2026-11-17: poets write the pole pieces — landed as PR #2310's per-poet register caches; one-word poems
-exempt from `FIELD_POEM_MIN_STAMPS`; Japanese covers deal in the native face whatever their length), and
-the acceptance checklist in the body plus the comments' additions.
+Note for the coordinator: the eventual PR for this branch is meant to close its issue (2509).
 
-## What was built
+## What was built and where
 
-### The critical pass — `app/src/curator/fieldRevision.mjs` (new, pure)
-- `judgeStandingPoem(form)` — reads the standing form's piece in the supply and judges its REGISTER TAG:
-  `cover` → `{ read: 'empty', doctrine: 'carson' }`, `interior` → `{ read: 'crowded', doctrine: 'ashworth' }`,
-  `between` or an untagged deck piece → fine. Not letter counts, not share of frame — the piece's own
-  typographic register, as ruled. Unknown piece → null (nothing to judge).
-- `classifyTempo(snapshot)` — the pressure law as a pure read of the loisActivity snapshot: `hot`
-  (rollsLastMinute ≥ `REVISION_HOT_ROLLS_PER_MIN`), `fiddling` (a settings tweak inside
-  `REVISION_FIDDLE_WINDOW_MS`, or a live undo burst), `away` (the feed's own away line, or no feed),
-  else `watching`.
-- `pickRevisionDecision(form, rng)` — the poem's answer: a deal decision naming a piece from the SAME
-  poet's register cache, toward the other pole — the middle band first, the far pole as fallback — never
-  the standing piece; a form standing in the native face is answered in the native face.
-- `FIELD_REVISION_KNOBS` — every threshold/band/gate of the pass as named constants in one frozen object,
-  banked into each request record as provenance (the fieldReview gates discipline). No tuning surface.
+| File | What it is |
+| --- | --- |
+| `app/src/agentUi/uiRegistry.mjs` | The registry (schema `kc-agent-ui/1`): every panel, every primary control, a plain-words description of what each does, its lawful action channel, the state reads that prove the action landed, and a stress mode (`walk` / `probe` / `skip`) with a reason wherever a control is not walked. Wherever the app keeps a control's options as a module export, the entry imports that export, never a copied literal; layout-param stops and ranges are pinned against the app's own `PARAM_STOPS` / `PARAM_SPEC` tables by the selfcheck (see the QA fix round). |
+| `app/src/agentUi/uiBridge.mjs` | The action bridge. Installs `window.__KC_UI__` = `{ schema, manifest(), act(id, value, param), read(id, param), stage(), state(keys) }`. Imported once from `app/src/main.jsx` (one added line). The hook is always-on by design: the ruling on this work is that the manifest ships in the live build so an agent can read and drive the hosted build — the deliberate exception to the test-only store-exposure precedent. |
+| `app/src/agentUi/uiRegistry.selfcheck.mjs` | The drift pin (see Verification). Registered with one added line in `app/selfcheck.manifest`. |
+| `app/e2e/agent-stress.mjs` | The standing stress script (playwright-core, the repo's e2e family). Boots a build, reads the shipped manifest off `window.__KC_UI__`, walks every registered control across its range (both extremes for sliders and segments), records per-step stage reads (fps, node count, tape, watchdog state) and console errors, and writes JSON + markdown reports in the 2026-11-24 session's A/B shape. `--write-baseline` accepts a baseline; `--baseline` diffs against it and the run exits non-zero on new breaks only. A failed walk is retried once before it is recorded (spring-smoothed params settle slowly on a loaded machine). |
+| `app/e2e/agent-stress.baseline.json` | The accepted baseline, written from a full run of this branch's build (see Stress evidence). |
+| `app/.prettierignore` | One adoption block (`!src/agentUi/`) so the new files are format-checked, following the repo's born-formatted precedent. |
 
-### The driver — `app/src/curator/fieldRevisionLive.js` (new), wired in `App.jsx`
-Ticks once a second; owns all the clocks (dwell, grace) so the slice never reads one (#806 law). Per tick:
-the store's `fieldVariety` flag follows the hot tempo; a pending request is silenced the moment the form
-moves, the poem is held, an exemption lands (the review loop's own table — kept/plate/raygun/whisper), or
-the tempo leaves watching; after `REVISION_ANSWER_DELAY_MS` of watching grace it calls the store's answer
-action. A poem is judged only after standing `REVISION_STAND_DWELL_MS` in the watching tempo, unheld and
-unexempt. Muted while a take plays back. All faults swallowed — a critic never breaks the stage.
-Its one `Date.now` (the injectable seam's default) carries an exact-count entry in
-`eslint-rules/determinism-allowlist.mjs` with the written reason, on the loisActivity precedent.
+No one-writer file was touched (`app/src/gl/liveLoop.mjs`, `app/src/gl/liveResolve.mjs`, `app/src/gl/particles.js` are untouched; the only pre-existing files edited outside the new directories are `app/src/main.jsx`, +1 import line, plus the manifest and prettierignore lines above).
 
-### The store — `app/src/state/slices/layoutSlice.js`
-- New session state beside `fieldReview`: `fieldRevision` (the pass's record) and `fieldVariety` (the hot
-  flag). Neither is serialized or undo-managed (fieldReview's discipline).
-- Actions: `setFieldVariety`, `requestFieldRevision` (re-validates the named form still stands, unheld,
-  and hasn't had its bite), `cancelFieldRevision` (records the silencing outcome), `answerFieldRevision`
-  (re-validates everything — pending, form unmoved, unheld, unexempt — then deals through `landPoem`).
-- `landPoem` gains two seams, both defaulting to today's behaviour: a caller-named `decision` (the
-  revision answer — it then flows through the gate, the doctrine arm, the shadow review, the ladder and
-  the counter exactly as a Director deal does) and variety read off `state.fieldVariety` into `dealPoet`
-  (including the ladder's own re-deal).
+## Coverage — 333 controls, 14 panels
 
-### The supply deals — `app/src/poets/fieldForm.js`, `placement.js`, `poemRow.mjs`
-- `POET_REGISTERS` + `findPoetPiece` — the supply: deck first, then the poet's register cache. `POET_DECKS`
-  is untouched (the #2310 suite's pins hold byte-for-byte).
-- `fieldDealReport` serves the whole supply and applies the two ruled exceptions to the #1932 minimum,
-  judged on the face actually dealt: a one-word deal is exempt; a `register: 'cover'` piece on a kana deal
-  is exempt. Every other piece keeps the minimum (pinned: Teijo's `t9` in the native face — 5 stamps,
-  between — still silences; its Latin face deals as always).
-- The one-word push (`placement.js`, `PUSH_*` constants beside the plate family): a one-word deal is sized
-  to 0.84 of the dish width, capped at em 0.28 (under the document door's 0.3 stamp ceiling), with
-  per-glyph em/rotation jitter drawn off the placement stream after the module origin — deterministic per
-  (piece, seed), gate-judged and door-fixed like every form (pinned across seeds, both faces).
-- `poemIdentity` reads the supply, so the poem row names register poems — and a pushed one-word poem's
-  identity chip shows the clean transcription off the piece, per FIELD law. `poemFormKey` is exported
-  (poet + piece + exact materialization) as the pass's form key.
-- The pending request shows on the poem row as a small chip — `too empty` / `too crowded` — beside the
-  FORM chip, only while the request names the standing piece (`PoemRow.jsx`). No new panel.
+| Panel | Controls |
+| --- | --- |
+| Top bar | 22 |
+| Bottom transport bar | 24 |
+| P01 CANVAS | 3 |
+| P02 ASSET POOL (grid) | 16 |
+| P02 inspector (selection) | 11 |
+| KEEPS SHELF | 6 |
+| P03 BUILD | 97 |
+| P04 PLAY | 18 |
+| P05 PIPELINE | 24 |
+| P06 STIMULI | 28 |
+| P07 DIRECTORS | 36 |
+| DEV tools | 25 |
+| WetLab | 17 |
+| Asset Studio | 6 |
+| **Total** | **333** |
 
-### Variety — `fieldDirector.js` / `fieldEval.js` / `director.js`
-`choosePoet` gains `variety`: the piece pick ranges over deck + register cache for the chosen poet. Off,
-the pick is the deck alone, exactly as shipped (pinned both ways).
+Generated families (per-asset tiles, per-layer strata controls, per-hit pills, per-route rows, kernel tiles, persona-tune leaves) get one registry entry each, marked as a family; the stress script derives a representative instance (first asset, first content layer, first preset) and walks that.
 
-## Decisions taken under the coordinator's standing recommendation (flagged per the brief)
+Run outcomes on the accepted baseline run: **193 pass, 89 probe, 50 skip, 1 fail** (the fail is environment-bound; see Stress evidence). 195 controls are registered as `walk`; one of them (`topbar.taste-voice`) resolves to a probe in the default profile because no representative instance exists there.
 
-1. **Push hardness** (the one question the issue's first comment left open — asked once and dropped, or
-   standing?): a request stands as a PENDING record for a short grace (`REVISION_ANSWER_DELAY_MS`, 6 s of
-   watching tempo), during which any user change silences it; then the poem answers. One bite per form —
-   answered or silenced, that exact materialization is never judged again.
-2. **The answer targets the middle band first** ("re-deals TOWARD the other pole"): a cover poem is
-   answered from `between` (the far pole only when the middle has no stock), so an answered poem lands
-   between the poles and cannot draw the opposite request next.
-3. **The answer stays with the standing poet** — the register caches were built per poet precisely so
-   each poet spans the line; the poem answers in its own voice, in its standing face (script included).
-4. **Exemptions reuse the review loop's table** (`reviewExemption`: kept, plate, raygun, whisper; held
-   forms likewise) — a poem the performer has claimed or treated is beyond critics, on the #2006
-   precedent.
-5. **The answer is a reviewed landing** (it rides `landPoem` whole, ladder included), not a
-   performer-style unreviewed re-deal: it is the poem system's own deal, and the ladder's re-deal inside
-   it can only land deck pieces (which read fine), so the pass cannot loop.
-6. **Away is a fourth tempo**: the feed's own idle line means nobody is watching, so nothing fires —
-   the watching state the ruling names requires a watcher.
+### Deliberate probe / skip calls (each is also recorded in the registry entry itself)
 
-## Verification (this tree, this build)
+- **KINETIC routed tap (`topbar.kinetic`) — probe.** Its routing lives in component-local heat state (`panels/layout/kineticHeat.mjs`) over four store passes; a stateless bridge call cannot reproduce the route honestly, so no channel is registered rather than a fake one.
+- **Stratum solo (`build.layer-solo`) — probe.** The channel is the panel's own, but a walk cannot observe it: the layers slice's content cap is 1 (a second KC track is refused, always), so the only content stratum is already solo by construction and both directions land on the same state.
+- **Add stratum (`build.add-stratum`) — probe.** Adds are lawfully refused at the cap and by the tape pre-flight; a walk cannot tell a lawful refusal from a break.
+- **Curate (`topbar.curate`) — walked, partially.** The bridge performs the two emits the control always makes; the conditional palette follow-up uses a helper that lives inside `CuratorBar.jsx` and is not exported, so it is not reproduced. Recorded in the entry.
+- **WetLab and Asset Studio dialog families — probe / skip where dialog-local.** Their store arguments are performer-derived inside the dialog (attach picks, gene edits, part edits). The beast settings that are plain store values are walked and pass (`wetlab.beast-*`).
+- **File-IO, download, clipboard and native-shell controls — skip.** Imports, exports, still/movie renders, REC, census load, the DEV·NATIVE tab: they leave the page or need the Tauri shell, so there is no in-page state change to verify.
+- **MEGAMIND connect / ask / embed — probe.** They call a local model endpoint; a standing stress run must not make model calls.
+- **STIMULI per-route rows — probe.** The payload is a table-edit function built from the live rows, not a plain value.
+- **Destructive or performer-data controls — skip / probe.** Deletes, renames and clears of the performer's own lists and assets are catalogued but not churned by the standing script.
+- **Readouts (`canvas.readouts`) — probe.** A readout changes no state; an agent reads it through the bridge's `stage()` / `state()`.
 
-- New suite `src/curator/fieldRevision.selfcheck.mjs` (14 cases, added to `app/selfcheck.manifest`):
-  the judge, the tempo table, the answer pick, the supply exceptions (one-word, Japanese covers across
-  12 seeds × both faces — dealt, gate-clean, door-fixed), the push (scale, per-glyph treatment, replay),
-  identity, variety both ways, the store actions (request/answer/hold/one-bite), and the driver against
-  a fake stage (dwell, grace, hot, fiddling-silence, fine-poem silence).
-- Targeted neighbours all green: poemRegister, poemRow, fieldLatin/Kana/Kanji/Plate/StampPath,
-  poemLife, fieldSilence, fieldReview, fieldReviewLadder, fieldReviewQuiet, fieldReviewVoice,
-  fieldDirector, fieldLiveDeal, fieldBattery, doctrines, doctrineLayout, buildPlacements.
-- Dice-driven poem suites run 20× each, all 20/20: poemRow, fieldLiveDeal, fieldReviewLadder,
-  fieldReview, poemRegister, fieldRevision, fieldSilence, fieldReviewQuiet.
-- `npm run lint` — 0 errors (11 warnings, the project's pre-existing baseline; the changed files add
-  none beyond pre-existing App.jsx hook notes). `npm run format:check` — clean. `npm run build` — green.
-- Full manifest sweep (continue-on-error, per-suite log): **793 pass / 3 fail** of 796. The only
-  failures are the known sandbox-environmental trio — `swarmWasm`, `rollSafety`, `accum` — the same
-  three that fail on this main in the sandbox (WASM bake + WebGL/browser-dependent suites); every
-  FIELD/poem suite passed inside the sweep, the new `fieldRevision` suite included.
+## How the bridge routes actions
 
-## What this does not do
-- No MegaMind/Mind tuning surface (the knobs are gathered and readable; tuning is a later slice, as ruled).
-- No new poems — the supply is #2310's cache, dealt as written.
-- The CURATOR press's own first deal (its private path in layoutSlice) does not take the variety flag;
-  variety rides every `landPoem` deal (KINETIC passes, the identity chip, round landings, ladder re-deals).
-- No change to the review loop's judgments: #2151 judges register, #2006 judges jank; they share the
-  exemption table and the deal path, nothing else.
+`act()` performs exactly the state change the control itself performs, through the app's existing channels — there is no parallel write path:
 
-## QA fix pass (post-review, same branch)
+- `bus` — emits on the app's own event bus (`composition/eventBus.js`) with the same payload the panel emits; the existing bus wiring funnels it into the same action/store path a click takes.
+- `store` — calls the same Zustand store action the component calls.
+- `apply` — dispatches through the app's `applyAction` funnel with the same action type and fields.
+- `module` — calls the module's own exported setter (dev mode, persona tuning, biology policy reset, active taste persona, governor event log). The bridge's module table and the registry's module channels are pinned to each other by the selfcheck, in both directions.
+- `recipe` — five named compositions of the channels above, using only the panels' own helpers (look-preset load, DAVIS favourite capture, audio-route add, poem doctrine, layer select).
 
-The QA review returned no blockers, one should-fix and four notes; all five are fixed in this pass:
+`act()` snapshots the control's registered reads before and after and returns both, so a caller can see the change land. Reach and legibility only: no new authority, and nothing about persona internals beyond what the panels themselves show.
 
-- **F1 (should-fix) — driver-level replay coverage.** The acceptance line "takes replay identically"
-  rested on code-reading for the driver half. The `fieldRevision` suite now carries two fake-stage
-  replay cases: with `isReplaying: () => true`, a pole-register poem standing past the dwell draws
-  no request and no variety write; and a request already pending when playback starts never answers
-  mid-replay — the grace restarts when playback ends and the poem answers then.
-- **F3 (note; coordinator ruled: fix the code, not the wording) — the dwell clock.** The driver
-  timed the 20 s dwell from the form's first appearance in ANY tempo, so a poem that stood 20 s
-  while hot was judged the instant the tempo cooled. The dwell now accumulates only in the
-  watching tempo (hot/fiddling/away time never counts), and a new suite case pins it: a form
-  standing twice the dwell while hot still waits a full watching dwell before it is judged.
-- **F5-chip (note) — stale chip.** `PoemRow.jsx` matched a pending request to the standing form
-  by poet+piece, so a re-dealt same piece could wear the chip for ~a tick. It matches by formKey
-  now: the chip rides only the exact materialization the request judged.
-- **F2 / F4 (notes) — paperwork.** The sweep was re-run on the final tree with the complete
-  per-suite log kept as an artifact; its summary is posted as a comment on the PR and the PR
-  body's verification section points at that comment. The PR body's files-touched list now names
-  this report.
+## Verification
 
-Verification for this pass: `fieldRevision` suite **17 cases passed** (14 + the 3 new ones above);
-poemRow 5× all pass (16 checks each); the field family and fieldReview family neighbours all pass;
-full manifest sweep on this tree: **793 pass / 3 fail of 796** — the known sandbox-environmental
-trio (`swarmWasm`, `rollSafety`, `accum`), complete per-suite log kept as an artifact, summary
-posted as a comment on the PR; `npm run lint` 0 errors (11 warnings, the pre-existing baseline);
-`npm run format:check` clean; `npm run build` green.
+- **Selfcheck (new):** `uiRegistry.selfcheck: OK — 333 controls, 14 panels, manifest correspondence + channels + reads + sources pinned`. It pins: the shipped manifest is the registry's JSON form (round-trip + per-control deep equality + counts); every bus event exists in the app's event table; every store action is a real function on the real store; every apply type is exported by the action module; every module channel's file and export exist and match the bridge's table (and vice versa); every read names a real state key; layout-param keys and beast-setting ranges match the app's own spec modules; every entry's cited source file exists and contains the channel literal it claims.
+- **Lint:** `npm run lint` — 0 errors, 11 warnings, all pre-existing in files this work did not touch (ShelfView.jsx, DataExportRow.jsx, LootRow.jsx). No agentUi findings.
+- **Format:** `npm run format:check` — "All matched files use Prettier code style!"
+- **Build:** `npm run build` — green (the one dynamic-import warning about devTabs.mjs is pre-existing on main).
+- **Suites naming touched files:** phase6 (walks the import graph from `main.jsx`) passes, both run directly and in the sweep; dishLinks, dishSpin, exposureModel, wetLook, wetSoak pass in the sweep.
+- **Full selfcheck sweep** (continue-on-error over all 823 manifest commands; log in the worktree root as `sweep.log`, gitignored): **complete — 819 pass verdicts, 4 fail verdicts; every one of the 823 manifest commands has a verdict**, including the new suite (`PASS node src/agentUi/uiRegistry.selfcheck.mjs`). The first sweep process was OOM-killed by the sandbox at 518 verdicts; a resumed sweep ran the remaining commands to completion, and both halves are in the same log. The only failures:
+  - Known sandbox-environmental failures, identical on pristine main per the standing record: `swarmWasm` (exit 1), `rollSafety` (exit 1), `accum` (exit 134).
+  - `livingMotion` (exit 1) — a wall-clock budget assertion ("the floor costs X ms a frame at 800 marks, budget 2 ms"). A/B in a fresh detached worktree at origin/main f260b748: pristine main failed 1 of 3 runs (+2.09 ms) and passed others (+1.63 ms, +1.05 ms); this branch passed at +0.87 ms and failed at +2.78 ms on identical code. The measurement swings run to run on the sandbox's shared CPUs; it is a timing flake present on main, not an effect of this change (which touches no engine or resolve code).
+
+## QA fix round (2026-11-24)
+
+The QA Review agent returned FINDINGS (no blockers). Findings 1–6 are fixed in this round; QA's open question is answered at the end.
+
+1. **`state()` overreach — fixed.** `window.__KC_UI__.state()` no longer dumps the whole store. It returns exactly the registered read surface: the union of every control's registered read paths plus the bridge's module reads (`STATE_READ_PATHS` in `uiBridge.mjs`, derived from the registry, so a new registered read extends it and nothing else can). Unregistered keys — including the ones QA named (`shelfDiskRoot`, `keeps`, `historyUndoStack`, `midiMap`) — are refused with `{ ok: false, error }`, the refusal shape `read()` uses. A registered path with no live value (e.g. `light.*` while the sun is off) serializes as null so the returned key set is stable. The selfcheck pins the allowlist against the registry in both directions, the no-arg key set, and the named refusals.
+2. **Copied option/stop literals + unpinned drift — fixed.** `directors.motion` now imports `KINEME_PATTERNS` (`engine/kineme.js`) and `directors.doctrine` imports `DOCTRINE_IDS` (`curator/doctrines.mjs`). A sweep of the whole registry found 18 more option lists with module exports, now imported the same way: `SCOPE_CYCLE` (topbar.start-scope), `BEAT_PRESETS` (topbar.beat-preset), `SCHEME_IDS` (topbar.palette-shuffle), `FIELD_CYCLE_DETENTS` (transport.dish-cycle), `MIRROR_STATES` (build.mirror), `BLEND_MODES` (build.layer-blend), `WET_STOPS` (build.layer-opacity), `STRATUM_ROTATIONS` (build.layer-rotation), `LIGHT_SLOTS` (build.sun-colour), `FIELDMAP_FIELDS` / `FIELDMAP_CHANNELS` (build.map-field / build.map-channel), `ids(FEEL_PRESETS)` (stimuli.feel), `BALLISTICS_CURVES` (stimuli.response), `RECIPE_OFFSET_CHANNELS` (directors.mutate-stream), `TRANSPORT_MODES` / `PATH_FAMILIES` (directors.travel / directors.travel-path), `STAGE_MODES` (pipeline.stage-mode), `STAGE_MAPPINGS` (pipeline.stage-mapping). The remaining literals are enumerations that exist only inside the control's own source component, or panel-offered subsets of a module list (build.layout-mode's tiles are a subset of `LAYOUT_MODES`; build.trail offers three of `TRAIL_MODES`' five), noted on their entries. The selfcheck now also compares EVERY lpRow's stops against `PARAM_STOPS` and its range against `PARAM_SPEC`, with the documented exceptions pinned exactly rather than waived: riftShear's panel-literal stops (exiled from the table by design), the swarmCohesion / leaveFade editor spans (narrower than the load-trust spec, per the tables' own comments), and the accumScan / riftShear no-spec spans. Mutation proof (scratch mutations, both reverted, suite green again): build.count's stops changed to `[10, 120, 240, 900]` → selfcheck FAILS (`stops [10,120,240,900] != PARAM_STOPS.count [10,120,240,800]`); directors.motion re-literalized without CADENCE → selfcheck FAILS (`directors.motion options != KINEME_PATTERNS`).
+3. **Sweep tally — corrected.** The Verification section above originally read "834 pass verdicts". The runner verdicts in `sweep.log` are 819 PASS + 4 FAIL = 823, exactly the manifest command count; 834 counted suites' own stdout lines beginning with "PASS". Corrected above and here.
+4. **`light.*` read subkeys — pinned.** The selfcheck now checks every `light.<sub>` read against `LIGHT_DEFAULT` (`data/light.js`), the same way layoutParams and beastSettings subkeys are pinned, so a bogus nested read fails the suite. Mutation proof: `light.x` → `light.xNope` fails the selfcheck; reverted.
+5. **Retry visibility — fixed.** `agent-stress.mjs` now records `passedOnRetry` on the result record (the JSON detail already carried it in prose) and the markdown report's B section lists the controls that passed only on retry, by name, so an intermittent pass cannot hide in the summary counts.
+6. **Baseline provenance — relabeled.** `agent-stress.baseline.json` said `"build": "f260b748"` — the base commit the preview was built from while the branch work was still uncommitted. It now names `845b50c4`, the branch head the baseline content was captured against. This round changes no control behavior or values (a read-surface scoping and import-for-literal swaps, all value-identical), so the baseline content stands; no fresh acceptance run was needed.
+
+**Coordinator's disposition of QA's open question:** the shipped manifest is read through the window hook on the hosted build, which is the served surface the issue's ruling specifies; no separate static JSON document is part of the deliverable.
+
+## Stress evidence
+
+All runs drove a local preview build of this branch through the sandbox path described below.
+
+**Accepted baseline run** (clean build, `--write-baseline`):
+
+```
+summary: walked 195, passed 193, failed 1, probed 89, skipped 50; new breaks: 0
+```
+
+The one fail is `stimuli.audio`, environment-bound and proven so: the bridge actuation sets `audioEnabled: true` (its own after-read shows it), then the audio engine's microphone request is denied in sandbox Chromium (`audioDenied: true`) and the app reverts to false. The control and the bridge are correct — the 2026-11-24 session toggled AUDIO successfully in a real browser on the hosted build. The baseline carries the fail; if the control passes on a secure-context machine (Mac/CI, where localhost is a secure context), the diff treats fail→pass as an improvement, not a break. The baseline also carries one console signature, `Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED` — a page resource fetch refused by the sandbox proxy; environmental to the sandbox drive path.
+
+**Seeded-break demonstration.** `app/src/state/applyAction.js` was temporarily seeded so the SET_LAYOUT_PARAM funnel ignored the key `count` (the panel and the bridge share that funnel, so the real control dies too). Rebuilt, re-served, full run against the accepted baseline:
+
+```
+summary: walked 195, passed 192, failed 2, probed 89, skipped 50; new breaks: 1
+SCRIPT EXIT: 1
+```
+
+Report A-section excerpt:
+
+```
+## A — breaks
+
+1. **build.count** — no-effect: read-back never changed (initial 320, landed [320,320,320]) (first attempt: …)
+2. **stimuli.audio** — toggle produced no change (initial false) (first attempt: …)
+
+Baseline diff (e2e/agent-stress.baseline.json): 1 new break(s).
+- build.count: new failure (baseline: pass)
+```
+
+Exactly one new break — the seeded control. The seed was then reverted completely (`git checkout`; a grep for the seed marker returns 0 and the file is absent from git status).
+
+**Final confirmation run** (post-revert clean build, `--baseline`):
+
+```
+summary: walked 195, passed 193, failed 1, probed 89, skipped 50; new breaks: 0
+SCRIPT EXIT: 0
+```
+
+`build.count` passes again — the revert is proven live, not just in git.
+
+### How sandbox verification differed from a normal run
+
+- The sandbox's system Chromium refuses localhost navigation, so runs used Playwright-core from the app's own `node_modules` with its bundled Chromium, flags `--use-angle=swiftshader --enable-unsafe-swiftshader`, and route interception: the script navigates to a fake host (`--base-url http://kc.local/Kinetic_Curator/`) and fulfils from the local preview server (`--serve-from http://127.0.0.1:4173`). On a Mac or in CI the same script runs plainly against `--base-url` with none of those flags.
+- SwiftShader on 1.5 shared CPUs renders at roughly 3–20 fps, so the governor sheds quality during long walks; end-of-run stage reads (e.g. `running: false, quality: performance`) are load artifacts of the sandbox, not restore failures — per-control verdicts are unaffected.
+- The microphone denial behind the `stimuli.audio` fail (above) is likewise a sandbox property.
+
+## Not verified, and why
+
+- **The hosted build itself.** The hook was verified against a local preview build of this branch. The hosted deploy only carries this work once the PR lands, so a hosted run was not possible before merge; the first post-merge run of `app/e2e/agent-stress.mjs` against the hosted URL is the natural follow-up.
+- **A CI/Mac run of the stress script.** Not available from the sandbox; the script is written to run there unchanged (configurable base URL, sandbox flags opt-in).
+- **Nothing else outstanding.** The sweep caveat that applied mid-build (an OOM-interrupted first pass) is resolved above: full manifest coverage was achieved across the two sweep processes, and the failure set is exactly the four entries documented under Verification.

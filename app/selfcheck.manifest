@@ -826,3 +826,4 @@ node src/engine/gaitBlend.selfcheck.mjs
 node src/state/gaitLocks.selfcheck.mjs
 node src/gl/liveResolve.gaitEase.selfcheck.mjs
 node src/gl/liveResolve.constructCap.selfcheck.mjs
+node src/agentUi/uiRegistry.selfcheck.mjs
