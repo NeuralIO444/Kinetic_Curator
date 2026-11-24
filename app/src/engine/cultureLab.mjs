@@ -113,18 +113,20 @@ export const CULTURE_NATIVE_RECIPES = Object.freeze({
   // paddle is the banks' TURN GAIN (0.5, beastRoam's own), tone is the feet's GRIP (0.8), timing is the crank's
   // period (60 steps: one turn a second, ≈ 75 px/s for the wild type), slowInOut the crank's ease, arcs the
   // steering lock. A plodder: it wanders less than the swimmers and keeps a wide berth from the rim (its legs
-  // reach a third of a body-length outward). As heavy as the swimmers (head 60, parts 20). anticipation is not
+  // reach a third of a body-length outward). One rigid chassis: every part as heavy as the head (60) and no
+  // follow-through lightening — the swarm's flocking divides by mass, and over a light hip and tail its separation
+  // pushed the frame's own parts apart unevenly, a net drag backward that stalled the walk (probed). anticipation is not
   // read by this plan (its gait is its geometry); it stands at the dish creature's value so DAVIS leans it as ever.
   [CULTURE_PLAN_STRANDBEEST]: normalizeCultureRecipe({
     name: 'strandbeest/native',
     drives: { wander: 0.5, ground: 1, rim: 2.4 },
-    physics: { thrust: 0.85, headMass: 60, partMass: 20, paddle: 0.5, tone: 0.8 },
+    physics: { thrust: 0.85, headMass: 60, partMass: 60, paddle: 0.5, tone: 0.8 },
     seasoning: {
       timing: 60,
       slowInOut: 1.5,
       anticipation: 0.3,
       arcs: 0.4,
-      followThrough: 0.4,
+      followThrough: 0,
       squash: 0.1,
       secondary: 0.03,
       exaggeration: 1,

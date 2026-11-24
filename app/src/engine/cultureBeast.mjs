@@ -42,7 +42,7 @@ import { cultureSoilSample } from './cultureSoil.mjs';
 import { CULTURE_SWARM_PARAMS } from './cultureSwarm.mjs';
 import { evaluateGenome } from './jansenSolver.js';
 import { legPoints, BEAST_BARS } from './beastBuilder.js';
-import { cultureBodyPlan } from './cultureBody.mjs';
+import { cultureBodyPlan, cultureBodyRestPose } from './cultureBody.mjs';
 
 /** Pixels per solver unit (relative a = 1) at body scale 1: the wild-type leg reaches ~33 px out and strokes ~16 px. */
 export const CULTURE_BEAST_PX = 14;
@@ -55,6 +55,13 @@ export const CULTURE_BEAST_LOCK_SNAP = Math.PI / 12;
 export const CULTURE_BEAST_LOCK_ARC = Math.PI / 2;
 /** SLOW IN / SLOW OUT read as the crank's ease: a bank's rate closes 1 / (this × slowInOut) of its gap per step. */
 export const CULTURE_BEAST_CRANK_EASE_STEPS = 6;
+/**
+ * The chassis HOLD: each step every frame part is pushed this share of the way back to its place in the frame's rest
+ * shape (at the new heading, centred on the living parts), × min(1, tone). A Strandbeest's chassis is rigid — the solver's links
+ * are distances with no bending stiffness, so without the hold the beam folds and the hips swing round their hubs
+ * (probed: a 90° fold in 8 s). Velocity only, like every muscle.
+ */
+export const CULTURE_BEAST_FRAME_HOLD = 0.25;
 /** The swarm step, in seconds (one 60 fps frame): crank rates are turns per second. */
 export const CULTURE_BEAST_STEP_S = 1 / 60;
 
@@ -360,6 +367,36 @@ export function stepCultureBeastMuscle(bodies, field, c) {
       const ty = (uy * along + turn * (x[i] - cx)) / damp;
       vx[i] += (tx - vx[i]) * g;
       vy[i] += (ty - vy[i]) * g;
+    }
+  }
+  // the chassis holds its shape: every living part pulled toward its place in the frame's rest shape at the new
+  // heading, the shape centred on the living parts' own centroid — so the hold only reshapes, it never drives (its
+  // pushes sum to zero: the walking stays the stance stroke's alone)
+  const { x, y, vx, vy, alive } = bodies;
+  const h = c.first;
+  const rest = cultureBodyRestPose(c.body, 0, 0, h1);
+  let ax = 0;
+  let ay = 0;
+  let rx = 0;
+  let ry = 0;
+  let m = 0;
+  for (let k = 0; k < c.n; k++) {
+    if (!alive[h + k]) continue;
+    ax += x[h + k];
+    ay += y[h + k];
+    rx += rest[k].x;
+    ry += rest[k].y;
+    m++;
+  }
+  if (m > 1) {
+    const ox = (ax - rx) / m;
+    const oy = (ay - ry) / m;
+    const hold = CULTURE_BEAST_FRAME_HOLD * Math.min(1, c.recipe.physics.tone);
+    for (let k = 0; k < c.n; k++) {
+      const i = h + k;
+      if (!alive[i]) continue;
+      vx[i] += (rest[k].x + ox - x[i]) * hold;
+      vy[i] += (rest[k].y + oy - y[i]) * hold;
     }
   }
   return h1;

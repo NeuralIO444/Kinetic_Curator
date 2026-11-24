@@ -290,6 +290,13 @@ export function cultureCitizensDebugSvg(layouts, { w = CULTURE_SWARM_WORLD_W, h 
   out.push(`<rect width="${w}" height="${h}" fill="#f4f1ea"/>`);
   const f = (v) => v.toFixed(1);
   for (const L of layouts) {
+    // a strandbeest's bones (slice C): each bar drawn as a line along its bone, its tone's grey — no text
+    for (const bn of L.bones || []) {
+      if (!bn.alive || !(bn.len > 0)) continue;
+      out.push(
+        `<line x1="${f(bn.x)}" y1="${f(bn.y)}" x2="${f(bn.tx)}" y2="${f(bn.ty)}" stroke="${TONE_GREY[bn.look.tone]}" stroke-width="2.5" stroke-linecap="round"/>`,
+      );
+    }
     for (const p of L.parts) {
       if (!p.alive) continue;
       const fill = TONE_GREY[p.look.tone];
