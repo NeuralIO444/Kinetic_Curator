@@ -87,6 +87,30 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   const headless = loisGate({ ...good, body: { ...good.body, parts: [] } }, live);
   assert.equal(headless.admitted, false);
   assert.ok(headless.faults.includes('no parts'));
+  // FIX-FORWARD (slice B QA): the socket cap and the socket set are the PLAN's, not the body's own claim
+  const moth = curatorAudition('moth', 7, 0, 0);
+  assert.equal(loisGate(moth, live).admitted, true, 'the real moth is admitted');
+  const extra = (id) => ({ id, part: 0, angle: 0, accepts: 'antenna', occupant: -1 });
+  const forged = {
+    ...moth,
+    body: { ...moth.body, socketCap: 6, sockets: [...moth.body.sockets, extra('x.1')] },
+  };
+  const over = loisGate(forged, live);
+  assert.equal(
+    over.admitted,
+    false,
+    'a forged moth with six sockets (the plan’s five plus one) and a cap of six is refused',
+  );
+  assert.ok(over.faults.includes('sockets over the plan cap'), 'by the plan’s cap, not its own');
+  assert.ok(over.faults.includes('socket x.1: not in the plan'), 'and the plan’s declared sockets');
+  const capOnly = loisGate({ ...moth, body: { ...moth.body, socketCap: 6 } }, live);
+  assert.equal(capOnly.admitted, false);
+  assert.ok(capOnly.faults.includes("socket cap is not the plan's"));
+  const renamed = loisGate(
+    { ...moth, body: { ...moth.body, sockets: moth.body.sockets.map((x, i) => (i ? x : { ...x, id: 'forged' })) } },
+    live,
+  );
+  assert.equal(renamed.admitted, false, 'a socket the plan never declared is refused');
   ok('LOIS’s gate refuses a bad body: a sticker and a two-shape body are not admitted, the fault is present');
 }
 
@@ -195,7 +219,7 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
     // RE-PIN (slice B, changed law) — was assembleCultureBody('moth') refused as unknown; the moth assembles now
     () => assembleCultureBody('wasp'),
     /unknown body plan "wasp"/,
-    'the moth is the next slice, not this one',
+    'a plan KINETIC does not declare is refused',
   );
   assert.throws(() => cultureBodyPlan(undefined), /unknown body plan/);
   assert.throws(() => assembleCultureBody(CULTURE_PLAN_DISH, { scale: 1.2 }), /outside KINETIC's band/);

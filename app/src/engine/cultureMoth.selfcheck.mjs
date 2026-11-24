@@ -1,8 +1,8 @@
 // node src/engine/cultureMoth.selfcheck.mjs
 // CULTURE Phase 5, slice B — the moth, the flagship citizen, living in the dish end to end (the body plan in
 // engine/cultureBody.mjs, the recipe and the roster in engine/cultureLab.mjs, the world's cast door and step).
-//   1. the moth plan assembled: head, thorax, abdomen, two wings and two antennae as one tree of joints, four
-//      declared sockets (every one born occupied, the cap equal to the count), a look per part, graphic not a
+//   1. the moth plan assembled: head, thorax, abdomen, two wings and two antennae as one tree of joints, five
+//      declared sockets (four born occupied, one free for Phase 6's looted limb, cap 5), a look per part, graphic not a
 //      sticker, a wingspan past two body-lengths — and the same body-reading LOIS gates every body on
 //   2. the wingbeat is the plan's anatomy: wing tips beat three times a stroke, antennae five, at their own weights
 //   3. DAVIS writes the moth's recipe: whole, in bounds, leaned ±15 % off a native that is the flitterer's and not
@@ -112,8 +112,9 @@ const pathRests = (body) => {
   assert.equal(b.links.length, b.parts.length - 1);
   for (const l of b.links)
     assert.ok(close(l.rest, (b.parts[l.a].radius + b.parts[l.b].radius) * 0.82), 'rests: the overlap rule');
-  // sockets limited by the PLAN (§2.10): four, each born occupied by the kind it accepts, the cap equal to the count
-  assert.equal(b.socketCap, 4);
+  // RE-PIN (slice B QA, Matt's ruling 2026-11-23 — changed law): sockets limited by the PLAN (§2.10): five, four born
+  // occupied by the kind they accept, ONE free (accepting any kind the plan uses) so the flagship can wear a looted limb
+  assert.equal(b.socketCap, 5);
   assert.deepEqual(
     b.sockets.map((s) => [s.id, s.part, s.accepts, s.occupant]),
     [
@@ -121,12 +122,15 @@ const pathRests = (body) => {
       ['head.r', 0, 'antenna', 6],
       ['spine.0.l', 1, 'wing', 8],
       ['spine.0.r', 1, 'wing', 11],
+      ['spine.1.free', 2, 'any', -1],
     ],
   );
-  assert.ok(
-    b.sockets.every((s) => s.occupant >= 0) && b.sockets.length === b.socketCap,
-    'no free socket: the moth’s plan has no room for a looted limb (the dish plan has two)',
-  );
+  assert.equal(b.sockets.filter((s) => s.occupant < 0).length, 1, 'exactly one free socket');
+  assert.equal(b.sockets.length, b.socketCap, 'the declared sockets fill the plan’s cap');
+  assert.deepEqual(cultureBodyFaults(b), [], 'a free socket accepting any kind the plan uses is lawful');
+  const bogus = { ...b, sockets: b.sockets.map((s) => (s.id === 'spine.1.free' ? { ...s, accepts: 'claw' } : s)) };
+  assert.ok(cultureBodyFaults(bogus).includes('socket spine.1.free: accepts'), 'a kind the body lacks is a fault');
+  assert.equal(b.parts.length, 14, 'a free socket draws no part');
   assert.deepEqual(Object.keys(b.limbs).sort(), ['antenna', 'wing']);
   assert.ok(b.parts.filter((p) => p.role === 'limb').every((p) => p.limb === 'wing' || p.limb === 'antenna'));
   // graphic, not a sticker, and never a drawn bug: only the four-mark vocabulary, tone roles, no colour, no copy
@@ -154,12 +158,20 @@ const pathRests = (body) => {
     cultureBodyFaults(wrongKind).includes('socket spine.0.l: occupant'),
     'a wing in an antenna socket is a fault',
   );
-  const over = { ...b, socketCap: 3 };
-  assert.ok(cultureBodyFaults(over).includes('sockets over the plan cap'));
+  // RE-PIN (slice B QA, changed law): the cap is the PLAN's, not the body's own claim — lowering the body's cap no
+  // longer makes four sockets "over"; it is a forged cap. A body past the plan's four is over however its cap reads.
+  assert.ok(cultureBodyFaults({ ...b, socketCap: 3 }).includes("socket cap is not the plan's"));
+  const extra = (id) => ({ id, part: 0, angle: 0, accepts: 'antenna', occupant: -1 });
+  const over = { ...b, socketCap: 6, sockets: [...b.sockets, extra('x.1'), extra('x.2')] };
+  assert.ok(
+    cultureBodyFaults(over).includes('sockets over the plan cap'),
+    'six sockets and a cap of six: over the plan',
+  );
+  assert.ok(cultureBodyFaults(over).includes('socket x.1: not in the plan'));
   assert.throws(() => assembleCultureBody(CULTURE_PLAN_MOTH, { scale: 1.2 }), /outside KINETIC's band/);
   assert.throws(() => cultureBodyPlan('wasp'), /unknown body plan/);
   ok(
-    'the moth plan assembled: a tree of 14 joined parts, four declared sockets all occupied, a layout of marks wider than long',
+    'the moth plan assembled: a tree of 14 joined parts, five declared sockets (four occupied, one free), a layout of marks wider than long',
   );
 }
 
@@ -239,7 +251,8 @@ const pathRests = (body) => {
   assert.ok(sticker.faults.includes('a sticker: fewer than three shapes'));
   const crammed = loisGate({ ...cand, body: { ...cand.body, socketCap: 2 } }, field);
   assert.equal(crammed.admitted, false);
-  assert.ok(crammed.faults.includes('sockets over the plan cap'));
+  // RE-PIN (slice B QA, changed law): the cap is the plan's; a body's lowered cap is a forged cap
+  assert.ok(crammed.faults.includes("socket cap is not the plan's"));
   assert.ok(loisGate({ ...cand, x: 1, y: 1 }, field).faults.includes('a part outside the dish'));
   ok('DAVIS writes the moth a whole, seeded, in-bounds recipe of its own; LOIS admits a moth and refuses a bad one');
 }

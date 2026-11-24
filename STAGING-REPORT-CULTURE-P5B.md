@@ -34,3 +34,11 @@ Confirm the moth stays in the gate's birth cast. Recommendation: keep.
 
 ## Slice C carries
 Strandbeest (#1863), test drives (#2342-#2344), the live-audio bridge into the room door. Phase 6 owns feeding, predation, breeding, growth.
+
+## Follow-up commit (QA nits + Matt's rulings of 2026-11-23)
+- LOIS reads the socket cap and the declared socket ids from the PLAN (cultureBodyPlan(body.plan)), not the body's own claim; a forged six-socket/cap-six moth is refused (fault names: over the plan cap, not in the plan, cap is not the plan's). Loud re-pin: the moth suite's "lower the body's cap" assertions now read "cap is not the plan's".
+- RULED (Matt): the moth has ONE free socket (spine.1.free, abdomen), cap 5, accepting any limb kind the plan uses (CULTURE_SOCKET_ANY); born empty, draws no part. Moth suite pins updated loudly. Body/world hashes of moth lives are unchanged (no part added).
+- Tests that bite: layout composes gait over feel per part; hash covers log entry contents (step, target, gaitId, by, locked) and notch.n/from/t0; soil-specific assertions now precede the 3x twin comparison (tolerance unchanged), the vacuous `tc.cause === 'soil'` claim dropped; a piece that starts in negative space but lands on ink releases (comment corrected to the landing law: LOIS vetoes where a piece lands).
+- Mutations, all KILLED: cap from body not plan; socket-in-plan check removed; cap-mismatch check removed; moth cap 5->6; free socket removed; free socket accepting wing only; layout feel-only; hash drops each of log step/target/gaitId/by/locked; hash drops notch.n; soil wither never ticks (named by the soil assertions in cultureCitizens).
+- Rulings recorded as RULED: moth topology kept (judged when drawn); per-stage dealt look (#2168) deferred to the render path; gait defaults (TASTE 0.5 ink, 16-beat phrase, moth Canon style japanese, moth in the gate birth cast) kept and tuned in iteration.
+- Gate-off live stage re-verified byte-identical to origin/main (same hashes as above).

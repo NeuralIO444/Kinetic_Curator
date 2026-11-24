@@ -40,6 +40,7 @@ import {
   CULTURE_WORLD_ASPECT_HW,
 } from './cultureWorld.mjs';
 import {
+  cultureCitizenLayout,
   rehomeCultureCitizens,
   cultureCitizensHash,
   cultureCitizensDebugSvg,
@@ -48,7 +49,7 @@ import {
 import { cultureBodyRestPose } from './cultureBody.mjs';
 import { curatorCast, CULTURE_CAST_SHEET, CULTURE_NATIVE_RECIPES } from './cultureLab.mjs';
 import { cultureRecipeMasses, normalizeCultureRecipe, CULTURE_FEEL_SOURCE_ID } from './cultureMotion.mjs';
-import { getMotionSource, POSE_IDENTITY } from './motionCore/index.js';
+import { getMotionSource, POSE_IDENTITY, composePose } from './motionCore/index.js';
 import { stepFluid } from './dishFluid.mjs';
 import { stepCulture } from './dishLife.mjs';
 import { injectFluidBirths } from './dishFluidCouple.mjs';
@@ -259,7 +260,6 @@ function dealMovers(w, n, seed) {
     w.citizens.list.forEach((c, k) => {
       if (!c.alive) return;
       assert.ok(path[k] / 60 > 40, `seed ${seed} citizen ${k} swims (${(path[k] / 60).toFixed(1)} px/s)`);
-      assert.ok(path[k] > 3 * pathT[k], 'its recipe moves it: a muscle-less twin barely drifts');
       // FIX-FORWARD (slice B, from slice A QA): the twin comparison above leans on the soil — an inert twin
       // drifts onto dead ground and withers (some seeds, within 12–30 s), after which it "barely drifts" because it
       // is DEAD. The assertion is kept exactly as it was; what is added is (a) wither-specific assertions, so a soil
@@ -269,9 +269,10 @@ function dealMovers(w, n, seed) {
       // the swimmer's rate), so the recipe is asserted to out-travel it by 1.5× over the cast, not 3×.
       assert.equal(w.bodies.alive[c.first], 1, 'the swimmer’s head was not withered');
       assert.ok(w.soil.wither[c.first] < CULTURE_SOIL_WITHER_STEPS, 'its wither clock never ran out');
-      const tc = t.citizens.list[k];
-      if (!tc.alive) assert.equal(tc.cause, 'soil', 'a twin that died, died of the soil — wither-specific');
       assert.equal(u.citizens.list[k].alive, 1, 'the soil-immune twin never dies');
+      // the slice A comparison, tolerance unchanged (3×), placed AFTER the wither-specific assertions so that a soil
+      // mutation is named by those (the swimmer withered / the clock ran out) before this one can fire on it
+      assert.ok(path[k] > 3 * pathT[k], 'its recipe moves it: a muscle-less twin barely drifts');
       assert.equal(c.age, w.citizens.step, 'age counts swarm steps of life');
     });
     const sumPath = w.citizens.list.reduce((n, _c, k) => n + path[k], 0);
@@ -505,4 +506,26 @@ function dealMovers(w, n, seed) {
   ok('the gate: no standing world; a world is born uncast and stays so until the Lab casts it');
 }
 
-console.log(`cultureCitizens.selfcheck: ${checks}/9 groups OK`);
+// 10 — FIX-FORWARD (slice B QA): the layout composes the gait OVER the creature's own pose, per part.
+{
+  const w = cast(7);
+  for (let s = 0; s < 90; s++) stepCultureWorld(w);
+  const c = w.citizens.list[0];
+  const wither = (i) => w.soil.wither[i] / 480;
+  const feelOnly = cultureCitizenLayout(w.bodies, c, wither);
+  const gp = (k) => ({ dx: 3 + k, dy: -2, dRot: 5, sx: 1.2, sy: 0.9, dAlpha: 0.1 });
+  const laid = cultureCitizenLayout(w.bodies, c, wither, gp);
+  laid.parts.forEach((p, k) => {
+    assert.deepEqual(p.gait, gp(k), 'the part carries its gait pose');
+    assert.equal(
+      JSON.stringify(p.pose),
+      JSON.stringify({ ...composePose(feelOnly.parts[k].pose, gp(k)) }),
+      `part ${k}: the layout's pose is the feel composed with the gait, not the feel alone`,
+    );
+    assert.notEqual(JSON.stringify(p.pose), JSON.stringify(feelOnly.parts[k].pose), `part ${k}: and it differs`);
+  });
+  assert.equal(feelOnly.parts[0].gait, null, 'no gait standing: the feel layer, untouched');
+  ok('the layout composes the gait over the feel, per part');
+}
+
+console.log(`cultureCitizens.selfcheck: ${checks}/10 groups OK`);

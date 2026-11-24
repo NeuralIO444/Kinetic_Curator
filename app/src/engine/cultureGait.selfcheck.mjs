@@ -477,6 +477,10 @@ const POSE_OPTS = {
   assert.ok(Math.abs((v.x * 16) / 200 - Math.round((v.x * 16) / 200)) < 1e-9, 'in sixteenths');
   const stuck = loisBreakVeto(grid, { x: 900, y: 900 }, { x: 30, y: 30 });
   assert.deepEqual(stuck, { x: 0, y: 0, vetoed: true }, 'a piece standing in negative space does not release at all');
+  // the law is where a piece LANDS: a piece that starts in negative space but can reach ink keeps the reach that lands on ink
+  const reach = loisBreakVeto(grid, { x: 520, y: 410 }, { x: -80, y: 0 });
+  assert.equal(cultureInkAt(grid, 520, 410), 0, 'it starts in negative space');
+  assert.deepEqual(reach, { x: -80, y: 0, vetoed: false }, 'and lands on ink, so it releases in full');
   ok(
     'the coverage grid is a union of the dealt frame’s ink; LOIS pulls a release back to ink and never lets one into a cell under 10%',
   );
@@ -842,6 +846,23 @@ const tasteOf = (w) => {
   ];
   const hs = variants.map((f) => mut(f));
   assert.ok(hs.every((x) => x !== h) && new Set(hs).size === hs.length, 'every field of the state moves the hash');
+  // FIX-FORWARD (slice B QA): the hash covers the CONTENTS of each log entry and of each notch, not just their count
+  const idle = canonGaits('swiss').idle.id;
+  const entry = { step: 1, target: 'citizen:0', gaitId: idle, by: 'queen', locked: false };
+  const withLog = (patch) => mut((g) => g.log.push({ ...entry, ...patch }));
+  const logH = [
+    withLog({}),
+    withLog({ step: 2 }),
+    withLog({ target: 'citizen:1' }),
+    withLog({ gaitId: canonGaits('swiss').performing.id }),
+    withLog({ by: 'user' }),
+    withLog({ locked: true }),
+  ];
+  assert.equal(new Set(logH).size, logH.length, 'every field of a log entry moves the hash');
+  const withNotch = (n) => mut((g) => (g.notch['citizen:0'] = { n, from: 1, t0: 0 }));
+  assert.ok(withNotch(1) !== withNotch(2) && withNotch(2) !== withNotch(3), 'the notch number alone moves the hash');
+  assert.ok(withNotch(1) !== mut((g) => (g.notch['citizen:0'] = { n: 1, from: 0.5, t0: 0 })), 'and its easing start');
+  assert.ok(withNotch(1) !== mut((g) => (g.notch['citizen:0'] = { n: 1, from: 1, t0: 2 })), 'and its clock');
   assert.ok(a.gait.breakup.size >= 0 && cultureGaitHash(a.gait) !== cultureGaitHash(plain.gait), 'the folds are in it');
   assert.equal(cultureGaitPartPose(createCultureGait(), 0, 0), null);
   assert.equal(cultureGaitTargetOf(3), 'citizen:3');

@@ -52,8 +52,10 @@
 //     20 px — the soil's, the fluid's, one grid); a cell's ink is the share of it covered by the DEALT frame (every
 //     living body's disc and every static box, at the positions the solver has them — never the displaced pieces,
 //     or a scatter would justify itself). A piece's break-up offset is pulled back along its own line, in sixteenths,
-//     to the farthest point that stands on a cell with at least CULTURE_INK_FLOOR (10%) ink; a piece that starts
-//     in negative space does not release at all. LOIS only vetoes — she never builds.
+//     to the farthest point that stands on a cell with at least CULTURE_INK_FLOOR (10%) ink; a piece whose whole
+//     line stands on negative space does not release at all. The law is on where a piece LANDS: the end of the
+//     released offset never stands on a protected cell (a piece that starts in negative space but can reach ink
+//     keeps the reach that lands on ink). LOIS only vetoes — she never builds.
 //   LOCKED GAITS are exempt from both: a locked wearer's gait is never damped and its break-up is never vetoed.
 //
 // THE CLOCK (gait-spec ruling 6). The gait counts BEATS: the gait layer accumulates beats on the world's swarm
@@ -365,8 +367,8 @@ export function cultureInkAt(grid, x, y) {
 /**
  * LOIS'S VETO on one released piece. `rest` is where the dealt piece stands, `off` its break-up offset. The offset's
  * far end may not land on protected negative space (a cell under CULTURE_INK_FLOOR of ink): it is pulled back along
- * its own line, in CULTURE_VETO_STEPS shares, to the farthest point that stands on ink; a piece that starts in
- * negative space does not release at all. Returns { x, y, vetoed } — the offset it may keep. Pure.
+ * its own line, in CULTURE_VETO_STEPS shares, to the farthest point that stands on ink; a piece whose whole
+ * line is negative space does not release at all. The test is where the piece lands, not where it starts. Returns { x, y, vetoed } — the offset it may keep. Pure.
  */
 export function loisBreakVeto(grid, rest, off) {
   if (off.x === 0 && off.y === 0) return { x: 0, y: 0, vetoed: false };

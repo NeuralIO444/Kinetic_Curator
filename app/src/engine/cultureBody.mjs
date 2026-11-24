@@ -38,12 +38,15 @@
 // abdomen with an accent tail, two WINGS (three discs each, broad and swept to the side) and two
 // ANTENNAE (two small discs each, swept forward) — never a bug drawn, an arrangement of marks
 // (§2.4: more layout than literal animal). Its sockets are limited by ITS plan (§2.10): two wing
-// sockets on the thorax and two antenna sockets on the head, every one born occupied and the cap
-// equal to the count — a body with no room to wear a looted limb (the dish plan, by contrast,
-// has two free). A plan's limbs come in KINDS (each its own radii, look, how hard it paddles and
+// sockets on the thorax and two antenna sockets on the head, born occupied, plus ONE free socket on
+// the abdomen (ruled by Matt: the flagship can wear a looted limb in Phase 6), cap 5 — the dish plan,
+// by contrast, has two free. A plan's limbs come in KINDS (each its own radii, look, how hard it paddles and
 // how often it beats per stroke): the dish's single kind is called 'limb' (as before), the moth's
 // are 'wing' and 'antenna'. The wingbeat is anatomy (a plan constant), the recipe's paddle dial is
 // its amplitude, so DAVIS's dials and bounds are the same ones the dish creature has.
+
+/** A socket that accepts any limb kind its plan declares (the moth's one free socket). */
+export const CULTURE_SOCKET_ANY = 'any';
 
 /** The dish plan's id: the dish's native body, the first citizen. */
 export const CULTURE_PLAN_DISH = 'dish';
@@ -96,7 +99,7 @@ const DISH_PLAN = Object.freeze({
  * The moth plan, declared (slice B). Proportions: a small head, a thorax that carries the wings, a
  * short abdomen, broad wings (22 / 18 / 12) and fine antennae (4 / 3): a wingspan a little over two
  * body-lengths and a body-length of about 90 px. The wings leave the thorax a touch behind square
- * (±100°) and the antennae leave the head forward (±40°). Four sockets, all born occupied, cap 4.
+ * (±100°) and the antennae leave the head forward (±40°). Five sockets, cap 5: four born occupied, one free (accepts any kind the plan uses).
  */
 const MOTH_PLAN = Object.freeze({
   id: CULTURE_PLAN_MOTH,
@@ -112,8 +115,11 @@ const MOTH_PLAN = Object.freeze({
     Object.freeze({ id: 'head.r', part: 'head', angle: -40 * DEG, limb: 'antenna', born: 'r' }),
     Object.freeze({ id: 'spine.0.l', part: 'spine.0', angle: 100 * DEG, limb: 'wing', born: 'l' }),
     Object.freeze({ id: 'spine.0.r', part: 'spine.0', angle: -100 * DEG, limb: 'wing', born: 'r' }),
+    // RULED (Matt, 2026-11-23): the flagship keeps ONE free socket, so it can wear a looted limb in Phase 6.
+    // It accepts any limb kind the plan uses (the coordinator's default); it is born empty, so no part is drawn.
+    Object.freeze({ id: 'spine.1.free', part: 'spine.1', angle: Math.PI, limb: CULTURE_SOCKET_ANY, born: null }),
   ]),
-  socketCap: 4,
+  socketCap: 5,
 });
 
 const PLANS = Object.freeze({ [CULTURE_PLAN_DISH]: DISH_PLAN, [CULTURE_PLAN_MOTH]: MOTH_PLAN });
@@ -268,14 +274,33 @@ export function cultureBodyFaults(body) {
   });
   if (body.links.length !== parts.length - 1) faults.push('not one tree');
   const sockets = body.sockets || [];
-  if (sockets.length > body.socketCap) faults.push('sockets over the plan cap');
+  // the cap and the socket set are the PLAN's, never the body's own claim (§2.10: sockets limited by the body plan)
+  let plan = null;
+  try {
+    plan = cultureBodyPlan(body.plan);
+  } catch {
+    faults.push('unknown plan');
+  }
+  if (plan) {
+    if (sockets.length > plan.socketCap) faults.push('sockets over the plan cap');
+    if (body.socketCap !== plan.socketCap) faults.push("socket cap is not the plan's");
+    const declared = new Set(plan.sockets.map((d) => d.id));
+    for (const s of sockets) if (!declared.has(s.id)) faults.push(`socket ${s.id}: not in the plan`);
+  }
   const kinds = body.limbs || {};
   for (const s of sockets) {
     if (!(s.part >= 0 && s.part < parts.length)) faults.push(`socket ${s.id}: host`);
-    if (!Object.prototype.hasOwnProperty.call(kinds, s.accepts)) faults.push(`socket ${s.id}: accepts`);
+    if (s.accepts !== CULTURE_SOCKET_ANY && !Object.prototype.hasOwnProperty.call(kinds, s.accepts))
+      faults.push(`socket ${s.id}: accepts`);
     if (s.occupant >= 0) {
       const o = parts[s.occupant];
-      if (!o || o.role !== 'limb' || o.socket !== s.id || o.parent !== s.part || o.limb !== s.accepts)
+      if (
+        !o ||
+        o.role !== 'limb' ||
+        o.socket !== s.id ||
+        o.parent !== s.part ||
+        (s.accepts === CULTURE_SOCKET_ANY ? !Object.prototype.hasOwnProperty.call(kinds, o.limb) : o.limb !== s.accepts)
+      )
         faults.push(`socket ${s.id}: occupant`);
     }
   }
