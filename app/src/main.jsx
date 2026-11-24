@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import './agentUi/uiBridge.mjs';
 import './styles/tokens.css';
 import './styles/layout.css';
 import './styles/panels.css';
