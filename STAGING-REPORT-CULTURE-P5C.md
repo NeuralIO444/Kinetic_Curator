@@ -1,6 +1,7 @@
 # STAGING REPORT — CULTURE Phase 5, slice C: the Strandbeest and the test drives
 
-Branch `feat/culture-phase5c-strandbeest`, built on origin/main `f0e7a7b` (#2469, slice B merged). The last slice of
+Branch `feat/culture-phase5c-strandbeest`, built on origin/main `f0e7a7b` (#2469, slice B merged) and rebased onto
+`e653610` (#2470, #2471 — neither touches the dish) before publishing. The last slice of
 Phase 5. Behind the `cultureDish` gate; zero live-stage change. No issue owns this slice. The parent epic (1863) stays
 open, the parent epic (2109) stays open, the parent umbrella (1183) stays open: the coordinator decides on each from
 the acceptance table below. Nothing here is merged.
@@ -154,6 +155,9 @@ four world hashes computed on a pristine detached worktree at `f0e7a7b` (dish sh
     15 checks passed. (The rule: QUEEN/GOVERNOR never named on a rendered surface — hooks count.)
   - fieldsWasm, swarmWasm, composite — pass alone on both (parallel-load flakes / standing environmental).
   - rollSafety — fails alone on both, identically (standing: headless `page.evaluate: Target crashed`).
+- **After the rebase:** the culture suites (beast, testDrive, roomLive, useCultureWorld, lab, moth, gait, citizens,
+  motion, rng) and #2471's neighbours (surfaceRegistry, queenDeniability, queenChannel, queenLean) re-run green; lint,
+  format:check and build re-run green.
 - **Cost (sandbox median, gate on only):** a swarm step of the gated world with the room on: 0.47 ms with the 5B
   roster, 0.69 ms with the full take sheet (+2 strandbeests, their closed-form legs, their gait over 73 bones each). The
   feel source's registered cost tier is unchanged (registries pinned equal to main at gate off; it registers lazily).
@@ -164,7 +168,8 @@ four world hashes computed on a pristine detached worktree at `f0e7a7b` (dish sh
   over the default store (`cultureDish` false) `9d7d6f7dd7d7f870022a337d1abf110d22516e39cf35038c2b341557497552fd`;
   the live gait evaluator (`gaitStage.poseConstruct`, every Canon style × kind × 32 beats)
   `ef4636852999efc078d2b99f3c0bf709cbfd57756ac38aa2f680e5073d68c6d3`; registries after importing the shell hook: 23
-  motion sources, 56 cost tiers — identical on both. **No audio subscription with the gate off:** cultureRoomLive g1
+  motion sources, 56 cost tiers — identical on both. Re-run after the rebase against a pristine detached worktree at
+  `e653610`: every hash identical again (and main's own unchanged by #2470/#2471). **No audio subscription with the gate off:** cultureRoomLive g1
   (a recording bus door sees zero subscriptions for every gate value but exactly `true`; real-bus events reach no world)
   and g5 (the source: the bridge starts only after the gate's refusal, once, and stops in the cleanup).
 
