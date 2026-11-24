@@ -19,7 +19,8 @@
 // simply gone from every mover (the solver already skips a link to a dead body); the citizen lives
 // on without it. A dead citizen's muscle stops; its surviving parts stay in the table as passive
 // bodies (§3.2's tier: every mark is a body, only creatures get drives). What a body does after
-// death — persisting 30 s, decaying, being looted — is Phase 6, and is not built here.
+// death — persisting 30 s, decaying, being looted — is Phase 6A's ecology (engine/cultureEcology.mjs), which also
+// deals the two other deaths (starvation, predation) on the citizen's own record.
 //
 // ONE BODY ACROSS THE SEAM. The swarm's boundary law wraps each disc on its own at the 120 px pad;
 // a jointed body whose head and tail straddle the seam would be yanked across the dish by its own
@@ -40,8 +41,11 @@ import { stepCultureBeastMuscle } from './cultureBeast.mjs';
 import { composePose } from './motionCore/index.js';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H, CULTURE_SWARM_WRAP_PAD } from './cultureSwarm.mjs';
 
-/** The causes a citizen may die of in this slice (Phase 6 adds starvation and predation). */
-export const CULTURE_CITIZEN_CAUSES = Object.freeze(['', 'soil']);
+/**
+ * The causes a citizen may die of: the soil (Phase 4's dead ground withering its head — seen here), and since Phase 6A
+ * starvation and predation (dealt by engine/cultureEcology.mjs; spec §4 Q1 — age and upkeep failure stay out).
+ */
+export const CULTURE_CITIZEN_CAUSES = Object.freeze(['', 'soil', 'starvation', 'predation']);
 /** The swarm wrap's span on each axis: a wrapped disc jumps by (almost) exactly this. */
 export const CULTURE_WRAP_SPAN_X = CULTURE_SWARM_WORLD_W + 2 * CULTURE_SWARM_WRAP_PAD;
 export const CULTURE_WRAP_SPAN_Y = CULTURE_SWARM_WORLD_H + 2 * CULTURE_SWARM_WRAP_PAD;
