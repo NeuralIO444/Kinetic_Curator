@@ -436,6 +436,7 @@ node src/engine/constructAssembler.selfcheck.mjs
 node src/engine/constructRules.selfcheck.mjs
 node src/engine/constructBank.selfcheck.mjs
 node src/engine/constructPool.selfcheck.mjs
+node src/engine/constructStagePool.selfcheck.mjs
 node src/engine/constructHouse.selfcheck.mjs
 node src/engine/constructPieces.selfcheck.mjs
 node src/engine/constructStage.selfcheck.mjs
