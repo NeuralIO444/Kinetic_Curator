@@ -1,6 +1,7 @@
 # STAGING REPORT — CULTURE Phase 6, slice A: the ecology turns on — life and death
 
-Branch `feat/culture-phase6a-life-death`, built on origin/main `75985b0` (#2472, slice 5C merged). Behind the
+Branch `feat/culture-phase6a-life-death`, built on origin/main `75985b0` (#2472, slice 5C merged) and rebased onto
+`f260b74` (#2476 docs, #2478 constructs on the stage — neither touches the dish) before publishing. Behind the
 `cultureDish` gate; zero live-stage change. No issue owns this slice; the parent umbrella (1183) and the test-drive
 issues stay as they are. Nothing here is merged. Session: https://claude.ai/code/session_01EoZUDnFJMovETsv13jZSbR
 
@@ -184,6 +185,9 @@ corpse's head on another.
   `ef4636852999efc078d2b99f3c0bf709cbfd57756ac38aa2f680e5073d68c6d3`; 23 motion sources, 56 cost tiers — identical on
   both, and identical to 5C's recorded values. No bus subscription with the gate off: the hook and the bridge are
   untouched (cultureRoomLive g1/g5 and useCultureWorld green, unmodified).
+- **After the rebase onto `f260b74`:** every culture suite, kernel/rng and #2478's constructStagePool re-run green; lint,
+  format:check and build re-run green; the gate-off probe re-run against a fresh detached worktree at `f260b74` — every
+  hash identical to the values above (main's own unchanged by #2476/#2478).
 - **Cost** (sandbox median, seed 7, take sheet, room on, a world step after 5 s): main 425 µs, this branch 416 µs —
   no measurable cost (noise).
 
