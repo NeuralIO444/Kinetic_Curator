@@ -239,6 +239,10 @@ export const boldBand = (bold, heat) =>
  * LOIS's brake (Matt 2026-10-27; restraint, not caution, per the 2026-11-18 ruling: one idea, cut the rest).
  * When the artist has been passing a lot (his keep-rate read, flatBias, at or over BRAKE_AT), he holds Davis
  * to the safe moves — bold at most BRAKE_MAX — until keeps come back.
+ * #2159 (Matt's fix ruling 2 of 3, 2026-11-12) answers the brake: plain is a cue to push. Under the brake, ONE
+ * bolder move stays in Davis's reach as his reply — the first bolder candidate in his own order — so a flat
+ * call gets a visibly bolder answer instead of the safest one. Exactly one: the brake still takes every other
+ * bolder move out of reach, and every other bound (route caps, phrase ledger, engagement tier) is untouched.
  */
 export const BRAKE_AT = LOIS_DEFAULTS.brake.at;
 export const BRAKE_MAX = LOIS_DEFAULTS.brake.max;
@@ -248,7 +252,8 @@ export const BRAKE_MAX = LOIS_DEFAULTS.brake.max;
  * @param show  the context's `show` block (mindContext): { energy, bpm, silent, routes:[{input,target,depth}], owned:[], flatBars, ... }
  * @param seed  the decision seed (document seed x bar), so the same dish conducts the same way
  * @param heat  0..1, the conducting temperature: it orders his tries inside the level (boldBand) — never what is in reach.
- *              What is in reach narrows only on LOIS's brake (`show.brake`: the safe moves, bold <= BRAKE_MAX).
+ *              What is in reach narrows only on LOIS's brake (`show.brake`: the safe moves, bold <= BRAKE_MAX,
+ *              plus the one bolder reply #2159 allows — the first bolder candidate in his order).
  * @param trace optional array (#2160, the skip trace): every candidate he discards pushes one `{ reason, input, target }`
  *              line, and a null for a reason of the whole call (silence, a full table, his few). Observability only:
  *              the trace never changes what he returns.
@@ -308,19 +313,29 @@ export function davisRoute(show, seed = 0, heat = 0, trace = null) {
   // then the seed's rotation. LOIS's brake is the only thing that takes a move out of reach.
   const lead = PRESETS[ENERGY_LEVELS[(order + rerolls) % 3]].filter(fits).length;
   const braked = show.brake === true;
-  const tries = pool
+  // his order is settled first (his level, the band nearest the heat, the seed's rotation); the brake reads it after
+  const ordered = pool
     .map((c, i) => ({
       c,
       lvl: i < lead ? 0 : 1,
       band: boldBand(c.bold, heat),
       rot: (i - start + pool.length) % pool.length,
     }))
+    .sort((a, b) => a.lvl - b.lvl || a.band - b.band || a.rot - b.rot);
+  // #2159: under the brake, the first bolder candidate in his order stays in reach — the one bolder reply. Every
+  // other bolder move is taken out, named in the trace as before. The exemption never depends on the trace, so
+  // the trace still never changes what he returns (#2160).
+  let answered = false;
+  const tries = ordered
     .filter((t) => {
-      const inReach = !braked || (Number.isFinite(t.c.bold) ? t.c.bold : 1) <= LOIS_TUNING().brake.max;
-      if (!inReach) skip(SKIP.brake, t.c);
-      return inReach;
+      if (!braked || (Number.isFinite(t.c.bold) ? t.c.bold : 1) <= LOIS_TUNING().brake.max) return true;
+      if (!answered) {
+        answered = true;
+        return true;
+      }
+      skip(SKIP.brake, t.c);
+      return false;
     })
-    .sort((a, b) => a.lvl - b.lvl || a.band - b.band || a.rot - b.rot)
     .map((t) => t.c);
   const mine = table.filter((r) => r && r.by === DAVIS_TAG);
   // a flat show with a route of his: move it somewhere else (one move, no pile-up)

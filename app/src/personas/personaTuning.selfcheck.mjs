@@ -177,12 +177,15 @@ ok('D1 no edits in force at rest: the table in force is the shipped table', () =
 });
 
 ok("D2 a live edit moves the mechanics without reload: LOIS's brake and his cut gates", () => {
-  const show = { energy: 'high', bpm: 120, silent: false, routes: [], owned: [], flatBars: 0, brake: true };
-  const braked = davisRoute(show, 0, 0);
-  assert.ok(braked && braked.target !== 'clock.kinemeRate', 'under the shipped brake the daring clock move is out of reach');
+  // #2159 (plain is a cue to push): under the brake ONE bolder reply stays in reach — here that reply is
+  // render.squash, and it is the artist's, so the shipped brake still narrows Davis to the safe moves here
+  const show = { energy: 'high', bpm: 120, silent: false, routes: [], owned: ['render.squash'], flatBars: 0, brake: true };
+  const braked = davisRoute(show, 0, 1);
+  assert.ok(braked && braked.target === 'render.glow', 'under the shipped brake he answers with the safe move');
+  assert.ok(braked.target !== 'clock.kinemeRate', 'under the shipped brake the daring clock move is out of reach');
   try {
     assert.equal(setTuningValue('personas.lois.knobs.brake.max', 1).ok, true);
-    const lifted = davisRoute(show, 0, 0);
+    const lifted = davisRoute(show, 0, 1);
     assert.ok(
       JSON.stringify(lifted) !== JSON.stringify(braked),
       "raising brake.max changes Davis's pick on the same show, same seed — live, no reload",
@@ -210,7 +213,7 @@ ok("D2 a live edit moves the mechanics without reload: LOIS's brake and his cut 
   }
   assert.deepStrictEqual(tuningOverrides(), {}, 'reset clears every edit');
   assert.equal(personaTuning(), TUNING_DEFAULTS, 'after reset the shipped table is in force again');
-  assert.equal(JSON.stringify(davisRoute(show, 0, 0)), JSON.stringify(braked), 'and the mechanics read the shipped values again');
+  assert.equal(JSON.stringify(davisRoute(show, 0, 1)), JSON.stringify(braked), 'and the mechanics read the shipped values again');
 });
 
 ok("D3 loisRank reads the table: the verdict's gates and the heuristic's numbers move with a live edit", () => {
