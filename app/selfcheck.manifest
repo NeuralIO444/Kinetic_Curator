@@ -226,6 +226,7 @@ node src/hooks/useCultureWorld.selfcheck.mjs
 node src/engine/cultureBeast.selfcheck.mjs
 node src/engine/cultureTestDrive.selfcheck.mjs
 node src/curator/cultureRoomLive.selfcheck.mjs
+node src/engine/cultureEcology.selfcheck.mjs
 node src/engine/dishFluid.selfcheck.mjs
 node src/engine/dishFluidCouple.selfcheck.mjs
 node src/engine/dishFluidStage.selfcheck.mjs

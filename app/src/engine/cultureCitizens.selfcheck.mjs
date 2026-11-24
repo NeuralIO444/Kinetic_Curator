@@ -47,6 +47,10 @@ import {
   CULTURE_WRAP_SPAN_X,
 } from './cultureCitizens.mjs';
 import { cultureBodyRestPose } from './cultureBody.mjs';
+import { CULTURE_FAT_BIRTH_TICKS, CULTURE_UPKEEP_BODY_TICKS, CULTURE_STARVE_STEPS } from './cultureEcology.mjs';
+
+/** Phase 6A: an unfed citizen cast at step 0 starves on this world step (fat 0 at 6,000, then 600 steps at 0). */
+const STARVED_AT = CULTURE_FAT_BIRTH_TICKS / CULTURE_UPKEEP_BODY_TICKS + CULTURE_STARVE_STEPS - 1;
 import { curatorCast, CULTURE_CAST_SHEET, CULTURE_NATIVE_RECIPES } from './cultureLab.mjs';
 import { cultureRecipeMasses, normalizeCultureRecipe, CULTURE_FEEL_SOURCE_ID } from './cultureMotion.mjs';
 import { getMotionSource, POSE_IDENTITY, composePose } from './motionCore/index.js';
@@ -257,8 +261,20 @@ function dealMovers(w, n, seed) {
         prevT[k] = [x, y];
       });
     }
+    // LOUD RE-PIN (Phase 6A — a changed law, spec §2.5 / §4 Q1): creatures eat beats, and this world has no room
+    // reading, so no morsel ever lands. Every citizen is born with CULTURE_FAT_BIRTH (50) fat and pays 1 fat/s: at fat 0
+    // sustained 5 s it starves — world step STARVED_AT (6,599), inside this minute. They are NOT fed here: the minute
+    // is the same minute, and what was "alive at the end" is now "lived until it died by the new law": starvation on
+    // the law's step — earlier only for a citizen that looted a limb and paid its upkeep — or predation (hungry after
+    // 20 s, a bigger citizen may kill a smaller on contact). A citizen the soil killed first is skipped exactly as before.
     w.citizens.list.forEach((c, k) => {
-      if (!c.alive) return;
+      if (c.cause === 'soil') return;
+      const life = w.ecology.lives[k];
+      assert.ok(c.cause === 'starvation' || c.cause === 'predation', `seed ${seed} citizen ${k}: died by the new law`);
+      if (c.cause === 'predation') assert.ok(life.killer >= 0 && life.killer !== k, 'a predation names its killer');
+      else if (life.loots === 0)
+        assert.equal(c.diedStep, STARVED_AT, 'on the starvation law’s step (50 fat at 1 fat/s, then 5 s at 0)');
+      else assert.ok(c.diedStep < STARVED_AT, 'a looter pays its limbs’ upkeep and starves sooner');
       assert.ok(path[k] / 60 > 40, `seed ${seed} citizen ${k} swims (${(path[k] / 60).toFixed(1)} px/s)`);
       // FIX-FORWARD (slice B, from slice A QA): the twin comparison above leans on the soil — an inert twin
       // drifts onto dead ground and withers (some seeds, within 12–30 s), after which it "barely drifts" because it
@@ -269,11 +285,16 @@ function dealMovers(w, n, seed) {
       // the swimmer's rate), so the recipe is asserted to out-travel it by 1.5× over the cast, not 3×.
       assert.equal(w.bodies.alive[c.first], 1, 'the swimmer’s head was not withered');
       assert.ok(w.soil.wither[c.first] < CULTURE_SOIL_WITHER_STEPS, 'its wither clock never ran out');
-      assert.equal(u.citizens.list[k].alive, 1, 'the soil-immune twin never dies');
+      assert.notEqual(u.citizens.list[k].cause, 'soil', 'the soil-immune twin never dies of the soil');
+      assert.equal(u.citizens.list[k].alive, 0, 'and with no beats it does not outlive the minute either');
       // the slice A comparison, tolerance unchanged (3×), placed AFTER the wither-specific assertions so that a soil
       // mutation is named by those (the swimmer withered / the clock ran out) before this one can fire on it
       assert.ok(path[k] > 3 * pathT[k], 'its recipe moves it: a muscle-less twin barely drifts');
-      assert.equal(c.age, w.citizens.step, 'age counts swarm steps of life');
+      assert.equal(
+        c.age,
+        Math.floor(c.diedStep / CULTURE_SWARM_STEP_DIVISOR),
+        'age counts swarm steps of life (re-pin: life ends at starvation)',
+      );
     });
     const sumPath = w.citizens.list.reduce((n, _c, k) => n + path[k], 0);
     const sumU = pathU.reduce((n, v) => n + v, 0);
@@ -283,8 +304,8 @@ function dealMovers(w, n, seed) {
     );
     assert.ok(maxSpan < 1.05, `the body holds together (max part reach ${maxSpan.toFixed(3)} body-lengths)`);
     assert.ok(
-      w.citizens.list.some((c) => c.alive),
-      'citizens live',
+      w.citizens.list.some((c) => c.cause === 'starvation' || c.cause === 'predation'),
+      'citizens lived until the new law took them (re-pin: Phase 6A — no beats, no food)',
     );
   }
   ok('it lives: each citizen swims by its recipe, stays in the dish, keeps its body whole; age counts its steps');

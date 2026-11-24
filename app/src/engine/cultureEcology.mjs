@@ -258,7 +258,9 @@ export function cultureCitizenSize(bodies, c, life) {
 
 /** The predation law, alone: a hungry attacker (fat ticks below the line) at least 1.2× the prey's size. */
 export function culturePredationAllowed(attackerFatTicks, attackerSize, preySize) {
-  return attackerFatTicks < CULTURE_PREDATION_FAT_TICKS && preySize > 0 && attackerSize / preySize >= CULTURE_PREDATION_RATIO;
+  return (
+    attackerFatTicks < CULTURE_PREDATION_FAT_TICKS && preySize > 0 && attackerSize / preySize >= CULTURE_PREDATION_RATIO
+  );
 }
 
 const touches = (bodies, i, j) => {
@@ -547,7 +549,8 @@ export function stepCultureMetabolism(world) {
     const life = lifeAt(eco, idx);
     if (c.alive) {
       let cost = CULTURE_UPKEEP_BODY_TICKS;
-      for (const s of life.sockets) if (s.looted && s.occupant >= 0 && bodies.alive[s.occupant]) cost += CULTURE_UPKEEP_LIMB_TICKS;
+      for (const s of life.sockets)
+        if (s.looted && s.occupant >= 0 && bodies.alive[s.occupant]) cost += CULTURE_UPKEEP_LIMB_TICKS;
       life.fat = Math.max(0, life.fat - cost);
       if (life.fat === 0) life.starve += 1;
       else life.starve = 0;
