@@ -443,6 +443,9 @@ const recipeWith = (base, patch) =>
 // 7 — it lives in the gated world.
 {
   let n = 0;
+  let axisSum = 0;
+  let axisN = 0;
+  let axisWorst = 0;
   for (let seed = 1; seed <= 20; seed++) {
     const w = createCultureWorld({ seed });
     castCultureTake(w, CULTURE_TAKE_SHEET);
@@ -459,6 +462,18 @@ const recipeWith = (base, patch) =>
         assert.ok(x >= 0 && x <= 1920 && y >= 0 && y <= 1080, `seed ${seed}: beast ${i} stays in the dish`);
         path[i] += Math.hypot(x - prev[i][0], y - prev[i][1]);
         prev[i] = [x, y];
+        // the chassis holds its shape at the crank's heading: head to the mean of its two spine hubs (while they live —
+        // the soil may wither a hub, and a beam with a hub gone has no axis to read)
+        const h = c.first;
+        if (!w.bodies.alive[h + 1] || !w.bodies.alive[h + 2]) return;
+        const ax = Math.atan2(
+          y - (w.bodies.y[h + 1] + w.bodies.y[h + 2]) / 2,
+          x - (w.bodies.x[h + 1] + w.bodies.x[h + 2]) / 2,
+        );
+        const d = Math.abs(((ax - c.heading + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+        axisSum += d;
+        axisN++;
+        if (d > axisWorst) axisWorst = d;
       });
     }
     beasts.forEach((c, i) => {
@@ -469,7 +484,14 @@ const recipeWith = (base, patch) =>
     });
   }
   assert.ok(n >= 30, `${n} beasts`);
-  ok(`it lives: 20 seeds × 60 s in the gated world — ${n} strandbeests, all inside the dish, alive, walking`);
+  assert.ok(
+    axisSum / axisN < 2 / 57.3,
+    `the chassis stands on its heading (mean ${((axisSum / axisN) * 57.3).toFixed(2)}°)`,
+  );
+  assert.ok(axisWorst < 15 / 57.3, `never twisted far (worst ${(axisWorst * 57.3).toFixed(1)}°)`);
+  ok(
+    `it lives: 20 seeds × 60 s in the gated world — ${n} strandbeests, all inside the dish, alive, walking, the chassis on its heading`,
+  );
 }
 
 // 8 — determinism and the hash.
