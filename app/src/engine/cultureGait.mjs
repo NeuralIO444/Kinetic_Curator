@@ -84,6 +84,7 @@ import { BEAST_BARS } from './beastBuilder.js';
 import { ATTACH_BOX } from './assetAttach.js';
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H } from './cultureSwarm.mjs';
+import { cultureBeastBones } from './cultureBeast.mjs';
 
 // ── the numbers (Matt's rulings are marked; the rest are the coordinator's defaults, tunable) ──────────────────────
 
@@ -119,7 +120,7 @@ export const CULTURE_ROOM_BPM = Object.freeze({ min: 30, max: 300 });
  * call, flagged: the dish creature breathes and wanders and follows the flow when it breaks up (organic); the moth's
  * long, slow follow-through and drifting, retracing break-up is the japanese set's.
  */
-export const CULTURE_GAIT_STYLES = Object.freeze({ dish: 'organic', moth: 'japanese' });
+export const CULTURE_GAIT_STYLES = Object.freeze({ dish: 'organic', moth: 'japanese', strandbeest: 'swiss' });
 
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const fin = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -444,12 +445,42 @@ export function assignCultureGait(g, raw, worldStep, citizenCount) {
 }
 
 const _tree = new WeakMap();
-/** A citizen's join tree, cached on its (frozen) body. */
+/**
+ * A citizen's join tree, cached on its (frozen) body. A swimmer is a 'rig' (its part tree). A strandbeest (slice C)
+ * wears its gait through the BEAST adapter: the beam is the root and each leg's twelve bars hang off it along the
+ * linkage's own construction — the walking structure's bones are what the gait moves, its discs follow the root.
+ */
 const treeOfCitizen = (c) => {
   let t = _tree.get(c.body);
-  if (!t) _tree.set(c.body, (t = cultureTreeOf('rig', c.body)));
+  if (!t) _tree.set(c.body, (t = c.linkage ? cultureTreeOf('beast', c.linkage) : cultureTreeOf('rig', c.body)));
   return t;
 };
+
+/**
+ * A wearer's pieces as the gait layer reads them: { n, marks, radius(k), alive(k) }. A swimmer's pieces are its parts
+ * (positions, disc radii and life from the body table — slice B's reading, unchanged). A strandbeest's are its bones in
+ * the beast adapter's node order (engine/cultureBeast.mjs cultureBeastBones): each piece stands at its bone's midpoint,
+ * its footprint a disc of half the bone's length, alive while its leg's hip (the beam: the head) lives.
+ */
+function wearerPieces(bodies, c) {
+  if (!c.linkage) {
+    const marks = new Array(c.n);
+    for (let k = 0; k < c.n; k++) marks[k] = { x: bodies.x[c.first + k], y: bodies.y[c.first + k] };
+    return {
+      n: c.n,
+      marks,
+      radius: (k) => bodies.radius[c.first + k],
+      alive: (k) => bodies.alive[c.first + k] === 1,
+    };
+  }
+  const bones = cultureBeastBones(bodies, c);
+  return {
+    n: bones.length,
+    marks: bones.map((b) => ({ x: (b.x + b.tx) / 2, y: (b.y + b.ty) / 2 })),
+    radius: (k) => bones[k].len / 2,
+    alive: (k) => bones[k].alive,
+  };
+}
 
 const lockedOf = (g, target) => !!(g.assign[target] && g.assign[target].locked);
 
@@ -467,9 +498,10 @@ function cultureGaitPhrase(g, ctx) {
     const c = citizens.list[idx];
     const o = g.out[target];
     const parts = [];
-    if (o)
-      for (let k = 0; k < c.n; k++)
-        if (bodies.alive[c.first + k]) parts.push({ radius: bodies.radius[c.first + k], dx: o.dx[k], dy: o.dy[k] });
+    if (o) {
+      const pc = wearerPieces(bodies, c);
+      for (let k = 0; k < pc.n; k++) if (pc.alive(k)) parts.push({ radius: pc.radius(k), dx: o.dx[k], dy: o.dy[k] });
+    }
     const reading = cultureTaste(parts);
     const cur = g.notch[target] || { n: 0, from: 1, t0: g.beats };
     const n = cultureDampStep(cur.n, reading.outranks, false);
@@ -521,9 +553,7 @@ export function stepCultureGait(g, ctx) {
     const locked = lockedOf(g, target);
     const level = cultureDampLevel(g.notch[target], g.beats, locked);
     const gait = w ? dampGait(w.gait, level) : null;
-    const n = c.n;
-    const marks = new Array(n);
-    for (let k = 0; k < n; k++) marks[k] = { x: bodies.x[c.first + k], y: bodies.y[c.first + k] };
+    const { n, marks } = wearerPieces(bodies, c);
     const tree = treeOfCitizen(c);
     const base = cultureGaitPose(marks, tree, gait, {
       beatTime: g.beats,
@@ -534,7 +564,7 @@ export function stepCultureGait(g, ctx) {
       canvasH: CULTURE_SWARM_WORLD_H,
     });
     const posed = marks.map((m, k) => ({ x: m.x + base[k].dx, y: m.y + base[k].dy }));
-    const head = marks[0];
+    const head = c.linkage ? { x: bodies.x[c.first], y: bodies.y[c.first] } : marks[0];
     const res = g.breakup.pose(target, {
       marks: posed,
       rest: marks,

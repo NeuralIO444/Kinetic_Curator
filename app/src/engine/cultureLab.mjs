@@ -34,12 +34,14 @@ import {
   CULTURE_LOOK_SHAPES,
   CULTURE_PLAN_DISH,
   CULTURE_PLAN_MOTH,
+  CULTURE_PLAN_STRANDBEEST,
   CULTURE_BODY_SCALE_MIN,
   CULTURE_BODY_SCALE_MAX,
 } from './cultureBody.mjs';
 import { normalizeCultureRecipe, cultureRecipeFaults, CULTURE_RECIPE_BOUNDS } from './cultureMotion.mjs';
 import { cultureSoilSample } from './cultureSoil.mjs';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H } from './cultureSwarm.mjs';
+import { JANSEN_RELATIVE, MEASURE_IDS, MEASURE_RANGES } from './jansenMeasures.js';
 
 /** Candidates CURATOR auditions per cast slot. */
 export const CULTURE_CAST_AUDITIONS = 16;
@@ -53,6 +55,13 @@ export const CULTURE_DAVIS_LEAN = 0.15;
 export const CULTURE_CAST_MARGIN_BODY_LENGTHS = 1.5;
 /** CURATOR's spacing: no two cast heads closer than this many body-lengths (nobody is born tangled). */
 export const CULTURE_CAST_SPACING_BODY_LENGTHS = 2;
+/**
+ * KINETIC's measure lean for a linkage body (slice C): each of the thirteen Jansen measure genes is the wild type
+ * leaned by at most this share, either way, and held in its legal range (k's ±2 % tripwire clamps it). At 6 % about
+ * three seeded sets in ten cannot assemble — stillbirths LOIS refuses (the epic's law 2) — so the gate is exercised and
+ * a slot of sixteen auditions still finds a living beast.
+ */
+export const CULTURE_KINETIC_MEASURE_LEAN = 0.06;
 
 /**
  * The native recipes, one per plan — the temperament DAVIS starts each body from. The dish
@@ -99,6 +108,30 @@ export const CULTURE_NATIVE_RECIPES = Object.freeze({
       exaggeration: 1.4,
     },
   }),
+  // Slice C — the strandbeest. The plan reads the dials its own way (engine/cultureBeast.mjs
+  // CULTURE_BEAST_DIAL_READING): thrust is the stance stroke's ADVANCE (0.85 of the stroke becomes travel),
+  // paddle is the banks' TURN GAIN (0.5, beastRoam's own), tone is the feet's GRIP (0.8), timing is the crank's
+  // period (60 steps: one turn a second, ≈ 75 px/s for the wild type), slowInOut the crank's ease, arcs the
+  // steering lock. A plodder: it wanders less than the swimmers and keeps a wide berth from the rim (its legs
+  // reach a third of a body-length outward). One rigid chassis: every part as heavy as the head (60) and no
+  // follow-through lightening — the swarm's flocking divides by mass, and over a light hip and tail its separation
+  // pushed the frame's own parts apart unevenly, a net drag backward that stalled the walk (probed). anticipation is not
+  // read by this plan (its gait is its geometry); it stands at the dish creature's value so DAVIS leans it as ever.
+  [CULTURE_PLAN_STRANDBEEST]: normalizeCultureRecipe({
+    name: 'strandbeest/native',
+    drives: { wander: 0.5, ground: 1, rim: 2.4 },
+    physics: { thrust: 0.85, headMass: 60, partMass: 60, paddle: 0.5, tone: 0.8 },
+    seasoning: {
+      timing: 60,
+      slowInOut: 1.5,
+      anticipation: 0.3,
+      arcs: 0.4,
+      followThrough: 0,
+      squash: 0.1,
+      secondary: 0.03,
+      exaggeration: 1,
+    },
+  }),
 });
 
 /** CURATOR's default cast sheet: three dish creatures — the first citizen, a few of them. */
@@ -114,6 +147,8 @@ export const CULTURE_TAKE_SHEET = Object.freeze({
   roster: Object.freeze([
     Object.freeze({ plan: CULTURE_PLAN_DISH, count: 3 }),
     Object.freeze({ plan: CULTURE_PLAN_MOTH, count: 2 }),
+    // slice C: two strandbeests walk in after the swimmers (their slots come last, so every earlier slot draws as before)
+    Object.freeze({ plan: CULTURE_PLAN_STRANDBEEST, count: 2 }),
   ]),
 });
 
@@ -143,12 +178,27 @@ export function normalizeCultureCastRoster(sheet = CULTURE_CAST_SHEET) {
   return Object.freeze(entries);
 }
 
-/** KINETIC: the candidate's body, the plan at a seeded scale in his band. */
+/**
+ * KINETIC's measure genes for a linkage body: the wild type, each gene leaned by a seeded share of at most
+ * ±CULTURE_KINETIC_MEASURE_LEAN and held in its legal range. Pure in (seed, candidate). A set that cannot assemble is
+ * dealt as it falls — the stillbirth is LOIS's to refuse, never KINETIC's to hide.
+ */
+export function kineticMeasures(seed, candidate) {
+  const out = {};
+  MEASURE_IDS.forEach((id, d) => {
+    const u = hashU01(seed, 'culture-linkage', candidate * 16 + d) * 2 - 1;
+    const r = MEASURE_RANGES[id];
+    out[id] = Math.min(r.max, Math.max(r.min, JANSEN_RELATIVE[id] * (1 + CULTURE_KINETIC_MEASURE_LEAN * u)));
+  });
+  return out;
+}
+
+/** KINETIC: the candidate's body, the plan at a seeded scale in his band (and a linkage plan's measure genes). */
 export function kineticAssemble(plan, seed, candidate) {
   const u = hashU01(seed, 'culture-cast', candidate * 4 + 3);
-  return assembleCultureBody(plan, {
-    scale: CULTURE_BODY_SCALE_MIN + u * (CULTURE_BODY_SCALE_MAX - CULTURE_BODY_SCALE_MIN),
-  });
+  const scale = CULTURE_BODY_SCALE_MIN + u * (CULTURE_BODY_SCALE_MAX - CULTURE_BODY_SCALE_MIN);
+  if (!cultureBodyPlan(plan).linkage) return assembleCultureBody(plan, { scale });
+  return assembleCultureBody(plan, { scale, measures: kineticMeasures(seed, candidate) });
 }
 
 /** The dials of a recipe in canonical order: [group, key] pairs over the bounds table. */

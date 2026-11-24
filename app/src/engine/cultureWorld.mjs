@@ -241,6 +241,14 @@
 //               any break-up that would land a piece on protected negative
 //               space (a cell under 10% ink). Gait is a pose offset: it never
 //               writes a body. It rides the world's own hash.
+//               Phase 5, slice C (the parent epic 1863): the strandbeest is the
+//               third citizen — an assembled walking structure (a beam of crank
+//               hubs and six hips as its discs; Jansen-linkage legs as closed-form
+//               bones, engine/cultureBeast.mjs). It walks by its stance stroke and
+//               steers by its banks' crank-phase differential, its feet planted on
+//               the soil; it wears its gait through the beast adapter. The take
+//               sheet casts two after the swimmers. Everything else is unchanged:
+//               the same doors, the same step order, the same hash.
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
 import { createCulture, stepCulture, seedRandom, cultureHash, CULTURE_RULE } from './dishLife.mjs';
@@ -299,6 +307,7 @@ import {
   normalizeCultureRoom,
 } from './cultureGait.mjs';
 import { cultureBodyRestPose } from './cultureBody.mjs';
+import { cultureBeastBones } from './cultureBeast.mjs';
 import { cultureRecipeMasses, ensureCultureFeelSource } from './cultureMotion.mjs';
 import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
 
@@ -852,12 +861,18 @@ export function cultureCitizenAt(world, index) {
   const list = world.citizens.list;
   if (!Number.isInteger(index) || index < 0 || index >= list.length)
     throw new Error(`cultureWorld: no citizen at index "${String(index)}"`);
-  return cultureCitizenLayout(
-    world.bodies,
-    list[index],
-    (i) => world.soil.wither[i] / CULTURE_SOIL_WITHER_STEPS,
-    (k) => cultureGaitPartPose(world.gait, index, k),
-  );
+  const c = list[index];
+  const wither = (i) => world.soil.wither[i] / CULTURE_SOIL_WITHER_STEPS;
+  if (!c.linkage)
+    return cultureCitizenLayout(world.bodies, c, wither, (k) => cultureGaitPartPose(world.gait, index, k));
+  // a strandbeest (slice C): its discs ride the gait's root (the beam, node 0); its BONES are the beast adapter's
+  // nodes 1.. — each bone with its look, its place, and the gait's pose for that node
+  const layout = cultureCitizenLayout(world.bodies, c, wither, () => cultureGaitPartPose(world.gait, index, 0));
+  layout.bones = cultureBeastBones(world.bodies, c).map((b, k) => {
+    const gp = cultureGaitPartPose(world.gait, index, k);
+    return { ...b, gait: gp ? { ...gp } : null };
+  });
+  return layout;
 }
 
 /**
