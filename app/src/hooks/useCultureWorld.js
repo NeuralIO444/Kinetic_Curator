@@ -26,7 +26,7 @@ import { startCultureRoom } from '../curator/cultureRoomLive.js';
 // CULTURE_TAKE_SHEET).
 //
 // Phase 5C — the take sheet adds two strandbeests; and the live room: while the gate is on the shell
-// starts the room bridge (curator/cultureRoomLive.js), so the dish's QUEEN hears the stage's own audio
+// starts the room bridge (curator/cultureRoomLive.js), so the dish's room reads the stage's own audio
 // and beat analysis and the citizens wear their gaits on the beat. Gate off, nothing subscribes.
 //
 // The effect's body is runCultureShell, exported so the gate is pinned by a selfcheck

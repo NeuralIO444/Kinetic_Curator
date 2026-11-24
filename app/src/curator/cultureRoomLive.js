@@ -1,6 +1,6 @@
 // cultureRoomLive.js — CULTURE Phase 5, slice C: the live-audio → room bridge (the room door slice B left unfed).
 //
-// What the QUEEN hears in the dish is the same room the live gait's QUEEN hears (curator/gaitLive.js), read off the
+// The dish's room is the same room the live gait's picker hears (curator/gaitLive.js), read off the
 // same bus events from the existing audio and beat analysis — nothing new is analysed:
 //
 //   - audio:energy { level }            the envelope band (low | mid | high, with hysteresis)
