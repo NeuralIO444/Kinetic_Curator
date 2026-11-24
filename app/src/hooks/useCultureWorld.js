@@ -7,6 +7,7 @@ import {
   standingCultureWorld,
   castCultureTake,
 } from '../engine/cultureWorld.mjs';
+import { CULTURE_TAKE_SHEET } from '../engine/cultureLab.mjs';
 
 // CULTURE Phase 0 — the app shell's seam for the dish gate (state.cultureDish, carried by
 // the project document only while on). While the gate is ON, the shell owns one CULTURE
@@ -19,6 +20,9 @@ import {
 // Phase 5A — citizens immigrate THROUGH this gate: a world born here is cast at birth
 // (castCultureTake — the Lab's door), so the first citizen lives in the dish only while
 // the gate is on. Nothing is drawn: the world has no render path yet.
+//
+// Phase 5B — the take sheet casts the dish creatures and then the flagship moths (cultureLab
+// CULTURE_TAKE_SHEET).
 //
 // The effect's body is runCultureShell, exported so the gate is pinned by a selfcheck
 // (hooks/useCultureWorld.selfcheck.mjs) — the hook only hands it the store's gate.
@@ -38,7 +42,7 @@ export function runCultureShell(on, seed, host) {
     return undefined;
   }
   const world = createCultureWorld({ seed });
-  castCultureTake(world);
+  castCultureTake(world, CULTURE_TAKE_SHEET);
   onWorld(world);
   setStandingCultureWorld(world);
   let raf = 0;
