@@ -418,7 +418,6 @@ export function stepCulturePredation(world) {
     const A = list[a];
     if (!A.alive) continue;
     const lifeA = lifeAt(eco, a);
-    if (lifeA.fat >= CULTURE_PREDATION_FAT_TICKS) continue;
     const sizeA = cultureCitizenSize(bodies, A, lifeA);
     for (let b = 0; b < list.length; b++) {
       if (b === a || !list[b].alive) continue;

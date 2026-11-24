@@ -514,6 +514,14 @@ const fullAll = (w) => {
   fullAll(w);
   place(w, 1, 900, 500, 0);
   starveNow(w, 1);
+  // a corpse does not loot: in a twin dish, citizen 0 dies too and lies with its head on 1's
+  const z = world(7);
+  fullAll(z);
+  place(z, 1, 900, 500, 0);
+  starveNow(z, 1);
+  place(z, 0, 945, 500, Math.PI);
+  starveNow(z, 0);
+  assert.equal(stepCultureLooting(z), 0, 'the dead loot nothing');
   place(w, 0, 945, 500, Math.PI);
   const A = w.citizens.list[0];
   const B = w.citizens.list[1];
@@ -583,6 +591,11 @@ const fullAll = (w) => {
   assert.equal(lifeA.sockets[0].looted, 1);
   assert.equal(lifeA.sockets[0].from, 2);
   assert.deepEqual(cultureBodyFaults(cultureWornBody(A, lifeA)), []);
+  // the cap and the sockets are the PLAN's: a forged extra socket on the life is never offered, even when it is the
+  // only free one (every real socket is occupied here)
+  lifeA.sockets.push({ ...lifeA.sockets[3], id: 'forged', occupant: -1, looted: 0, kind: '', slots: [], parts: [] });
+  assert.equal(stepCultureLooting(w), 0, 'a socket the plan does not declare is never offered');
+  lifeA.sockets.pop();
   // over the plan: refused loudly
   lifeA.sockets.push({ ...lifeA.sockets[3], id: 'forged' });
   w.bodies.alive[lifeA.sockets[1].occupant] = 0;
@@ -596,10 +609,13 @@ const fullAll = (w) => {
   place(m, 3, 700, 800, 0);
   starveNow(m, 3);
   const mi = 2;
-  place(m, mi, 745, 500, Math.PI);
+  const reach = (ww, a, b) => ww.citizens.list[a].body.parts[0].radius + ww.citizens.list[b].body.parts[0].radius - 2;
+  place(m, mi, 700 + reach(m, mi, 0), 500, Math.PI);
+  const dx0 = m.bodies.x[m.citizens.list[mi].first] - m.bodies.x[m.citizens.list[0].first];
+  assert.ok(Math.abs(dx0) < reach(m, mi, 0) + 2, 'the fixture: the moth’s head is on the dish corpse’s head');
   assert.equal(stepCultureLooting(m), 0, 'a moth takes no dish limb (its plan uses wings and antennae)');
   const mothCorpse = m.citizens.list[3];
-  place(m, mi, 700 + mothCorpse.body.parts[0].radius + m.citizens.list[mi].body.parts[0].radius - 2, 800, Math.PI);
+  place(m, mi, 700 + reach(m, mi, 3), 800, Math.PI);
   const look0 = m.ecology.lives[3].sockets[0].slots.map((i) => mothCorpse.body.parts[i - mothCorpse.first].look);
   assert.equal(stepCultureLooting(m), 1, 'a moth takes a moth’s limb');
   const ms = m.ecology.lives[mi].sockets[4];
