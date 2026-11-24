@@ -228,15 +228,22 @@ looting and attaching (sockets declared on all three plans; the beast's cap is 6
 T3's baby preview), growth, any per-take cast policy beyond the Lab's fresh cast. Outside the program: the render path
 (drawing citizens and bones, the dealt look), S5 trails, take recording of the world and its room, takeover.
 
-## Open questions (multiple choice, recommendation first)
+## For Matt — RULED (Matt, 2026-11-24)
 
-1. **The dish reading of a Strandbeest (the epic's D-B1).** (a) the profile laid flat beside the beam, feet planting at
-   the outer rim — *built, recommended*; (b) a true side view (the beast drawn in profile on a top-down dish, height as
-   scale or shadow); (c) a different reading.
-2. **A free socket on the beast?** (a) none — cap 6, every socket a crank throw — *built, recommended*; (b) one free
-   socket on the tail (like the moth), accepting any limb, worn passively.
-3. **The epic's S5 trails line.** (a) the coordinator files S5 (trails & kin) as its own issue and the epic's CULTURE
-   body is judged here — *recommended*; (b) the epic stays open until S5 lands.
+1. RULED: the strandbeest's dish reading (the epic's D-B1) — the profile laid flat beside the beam, the feet planting at
+   the outer rim of their reach — is kept.
+2. RULED: no free socket on the beast — cap 6, every socket a crank throw.
+3. RULED: S5 (trails & kin, the epic's "signs its path with a curve its family shares") is filed as its own issue; the
+   coordinator files it.
+4. RULED: the test-drive issues (2342, 2343, 2344) stay open — the WetLab UI comes later; T3 follows Phase 6.
+
+## QA follow-up (one commit)
+
+- `CULTURE_BEAST_DIAL_READING` now says what the code does: paddle is the turn gain by which steering brakes the INNER
+  bank (2·gain·|s|, never below 0) while the outer bank holds the base rate — not beastRoam's 1 ± turnGain; partMass
+  notes that the native recipe sets followThrough 0, so the chassis is uniformly heavy.
+- The mood map's deviation clamp is pinned: for every drive, a gain of ¼ and of 0.3 read exactly as ½ (cultureTestDrive
+  g4). Mutation (clamp removed: `dev = log2(g)`) applied alone → KILLED by cultureTestDrive g4 ("approval: ¼ reads as ½").
 
 ## Surprises
 

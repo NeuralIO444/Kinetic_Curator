@@ -148,6 +148,15 @@ const motion = (r) =>
             assert.ok(m[k] >= CULTURE_MOOD_MIN && m[k] <= CULTURE_MOOD_MAX, `${k} bounded`);
           assert.deepEqual(m, cultureMoodMultipliers({ approval: a, crowding: c, strain: s, boredom: b }));
         }
+  // the deviation is clamped to [−1, 1]: any gain at ½ or below reads as −1 (½ and the gene's floor ¼ are the same mood)
+  for (const d of CULTURE_MOOD_DRIVES) {
+    assert.deepEqual(cultureMoodMultipliers({ [d]: 0.25 }), cultureMoodMultipliers({ [d]: 0.5 }), `${d}: ¼ reads as ½`);
+    assert.deepEqual(
+      cultureMoodMultipliers({ [d]: 0.3 }),
+      cultureMoodMultipliers({ [d]: 0.5 }),
+      `${d}: 0.3 reads as ½`,
+    );
+  }
   // out-of-gene values are held in the gene's range; junk reads as the norm
   assert.deepEqual(cultureMoodMultipliers({ strain: 99 }), cultureMoodMultipliers({ strain: 2 }));
   assert.deepEqual(cultureMoodMultipliers({ strain: 'x' }), { breath: 1, pulse: 1, drift: 1 });

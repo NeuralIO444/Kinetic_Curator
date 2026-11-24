@@ -76,8 +76,10 @@ export const CULTURE_BEAST_DIAL_READING = Object.freeze({
   'drives.rim': 'the desire (shared registry)',
   'physics.thrust': 'ADVANCE — the share of the stance stroke that becomes travel, min(1, thrust) (0 walks in place)',
   'physics.headMass': 'the front hub’s mass',
-  'physics.partMass': 'the frame’s base mass (followThrough lightens the hips and tail, as for every plan)',
-  'physics.paddle': 'TURN GAIN — a bank’s crank-rate swing at full lock: rates 1 ± gain (beastRoam’s turnGain)',
+  'physics.partMass':
+    'the frame’s base mass (followThrough would lighten the hips and tail, as for every plan; the native recipe sets followThrough 0, so the chassis is uniformly heavy)',
+  'physics.paddle':
+    'TURN GAIN — steering brakes the INNER bank by 2·gain·|s| of the base rate (never below 0) while the outer bank holds the base rate (cultureBeastBankTargets; not beastRoam’s 1 ± turnGain)',
   'physics.tone': 'GRIP — how hard planted feet hold the frame to the stance stroke, min(1, tone) of the gap a step',
   'seasoning.timing': 'TIMING — swarm steps per crank turn (60 = one turn a second)',
   'seasoning.slowInOut': 'SLOW IN / SLOW OUT — the crank’s ease toward a new rate',
