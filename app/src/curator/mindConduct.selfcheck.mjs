@@ -789,14 +789,32 @@ ok('#1483 Davis is the wild man: every move in reach at any heat; the heat order
   const highSafe = PRESETS.high.filter((c) => c.bold <= 0.6).map((c) => c.target);
   const leftover = davisRoute(show('high', { owned: highSafe }), 1, 0);
   assert.ok(leftover && boldOf(leftover) > 0.6, 'cool, the safe moves taken: he reaches for a daring one anyway');
-  // LOIS's brake: only safe moves, at any heat; nothing safe left -> he holds
+  // LOIS's brake, answered (#2159, Matt's fix ruling 2 of 3, 2026-11-12: plain is a cue to push): a braked reply is
+  // a safe move or the ONE bolder reply — the brake trace names every bolder candidate but that one, at any heat
+  const bolder = all.filter((c) => c.bold > BRAKE_MAX);
+  let boldReplies = 0;
   for (const energy of ENERGY_LEVELS)
     for (const s of seeds) {
-      const b = davisRoute(show(energy, { brake: true }), s, 1);
-      assert.ok(!b || boldOf(b) <= BRAKE_MAX, `${energy}/${s}: braked, a safe move (${b && b.target})`);
+      const trace = [];
+      const b = davisRoute(show(energy, { brake: true }), s, 1, trace);
+      assert.equal(
+        trace.filter((x) => x.reason === SKIP.brake).length,
+        bolder.length - 1,
+        `${energy}/${s}: the brake takes every bolder move out of reach but the one reply`,
+      );
+      if (b && boldOf(b) > BRAKE_MAX) boldReplies++;
     }
+  assert.ok(boldReplies > 0, 'under the brake he does answer boldly (the ruling fires, not just permits)');
+  // braked, nothing safe left: he no longer holds — the one bolder reply lands
   const allSafe = all.filter((c) => c.bold <= BRAKE_MAX).map((c) => c.target);
-  assert.equal(davisRoute(show('high', { brake: true, owned: allSafe }), 1, 1), null, 'braked, nothing safe: he holds');
+  const answer = davisRoute(show('high', { brake: true, owned: allSafe }), 1, 1);
+  assert.ok(answer && boldOf(answer) > BRAKE_MAX, 'braked, nothing safe: the bolder reply, not silence');
+  // and the reply stays bounded: a target the artist owns is out of reach, bolder or not
+  assert.equal(
+    davisRoute(show('high', { brake: true, owned: all.map((c) => c.target) }), 1, 1),
+    null,
+    'braked, everything owned: he holds',
+  );
   // the rules read meta.heat; it never enters the context or the record
   const ctx = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: show('high') });
   assert.ok(!JSON.stringify(ctx).includes('heat'), 'the context a model is told carries no temperature');
@@ -830,6 +848,43 @@ ok('#1483 Davis is the wild man: every move in reach at any heat; the heat order
   for (const dir of ['panels', 'components'])
     for (const f of walk(join(srcRoot, dir)).filter((p) => /\.(jsx?|mjs)$/.test(p) && !p.endsWith('.selfcheck.mjs')))
       assert.ok(!readFileSync(f, 'utf8').includes('conductHeat'), `${f}: no surface reads the conducting temperature`);
+});
+
+ok('#2159 the brake answered: the #2075 stall gets one visibly bolder move, and only one', () => {
+  const all = ENERGY_LEVELS.flatMap((l) => PRESETS[l]);
+  const boldOf = (op) => all.find((c) => c.target === (op.op === 'retarget' ? op.to : op.target)).bold;
+  // the diagnosis shape (issue 2075, finding 2): MID energy, LOIS's brake standing, his row on the table, every
+  // safe retarget blocked — under the old law this call was the six-phrase silence: null
+  const stall = {
+    energy: 'mid',
+    bpm: 124,
+    silent: false,
+    brake: true,
+    flatBars: PHRASE_BARS,
+    routes: [{ ...r('band.mids', 'render.glow', 0.3), by: 'davis' }],
+    owned: ['render.breath', 'render.alpha'],
+  };
+  const reply = davisRoute(stall, 3, 0.5);
+  assert.ok(reply && reply.op === 'retarget', 'he answers the flat call');
+  assert.ok(boldOf(reply) > BRAKE_MAX, `the answer is visibly bolder than the brake's cap (to ${reply.to})`);
+  // exactly one bolder candidate in reach: the brake trace names the rest; own the exempted one and no second
+  // bolder candidate takes its place (the safe moves owned too, so any bolder fall-through would show)
+  const plain = { energy: 'mid', bpm: 124, silent: false, routes: [], owned: [], flatBars: 0, brake: true };
+  const trace = [];
+  davisRoute(plain, 0, 0, trace);
+  const named = new Set(trace.filter((x) => x.reason === SKIP.brake).map((x) => `${x.input}>${x.target}`));
+  const exempted = all.filter((c) => c.bold > BRAKE_MAX && !named.has(`${c.input}>${c.target}`));
+  assert.equal(exempted.length, 1, 'one bolder candidate in reach, the rest named by the brake');
+  const safeTargets = all.filter((c) => c.bold <= BRAKE_MAX).map((c) => c.target);
+  assert.equal(
+    davisRoute({ ...plain, owned: [...safeTargets, exempted[0].target] }, 0, 0),
+    null,
+    'the exempted move owned: no second bolder candidate takes its place',
+  );
+  // outside the brake condition nothing is booked: no brake, no brake skips
+  const t2 = [];
+  davisRoute({ ...plain, brake: false }, 0, 0, t2);
+  assert.ok(!t2.some((x) => x.reason === SKIP.brake), 'no brake, no brake skips');
 });
 
 // #2160 — THE SKIP TRACE (Matt's fix ruling 3 of 3, 2026-11-12): every candidate davisRoute discards leaves a one-line
