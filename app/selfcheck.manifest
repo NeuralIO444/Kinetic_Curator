@@ -762,6 +762,7 @@ node src/poets/rayGunDistort.selfcheck.mjs
 node src/poets/poemLife.selfcheck.mjs
 node src/curator/doctrines.selfcheck.mjs
 node src/personas/personaKernel.selfcheck.mjs
+node src/personas/surfaceRegistry.selfcheck.mjs
 node src/personas/personaTuning.selfcheck.mjs
 node src/personas/band.selfcheck.mjs
 node src/personas/chemistry.selfcheck.mjs
