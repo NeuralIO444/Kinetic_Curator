@@ -226,6 +226,21 @@
 //               citizen is dead (seen one step behind). Resolver-class, no
 //               stamp: the law composition does not change. Born uncast and
 //               empty — an uncast world steps exactly as before.
+//               Phase 5, slice B (the parent issues 2331 and 2332): the moth is
+//               the second citizen (a roster sheet casts a dish creature and a
+//               moth; the Lab's door normalizes both sheet shapes), and the
+//               gait layer is CULTURE's own (engine/cultureGait.mjs): every
+//               citizen is a rig on the live gait evaluator. It is dormant
+//               until the dish has citizens and a room reading. The doors:
+//               setCultureRoom (energy, silence, bpm; refuses loudly) and
+//               assignCultureCitizenGait (a Canon gait id; a user lock wins,
+//               every applied pick is logged). Once a phrase the QUEEN picks
+//               per wearer by Canon style, TASTE reads whether moving pieces
+//               outrank the dealt shapes, and the damp step walks the gait
+//               down 25% a phrase to a floor of 25% (and back up); LOIS vetoes
+//               any break-up that would land a piece on protected negative
+//               space (a cell under 10% ink). Gait is a pose offset: it never
+//               writes a body. It rides the world's own hash.
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
 import { createCulture, stepCulture, seedRandom, cultureHash, CULTURE_RULE } from './dishLife.mjs';
@@ -275,6 +290,14 @@ import {
   cultureCitizenLayout,
 } from './cultureCitizens.mjs';
 import { curatorCast, CULTURE_CAST_SHEET } from './cultureLab.mjs';
+import {
+  createCultureGait,
+  stepCultureGait,
+  cultureGaitHash,
+  cultureGaitPartPose,
+  assignCultureGait,
+  normalizeCultureRoom,
+} from './cultureGait.mjs';
 import { cultureBodyRestPose } from './cultureBody.mjs';
 import { cultureRecipeMasses, ensureCultureFeelSource } from './cultureMotion.mjs';
 import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
@@ -474,6 +497,8 @@ export function createCultureWorld({ seed = 0 } = {}) {
      * joints live in the ordinary body and link tables above.
      */
     citizens: createCultureCitizens(),
+    /** The gait layer (Phase 5B): dormant until the dish has citizens; see engine/cultureGait.mjs. */
+    gait: createCultureGait(),
   };
 }
 
@@ -541,6 +566,27 @@ export function stepCultureWorld(world) {
     rehomeCultureCitizens(world.bodies, world.citizens);
     stepCultureSolver(world.bodies, world.statics, world.links);
     world.solver.step += 1;
+    // The gait layer (Phase 5B): reads the settled frame, writes only its own pose state.
+    if (world.citizens.list.length) {
+      const magnets = cultureFieldMagnets(world.fields);
+      stepCultureGait(world.gait, {
+        bodies: world.bodies,
+        citizens: world.citizens,
+        statics: world.statics,
+        seed: world.seed,
+        worldStep: world.step,
+        drift: magnets.length
+          ? {
+              density: cultureFluidDensity(world),
+              magnets,
+              pull: CULTURE_FIELD_FLUID_PULL,
+              aspectHW: CULTURE_WORLD_ASPECT_HW,
+              W: CULTURE_SWARM_WORLD_W,
+              H: CULTURE_SWARM_WORLD_H,
+            }
+          : null,
+      });
+    }
   }
   // The ground judges last (Phase 4): every world step, after the culture has
   // grown and the bodies have moved, the soil reads the published field — the
@@ -806,7 +852,30 @@ export function cultureCitizenAt(world, index) {
   const list = world.citizens.list;
   if (!Number.isInteger(index) || index < 0 || index >= list.length)
     throw new Error(`cultureWorld: no citizen at index "${String(index)}"`);
-  return cultureCitizenLayout(world.bodies, list[index], (i) => world.soil.wither[i] / CULTURE_SOIL_WITHER_STEPS);
+  return cultureCitizenLayout(
+    world.bodies,
+    list[index],
+    (i) => world.soil.wither[i] / CULTURE_SOIL_WITHER_STEPS,
+    (k) => cultureGaitPartPose(world.gait, index, k),
+  );
+}
+
+/**
+ * THE ROOM'S DOOR (Phase 5B) — what the QUEEN hears: { energy: null | low | mid | high, silent, bpm }. A recorded
+ * input of the gait layer; refused loudly when malformed. With no reading the wanted gait is still.
+ */
+export function setCultureRoom(world, room) {
+  world.gait.room = normalizeCultureRoom(room);
+  return world.gait.room;
+}
+
+/**
+ * THE GAIT DOOR (Phase 5B) — one GAIT_ASSIGN for a citizen ('citizen:<index>'): the user's pick or lock, or a
+ * persona's. A lock wins over the QUEEN and DAVIS; applied events are recorded with the world step. Refused loudly
+ * when malformed or naming a wearer or a gait the dish does not hold. Returns { applied, reason }.
+ */
+export function assignCultureCitizenGait(world, event) {
+  return assignCultureGait(world.gait, event, world.step, world.citizens.list.length);
 }
 
 /**
@@ -1020,6 +1089,7 @@ export function cultureWorldHash(world) {
   mixU32(cultureHandHash(world.hand));
   mixU32(cultureSoilHash(world.soil, world.bodies.count));
   mixU32(cultureCitizensHash(world.citizens));
+  mixU32(cultureGaitHash(world.gait));
   return h >>> 0;
 }
 

@@ -33,6 +33,7 @@ import {
   cultureBodyPlan,
   CULTURE_LOOK_SHAPES,
   CULTURE_PLAN_DISH,
+  CULTURE_PLAN_MOTH,
   CULTURE_BODY_SCALE_MIN,
   CULTURE_BODY_SCALE_MAX,
 } from './cultureBody.mjs';
@@ -76,10 +77,45 @@ export const CULTURE_NATIVE_RECIPES = Object.freeze({
       exaggeration: 1.2,
     },
   }),
+  // Slice B — the flagship. A flitterer: snappier arcs than the dish creature, a short stroke of 0.8 s with
+  // a small wind-up, its wings and antennae lagging the stroke (followThrough 0.8), a restless wander and
+  // a wide berth from the rim (its wings reach a body-length and more to either side). As heavy as the dish
+  // creature (head 60, parts 20): at head 40 the swarm's flocking, which divides by mass, over fourteen
+  // discs shoved the head out of the dish in the rim's face (probed: up to 8 px past the border in one
+  // seed of five); at 60 / 20, zero overshoot over twenty seeds. The wingbeat (3 a stroke) is the plan's
+  // anatomy; `paddle` here is its amplitude.
+  [CULTURE_PLAN_MOTH]: normalizeCultureRecipe({
+    name: 'moth/native',
+    drives: { wander: 0.8, ground: 1, rim: 2.2 },
+    physics: { thrust: 0.34, headMass: 60, partMass: 20, paddle: 0.35, tone: 0.5 },
+    seasoning: {
+      timing: 48,
+      slowInOut: 1.5,
+      anticipation: 0.2,
+      arcs: 0.35,
+      followThrough: 0.8,
+      squash: 0.22,
+      secondary: 0.08,
+      exaggeration: 1.4,
+    },
+  }),
 });
 
 /** CURATOR's default cast sheet: three dish creatures — the first citizen, a few of them. */
 export const CULTURE_CAST_SHEET = Object.freeze({ plan: CULTURE_PLAN_DISH, count: 3 });
+
+/**
+ * CURATOR's take sheet — what the gate's shell casts (slice B): the dish creatures first, exactly as
+ * the default sheet casts them (slots 0..2 draw the same candidates), then the flagship, two moths.
+ * A sheet may be one plan and a count ({ plan, count }, the slice A shape) or a roster of them
+ * ({ roster: [{ plan, count }, …] }), cast in order; slots count on through the roster.
+ */
+export const CULTURE_TAKE_SHEET = Object.freeze({
+  roster: Object.freeze([
+    Object.freeze({ plan: CULTURE_PLAN_DISH, count: 3 }),
+    Object.freeze({ plan: CULTURE_PLAN_MOTH, count: 2 }),
+  ]),
+});
 
 /** The sheet's reading: a known plan and a whole count in [0, CULTURE_CAST_CAP], or a loud refusal. */
 export function normalizeCultureCastSheet(sheet = CULTURE_CAST_SHEET) {
@@ -90,6 +126,21 @@ export function normalizeCultureCastSheet(sheet = CULTURE_CAST_SHEET) {
   if (!Number.isInteger(count) || count < 0 || count > CULTURE_CAST_CAP)
     throw new Error(`cultureLab: cast count "${String(count)}" — a whole number in [0, ${CULTURE_CAST_CAP}]`);
   return Object.freeze({ plan, count });
+}
+
+/**
+ * A sheet read as a roster: the slice A shape ({ plan, count }) is a roster of one; a roster is a
+ * non-empty list of { plan, count }, each read by normalizeCultureCastSheet, the total within
+ * CULTURE_CAST_CAP. Returns the frozen list of entries. A loud refusal otherwise.
+ */
+export function normalizeCultureCastRoster(sheet = CULTURE_CAST_SHEET) {
+  const list = sheet && Array.isArray(sheet.roster) ? sheet.roster : null;
+  if (!list) return Object.freeze([normalizeCultureCastSheet(sheet)]);
+  if (!list.length) throw new Error('cultureLab: a roster needs at least one entry');
+  const entries = list.map((e) => normalizeCultureCastSheet(e));
+  const total = entries.reduce((n, e) => n + e.count, 0);
+  if (total > CULTURE_CAST_CAP) throw new Error(`cultureLab: the roster casts ${total} — at most ${CULTURE_CAST_CAP}`);
+  return Object.freeze(entries);
 }
 
 /** KINETIC: the candidate's body, the plan at a seeded scale in his band. */
@@ -187,23 +238,26 @@ export function curatorAudition(plan, seed, slot, audition) {
  * Returns { members, refused }, frozen. Pure.
  */
 export function curatorCast(seed, field, sheet = CULTURE_CAST_SHEET) {
-  const s = normalizeCultureCastSheet(sheet);
+  const roster = normalizeCultureCastRoster(sheet);
   const members = [];
   const refused = [];
-  for (let slot = 0; slot < s.count; slot++) {
-    let best = null;
-    let lastFaults = [];
-    for (let a = 0; a < CULTURE_CAST_AUDITIONS; a++) {
-      const candidate = curatorAudition(s.plan, seed, slot, a);
-      const verdict = loisGate(candidate, field, members);
-      if (!verdict.admitted) {
-        lastFaults = verdict.faults;
-        continue;
+  let slot = 0;
+  for (const entry of roster) {
+    for (let n = 0; n < entry.count; n++, slot++) {
+      let best = null;
+      let lastFaults = [];
+      for (let a = 0; a < CULTURE_CAST_AUDITIONS; a++) {
+        const candidate = curatorAudition(entry.plan, seed, slot, a);
+        const verdict = loisGate(candidate, field, members);
+        if (!verdict.admitted) {
+          lastFaults = verdict.faults;
+          continue;
+        }
+        if (!best || verdict.praise > best.praise) best = Object.freeze({ ...candidate, praise: verdict.praise });
       }
-      if (!best || verdict.praise > best.praise) best = Object.freeze({ ...candidate, praise: verdict.praise });
+      if (best) members.push(best);
+      else refused.push(Object.freeze({ slot, faults: lastFaults }));
     }
-    if (best) members.push(best);
-    else refused.push(Object.freeze({ slot, faults: lastFaults }));
   }
   return Object.freeze({ members: Object.freeze(members), refused: Object.freeze(refused) });
 }

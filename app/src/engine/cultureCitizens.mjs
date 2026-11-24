@@ -29,6 +29,7 @@
 // exactly one wrap span — the body crosses the seam whole, with its anchor, or not at all.
 // Positions only; velocity and every other column untouched.
 import { stepCultureCitizenMuscle, cultureFeelPose, cultureBodyDepths, cultureBodyBraces } from './cultureMotion.mjs';
+import { composePose } from './motionCore/index.js';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H, CULTURE_SWARM_WRAP_PAD } from './cultureSwarm.mjs';
 
 /** The causes a citizen may die of in this slice (Phase 6 adds starvation and predation). */
@@ -65,7 +66,8 @@ export function enrolCultureCitizen(citizens, member, first, bornStep) {
     let root = i;
     while (parts[root].socket === null) root = parts[root].parent;
     const sock = member.body.sockets.find((s) => s.id === parts[root].socket);
-    limbTips.push(Object.freeze({ part: i, side: sock.angle >= 0 ? 1 : -1 }));
+    const kind = member.body.limbs[parts[i].limb];
+    limbTips.push(Object.freeze({ part: i, side: sock.angle >= 0 ? 1 : -1, weight: kind.paddle, beat: kind.beat }));
   }
   citizens.list.push({
     plan: member.body.plan,
@@ -208,7 +210,7 @@ export function cultureCitizensHash(citizens) {
  * nothing. There is no render path in the world yet: this is the data one would draw, and the
  * debug preview below is the only drawing of it.
  */
-export function cultureCitizenLayout(bodies, c, wither = () => 0) {
+export function cultureCitizenLayout(bodies, c, wither = () => 0, gaitPose = () => null) {
   const t = c.age / 60; // swarm steps → seconds of life (one swarm step is one 60 fps frame)
   const parts = c.body.parts.map((p, k) => {
     const i = c.first + k;
@@ -221,7 +223,7 @@ export function cultureCitizenLayout(bodies, c, wither = () => 0) {
       const dy = bodies.y[i] - bodies.y[j];
       if (dx * dx + dy * dy > 1e-18) ang = Math.atan2(-dy, -dx);
     }
-    const pose = cultureFeelPose({ key: `${c.first}:${k}`, seedOffset: 0, phase01: 0 }, t, {
+    const feel = cultureFeelPose({ key: `${c.first}:${k}`, seedOffset: 0, phase01: 0 }, t, {
       along: bodies.vx[i] * Math.cos(ang) + bodies.vy[i] * Math.sin(ang),
       role: p.role,
       squash: c.recipe.seasoning.squash,
@@ -229,6 +231,9 @@ export function cultureCitizenLayout(bodies, c, wither = () => 0) {
       exaggeration: c.recipe.seasoning.exaggeration,
       wither: wither(i),
     });
+    // the gait layers over the creature's own pose (Motion Core composePose); no gait standing = the feel, untouched
+    const gp = gaitPose(k);
+    const pose = gp ? composePose(feel, gp) : feel;
     return {
       id: p.id,
       role: p.role,
@@ -240,6 +245,7 @@ export function cultureCitizenLayout(bodies, c, wither = () => 0) {
       radius: bodies.radius[i],
       rot: (ang * 180) / Math.PI,
       pose: { ...pose },
+      gait: gp ? { ...gp } : null,
     };
   });
   return { plan: c.plan, alive: c.alive === 1, heading: c.heading, age: c.age, parts };

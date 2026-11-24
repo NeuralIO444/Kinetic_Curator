@@ -32,9 +32,23 @@
 // stage's) — so the body reads as an assembled layout of distinct marks. §2.10's "a looted limb
 // keeps its original look" needs exactly this: the look rides the part, not the creature. No
 // label or name string here is ever drawn (unsigned copy stays out of the UI).
+//
+// THE MOTH PLAN (slice B) — the flagship, the second citizen, and a richer body through the same
+// door. Still graphic, still a layout: a small ink dot for a head, a ringed thorax, a squared
+// abdomen with an accent tail, two WINGS (three discs each, broad and swept to the side) and two
+// ANTENNAE (two small discs each, swept forward) — never a bug drawn, an arrangement of marks
+// (§2.4: more layout than literal animal). Its sockets are limited by ITS plan (§2.10): two wing
+// sockets on the thorax and two antenna sockets on the head, every one born occupied and the cap
+// equal to the count — a body with no room to wear a looted limb (the dish plan, by contrast,
+// has two free). A plan's limbs come in KINDS (each its own radii, look, how hard it paddles and
+// how often it beats per stroke): the dish's single kind is called 'limb' (as before), the moth's
+// are 'wing' and 'antenna'. The wingbeat is anatomy (a plan constant), the recipe's paddle dial is
+// its amplitude, so DAVIS's dials and bounds are the same ones the dish creature has.
 
 /** The dish plan's id: the dish's native body, the first citizen. */
 export const CULTURE_PLAN_DISH = 'dish';
+/** The moth plan's id: the flagship, the second citizen. */
+export const CULTURE_PLAN_MOTH = 'moth';
 
 /** The graphic vocabulary a part's look may use. Frozen: a new shape is a deliberate addition. */
 export const CULTURE_LOOK_SHAPES = Object.freeze(['ring', 'square', 'bar', 'dot']);
@@ -51,6 +65,10 @@ export const CULTURE_BODY_SCALE_MAX = 1.1;
 
 const DEG = Math.PI / 180;
 
+const lookOf = (shape, tone) => Object.freeze({ shape, tone });
+const limbKind = (radii, look, tipLook, paddle, beat) =>
+  Object.freeze({ radii: Object.freeze(radii), look, tipLook, paddle, beat });
+
 /**
  * The dish plan, declared. Angles are radians from the body's heading (0 = forward, positive =
  * the heading's left in body space, y down — the screen's counter-clockwise reading is not
@@ -58,30 +76,54 @@ const DEG = Math.PI / 180;
  */
 const DISH_PLAN = Object.freeze({
   id: CULTURE_PLAN_DISH,
-  head: Object.freeze({ radius: 27, look: Object.freeze({ shape: 'ring', tone: 'main' }) }),
+  head: Object.freeze({ radius: 27, look: lookOf('ring', 'main') }),
   spine: Object.freeze([22, 19, 16, 13]),
-  spineLook: Object.freeze({ shape: 'square', tone: 'ink' }),
-  tailLook: Object.freeze({ shape: 'dot', tone: 'accent' }),
-  limb: Object.freeze([10, 7, 4.5]),
-  limbLook: Object.freeze({ shape: 'bar', tone: 'main' }),
-  limbTipLook: Object.freeze({ shape: 'dot', tone: 'accent' }),
+  spineLook: lookOf('square', 'ink'),
+  tailLook: lookOf('dot', 'accent'),
+  limbs: Object.freeze({
+    limb: limbKind([10, 7, 4.5], lookOf('bar', 'main'), lookOf('dot', 'accent'), 1, 1),
+  }),
   sockets: Object.freeze([
-    Object.freeze({ id: 'head.l', part: 'head', angle: 115 * DEG, born: 'l' }),
-    Object.freeze({ id: 'head.r', part: 'head', angle: -115 * DEG, born: 'r' }),
-    Object.freeze({ id: 'spine.1.l', part: 'spine.1', angle: 90 * DEG, born: null }),
-    Object.freeze({ id: 'spine.1.r', part: 'spine.1', angle: -90 * DEG, born: null }),
+    Object.freeze({ id: 'head.l', part: 'head', angle: 115 * DEG, limb: 'limb', born: 'l' }),
+    Object.freeze({ id: 'head.r', part: 'head', angle: -115 * DEG, limb: 'limb', born: 'r' }),
+    Object.freeze({ id: 'spine.1.l', part: 'spine.1', angle: 90 * DEG, limb: 'limb', born: null }),
+    Object.freeze({ id: 'spine.1.r', part: 'spine.1', angle: -90 * DEG, limb: 'limb', born: null }),
   ]),
   socketCap: 4,
 });
 
-const PLANS = Object.freeze({ [CULTURE_PLAN_DISH]: DISH_PLAN });
+/**
+ * The moth plan, declared (slice B). Proportions: a small head, a thorax that carries the wings, a
+ * short abdomen, broad wings (22 / 18 / 12) and fine antennae (4 / 3): a wingspan a little over two
+ * body-lengths and a body-length of about 90 px. The wings leave the thorax a touch behind square
+ * (±100°) and the antennae leave the head forward (±40°). Four sockets, all born occupied, cap 4.
+ */
+const MOTH_PLAN = Object.freeze({
+  id: CULTURE_PLAN_MOTH,
+  head: Object.freeze({ radius: 12, look: lookOf('dot', 'ink') }),
+  spine: Object.freeze([18, 14, 9]),
+  spineLooks: Object.freeze([lookOf('ring', 'main'), lookOf('square', 'ink'), lookOf('dot', 'accent')]),
+  limbs: Object.freeze({
+    wing: limbKind([22, 18, 12], lookOf('bar', 'main'), lookOf('ring', 'accent'), 1, 3),
+    antenna: limbKind([4, 3], lookOf('bar', 'ink'), lookOf('dot', 'accent'), 0.3, 5),
+  }),
+  sockets: Object.freeze([
+    Object.freeze({ id: 'head.l', part: 'head', angle: 40 * DEG, limb: 'antenna', born: 'l' }),
+    Object.freeze({ id: 'head.r', part: 'head', angle: -40 * DEG, limb: 'antenna', born: 'r' }),
+    Object.freeze({ id: 'spine.0.l', part: 'spine.0', angle: 100 * DEG, limb: 'wing', born: 'l' }),
+    Object.freeze({ id: 'spine.0.r', part: 'spine.0', angle: -100 * DEG, limb: 'wing', born: 'r' }),
+  ]),
+  socketCap: 4,
+});
 
-/** The plans KINETIC can assemble (one in this slice: the dish creature). */
+const PLANS = Object.freeze({ [CULTURE_PLAN_DISH]: DISH_PLAN, [CULTURE_PLAN_MOTH]: MOTH_PLAN });
+
+/** The plans KINETIC can assemble: the dish creature (slice A) and the moth (slice B). */
 export const CULTURE_BODY_PLANS = Object.freeze(Object.keys(PLANS));
 
 /** A plan's declaration, or a loud refusal for a plan that does not exist. */
 export function cultureBodyPlan(planId) {
-  const p = PLANS[planId];
+  const p = Object.prototype.hasOwnProperty.call(PLANS, planId) ? PLANS[planId] : null;
   if (!p) throw new Error(`cultureBody: unknown body plan "${String(planId)}" (${CULTURE_BODY_PLANS.join(' | ')})`);
   return p;
 }
@@ -114,6 +156,7 @@ export function assembleCultureBody(planId, { scale = 1 } = {}) {
     radius: plan.head.radius * scale,
     parent: -1,
     socket: null,
+    limb: null,
     look: plan.head.look,
   });
   let prev = head;
@@ -124,7 +167,8 @@ export function assembleCultureBody(planId, { scale = 1 } = {}) {
       radius: r * scale,
       parent: prev,
       socket: null,
-      look: k === plan.spine.length - 1 ? plan.tailLook : plan.spineLook,
+      limb: null,
+      look: plan.spineLooks ? plan.spineLooks[k] : k === plan.spine.length - 1 ? plan.tailLook : plan.spineLook,
     });
     links.push(Object.freeze({ a: prev, b: i, rest: restOf(parts[prev].radius, parts[i].radius) }));
     prev = i;
@@ -134,25 +178,30 @@ export function assembleCultureBody(planId, { scale = 1 } = {}) {
     const host = parts.findIndex((p) => p.id === s.part);
     let occupant = -1;
     if (s.born) {
+      const kind = plan.limbs[s.limb];
       let up = host;
-      plan.limb.forEach((r, k) => {
+      kind.radii.forEach((r, k) => {
         const i = add({
-          id: `limb.${s.born}.${k}`,
+          id: `${s.limb}.${s.born}.${k}`,
           role: 'limb',
           radius: r * scale,
           parent: up,
           socket: k === 0 ? s.id : null,
-          look: k === plan.limb.length - 1 ? plan.limbTipLook : plan.limbLook,
+          limb: s.limb,
+          look: k === kind.radii.length - 1 ? kind.tipLook : kind.look,
         });
         links.push(Object.freeze({ a: up, b: i, rest: restOf(parts[up].radius, parts[i].radius) }));
         if (k === 0) occupant = i;
         up = i;
       });
     }
-    sockets.push(Object.freeze({ id: s.id, part: host, angle: s.angle, accepts: 'limb', occupant }));
+    sockets.push(Object.freeze({ id: s.id, part: host, angle: s.angle, accepts: s.limb, occupant }));
   }
   let length = parts[head].radius + parts[prev].radius;
   for (const l of links) if (parts[l.b].role === 'spine') length += l.rest;
+  const limbs = {};
+  for (const k of Object.keys(plan.limbs))
+    limbs[k] = Object.freeze({ paddle: plan.limbs[k].paddle, beat: plan.limbs[k].beat });
   return Object.freeze({
     plan: plan.id,
     scale,
@@ -160,6 +209,7 @@ export function assembleCultureBody(planId, { scale = 1 } = {}) {
     links: Object.freeze(links),
     sockets: Object.freeze(sockets),
     socketCap: plan.socketCap,
+    limbs: Object.freeze(limbs),
     length,
   });
 }
@@ -195,8 +245,8 @@ export function cultureBodyRestPose(body, x, y, heading) {
  * 0; every part's role, positive finite radius, and look are from the declared vocabularies; the
  * parts form ONE tree (every non-head part's parent precedes it, and every part is joined to its
  * parent by exactly the link that names it); every link rest is the overlap rule of its radii;
- * sockets stand within the plan's cap, each on a real part, each occupant a limb root naming that
- * socket; and the body is graphic, not a sticker — at least three distinct shapes in its layout.
+ * sockets stand within the plan's cap, each on a real part and accepting a limb kind the body has, each
+ * occupant a limb root of that kind naming that socket; and the body is graphic, not a sticker — at least three distinct shapes in its layout.
  */
 export function cultureBodyFaults(body) {
   const faults = [];
@@ -219,11 +269,14 @@ export function cultureBodyFaults(body) {
   if (body.links.length !== parts.length - 1) faults.push('not one tree');
   const sockets = body.sockets || [];
   if (sockets.length > body.socketCap) faults.push('sockets over the plan cap');
+  const kinds = body.limbs || {};
   for (const s of sockets) {
     if (!(s.part >= 0 && s.part < parts.length)) faults.push(`socket ${s.id}: host`);
+    if (!Object.prototype.hasOwnProperty.call(kinds, s.accepts)) faults.push(`socket ${s.id}: accepts`);
     if (s.occupant >= 0) {
       const o = parts[s.occupant];
-      if (!o || o.role !== 'limb' || o.socket !== s.id || o.parent !== s.part) faults.push(`socket ${s.id}: occupant`);
+      if (!o || o.role !== 'limb' || o.socket !== s.id || o.parent !== s.part || o.limb !== s.accepts)
+        faults.push(`socket ${s.id}: occupant`);
     }
   }
   if (new Set(parts.map((p) => p.look && p.look.shape)).size < 3) faults.push('a sticker: fewer than three shapes');

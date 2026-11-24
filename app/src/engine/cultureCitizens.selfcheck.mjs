@@ -213,6 +213,10 @@ function dealMovers(w, n, seed) {
     const w = cast(seed);
     const t = cast(seed);
     for (const c of t.citizens.list) c.recipe = INERT; // a muscle-less twin
+    const u = cast(seed); // the same, soil-immune (wither clocks cleared before every step)
+    for (const c of u.citizens.list) c.recipe = INERT;
+    const pathU = w.citizens.list.map(() => 0);
+    let prevU = u.citizens.list.map((c) => headOf(u, c));
     const path = w.citizens.list.map(() => 0);
     const pathT = t.citizens.list.map(() => 0);
     let prev = w.citizens.list.map((c) => headOf(w, c));
@@ -221,7 +225,14 @@ function dealMovers(w, n, seed) {
     for (let s = 0; s < 60 * 120; s++) {
       stepCultureWorld(w);
       stepCultureWorld(t);
+      u.soil.wither.fill(0);
+      stepCultureWorld(u);
       if (s % 12 !== 0) continue;
+      u.citizens.list.forEach((c, k) => {
+        const [x, y] = headOf(u, c);
+        pathU[k] += Math.hypot(x - prevU[k][0], y - prevU[k][1]);
+        prevU[k] = [x, y];
+      });
       w.citizens.list.forEach((c, k) => {
         const [x, y] = headOf(w, c);
         path[k] += Math.hypot(x - prev[k][0], y - prev[k][1]);
@@ -249,8 +260,26 @@ function dealMovers(w, n, seed) {
       if (!c.alive) return;
       assert.ok(path[k] / 60 > 40, `seed ${seed} citizen ${k} swims (${(path[k] / 60).toFixed(1)} px/s)`);
       assert.ok(path[k] > 3 * pathT[k], 'its recipe moves it: a muscle-less twin barely drifts');
+      // FIX-FORWARD (slice B, from slice A QA): the twin comparison above leans on the soil — an inert twin
+      // drifts onto dead ground and withers (some seeds, within 12–30 s), after which it "barely drifts" because it
+      // is DEAD. The assertion is kept exactly as it was; what is added is (a) wither-specific assertions, so a soil
+      // mutation is caught for what it is: the swimmer's head never withered, and a twin that died, died of the
+      // soil; and (b) a soil-free muscle assertion against a third, soil-immune twin (its wither clocks cleared every
+      // step). The honest number there: absent the soil an inert body still drifts on its own flocking (about half
+      // the swimmer's rate), so the recipe is asserted to out-travel it by 1.5× over the cast, not 3×.
+      assert.equal(w.bodies.alive[c.first], 1, 'the swimmer’s head was not withered');
+      assert.ok(w.soil.wither[c.first] < CULTURE_SOIL_WITHER_STEPS, 'its wither clock never ran out');
+      const tc = t.citizens.list[k];
+      if (!tc.alive) assert.equal(tc.cause, 'soil', 'a twin that died, died of the soil — wither-specific');
+      assert.equal(u.citizens.list[k].alive, 1, 'the soil-immune twin never dies');
       assert.equal(c.age, w.citizens.step, 'age counts swarm steps of life');
     });
+    const sumPath = w.citizens.list.reduce((n, _c, k) => n + path[k], 0);
+    const sumU = pathU.reduce((n, v) => n + v, 0);
+    assert.ok(
+      sumPath > 1.5 * sumU,
+      `soil-free: its recipe out-travels an inert body (${(sumPath / sumU).toFixed(2)}×)`,
+    );
     assert.ok(maxSpan < 1.05, `the body holds together (max part reach ${maxSpan.toFixed(3)} body-lengths)`);
     assert.ok(
       w.citizens.list.some((c) => c.alive),

@@ -65,9 +65,17 @@ function host() {
   assert.equal(w.seed, 7);
   assert.equal(w.citizens.cast, 1, 'cast at birth — the Lab’s door');
   assert.ok(w.citizens.list.length >= 2, 'the first citizens live in the dish');
+  // RE-PIN (slice B, changed law: the flagship arrives with the gate) — was: every citizen is a dish creature.
+  // Now the take sheet's own order is pinned exactly: the dish creatures first, the moths after.
+  const plans = w.citizens.list.map((c) => c.plan);
   assert.ok(
-    w.citizens.list.every((c) => c.plan === 'dish'),
-    'the first citizen is the dish creature',
+    plans.includes('dish') && plans.includes('moth'),
+    'the first citizen and the flagship both live in the dish',
+  );
+  assert.deepEqual(
+    plans,
+    [...plans].sort((a, b) => (a === b ? 0 : a === 'dish' ? -1 : 1)),
+    'dish creatures first, then moths',
   );
   assert.equal(h.requests, 1, 'one frame requested');
   h.frame(1000);

@@ -63,9 +63,41 @@ const field = (fill) => ({
 });
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 
+// 0 — FIX-FORWARD (slice A QA): loisGate refuses a bad body. Removing `...cultureBodyFaults(body)` from loisGate
+// used to survive every suite.
+{
+  const live = field(1);
+  const good = curatorAudition(CULTURE_PLAN_DISH, 7, 0, 0);
+  const bodyOf = (look) => ({ ...good.body, parts: good.body.parts.map((p) => ({ ...p, look })) });
+  const sticker = loisGate({ ...good, body: bodyOf({ shape: 'dot', tone: 'main' }) }, live);
+  assert.equal(sticker.admitted, false, 'a one-shape sticker is refused at LOIS’s gate');
+  assert.ok(sticker.faults.includes('a sticker: fewer than three shapes'), 'and the fault is named');
+  const two = loisGate(
+    {
+      ...good,
+      body: {
+        ...good.body,
+        parts: good.body.parts.map((p, i) => ({ ...p, look: { shape: i % 2 ? 'dot' : 'ring', tone: 'main' } })),
+      },
+    },
+    live,
+  );
+  assert.equal(two.admitted, false, 'a two-shape body is refused');
+  assert.ok(two.faults.includes('a sticker: fewer than three shapes'));
+  const headless = loisGate({ ...good, body: { ...good.body, parts: [] } }, live);
+  assert.equal(headless.admitted, false);
+  assert.ok(headless.faults.includes('no parts'));
+  ok('LOIS’s gate refuses a bad body: a sticker and a two-shape body are not admitted, the fault is present');
+}
+
 // 1 — the dish plan, assembled.
 {
-  assert.deepEqual([...CULTURE_BODY_PLANS], [CULTURE_PLAN_DISH], 'one plan in this slice: the dish creature');
+  // RE-PIN (slice B, changed law: the moth is the second plan) — was: [CULTURE_PLAN_DISH], 'one plan in this slice'
+  assert.deepEqual(
+    [...CULTURE_BODY_PLANS],
+    [CULTURE_PLAN_DISH, 'moth'],
+    'two plans: the dish creature, the flagship moth',
+  );
   const b = assembleCultureBody(CULTURE_PLAN_DISH);
   assert.ok(Object.isFrozen(b) && Object.isFrozen(b.parts) && Object.isFrozen(b.parts[0]), 'frozen all the way down');
   assert.equal(b.parts.length, 11, 'head + 4 spine + 2 limbs × 3');
@@ -160,8 +192,9 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   const twoHeads = remake({ parts: b.parts.map((p, i) => (i === 1 ? { ...p, role: 'head' } : p)) });
   assert.ok(cultureBodyFaults(twoHeads).includes('one head, first'));
   assert.throws(
-    () => assembleCultureBody('moth'),
-    /unknown body plan "moth"/,
+    // RE-PIN (slice B, changed law) — was assembleCultureBody('moth') refused as unknown; the moth assembles now
+    () => assembleCultureBody('wasp'),
+    /unknown body plan "wasp"/,
     'the moth is the next slice, not this one',
   );
   assert.throws(() => cultureBodyPlan(undefined), /unknown body plan/);
@@ -336,7 +369,8 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   assert.equal(none.refused.length, 3);
   assert.ok(none.refused.every((r) => r.faults.includes('head on dead ground')));
   assert.equal(curatorCast(7, f, { plan: CULTURE_PLAN_DISH, count: 0 }).members.length, 0);
-  assert.throws(() => normalizeCultureCastSheet({ plan: 'moth', count: 1 }), /unknown body plan/);
+  // RE-PIN (slice B, changed law) — was { plan: 'moth' } refused as unknown; the moth now casts, an unknown plan still does not
+  assert.throws(() => normalizeCultureCastSheet({ plan: 'wasp', count: 1 }), /unknown body plan/);
   assert.throws(() => normalizeCultureCastSheet({ plan: CULTURE_PLAN_DISH, count: 1.5 }), /whole number/);
   assert.throws(
     () => normalizeCultureCastSheet({ plan: CULTURE_PLAN_DISH, count: CULTURE_CAST_CAP + 1 }),
@@ -365,4 +399,4 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   ok('the Lab draws on registered channels only');
 }
 
-console.log(`cultureLab.selfcheck: ${checks}/7 groups OK`);
+console.log(`cultureLab.selfcheck: ${checks}/8 groups OK`);

@@ -18,6 +18,9 @@
 //   FORCES  → the only output that touches the world: velocity added to the citizen's own
 //             bodies in the world's table (the head's thrust, the limb tips' paddle). Never a
 //             position write — the swarm integrates and the solver joins, as for every body.
+//             Each limb tip's push is weighted by its limb kind (the plan's `paddle` weight) and
+//             strokes `beat` times a cycle — the dish's one limb kind is 1 and 1, bit for bit slice A;
+//             a moth's wing is heavier and beats three to the stroke (slice B).
 //
 // Drives → forces on the swarm/solver bodies: a citizen is pushed exactly like the Queen's fields
 // and the hand push (velocity added, not divided by mass — the fields' weather discipline), so a
@@ -393,7 +396,9 @@ export function stepCultureCitizenMuscle(bodies, field, c) {
     for (const tip of c.limbTips) {
       const i = h + tip.part;
       if (!alive[i]) continue;
-      const a = paddle * Math.sin(TAU * (p - lag * c.depth[tip.part])) * tip.side;
+      // the tip's kind sets its weight and how many beats it makes per stroke (the plan's anatomy: the
+      // dish's one limb kind is 1 and 1, bit for bit what slice A paddled; a moth's wing beats 3 a stroke)
+      const a = paddle * tip.weight * Math.sin(TAU * tip.beat * (p - lag * c.depth[tip.part])) * tip.side;
       vx[i] += -uy * a;
       vy[i] += ux * a;
     }

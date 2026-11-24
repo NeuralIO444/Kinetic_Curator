@@ -220,6 +220,8 @@ node src/engine/cultureSoil.selfcheck.mjs
 node src/engine/cultureMotion.selfcheck.mjs
 node src/engine/cultureLab.selfcheck.mjs
 node src/engine/cultureCitizens.selfcheck.mjs
+node src/engine/cultureMoth.selfcheck.mjs
+node src/engine/cultureGait.selfcheck.mjs
 node src/hooks/useCultureWorld.selfcheck.mjs
 node src/engine/dishFluid.selfcheck.mjs
 node src/engine/dishFluidCouple.selfcheck.mjs
