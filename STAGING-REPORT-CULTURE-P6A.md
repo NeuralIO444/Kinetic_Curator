@@ -39,7 +39,7 @@ plan uses); strandbeest 6 crank throws, none free; dish creature as in 5A (4, tw
 | Upkeep | 1 fat/s a body + 0.5 fat/s a carried limb | `CULTURE_UPKEEP_BODY_FAT_S`, `CULTURE_UPKEEP_LIMB_FAT_S` (2 / 1 ticks a step) |
 | Starvation | fat 0 sustained 5 s | `CULTURE_STARVE_S` (600 steps) |
 | Dead-ground wither | 4 s (Phase 4, unchanged) | `CULTURE_SOIL_WITHER_S` |
-| Decay | body 30 s, limbs lootable throughout | `CULTURE_CORPSE_S` (3,600 steps) |
+| Decay | body 30 s, limbs lootable throughout (while the part stands — the soil may wither it first) | `CULTURE_CORPSE_S` (3,600 steps) |
 | Predation | attacker fat < 30 and size ratio ≥ 1.2 | `CULTURE_PREDATION_FAT`, `CULTURE_PREDATION_RATIO` |
 | Sim | 120 Hz | `CULTURE_ECOLOGY_STEP_HZ` (pinned = `CULTURE_STEP_HZ`) |
 | Sensory range | 3 body-lengths | `cultureSenseRange` (5A's) |
@@ -77,7 +77,9 @@ hunger pull weighs **2 × (1 − fat/100)** in the drives' units.
 10. **Death and the corpse.** Any death (soil, starvation, predation) leaves a corpse: no muscle, no age, no gait (as 5A
     already did for soil), its parts still ordinary bodies the dish can push. Its look fades in data: the read door's
     `life.decay` rises 0 → 1 over 30 s and every part's `pose.dAlpha` is lowered by it. At exactly 30 s its last parts
-    (born and carried) are gone (alive 0, soil clocks cleared). Limbs lootable until then.
+    (born and carried) are gone (alive 0, soil clocks cleared). Limbs lootable until then — **while the part stands**:
+    the soil still judges a corpse's parts (Phase 4's law), so on dead ground a corpse's limb can wither before 30 s,
+    and a withered limb root is no longer lootable.
 11. **Looting re-deals the limb.** The corpse's limb (its living chain from the root) is appended as fresh slots on the
     looter — each part its ORIGINAL radius, look (shape + tone role) and mass — laid out from the socket's host along the
     socket's angle at the overlap rule, moving with the host, joined by fresh links; the corpse's slots are retired
@@ -93,7 +95,10 @@ hunger pull weighs **2 × (1 − fat/100)** in the drives' units.
 14. **Order.** Food sense before the muscle; carried limbs rehomed with the body before the solver; after the gait:
     beats land → eating → predation → looting on the settled frame; metabolism every world step before the soil.
 15. **Dormant over an uncast world** (the gait layer's precedent): no lives, no morsels, no step counted — an uncast
-    world hashes exactly as before this slice (cultureCitizens g1, unmodified, proves it against an independent replay).
+    world's STATE is identical to before this slice; its hash VALUE moves by the constant fold of the empty ecology's
+    hash (`cultureWorldHash` always folds it). cultureCitizens g1, unmodified, proves the state against an independent
+    replay (its replay world carries the same empty ecology, so the two hashes agree). *(Wording corrected in the QA
+    follow-up: the first draft said "hashes exactly as before", which is false.)*
 
 ## Mutation tests — 37/37 killed (each applied alone to a clean tree, the named suite run, the file restored)
 
@@ -203,7 +208,16 @@ By plan, lean room: dish 40/57 alive (3 starved, 14 preyed), moth 34/40 (5, 1), 
 preyed). Unfed: strandbeests were 20 of the 40 predation victims. Breeding/growth are 6B, so there are no births beyond
 the cast.
 
-## Open questions (multiple choice + recommendation; none blocking)
+## For Matt — RULED (Matt, 2026-11-24)
+
+1. RULED: **a kill gives no fat** — the food web is beats only (as built).
+2. RULED: **a strandbeest's planted feet eat too** — built in the QA follow-up (below).
+3. RULED: **hunger becomes a DAVIS drive, blended by breeding, in 6B** — not here; 6A keeps it as the ecology's law.
+4. RULED: **morsels land uniformly** (as built).
+5. RULED: **looted limbs are worn only** (as built).
+6. "Carried limb = looted limb" (design call 4) stands as the coordinator's reading of the ruling.
+
+## Open questions as first filed (all now ruled above)
 
 1. **Does a kill feed the predator?** (a) no — the food web is beats, as ruled (built); (b) +10, like a morsel;
    (c) the prey's remaining fat. **Recommend (a)**: the limbs are the reward; feeding on kills would make predation the
@@ -220,9 +234,60 @@ the cast.
 5. **Where does a beat land?** (a) uniformly inside the dish (built); (b) biased toward living ground (fertility feeds
    the ecology, §5.2); (c) near a source once the dish has sources. **Recommend (a)** until the dish has sources.
 
+## QA follow-up (one PR after the merge of the slice — it follows the slice's QA and records Matt's rulings)
+
+1. **RULED and built — a strandbeest's planted feet eat too.** A foot is *planted* exactly when the existing stance band
+   says so (`cultureBeastFeet(...).planted`, the band slice C already walks on — no new band). A planted foot eats a
+   morsel within its hip disc's radius + the morsel's reach (`CULTURE_MORSEL_RADIUS`), the same +10 as a head; a swinging
+   foot eats nothing. The mouths are dealt in a canonical order (`cultureMouths`: per living citizen in cast order, its
+   head, then each planted foot in leg order); each morsel goes to the NEAREST mouth that reaches it, and an exact tie to
+   the first in that order — the earlier citizen, a citizen's head before its feet, the earlier leg
+   (`cultureMouthReaching`). A full citizen's mouths pass (one guard, in the chooser). Sensing is unchanged (the head).
+2. **The hash covers every piece of new state, now proven.** cultureEcology g9 also changes morsel y and serial, a
+   socket's slot and slot count, a carried part's radius, look shape and look tone, and a socket's id — each must move
+   the world hash.
+3. **Wording:** design call 15 (an uncast world: state identical, the hash value moves by the constant fold) and the
+   corpse's "lootable throughout" (while the part stands; the soil may wither it first).
+4. **Mutation tests — 46/46 killed** on the final code (the slice's 37, re-anchored where the eating code moved, plus 9):
+
+   | Mutation | Killed by |
+   |---|---|
+   | feet never eat | cultureEcology g10 (its mouths: head, then each planted foot) |
+   | a swinging foot eats | cultureEcology g10 |
+   | a mouth tie goes to the later mouth | cultureEcology g10 "a tie: the earlier citizen" |
+   | foot reach doubled | cultureEcology g10 "beyond the foot's reach" |
+   | full citizens eat (the one fullness guard removed) | cultureEcology g2 |
+   | eating: the first mouth, not the nearest | cultureEcology g2 |
+   | ecology hash drops morsel y | cultureEcology g9 |
+   | ecology hash drops socket slots | cultureEcology g9 |
+   | ecology hash drops a carried part's radius | cultureEcology g9 |
+   | ecology hash drops a carried part's look shape | cultureEcology g9 |
+   | ecology hash drops a carried part's look tone | cultureEcology g9 |
+
+   (While re-anchoring, the fullness guard was found twice — in the mouth list and in the chooser — which would have
+   masked a mutation of either; it now stands once, in the chooser.)
+5. **Behaviour, re-run (the full take sheet, 20 seeds):**
+
+   | Room | Cast | Alive | Soil | Starved | Preyed | Loots | Morsels landed / eaten |
+   |---|---|---|---|---|---|---|---|
+   | mid, 120 bpm, 60 s | 131 | 128 | 2 | 0 | 1 | 0 | 2,380 / 1,061 |
+   | none (unfed), 60 s | 131 | 0 | 0 | 91 | 40 | 16 | 0 / 0 (unchanged: no beats, no feet eat) |
+   | low, 40 bpm, 120 s | 131 | 71 | 0 | 33 | 27 | 16 | 1,580 / 1,034 |
+
+   Strandbeests, lean room: **2/34 alive** (was 0/34) — 24 starved (was 25), 8 preyed (was 9). Fed room: 31/34 alive,
+   none starved (was 1). The feet help a little; the beast's slow, wide-turning walk still rarely puts a planted foot on a
+   morsel in a lean room, and its small disc area still makes it prey. Swimmers in the lean room: dish 37/57 alive (17
+   preyed), moth 32/40 — the beasts' extra eating shifts who is hungry when, so the totals move a little. Iteration
+   material, not a blocker.
+6. **Re-pins: none.** Every prior suite passes unmodified (cultureBeast g8's room-on pins are swimmer-only sheets, so the
+   feet do not reach them; g9's fed world still differs from the unfed).
+7. **Verification:** cultureEcology 10/10; every culture suite, kernel/rng green; lint 0 errors; format:check clean;
+   build green; gate-off live stage byte-identical to origin/main `72ad5e3` (all modes `3f43c59f…eb681ba`,
+   serializeProject `9d7d6f7d…7552fd`, live gait `ef463685…68c6d3`, 23 motion sources, 56 cost tiers).
+
 ## What 6B carries
 
 Breeding (§3.3 — fat ≥ 60 and growth stage ≥ 2, body parts mixed as well as recipes, breeding costs fat) and with it
 births beyond the cast and T3's baby preview; growth (§3.4, XP — eating, looting, surviving a lean period are natural XP
-sources now that they exist as events); per-take Lab casting changes; and whichever of the open questions above Matt
-rules into it.
+sources now that they exist as events); per-take Lab casting changes; and, RULED, hunger as a DAVIS drive blended by
+breeding.
