@@ -1722,6 +1722,7 @@ export function createLiveLoop(
     return { target: outTarget, fxFinishChains: toTarget.fxFinishChains || [] };
   }
 
+  let stillRun = null; // { left, done } — set only by the test hook below
   function tick() {
     if (!running) return;
     rafId = requestAnimationFrame(tick);
@@ -1738,9 +1739,13 @@ export function createLiveLoop(
     // physics into a single huge step. Accumulate loopTimeMs so the noise
     // field progresses in simulation time, not wall time — a tab that was
     // backgrounded for 30 s resumes where it left off instead of jumping.
+    // Test-only still (#2477): while a `__kcStill` run is active the clock is a fixed 1/60 step and the loop freezes
+    // after the requested frame count — so the frame is a function of (scene, count), not of wall pacing.
+    if (stillRun && stillRun.left <= 0) return;
+    if (stillRun && !getState().running) getState().setRunning(true); // the FPS watchdog may trip mid-still in headless GL
     const now = performance.now();
     if (prevTime === 0) prevTime = now; // first frame after start/restore
-    const rawDtMs = now - prevTime;
+    const rawDtMs = stillRun ? 1000 / 60 : now - prevTime;
     prevTime = now;
     const clampedDtMs = Math.max(8, Math.min(50, rawDtMs));
     const dtSec = clampedDtMs / 1000;
@@ -2062,6 +2067,7 @@ export function createLiveLoop(
         }
       }
       frameCount++;
+      if (stillRun && --stillRun.left <= 0) stillRun.done(frameCount); // test-only still (#2477)
       // #266 — the tick presented cleanly; counts toward honest recovery.
       // Ticks that return early (bake in flight / paused) never reach here,
       // so they neither trip nor clear the fault — only real presents count.
@@ -2204,6 +2210,52 @@ export function createLiveLoop(
     } catch {
       return null;
     }
+  }
+
+  // Test hook (the `__KC_EXPOSE_STORE` convention; inert in production): the last PRESENTED frame as a coarse grid of
+  // mean colours, read through the same readback the loop mirror uses (no screenshot, no rAF wait, so it works under
+  // a held clock). The e2e compares two contexts' stages by this; `n` is the presented-frame count.
+  if (typeof window !== 'undefined' && window.__KC_EXPOSE_STORE === true) {
+    window.__kcStill = (frames = 30) =>
+      new Promise((resolve) => {
+        // Headless software GL is slow enough that the FPS watchdog (tripWatchdog) pauses the run flag a few frames after
+        // boot, which is why a free-running test canvas stops repainting. The still resumes it (setRunning clears the
+        // stop) and the fixed-step frame count, not wall pacing, decides when it is done.
+        getState().setRunning(true);
+        live.dropAccum(); // no feedback-trail history: the frame is a function of (scene, count)
+        loopTimeMs = 0;
+        prevTime = 0;
+        stillRun = { left: frames, done: resolve };
+      });
+    window.__kcPresentedGrid = (cells = 4) => {
+      const f = grabPresentedFrame();
+      if (!f || !f.pixels) return null;
+      const { pixels, width, height } = f;
+      const grid = [];
+      for (let cy = 0; cy < cells; cy++) {
+        for (let cx = 0; cx < cells; cx++) {
+          const x0 = Math.floor((cx * width) / cells);
+          const x1 = Math.max(x0 + 1, Math.floor(((cx + 1) * width) / cells));
+          const y0 = Math.floor((cy * height) / cells);
+          const y1 = Math.max(y0 + 1, Math.floor(((cy + 1) * height) / cells));
+          let r = 0;
+          let g = 0;
+          let b = 0;
+          let k = 0;
+          for (let y = y0; y < y1; y += 2) {
+            for (let x = x0; x < x1; x += 2) {
+              const o = (y * width + x) * 4;
+              r += pixels[o];
+              g += pixels[o + 1];
+              b += pixels[o + 2];
+              k++;
+            }
+          }
+          grid.push(r / k, g / k, b / k);
+        }
+      }
+      return { n: f.n, width, height, grid };
+    };
   }
 
   function start() {

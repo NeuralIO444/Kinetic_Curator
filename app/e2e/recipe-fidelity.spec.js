@@ -4,11 +4,12 @@
 // carried but the link) and asserts the receiver stands on the same stage:
 //   1. the link's frame-0 hash `f` equals the receiver's frame-0 hash, and the receiver shows no
 //      "Scene differs from sender's build" notice;
-//   2. a second fresh context on the same link lands on the same hash.
-// NOT here: a downscaled canvas checksum (#2325 asked for one). The live loop animates and, in headless software GL,
-// paces unevenly: the same link photographed in two contexts differed by 4..70 /255 on a 2x2 mean-colour grid, and the
-// sender's own canvas did not repaint after a scene edit inside the test window. A pixel gate that flaky is worse
-// than none, so the exact frame-0 hash is the gate and the canvas checksum is left for a still-render path.
+//   2. a second fresh context on the same link lands on the same hash;
+//   3. (#2477) both receivers' CANVASES agree on a still: `__kcStill(12)` runs exactly three fixed-step frames from
+//      t=0 and freezes the loop, `__kcPresentedGrid` reads the presented frame as a 4x4 mean-colour grid. Free-running
+//      canvases differed by 4..70 /255 in headless GL (uneven pacing), so the still path is the only fair photograph.
+//      A control context with NO scene must differ, so the checksum is proven to see the scene at all.
+//      The sender's canvas is not compared: it did not repaint after an in-test applyScene (see #2477, filed separately).
 // Deliberately dropping a carried scene field from `x` (recipeSceneKeys.pickSceneBlock) fails (1); the PR shows it.
 import { test, expect } from '@playwright/test';
 import { assembleConstruct, constructTileId } from '../src/engine/constructAssembler.js';
@@ -27,6 +28,19 @@ const init = () => {
   }
 };
 
+// A fixed-step still (test hook in gl/liveLoop.mjs, inert without __KC_EXPOSE_STORE): returns the 4x4 mean-colour grid.
+async function stillGrid(page) {
+  await page.bringToFront();
+  const done = await page.evaluate(() =>
+    Promise.race([window.__kcStill(12), new Promise((r) => setTimeout(() => r('TIMEOUT'), 90_000))]),
+  );
+  expect(done, 'the still finished its frames').not.toBe('TIMEOUT');
+  const g = await page.evaluate(() => window.__kcPresentedGrid(4));
+  expect(g && g.grid && g.grid.length, 'a presented frame to read').toBe(48);
+  return g.grid;
+}
+const gridDiff = (x, y) => x.reduce((acc, v, i) => acc + Math.abs(v - y[i]), 0) / x.length;
+
 async function boot(page, url) {
   await page.addInitScript(init);
   await page.goto(url);
@@ -37,7 +51,7 @@ async function boot(page, url) {
 }
 
 test('a dressed scene copied as a link opens in a NEW browser context on the same frame 0', async ({ browser }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(420_000);
   const ctxA = await browser.newContext();
   await ctxA.grantPermissions(['clipboard-read', 'clipboard-write']);
   const a = await ctxA.newPage();
@@ -101,9 +115,20 @@ test('a dressed scene copied as a link opens in a NEW browser context on the sam
   const c = await ctxC.newPage();
   await boot(c, link);
   await c.waitForTimeout(2000);
-  expect(await c.evaluate(() => window.__kcFrame0Hash())).toBe(hashA);
+  await expect.poll(() => c.evaluate(() => window.__kcFrame0Hash()), { timeout: 20_000 }).toBe(hashA);
+
+  // (3) the canvas checksum on the still path: two receivers agree, a scene-less stage does not.
+  const gridB = await stillGrid(b);
+  const gridC = await stillGrid(c);
+  expect(gridDiff(gridB, gridC), 'two receivers of one link paint the same still').toBeLessThan(12);
+  const ctxD = await browser.newContext();
+  const d = await ctxD.newPage();
+  await boot(d, '/?boot=factory');
+  const gridD = await stillGrid(d);
+  expect(gridDiff(gridB, gridD), 'the checksum sees the carried scene').toBeGreaterThan(40);
 
   await ctxA.close();
   await ctxB.close();
   await ctxC.close();
+  await ctxD.close();
 });
