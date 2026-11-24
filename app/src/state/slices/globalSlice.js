@@ -24,6 +24,7 @@ import {} from '../projectNormalize.js';
 import { clampCycleGens, FIELD_CYCLE_GENS } from '../../engine/dishLifeField.mjs'; // #1923 Phase 4: the re-seed interval's detents
 import { sanitizeMagnets, clampFluidDial, clampFluidRung, MAX_MAGNETS } from '../../engine/dishFluid.mjs'; // #1997: the ferrofluid's stamped-state sanitizers
 import { emit, Events } from '../../composition/eventBus.js';
+import { watchdogGraceDeadline, faultWatchdogReading } from '../watchdogLaw.mjs'; // #2481: resume grace + trip readings
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
 import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { chapterMemorySummary } from '../../curator/chapterMemory.mjs'; // #1858: the book-memory line
@@ -404,6 +405,23 @@ export const createGlobalSlice = (set, get) => ({
    * the session is paused (e.g. 'fps-critical' vs a render-error label). */
   lastWatchdogReason: null,
   /**
+   * #2481 (ruling 3) — the watchdog's OWN measurement at the current
+   * trip: a state/watchdogLaw.mjs reading in the terms the trip acted
+   * on (effective fps vs its floor, loop-time ratio, frame silence, or
+   * the fault label). The PERF PAUSED pill and the governor log show
+   * this — never a display fps that contradicts it. Set by tripWatchdog,
+   * cleared on manual resume alongside the reason. Session-only.
+   */
+  lastWatchdogReading: null,
+  /**
+   * #2481 (ruling 1) — the grace deadline (wall-clock ms) a manual
+   * resume arms: until it passes, the governor's perf trip paths may
+   * not re-trip, so a resume lands and the loop gets a few seconds to
+   * settle instead of re-pausing within a frame. 0 = no grace armed.
+   * Session-only, like the rest of the watchdog state.
+   */
+  watchdogGraceUntil: 0,
+  /**
    * RENDER FAULT (#266): a deterministic per-frame fault in the live loop
    * (frame building / rendering / presenting throwing on consecutive ticks)
    * or a deterministic atlas-bake failure. The loop sets this sticky — the
@@ -600,10 +618,21 @@ export const createGlobalSlice = (set, get) => ({
       // outright — slowRender, its source, and the badge's reason. The cut-6
       // soft freeze is NOT cleared here; it auto-clears on FPS recovery in
       // the governor hook.
+      // #2481 — the same resume arms the grace deadline (ruling 1): the
+      // governor's perf trips hold off until it passes, so this resume
+      // cannot be undone by a sustain window that matured during the stop.
       const resumeWatchdog = !!running && state.slowRenderSource === 'watchdog';
       return {
         running,
-        ...(resumeWatchdog ? { slowRender: false, slowRenderSource: null, lastWatchdogReason: null } : {}),
+        ...(resumeWatchdog
+          ? {
+              slowRender: false,
+              slowRenderSource: null,
+              lastWatchdogReason: null,
+              lastWatchdogReading: null,
+              watchdogGraceUntil: watchdogGraceDeadline(Date.now()),
+            }
+          : {}),
       };
     }),
   setFps: (fps) => set({ fps }),
@@ -793,8 +822,9 @@ export const createGlobalSlice = (set, get) => ({
     }),
   /** #264 — the governor records the tier its quality shed stepped from. */
   setQualityShedFrom: (tier) => set({ qualityShedFrom: tier }),
-  /** #264 — lets the badge return to clean once a watchdog stop is gone. */
-  clearWatchdogReason: () => set({ lastWatchdogReason: null }),
+  /** #264 — lets the badge return to clean once a watchdog stop is gone.
+   * #2481 — the trip's reading goes with the reason: both are the badge's. */
+  clearWatchdogReason: () => set({ lastWatchdogReason: null, lastWatchdogReading: null }),
   setBatchPaused: (paused) => set({ batchPaused: !!paused }),
   setPerfTier1: (on) => set({ perfTier1: !!on }),
   setFxaaShed: (on) => set({ fxaaShed: !!on }),
@@ -836,7 +866,7 @@ export const createGlobalSlice = (set, get) => ({
    * Cross-slice write (evolveMode lives in davisSlice): already precedented
    * by setQuality reaching into layoutParams above.
    */
-  tripWatchdog: (reason) =>
+  tripWatchdog: (reason, reading) =>
     set((state) => ({
       slowRender: true,
       slowRenderSource: 'watchdog',
@@ -845,6 +875,11 @@ export const createGlobalSlice = (set, get) => ({
       perfTier1: true,
       watchdogTripGen: state.watchdogTripGen + 1,
       lastWatchdogReason: reason,
+      // #2481 (ruling 3) — the measurement this trip acted on, in its own
+      // terms (state/watchdogLaw.mjs). Callers that measure pass theirs;
+      // the correctness trips (accum-nan, render-error) pass none, and
+      // their reading is the fault label itself.
+      lastWatchdogReading: reading !== undefined ? reading : faultWatchdogReading(reason),
     })),
   setWebcamEnabled: (enabled) => set({ webcamEnabled: enabled }),
   /**

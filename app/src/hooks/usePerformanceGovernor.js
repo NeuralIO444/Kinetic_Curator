@@ -45,11 +45,15 @@ import {
   frameStalled,
   FRAME_STALL_MS,
   measureLoopRate,
-  CRAWL_WINDOW_MS,
   CRAWL_MAX_LOOP_RATIO,
-  effectiveGovernorFps,
 } from './governorCuts.js';
 import { getFrameDeltas, clearFrameDeltas } from './useFpsMeter.js';
+import {
+  inWatchdogGrace,
+  fpsWatchdogReading,
+  crawlWatchdogReading,
+  stalledWatchdogReading,
+} from '../state/watchdogLaw.mjs';
 import { recordGovernorEvent, CUT_KINDS } from '../gl/governorEventLog.mjs';
 import { feedbackWarpAmount } from '../gl/spectrumWarp.mjs';
 import { accumFeedSelection } from '../gl/renderer.mjs';
@@ -241,6 +245,10 @@ export function usePerformanceGovernor() {
   // meaningless (no frames present during the rebake); don't let the
   // watchdog trip on the new session before it has drawn anything.
   const glContext = useStore((s) => s.glContext);
+  // #2481 (ruling 1) — the manual-resume grace deadline: while it is in
+  // the future, every perf trip path below holds off (the slice arms it
+  // in setRunning when a resume clears a watchdog stop).
+  const watchdogGraceUntil = useStore((s) => s.watchdogGraceUntil);
 
   const lowSinceRef = useRef(null);
   const lastActionRef = useRef(0);
@@ -352,6 +360,16 @@ export function usePerformanceGovernor() {
       criticalSinceRef.current = null;
       return;
     }
+    // #2481 (ruling 1) — grace: a manual resume just landed; hold the
+    // trip window shut until the deadline passes. The window is held
+    // at null (not merely the trip suppressed), so after grace the
+    // full sustain is still owed — and a window that matured DURING
+    // the stop, while a saturated main thread kept effFps critical,
+    // can no longer re-trip on the first pass after resume.
+    if (inWatchdogGrace(Date.now(), watchdogGraceUntil)) {
+      criticalSinceRef.current = null;
+      return;
+    }
     if (effFps >= recoverFps) {
       criticalSinceRef.current = null;
       return;
@@ -380,7 +398,7 @@ export function usePerformanceGovernor() {
       return;
     }
     if (!slowRender && now - criticalSinceRef.current >= CRITICAL_SUSTAIN_MS) {
-      tripWatchdog('fps-critical');
+      tripWatchdog('fps-critical', fpsWatchdogReading(effFps, CRITICAL_FPS));
       // Event-log only: step 7 of the shed ladder fired.
       recordGovernorEvent({
         type: 'shed',
@@ -405,6 +423,7 @@ export function usePerformanceGovernor() {
     clearWatchdogReason,
     recoverFps,
     glContext,
+    watchdogGraceUntil,
     watchdogMayTripNow,
   ]);
 
@@ -480,6 +499,15 @@ export function usePerformanceGovernor() {
         stallWasStoppedRef.current = true;
         return;
       }
+      // #2481 (ruling 1) — grace: a manual resume just landed, so hold
+      // both carve-outs off until the deadline passes. Arming the same
+      // restart the stopped branch arms means the stall bound and the
+      // crawl's delta window both start fresh when grace ends — a
+      // resume can never be re-tripped by time measured before it.
+      if (inWatchdogGrace(Date.now(), s.watchdogGraceUntil)) {
+        stallWasStoppedRef.current = true;
+        return;
+      }
       if (stallWasStoppedRef.current) {
         stallWasStoppedRef.current = false;
         lastFrameAtRef.current = Date.now();
@@ -491,17 +519,16 @@ export function usePerformanceGovernor() {
         return;
       }
       if (frameStalled(lastFrameAtRef.current, Date.now())) {
-        s.tripWatchdog('fps-stalled');
+        s.tripWatchdog('fps-stalled', stalledWatchdogReading(FRAME_STALL_MS));
         // Event-log only: the carve-out fires under the watchdog kind.
+        // #2481 (ruling 3) — no fps record here: the stall acted on
+        // silence, not a rate, and the old { at, threshold: 0 } record
+        // rendered in X-RAY as the nonsense "2fps < 0". The detail IS
+        // the measurement, and the row now shows it.
         recordGovernorEvent({
           type: 'shed',
           cutKind: 'watchdog',
           label: 'watchdog hard stop — frame stalled',
-          fps: {
-            at: Math.round(effectiveGovernorFps(Number(s.fps) || 0, s.stageTimings) * 10) / 10,
-            threshold: 0,
-            sustainedMs: FRAME_STALL_MS,
-          },
           detail: `no completed frame for ${FRAME_STALL_MS / 1000}s`,
         });
         console.info(
@@ -522,17 +549,17 @@ export function usePerformanceGovernor() {
       if (lastFrameAtRef.current == null) return;
       const rate = measureLoopRate(getFrameDeltas());
       if (!rate || rate.ratio >= CRAWL_MAX_LOOP_RATIO) return;
-      s.tripWatchdog('fps-crawl');
+      s.tripWatchdog('fps-crawl', crawlWatchdogReading(rate.ratio, rate.wallMs, rate.frames));
       // Event-log only: the carve-out fires under the watchdog kind.
+      // #2481 (ruling 3) — no fps record here either: the crawl acted
+      // on the loop-rate ratio, not on the GPU-implied fps the old
+      // record put in the `at` slot (which is how the log came to read
+      // "2fps < 0" while the stage's own readout said 60). The detail
+      // IS the measurement, and the row now shows it.
       recordGovernorEvent({
         type: 'shed',
         cutKind: 'watchdog',
         label: 'watchdog hard stop — loop time crawling',
-        fps: {
-          at: Math.round(effectiveGovernorFps(Number(s.fps) || 0, s.stageTimings) * 10) / 10,
-          threshold: 0,
-          sustainedMs: CRAWL_WINDOW_MS,
-        },
         detail: `loop time advanced ${Math.round(rate.ratio * 100)}% of wall across ${(rate.wallMs / 1000).toFixed(1)}s (${rate.frames} frames)`,
       });
       console.info(

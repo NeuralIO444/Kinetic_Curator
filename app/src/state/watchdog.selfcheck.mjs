@@ -8,6 +8,7 @@
 
 import assert from 'node:assert';
 import { createGlobalSlice } from './slices/globalSlice.js';
+import { WATCHDOG_RESUME_GRACE_MS, fpsWatchdogReading } from './watchdogLaw.mjs';
 
 function makeStore() {
   let state = {};
@@ -28,6 +29,8 @@ function makeStore() {
   assert.strictEqual(s.get().perfTier1, false);
   assert.strictEqual(s.get().watchdogTripGen, 0);
   assert.strictEqual(s.get().lastWatchdogReason, null);
+  assert.strictEqual(s.get().lastWatchdogReading, null, '#2481: no trip, no reading');
+  assert.strictEqual(s.get().watchdogGraceUntil, 0, '#2481: no resume yet, no grace armed');
   assert.strictEqual(s.get().running, true, 'running defaults true');
 }
 
@@ -97,3 +100,56 @@ console.log('watchdog.selfcheck: OK (#107 §4 two-tier watchdog)');
 }
 
 console.log('watchdog.selfcheck: OK (#264 manual resume)');
+
+// #2481 — the trip carries its own measurement (ruling 3): a measuring
+// caller passes its reading and the slice stores it verbatim; a
+// correctness caller passes none and the reading is the fault label.
+{
+  const s = makeStore();
+  const reading = fpsWatchdogReading(1.4, 10);
+  s.get().tripWatchdog('fps-critical', reading);
+  assert.deepStrictEqual(s.get().lastWatchdogReading, reading, 'measuring trip stores its reading');
+
+  const s2 = makeStore();
+  s2.get().tripWatchdog('accum-nan');
+  assert.deepStrictEqual(
+    s2.get().lastWatchdogReading,
+    { kind: 'fault', label: 'accum-nan' },
+    'correctness trip: the fault label is the reading',
+  );
+}
+
+// #2481 — manual resume arms the grace deadline (ruling 1) and clears
+// the reading with the reason; nothing else arms it.
+{
+  const s = makeStore();
+  s.get().tripWatchdog('fps-critical', fpsWatchdogReading(1.4, 10));
+  const before = Date.now();
+  s.get().setRunning(true);
+  const after = Date.now();
+  const until = s.get().watchdogGraceUntil;
+  assert.ok(
+    until >= before + WATCHDOG_RESUME_GRACE_MS && until <= after + WATCHDOG_RESUME_GRACE_MS,
+    'resume arms grace = now + WATCHDOG_RESUME_GRACE_MS',
+  );
+  assert.strictEqual(s.get().lastWatchdogReading, null, 'resume clears the reading with the reason');
+}
+{
+  // Pausing never arms grace.
+  const s = makeStore();
+  s.get().tripWatchdog('fps-critical');
+  s.get().setRunning(false);
+  assert.strictEqual(s.get().watchdogGraceUntil, 0, 'pause arms no grace');
+}
+{
+  // A resume with no watchdog stop to clear arms no grace — including
+  // over a cut-6 soft freeze, which setRunning deliberately leaves up.
+  const s = makeStore();
+  s.get().setRunning(true);
+  assert.strictEqual(s.get().watchdogGraceUntil, 0, 'plain resume arms no grace');
+  s.get().setSlowRender(true, 'cut6');
+  s.get().setRunning(true);
+  assert.strictEqual(s.get().watchdogGraceUntil, 0, 'soft-freeze resume arms no grace');
+}
+
+console.log('watchdog.selfcheck: OK (#2481 readings + resume grace)');

@@ -55,11 +55,31 @@ function EventRow({ e }) {
       <span style={{ flexShrink: 0, color: '#8a93a6' }}>{new Date(e.t).toLocaleTimeString()}</span>
       <span style={{ flexShrink: 0 }}>step {e.step}</span>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.label}</span>
-      {e.fps && (
+      {/* #2481 (ruling 3) — the right slot shows the measurement the event
+          acted on: the fps pair only when the trip genuinely has an fps
+          threshold (threshold 0 was the stall/crawl placeholder that
+          rendered as "2fps < 0"); otherwise the detail, which for the
+          carve-out trips IS the measurement (silence, loop-rate ratio). */}
+      {e.fps && e.fps.threshold > 0 ? (
         <span style={{ color: '#8a93a6', marginLeft: 'auto', flexShrink: 0 }}>
           {e.fps.at.toFixed(0)}fps &lt; {e.fps.threshold}
         </span>
-      )}
+      ) : e.detail ? (
+        <span
+          style={{
+            color: '#8a93a6',
+            marginLeft: 'auto',
+            flexShrink: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+          title={e.detail}
+        >
+          {e.detail}
+        </span>
+      ) : null}
     </div>
   );
 }

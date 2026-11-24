@@ -202,6 +202,12 @@ export const DETERMINISM_ALLOWLIST = {
     'Date.now': { count: 2, why: 'wing-warp measurement harness (debug) — timing only' },
     'performance.now': { count: 2, why: 'wing-warp measurement harness (debug) — timing only' },
   },
+  'state/slices/globalSlice.js': {
+    'Date.now': {
+      count: 1,
+      why: '#2481 watchdog resume grace: setRunning stamps the grace deadline (watchdogGraceUntil) when a manual resume clears a watchdog hard stop — interaction timing in the slowRenderSource class (session-only, never serialized, never stamped on resolver input, never read by the sim); the governor compares it against its own wall clock, so a take replays identically with or without it',
+    },
+  },
   'state/bundle.js': {
     'Date.now': {
       count: 2,
