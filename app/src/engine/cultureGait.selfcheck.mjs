@@ -541,7 +541,16 @@ const stepsToBeat = (w, beats) => {
     'no gait stands',
   );
   const bare = cultureCitizenLayout(w.bodies, w.citizens.list[0], (i) => w.soil.wither[i] / 480);
-  assert.equal(JSON.stringify(lay), JSON.stringify(bare), 'with no room the layout is the feel layer, bit for bit');
+  // LOUD RE-PIN (Phase 6A — the read door now carries the citizen's LIFE: fat, starvation, decay, sockets as worn). The
+  // claim is unchanged: with no room the layout is the feel layer, bit for bit — every key the feel layer writes, and
+  // nothing else but the one `life` reading (no looted limb here, so no carried part follows the born ones).
+  const { life, ...layNoLife } = lay;
+  assert.ok(life && typeof life.fat === 'number', 'the life rides the read door');
+  assert.equal(
+    JSON.stringify(layNoLife),
+    JSON.stringify(bare),
+    'with no room the layout is the feel layer, bit for bit',
+  );
   // the room: high energy → performing, by the wearer's Canon style; recorded; the pose moves
   const g = castDish(7, {
     roster: [

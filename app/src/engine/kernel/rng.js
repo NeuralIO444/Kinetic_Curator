@@ -247,6 +247,10 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // measures leaned off the wild type. The body's build, like its scale on 'culture-cast' — but a channel of its own,
   // so the dish and moth casts' draws do not move; spatial, the build's stream. No offsets are passed (identity).
   'culture-linkage': 'spatial',
+  // CULTURE Phase 6A — where a beat lands in the dish as a morsel (engine/cultureEcology.mjs landCultureMorsel): placement,
+  // so the spatial stream, keyed by the morsel's serial at the world seed. A channel of its own, so no cast, recipe,
+  // wander or linkage draw moves; it only runs behind the cultureDish gate. No offsets are passed (identity).
+  'culture-morsel': 'spatial',
 });
 
 const OFFSET_GROUP_OF = new Map([

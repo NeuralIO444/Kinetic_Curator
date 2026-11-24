@@ -56,9 +56,13 @@ import {
   cultureCitizensHash,
   enrolCultureCitizen,
 } from './cultureCitizens.mjs';
-import { stepCultureSwarm } from './cultureSwarm.mjs';
+import { stepCultureSwarm, cultureSwarmHash } from './cultureSwarm.mjs';
 import { stepCultureSolver } from './cultureSolver.mjs';
-import { cultureTreeOf } from './cultureGait.mjs';
+import { cultureTreeOf, cultureGaitHash } from './cultureGait.mjs';
+import { CULTURE_FAT_BIRTH_TICKS, CULTURE_UPKEEP_BODY_TICKS, CULTURE_STARVE_STEPS } from './cultureEcology.mjs';
+
+/** Phase 6A: an unfed citizen cast at step 0 starves on this world step (fat 0 at 6,000, then 600 steps at 0). */
+const STARVED_AT = CULTURE_FAT_BIRTH_TICKS / CULTURE_UPKEEP_BODY_TICKS + CULTURE_STARVE_STEPS - 1;
 import {
   createCultureWorld,
   castCultureTake,
@@ -457,6 +461,8 @@ const recipeWith = (base, patch) =>
       stepCultureWorld(w);
       if (s % 60) continue;
       beasts.forEach((c, i) => {
+        // LOUD RE-PIN (Phase 6A): measured while the beast lives — a corpse has no crank, no chassis hold, no drives
+        if (!c.alive) return;
         const x = w.bodies.x[c.first];
         const y = w.bodies.y[c.first];
         assert.ok(x >= 0 && x <= 1920 && y >= 0 && y <= 1080, `seed ${seed}: beast ${i} stays in the dish`);
@@ -478,9 +484,17 @@ const recipeWith = (base, patch) =>
     }
     beasts.forEach((c, i) => {
       n++;
-      assert.equal(c.alive, 1, `seed ${seed}: beast ${i} alive`);
-      assert.ok(path[i] / 60 > 8, `seed ${seed}: beast ${i} walks (${(path[i] / 60).toFixed(1)} px/s)`);
-      assert.ok(path[i] / 60 < 90, `seed ${seed}: beast ${i} plods (${(path[i] / 60).toFixed(1)} px/s)`);
+      // LOUD RE-PIN (Phase 6A — a changed law, spec §2.5 / §4 Q1): no room reading here, so no beat lands and no beast is
+      // fed. Born with 50 fat at 1 fat/s, an unfed beast starves at fat 0 sustained 5 s — world step 6,599, inside this
+      // minute — unless a hungry swimmer 1.2× its size (its legs are bones, so its disc area is small) kills it first.
+      // Not fed here: "alive at 60 s" is now "lived until the new law took it"; the walk is measured over its life.
+      const life = w.ecology.lives[w.citizens.list.indexOf(c)];
+      assert.equal(c.alive, 0, `seed ${seed}: beast ${i}, unfed, does not outlive the minute`);
+      assert.ok(c.cause === 'starvation' || c.cause === 'predation', `seed ${seed}: beast ${i} died by the new law`);
+      if (c.cause === 'starvation' && life.loots === 0) assert.equal(c.diedStep, STARVED_AT, 'on the law’s step');
+      const lifeS = c.diedStep / 120;
+      assert.ok(path[i] / lifeS > 8, `seed ${seed}: beast ${i} walks (${(path[i] / lifeS).toFixed(1)} px/s)`);
+      assert.ok(path[i] / lifeS < 90, `seed ${seed}: beast ${i} plods (${(path[i] / lifeS).toFixed(1)} px/s)`);
     });
   }
   assert.ok(n >= 30, `${n} beasts`);
@@ -490,7 +504,7 @@ const recipeWith = (base, patch) =>
   );
   assert.ok(axisWorst < 15 / 57.3, `never twisted far (worst ${(axisWorst * 57.3).toFixed(1)}°)`);
   ok(
-    `it lives: 20 seeds × 60 s in the gated world — ${n} strandbeests, all inside the dish, alive, walking, the chassis on its heading`,
+    `it lives: 20 seeds × 60 s in the gated world — ${n} strandbeests, all inside the dish, walking, the chassis on its heading, until the new law (unfed)`,
   );
 }
 
@@ -521,51 +535,73 @@ const recipeWith = (base, patch) =>
   assert.notEqual(cultureCitizensHash(a.citizens), h, 'the hash covers the measure genes');
   c.linkage = lk;
   assert.equal(cultureCitizensHash(a.citizens), h);
-  // the swimmers' worlds are slice B's to the bit: pinned against origin/main f0e7a7b (the dish sheet and the 5B roster,
-  // 1,200 steps, the room on)
-  const pins = [
-    [CULTURE_CAST_SHEET, 7, 2889846307],
-    [CULTURE_CAST_SHEET, 42, 55187148],
-    [
-      {
-        roster: [
-          { plan: 'dish', count: 3 },
-          { plan: 'moth', count: 2 },
-        ],
-      },
-      7,
-      1880458193,
+  // LOUD RE-PIN (Phase 6A — a changed law: creatures eat beats, every citizen carries fat, and the world hash folds the
+  // ecology). The slice C claim was "the swimmers' worlds are slice B's to the bit", pinned as WHOLE world hashes with the
+  // room on (origin/main f0e7a7b: 2889846307, 55187148, 1880458193, 3345345550). Under the new law:
+  //   (a) room OFF — no beat lands, no food is sensed, and in 1,200 steps (10 s) nobody is hungry (fat 40 > 30) or
+  //       starving: the body table, the citizens and the gait layer are slice B's / slice C's to the bit — the swarm,
+  //       citizens and gait hashes are pinned against origin/main 75985b0 (computed on a pristine detached worktree);
+  //       only the world hash moves, by the ecology's fold.
+  //   (b) room ON — the beats land as morsels and the citizens turn toward them and eat: the bodies move differently by
+  //       law. The whole world hashes are re-pinned to this slice's values (twin-checked above).
+  const ROSTER_5B = {
+    roster: [
+      { plan: 'dish', count: 3 },
+      { plan: 'moth', count: 2 },
     ],
-    [
-      {
-        roster: [
-          { plan: 'dish', count: 3 },
-          { plan: 'moth', count: 2 },
-        ],
-      },
-      42,
-      3345345550,
-    ],
+  };
+  const quietPins = [
+    // [sheet, seed, swarm hash, citizens hash, gait hash] — origin/main 75985b0, room off, 1,200 steps
+    [CULTURE_CAST_SHEET, 7, 13186533, 4206198939, 1766681291],
+    [CULTURE_CAST_SHEET, 42, 1934605904, 3805670001, 1766681291],
+    [ROSTER_5B, 7, 736812686, 2382023884, 1766681291],
+    [ROSTER_5B, 42, 223519438, 2589181518, 1766681291],
+    [CULTURE_TAKE_SHEET, 7, 2791955768, 331514779, 1766681291],
+    [CULTURE_TAKE_SHEET, 42, 735201613, 3816371860, 1766681291],
   ];
-  for (const [sheet, seed, pin] of pins) {
+  for (const [sheet, seed, swarm, cit, gait] of quietPins) {
+    const w = createCultureWorld({ seed });
+    castCultureTake(w, sheet);
+    for (let s = 0; s < 1200; s++) stepCultureWorld(w);
+    assert.equal(w.ecology.morsels.length + w.ecology.serial, 0, 'room off: no beat lands');
+    assert.equal(cultureSwarmHash(w.bodies), swarm, `room off (seed ${seed}): the bodies are origin/main's to the bit`);
+    assert.equal(cultureCitizensHash(w.citizens), cit, `room off (seed ${seed}): the citizens are origin/main's`);
+    assert.equal(cultureGaitHash(w.gait), gait, `room off (seed ${seed}): the gait layer is origin/main's`);
+  }
+  const roomPins = [
+    // [sheet, seed, world hash] — this slice, room on (high, 128 bpm), 1,200 steps
+    [CULTURE_CAST_SHEET, 7, 3241583243],
+    [CULTURE_CAST_SHEET, 42, 1396512032],
+    [ROSTER_5B, 7, 1755287174],
+    [ROSTER_5B, 42, 548154483],
+  ];
+  for (const [sheet, seed, pin] of roomPins) {
     const w = createCultureWorld({ seed });
     castCultureTake(w, sheet);
     setCultureRoom(w, { energy: 'high', silent: 0, bpm: 128 });
     for (let s = 0; s < 1200; s++) stepCultureWorld(w);
-    assert.equal(cultureWorldHash(w), pin, `swimmers' world (seed ${seed}) is slice B's to the bit`);
+    assert.ok(w.ecology.eaten > 0, 'room on: the beats fed somebody');
+    assert.equal(cultureWorldHash(w), pin, `swimmers' world, room on (seed ${seed}): re-pinned under the ecology`);
   }
   ok(
-    'determinism: twin worlds and layouts bit-identical; the hash covers the crank and the genes; swimmer worlds equal origin/main',
+    'determinism: twin worlds and layouts bit-identical; the hash covers the crank and the genes; quiet swimmer worlds equal origin/main (bodies, citizens, gait); fed worlds re-pinned',
   );
 }
 
 // 9 — the gait.
 {
-  const run = (room) => {
+  // LOUD RE-PIN (Phase 6A — a changed law: an audible room's beats now land as morsels the citizens turn toward, so a
+  // room moves bodies through FEEDING). The gait claim below is about the gait alone, so the world it compares runs with
+  // its morsels cleared after every step (`unfed`) — nothing is ever sensed, nobody turns toward food, and in 10 s
+  // nobody is hungry or starving: the room's only remaining reach into the dish is the gait, as in slice C.
+  const run = (room, unfed = false) => {
     const w = createCultureWorld({ seed: 7 });
     castCultureTake(w, CULTURE_TAKE_SHEET);
     if (room) setCultureRoom(w, room);
-    for (let s = 0; s < 120 * 10; s++) stepCultureWorld(w);
+    for (let s = 0; s < 120 * 10; s++) {
+      stepCultureWorld(w);
+      if (unfed) w.ecology.morsels.length = 0;
+    }
     return w;
   };
   const w = run({ energy: 'high', silent: 0, bpm: 120 });
@@ -601,8 +637,16 @@ const recipeWith = (base, patch) =>
   assert.ok(cultureCitizenAt(still, i).bones.every((b) => b.gait === null));
   // gait is a pose offset: the bodies move exactly as in the world without a room
   const cols = (x) => JSON.stringify([...x.bodies.x.slice(0, x.bodies.count), ...x.bodies.y.slice(0, x.bodies.count)]);
-  assert.equal(cols(w), cols(still), 'gait never moves a body');
-  assert.equal(JSON.stringify(c.pA), JSON.stringify(still.citizens.list[i].pA), 'nor turns a crank');
+  const worn = run({ energy: 'high', silent: 0, bpm: 120 }, true);
+  assert.ok(worn.ecology.serial > 0, 'the room was audible: beats landed (and were cleared)');
+  assert.ok(worn.gait.out[`citizen:${i}`], 'the unfed world wears its gait too');
+  assert.equal(cols(worn), cols(still), 'gait never moves a body');
+  assert.equal(
+    JSON.stringify(worn.citizens.list[i].pA),
+    JSON.stringify(still.citizens.list[i].pA),
+    'nor turns a crank',
+  );
+  assert.notEqual(cols(w), cols(still), 'the fed world differs (feeding moves bodies — the ecology, not the gait)');
   ok(
     'the gait: the beast wears its Canon gait through the beast adapter, one pose per bone, the discs on the root; gait never moves a body',
   );

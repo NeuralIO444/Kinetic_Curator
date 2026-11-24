@@ -268,7 +268,7 @@ export function cultureSenses(bodies, field, c) {
   const h = c.first;
   const x = bodies.x[h];
   const y = bodies.y[h];
-  return {
+  const senses = {
     x,
     y,
     vx: bodies.vx[h],
@@ -278,6 +278,10 @@ export function cultureSenses(bodies, field, c) {
     ground: cultureSoilSample(field, x, y),
     range: cultureSenseRange(c.body),
   };
+  // Phase 6A: the nearest morsel in range, when the ecology handed the citizen one (engine/cultureEcology.mjs
+  // stepCultureFoodSense) — { x, y, pull }. Absent, the senses are exactly slice C's.
+  if (c.food) senses.food = c.food;
+  return senses;
 }
 
 /** The summed, weighted desire of a citizen's drives (canonical drive order), and its strength 0..1. */
@@ -290,6 +294,19 @@ export function cultureDesire(senses, c) {
     const d = CULTURE_DRIVES[name](senses, c);
     x += d.x * w;
     y += d.y * w;
+  }
+  // Phase 6A — HUNGER: creatures eat beats (spec §2.5). A sensed morsel pulls the desire toward it at the ecology's
+  // weight (CULTURE_HUNGER_PULL × emptiness). It is the ecology's law, not a recipe dial (DAVIS's recipe shape is
+  // unchanged); with no food sensed the sum is exactly the drives'.
+  const f = senses.food;
+  if (f) {
+    const fx = f.x - senses.x;
+    const fy = f.y - senses.y;
+    const fm = Math.sqrt(fx * fx + fy * fy);
+    if (fm > 1e-9) {
+      x += (fx / fm) * f.pull;
+      y += (fy / fm) * f.pull;
+    }
   }
   const m = Math.sqrt(x * x + y * y);
   return { x, y, strength: Math.min(1, m) };

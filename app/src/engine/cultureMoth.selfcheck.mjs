@@ -37,6 +37,10 @@ import {
   CULTURE_DAVIS_LEAN,
 } from './cultureLab.mjs';
 import { CULTURE_RECIPE_BOUNDS, stepCultureCitizenMuscle } from './cultureMotion.mjs';
+import { CULTURE_FAT_BIRTH_TICKS, CULTURE_UPKEEP_BODY_TICKS, CULTURE_STARVE_STEPS } from './cultureEcology.mjs';
+
+/** Phase 6A: an unfed citizen cast at step 0 starves on this world step (fat 0 at 6,000, then 600 steps at 0). */
+const STARVED_AT = CULTURE_FAT_BIRTH_TICKS / CULTURE_UPKEEP_BODY_TICKS + CULTURE_STARVE_STEPS - 1;
 import {
   createCultureWorld,
   stepCultureWorld,
@@ -345,6 +349,10 @@ const pathRests = (body) => {
       stepCultureWorld(w);
       if (s % 12 !== 0) continue;
       w.citizens.list.forEach((c, k) => {
+        // LOUD RE-PIN (Phase 6A): measured while the moth lives — a corpse has no muscle and no rim drive, and a looted
+        // corpse's taken parts are gone from it; the claims below are about a living moth.
+        if (!c.alive) return;
+        for (let j = 0; j < c.n; j++) assert.equal(w.bodies.alive[c.first + j], 1, 'every part stays while it lives');
         const x = w.bodies.x[c.first];
         const y = w.bodies.y[c.first];
         path[k] += Math.hypot(x - prev[k][0], y - prev[k][1]);
@@ -359,9 +367,18 @@ const pathRests = (body) => {
     }
     w.citizens.list.forEach((c, k) => {
       cast++;
-      assert.equal(c.alive, 1, `seed ${seed}: a moth lives`);
-      for (let j = 0; j < c.n; j++) assert.equal(w.bodies.alive[c.first + j], 1, 'every part stays');
-      minSpeed = Math.min(minSpeed, path[k] / 60);
+      // LOUD RE-PIN (Phase 6A — a changed law, spec §2.5 / §4 Q1): this world has no room reading, so no beat lands and
+      // no moth is fed. Born with 50 fat at 1 fat/s, an unfed moth starves at fat 0 sustained 5 s — world step 6,599,
+      // inside this minute (sooner if it looted a limb and paid its upkeep) — unless a hungry, bigger moth kills it
+      // first. Not fed here: "alive at 60 s" is now "lived until the new law took it". The swim is measured over life.
+      const life = w.ecology.lives[k];
+      assert.equal(c.alive, 0, `seed ${seed}: an unfed moth does not outlive the minute`);
+      assert.ok(
+        c.cause === 'starvation' || c.cause === 'predation',
+        `seed ${seed}: it died by the new law (${c.cause})`,
+      );
+      if (c.cause === 'starvation' && life.loots === 0) assert.equal(c.diedStep, STARVED_AT, 'on the law’s step');
+      minSpeed = Math.min(minSpeed, path[k] / (c.diedStep / 120));
     });
   }
   assert.equal(cast, 30);
@@ -371,7 +388,9 @@ const pathRests = (body) => {
     maxExcess < 16,
     `every part holds within its joints’ reach, the links stretching under 16 px (${maxExcess.toFixed(1)}; probed 13)`,
   );
-  ok('it lives: 10 seeds × 60 s × 3 moths — all alive, no part lost, none past the rim, all swimming, reach held');
+  ok(
+    'it lives: 10 seeds × 60 s × 3 moths — no part lost, none past the rim, all swimming, reach held, until the new law (unfed: starvation or predation)',
+  );
 }
 
 // 6 — soil, Queen's field, performer's hand.

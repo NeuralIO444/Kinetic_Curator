@@ -249,6 +249,28 @@
 //               the soil; it wears its gait through the beast adapter. The take
 //               sheet casts two after the swimmers. Everything else is unchanged:
 //               the same doors, the same step order, the same hash.
+//
+//   THE ECOLOGY Phase 6, slice A (spec §2.5, §2.9, §2.10, §3.1, §4 Q1): life and
+//               death (engine/cultureEcology.mjs). Creatures eat beats: every whole
+//               beat the gait clock crosses while the room is audible lands a
+//               morsel in the dish (the 'culture-morsel' channel places it); a
+//               citizen that is not full senses the nearest within 3 body-lengths
+//               (before its muscle, on the swarm's cadence — the hunger pull its
+//               desire reads) and eats one its head touches (+10 fat). Every
+//               citizen carries fat and pays upkeep each world step (1 fat/s the
+//               body, 0.5 fat/s each looted limb). Death comes by starvation (fat 0
+//               sustained 5 s) and predation (a hungry citizen, fat < 30, whose
+//               head touches one it outsizes 1.2×) — the soil still withers bodies,
+//               as Phase 4 rules. A corpse decays in the dish for 30 s (no muscle,
+//               no gait, its look fading in data), then its last parts are gone;
+//               throughout, its limbs are lootable: a living citizen touching it
+//               takes one into a free socket of its PLAN that accepts the kind,
+//               the limb re-dealt on the looter with its original look, its upkeep
+//               paid, the worn body read by LOIS. Order: food sense before the
+//               muscle; the carried limbs rehomed with the body; after the gait,
+//               the beats land, then eating, predation, looting on the settled
+//               frame; metabolism every world step before the soil, which judges
+//               last. Dormant over an uncast world. The hash folds it whole.
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
 import { createCulture, stepCulture, seedRandom, cultureHash, CULTURE_RULE } from './dishLife.mjs';
@@ -309,6 +331,20 @@ import {
 import { cultureBodyRestPose } from './cultureBody.mjs';
 import { cultureBeastBones } from './cultureBeast.mjs';
 import { cultureRecipeMasses, ensureCultureFeelSource } from './cultureMotion.mjs';
+import {
+  createCultureEcology,
+  enrolCultureLife,
+  stepCultureFoodSense,
+  rehomeCultureCarried,
+  landCultureBeats,
+  stepCultureEating,
+  stepCulturePredation,
+  stepCultureLooting,
+  stepCultureMetabolism,
+  cultureEcologyHash,
+  cultureLifeReading,
+  cultureCarriedLayout,
+} from './cultureEcology.mjs';
 import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
 
 /** The backend id this world stamps, in the simBackends vocabulary: JS, versioned. */
@@ -508,6 +544,11 @@ export function createCultureWorld({ seed = 0 } = {}) {
     citizens: createCultureCitizens(),
     /** The gait layer (Phase 5B): dormant until the dish has citizens; see engine/cultureGait.mjs. */
     gait: createCultureGait(),
+    /**
+     * The ecology (Phase 6A): the morsels standing in the dish, the tallies, and one life per citizen
+     * (fat, the starvation clock, sockets as worn). Dormant until the Lab casts; see engine/cultureEcology.mjs.
+     */
+    ecology: createCultureEcology(),
   };
 }
 
@@ -565,6 +606,8 @@ export function stepCultureWorld(world) {
   }
   if (world.step % CULTURE_SWARM_STEP_DIVISOR === 0) {
     stepCultureFields(world.bodies, world.fields, cultureFluidDensity(world));
+    // The hunger pull (Phase 6A): each citizen that is not full senses the nearest morsel in range.
+    stepCultureFoodSense(world.bodies, world.citizens, world.ecology);
     // The citizens' muscle (Phase 5A): after the Queen's standing fields, before
     // the performer's hand — the hand stays last among forces (the override).
     stepCultureCitizens(world.bodies, world.citizens, world.life.field, world.step);
@@ -573,11 +616,13 @@ export function stepCultureWorld(world) {
     // One body across the seam (Phase 5A): the swarm wraps each disc alone;
     // a citizen's parts are brought to its anchor's side before the solver joins.
     rehomeCultureCitizens(world.bodies, world.citizens);
+    rehomeCultureCarried(world.bodies, world.citizens, world.ecology);
     stepCultureSolver(world.bodies, world.statics, world.links);
     world.solver.step += 1;
     // The gait layer (Phase 5B): reads the settled frame, writes only its own pose state.
     if (world.citizens.list.length) {
       const magnets = cultureFieldMagnets(world.fields);
+      const b0 = world.gait.beats;
       stepCultureGait(world.gait, {
         bodies: world.bodies,
         citizens: world.citizens,
@@ -595,8 +640,16 @@ export function stepCultureWorld(world) {
             }
           : null,
       });
+      // The ecology on the settled frame (Phase 6A): the room's beats land as morsels (one per whole beat the
+      // gait clock crossed while audible), then the contacts — eating, predation, looting.
+      landCultureBeats(world.ecology, world.seed, world.gait.room, b0, world.gait.beats, world.step);
+      stepCultureEating(world);
+      stepCulturePredation(world);
+      stepCultureLooting(world);
     }
   }
+  // Metabolism (Phase 6A), every world step: upkeep, the starvation clock, corpse decay, morsel spoilage.
+  stepCultureMetabolism(world);
   // The ground judges last (Phase 4): every world step, after the culture has
   // grown and the bodies have moved, the soil reads the published field — the
   // last completed generation — under each living body's centre; sustained
@@ -843,7 +896,8 @@ export function castCultureTake(world, sheet = CULTURE_CAST_SHEET) {
     bodies.count += m.body.parts.length;
     for (const l of m.body.links) addCultureLink(world, first + l.a, first + l.b, l.rest);
     const seed = (world.seed ^ Math.imul(slot + 1, 0x9e3779b9)) >>> 0;
-    enrolCultureCitizen(citizens, { ...m, seed }, first, world.step);
+    const idx = enrolCultureCitizen(citizens, { ...m, seed }, first, world.step);
+    enrolCultureLife(world.ecology, citizens.list[idx]);
   });
   citizens.cast = 1;
   return { cast: members.length, refused };
@@ -863,16 +917,42 @@ export function cultureCitizenAt(world, index) {
     throw new Error(`cultureWorld: no citizen at index "${String(index)}"`);
   const c = list[index];
   const wither = (i) => world.soil.wither[i] / CULTURE_SOIL_WITHER_STEPS;
+  let layout;
   if (!c.linkage)
-    return cultureCitizenLayout(world.bodies, c, wither, (k) => cultureGaitPartPose(world.gait, index, k));
-  // a strandbeest (slice C): its discs ride the gait's root (the beam, node 0); its BONES are the beast adapter's
-  // nodes 1.. — each bone with its look, its place, and the gait's pose for that node
-  const layout = cultureCitizenLayout(world.bodies, c, wither, () => cultureGaitPartPose(world.gait, index, 0));
-  layout.bones = cultureBeastBones(world.bodies, c).map((b, k) => {
-    const gp = cultureGaitPartPose(world.gait, index, k);
-    return { ...b, gait: gp ? { ...gp } : null };
-  });
+    layout = cultureCitizenLayout(world.bodies, c, wither, (k) => cultureGaitPartPose(world.gait, index, k));
+  else {
+    // a strandbeest (slice C): its discs ride the gait's root (the beam, node 0); its BONES are the beast adapter's
+    // nodes 1.. — each bone with its look, its place, and the gait's pose for that node
+    layout = cultureCitizenLayout(world.bodies, c, wither, () => cultureGaitPartPose(world.gait, index, 0));
+    layout.bones = cultureBeastBones(world.bodies, c).map((b, k) => {
+      const gp = cultureGaitPartPose(world.gait, index, k);
+      return { ...b, gait: gp ? { ...gp } : null };
+    });
+  }
+  // Phase 6A — the life: fat, starvation, the corpse's decay; the decay fades every part's look toward nothing
+  // (alpha −1 at removal, composed onto the pose's own); the limbs it carries follow the born parts, each with its
+  // ORIGINAL look and where it came from. Data only — nothing is drawn.
+  const life = cultureLifeReading(world, index);
+  layout.life = life;
+  const carried = cultureCarriedLayout(world.bodies, c, world.ecology.lives[index], layout.parts.length);
+  for (const p of carried) p.pose = { dx: 0, dy: 0, dRot: 0, sx: 1, sy: 1, dAlpha: 0 };
+  layout.parts.push(...carried);
+  if (life.decay > 0) for (const p of layout.parts) p.pose = { ...p.pose, dAlpha: p.pose.dAlpha - life.decay };
   return layout;
+}
+
+/**
+ * THE ECOLOGY'S READ DOORS (Phase 6A) — the morsels standing in the dish (fresh copies: serial, place, the step it
+ * landed), and one citizen's life (fat, starvation, decay, cause, killer, loots, sockets as worn). Read-only; an
+ * index outside the cast is refused, loudly.
+ */
+export function cultureMorsels(world) {
+  return world.ecology.morsels.map((m) => ({ ...m }));
+}
+export function cultureCitizenLife(world, index) {
+  if (!Number.isInteger(index) || index < 0 || index >= world.citizens.list.length)
+    throw new Error(`cultureWorld: no citizen at index "${String(index)}"`);
+  return cultureLifeReading(world, index);
 }
 
 /**
@@ -1063,7 +1143,8 @@ function mixFloat(mix, v) {
  * the currents table), and the soil's standing state (the soil core's
  * fingerprint of its step, kill count, and the dealt bodies' wither clocks), and the
  * citizens' standing state (the citizens core's fingerprint of the cast, each
- * citizen's body, recipe and life). Same feed sequence =>
+ * citizen's body, recipe and life), the gait layer's, and the ecology's (Phase 6A: the morsels,
+ * the tallies, every life's fat, starvation clock, and sockets as worn). Same feed sequence =>
  * same hash, on any device (all arithmetic here is IEEE-exact JS). FNV-1a, the
  * dishWet.selfcheck precedent.
  */
@@ -1105,6 +1186,7 @@ export function cultureWorldHash(world) {
   mixU32(cultureSoilHash(world.soil, world.bodies.count));
   mixU32(cultureCitizensHash(world.citizens));
   mixU32(cultureGaitHash(world.gait));
+  mixU32(cultureEcologyHash(world.ecology));
   return h >>> 0;
 }
 
