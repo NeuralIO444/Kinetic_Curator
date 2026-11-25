@@ -25,6 +25,21 @@ export function audibleOn() {
   }
 }
 
+/**
+ * Set the same switch the console sets (the DEV panel's neutral `audible beats` row): on writes `true`, off removes
+ * it. The flag's name stays in this driver (queenDeniability). Read on every tick, so it takes effect live; on, the
+ * next pointer or key press opens the AudioContext as before. Never saved. The volume/tone levers stay console-only.
+ */
+export function setAudibleOn(value) {
+  try {
+    if (value === true) globalThis.__KC_QUEEN_AUDIBLE = true;
+    else delete globalThis.__KC_QUEEN_AUDIBLE;
+  } catch {
+    /* a frozen global: the switch stays as it was */
+  }
+  return audibleOn();
+}
+
 /** How far ahead the driver schedules, in beats, and how often it wakes, in ms (the WebAudio look-ahead idiom). */
 export const LOOKAHEAD_BEATS = 0.25;
 export const TICK_MS = 25;
