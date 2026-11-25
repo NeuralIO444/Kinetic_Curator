@@ -59,16 +59,22 @@ read:
 - **`enabledAssets`** (a non-null map is a whitelist — an empty or all-off
   map yields 0 placements on every layer; this is the only single-field
   route to exactly 0). Writers: the ASSETS panel (ALL ON writes the full
-  catalog map; per-asset toggles flip single keys), `commitVoiceMix`,
-  keep/favorite recall, history restore, scene load. `commitVoiceMix`'s two
-  branches: `'all'` rebuilds the map from the keys already present (it can
-  widen, never empty); the curated branch copies the voice's own map. All
-  four flagship voices carry a 4-asset pool (verified by importing
-  `FLAGSHIP_VOICES`); user voices pass `sanitizeUserVoice`, which defaults a
-  missing assets field to `'all'`. No shipped voice resolves to an empty or
-  all-off map, so no voice commit — including the bounded-crawl commit that
-  lands a stuck mix (the likely truth behind B19's mix "disappearing on its
-  own") — can zero the pool.
+  catalog map; ALL OFF writes an all-off map — a deliberate performer
+  action with an obvious recovery, enumerated here for completeness;
+  per-asset toggles flip single keys), `commitVoiceMix`, keep/favorite
+  recall, history restore, scene load. `commitVoiceMix`'s two branches:
+  `'all'` rebuilds the map from the keys already present — it can widen
+  **only from a non-null map**; over a null current map it writes `{}`
+  (see the leads below). The curated branch copies the voice's own map.
+  All four flagship voices carry a 4-asset pool (verified by importing
+  `FLAGSHIP_VOICES`), so no flagship commit — including the bounded-crawl
+  commit that lands a stuck mix (the likely truth behind B19's mix
+  "disappearing on its own") — can zero the pool. User voices are a
+  different story: `sanitizeUserVoice` defaults the assets field to
+  `'all'` **only when the field is missing or non-object**; an all-off or
+  empty map passes through verbatim, and committing such a voice zeroes
+  the pool. Those paths are leads, not part of this finding — see the
+  conclusion and the follow-up issue (2522).
 - **`layoutParams.count`**: evolve dice ranges floor at 30 (DICE_RANGES);
   voice params are fixed positive counts; keep configs carry captured
   counts. The 10-node dip in attempt 1 is this floor plus mode geometry,
@@ -92,12 +98,21 @@ read:
 
 **Conclusion:** one defect or two cannot be distinguished from the session
 record, because no defect in the sequence exists on this tree to dissect.
-The remaining un-eliminated lead is state arriving from outside the PLAY
-sequence — e.g. a loaded project whose saved `enabledAssets` map has keys
-but every value off (the scene-load guard checks key count, not values).
-There is no evidence the session loaded such a project mid-sequence (it
-began from a working 184-node stage), so it is recorded here as a lead for
-any future recurrence, not as the root cause of this finding.
+The remaining un-eliminated leads are states arriving from outside the
+PLAY sequence, all filed as the follow-up issue (2522):
+
+- a loaded project whose saved `enabledAssets` map has keys but every
+  value off (the scene-load guard checks key count, not values);
+- `commitVoiceMix`'s `'all'` branch over a null live map, which writes
+  `{}` — converting a state that displays as everything-enabled into an
+  empty whitelist;
+- a user voice whose saved assets map is all-off or empty (sanitize
+  preserves both; `captureLiveVoiceState` can manufacture the empty case
+  from a null live map), committed via the voice mix.
+  There is no evidence the session touched any of these mid-sequence (it
+  began from a working 184-node stage, and B19's mix came from flagship
+  voice buttons), so they are recorded as leads for a deliberate follow-up,
+  not as the root cause of this finding.
 
 ## What was built
 
@@ -119,7 +134,7 @@ pool`. The mutation was reverted immediately after the probe.
 ## Verification
 
 - New suite: `playUndoStage.selfcheck: OK (28 modes x issue sequence, 4
-  voice commits, morph-undo restore)`.
+voice commits, morph-undo restore)`.
 - Targeted neighbors, 12/12 pass: useVoiceMixDriver, usePhraseLoop,
   personaUndo, undoLayers, undoSeedOffsets, phraseTick, beatArbiter,
   voiceSlice, voices (data), queueTransport, favorites, curator voice.
@@ -140,11 +155,32 @@ pool`. The mutation was reverted immediately after the probe.
   this sequence on this tree; patching a guessed seam would be a symptom
   patch against the standing right-fix rule, and would risk the pool/morph
   behavior the new suite now pins.
-- **No change to the scene-load `enabledAssets` guard** (the residual lead
-  above): it belongs to a different finding than the one filed, with no
-  session evidence behind it. It is named here so a recurrence — or a
-  deliberate follow-up issue — starts from it.
+- **No change to the scene-load `enabledAssets` guard, the voice-mix
+  commit, or voice sanitize/capture** (the leads above): they belong to a
+  different finding than the one filed, with no session evidence behind
+  them. They are filed as the follow-up issue (2522) so a deliberate fix
+  or ruling starts from the demonstrated evidence.
 - The session's exact live conditions (a real microphone driving beat
   attacks at 40–60 fps over minutes, the session's own saved project) cannot
   be recreated in the sandbox; the store-level sweep covers the same driver
   code paths those conditions feed.
+
+## QA Review addendum (2026-11-25)
+
+QA verdict: CLEAN on the disposition, with one SHOULD-FIX applied in this
+revision — the audit above originally overclaimed that no voice commit can
+produce an empty/all-off pool. QA independently reproduced the sequence
+(including harsher variations: flurry during an in-flight morph, 30
+compounded evolves, a standing flagship mix with a mid-flurry crawl
+commit; minimum observed 110 nodes) and confirmed the NOT-REPRODUCED
+verdict, but demonstrated three voice-data paths to exactly 0 that the
+original text wrongly sealed off: the 'all' commit over a null map, an
+all-off user-voice map, and an empty user-voice map (140-node stage → 0 on
+commit, each). The audit text, the conclusion's lead list, and the
+deliberately-not-done section have been corrected accordingly; the panel's
+ALL OFF writer was added to the enumeration; and all outside-sequence
+leads (those three plus the all-off project load) are filed together as
+issue 2522. QA also re-ran the suite's mutation proof verbatim (curated
+branch patched to write an empty pool → the suite fails with the recorded
+message) and verified the sweep count from the log (828 PASS / 3 FAIL
+verdict lines).
