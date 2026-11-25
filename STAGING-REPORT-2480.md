@@ -171,3 +171,78 @@ file):
 - The four live-browser reproduction runs are documented in the reproduction
   section above, with their environmental limits stated plainly; the root
   cause rests on the code-path audit, which needs no frame rate to hold.
+
+## Fix addendum — the designated-writer slice (this branch)
+
+The coordinator designated this slice's builder as the single writer for
+`app/src/gl/liveLoop.mjs`; the seam specified above is implemented there, and
+nowhere else (`liveResolve.mjs` and `particles.js` untouched). Diff:
+`liveLoop.mjs` +29/−1, one new selfcheck suite, one manifest line.
+
+**What was built** — the loop-owned reseed flag, exactly as specified:
+
+- `accumReseedPending` declared beside `accumFrozen` in the ACCUM session state.
+- `clearAccum()`: after `accumObj.begin(beginBg)`, the flag is set when
+  `accumFrozen` stands.
+- The tick's hold test is now `frozen && accumObj && !accumReseedPending` — a
+  pending reseed falls through to the existing render + step branch for exactly
+  one frame; no new render code. The flag is cleared at the end of that branch,
+  so it is consumed whether the frame stepped cleanly or faulted into the plain
+  fallback (which presents the live scene directly). The frozen hold resumes
+  from the next frame, untouched otherwise.
+- The session-end reset clears the flag beside the #268 `accumFrozen` reset, so
+  no reseed outlives its session.
+
+**Sibling begin sites** — both handled, per the report's one-mechanism rule:
+
+- _Enable path:_ a real trap — FREEZE can be standing when ACCUM enables (set
+  via MIDI with ACCUM off; the panel disables its button then, the MIDI target
+  does not check). The enable site sets the flag when the frame's frozen read
+  is true, immediately after `begin()` + `accumActive = true`, so the same
+  tick's hold test already yields.
+- _Dpr-rebuild path:_ this `begin()` sits inside the render + step branch, so
+  the frame that lands it steps anyway and cannot itself trap; the flag is set
+  there too (when frozen), and the same frame's branch-end clear consumes it —
+  no behaviour change today, and any future route that reaches that begin
+  while frozen is covered by the same mechanism.
+
+**The pin** — `app/src/gl/accumFreezeClear.selfcheck.mjs` (registered in
+`app/selfcheck.manifest` after `accumGuard`): 4 source-pin groups on the seam's
+shape, plus 6 browser groups driving the BUILT app through the shipped
+`__KC_UI__` bridge (`directors.accum` / `directors.accum-freeze` /
+`directors.accum-clear` — the panels' own channels), frames forced through the
+#2477 still path, the presented frame read as an 8×8 mean-colour grid
+(`__kcPresentedGrid`). The governor is gated off (`__KC_GOVERNOR_OFF`, the
+established e2e gate) so ACCUM stays effective under software GL; the suite
+asserts that precondition (accumulation on, no tier-1 shed, no render fault,
+count > 0) at the moment of CLEAR. Sandbox A/B, same driver: on this tree the
+post-CLEAR grid reads **distinct 28 / range 151** at 48 nodes (the scene as a
+still, trails gone); on the pre-fix tree it reads **distinct 1 / range 1** at
+600 nodes — pure flat while the count read 600, the session's trap reproduced
+in-sandbox. The suite is red on the pre-fix tree and green here (10 groups).
+One route note: the still hook's `dropAccum` does not defeat the test —
+`begin()` is a program-free clear on bridge-owned targets, so CLEAR still
+flattens for real, and the reseed frame re-creates the accum object through
+`ensureAccum`, exactly as the live path does after any drop.
+
+**Verification**
+
+- New suite: `accumFreezeClear.selfcheck: ok (10 groups)` — and red on the
+  pre-fix tree.
+- Targeted neighbours, 12/12 pass: accumGuard, accum.seam, liveLoopScope,
+  liveLoopSwell, clock.freeze, grainFinish, trailGrid, clock.evolve-accum,
+  accumInput, accumFeed, accum.inventory, playUndoStage (A1).
+- `npm run lint`: **0 errors** (11 warnings, pre-existing — the base count).
+- `npm run format:check`: **clean**.
+- `npm run build`: **green**.
+- Full manifest sweep (continue-on-error; only `PASS: node …` / `FAIL: node …`
+  verdict lines counted — five phantom suite-stdout "PASS:" lines excluded):
+  **830 PASS / 3 FAIL of 833**. The three failures are the known
+  sandbox-environmental set, each re-run by this slice on the base tree (the
+  fix stashed) with identical exit codes: swarmWasm (exit 1), rollSafety
+  (exit 1), accum (exit 134). Nothing is attributable to this branch. (The
+  sweep shell was OOM-killed at suite 664 and resumed from the verdict log;
+  the tally above is the completed 833.)
+- The outcome remains feel-visible (a held still of the current scene instead
+  of black), so — as the report flagged — the published PR belongs in the
+  review lane.
