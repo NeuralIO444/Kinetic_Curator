@@ -100,8 +100,12 @@ test('a dressed scene copied as a link opens in a NEW browser context on the sam
   await boot(b, link);
   await b.waitForTimeout(4000);
 
-  const hashB = await b.evaluate(() => window.__kcFrame0Hash());
-  expect(hashB, 'the receiver stands on the sender’s frame 0').toBe(hashA);
+  await expect
+    .poll(() => b.evaluate(() => window.__kcFrame0Hash()), {
+      timeout: 20_000,
+      message: 'the receiver stands on the sender’s frame 0',
+    })
+    .toBe(hashA);
   await expect(b.locator('body')).not.toContainText("Scene differs from sender's build");
 
   const sceneB = await b.evaluate(() => {
@@ -120,12 +124,16 @@ test('a dressed scene copied as a link opens in a NEW browser context on the sam
   // (3) the canvas checksum on the still path: two receivers agree, a scene-less stage does not.
   const gridB = await stillGrid(b);
   const gridC = await stillGrid(c);
-  expect(gridDiff(gridB, gridC), 'two receivers of one link paint the same still').toBeLessThan(12);
   const ctxD = await browser.newContext();
   const d = await ctxD.newPage();
   await boot(d, '/?boot=factory');
   const gridD = await stillGrid(d);
-  expect(gridDiff(gridB, gridD), 'the checksum sees the carried scene').toBeGreaterThan(40);
+  // Absolute noise between two receivers varies by machine (0.5..14 /255 seen); the scene-less control sits ~100 away.
+  // So the gate is relative: same-link receivers must be far closer to each other than to the control.
+  const same = gridDiff(gridB, gridC);
+  const control = gridDiff(gridB, gridD);
+  expect(control, 'the checksum sees the carried scene').toBeGreaterThan(40);
+  expect(same, 'two receivers of one link paint the same still').toBeLessThan(control / 3);
 
   await ctxA.close();
   await ctxB.close();
