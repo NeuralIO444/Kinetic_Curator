@@ -1677,9 +1677,10 @@ export const createGlobalSlice = (set, get) => ({
       // #2322 — a document load is the rig half + the scene half + the resets. The scene half lives in
       // state/sceneApply.js so a recipe (applyScene) and undo read the very same sanitizers.
       const rig = rigFieldsFromDoc(doc, state);
+      const sceneFields = sceneFieldsFromDoc(doc, state, { kits: rig.kits });
       return {
         ...rig,
-        ...sceneFieldsFromDoc(doc, state, { kits: rig.kits }),
+        ...sceneFields,
         ...sceneRuntimeResets(),
         // #264 — a fresh document owns its quality; any governor shed claim ends here.
         qualityShedFrom: null,
@@ -1690,6 +1691,9 @@ export const createGlobalSlice = (set, get) => ({
         // layers (a layerless doc used to leave stale undo history behind).
         historyUndoStack: [],
         historyRedoStack: [],
+        // #2522 — a saved all-off scene is a genuine state (sceneApply keeps it), but it must not open to a silent
+        // blank stage: say so. Never changes the loaded scene, never blocks the load.
+        ...allOffLoadNotice(sceneFields.enabledAssets),
       };
     });
   },
@@ -1711,5 +1715,13 @@ export const createGlobalSlice = (set, get) => ({
     });
   },
 });
+
+/** #2522 — the boot notice for the asset map a load LANDS (after the layer snapshot has had its say) turns nothing on; `{}` (no notice) otherwise. */
+export function allOffLoadNotice(m) {
+  const ids = m && typeof m === 'object' ? Object.keys(m) : [];
+  return ids.length > 0 && !ids.some((id) => m[id] === true)
+    ? { bootNotice: 'All assets are off in this project — the stage is empty. Turn some on in ASSETS.' }
+    : {};
+}
 
 export { WEIGHT_CYCLE, initialEnabledAssets };
