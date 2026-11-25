@@ -420,6 +420,14 @@ export function createLiveLoop(
   // step frame to re-seed the buffer with the current scene; the hold
   // then resumes.
   let accumReseedPending = false;
+  // #2486: the identity of the scene the last presented frame was built
+  // from (sceneSignature below), recorded at every present. While paused
+  // the tick compares the current frame's signature against it: a
+  // mismatch means a scene write landed during the hold (a hit recall
+  // above all), and the paused branch presents exactly one held still of
+  // the new scene instead of leaving the stale frame on the canvas
+  // until RUN.
+  let lastPresentedSig = null;
   let lastAccumOn = false;
   // #1490 — the spectral feedback warp's driver: its per-bin attenuated state lives here, private to
   // the feedback pass (the spectrum core is never smoothed for anyone else's sake).
@@ -1730,6 +1738,61 @@ export function createLiveLoop(
   }
 
   let stillRun = null; // { left, done } — set only by the test hook below
+
+  // #2486 — the identity of a scene, for the paused present-on-change
+  // seam: everything buildFrame renders from, read as the store's own
+  // references (zustand writes replace them wholesale, never mutate in
+  // place) or scalars, plus the frame's presented facts (size, ground,
+  // ACCUM posture, dissolve factor, atlas generation). Two deliberate
+  // exclusions: audio — a motion input the pause holds by its own law,
+  // whose bands rewrite every frame and would still every tick — and
+  // wall-clock dressing (the weave offset, the glow gesture), held for
+  // the same reason. The voice mix rides by value (from / to / t): its
+  // driver rewrites the mix object every rAF even at a held t, so the
+  // reference alone would read as perpetual change.
+  function sceneSignature(s, f) {
+    const mix = s.voiceMix;
+    return [
+      s.seed,
+      s.seedOffsets,
+      s.layoutParams,
+      s.paletteId,
+      s.paletteOverrides,
+      s.userPalettes,
+      s.enabledAssets,
+      s.layers,
+      s.activeLayerId,
+      s.light,
+      s.world,
+      s.customAssets,
+      s.regionKinemes,
+      s.assetKineme,
+      s.colorMode,
+      s.quality,
+      s.perfTier1,
+      s.exposureStops,
+      mix ? mix.from : null,
+      mix ? mix.to : null,
+      mix ? (mix.t ?? 0) : null,
+      s.morphing,
+      s.morphFrom,
+      s.morphTo,
+      f.rw,
+      f.rh,
+      f.bgCss,
+      f.transparent,
+      f.accumOn,
+      f.accumFrozen,
+      f.mix,
+      atlasKey,
+    ];
+  }
+  function sameSceneSignature(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
   function tick() {
     if (!running) return;
     rafId = requestAnimationFrame(tick);
@@ -1826,12 +1889,35 @@ export function createLiveLoop(
         feedbackWarp,
       } = frame;
 
+      // #2486: what the canvas currently shows, in identity terms — the
+      // paused branch below compares, and the present site records.
+      const sig = sceneSignature(getState(), frame);
+
       if (paused) {
         // Spine B (#388): paused holds the last presented frame; roll back loopTimeMs since physics did not step.
         loopTimeMs -= clampedDtMs;
         presentedMs -= presentedDtMs;
         rollBackLifeClocks();
-        return;
+        // #2486 — present-on-change: the hold stands, but a scene write
+        // that landed during it (a hit recall above all — the store and
+        // the resolver already hold the hit; only the canvas was gated)
+        // presents exactly one held still of the new scene, then the
+        // hold resumes. The clocks stay rolled back above: the still is
+        // a peek at the frame buildFrame just computed at the held
+        // clock, never a physics step, and the stop itself is untouched
+        // (running / slowRender / badges all stand). An unchanged scene
+        // returns here as before — at most one still per distinct
+        // change, so the stop's cost bound holds.
+        if (sameSceneSignature(sig, lastPresentedSig)) return;
+        // Paused AND frozen with ACCUM on, the frozen branch would
+        // present the buffer's pre-change texture — the recall could
+        // never show. Ask A2's reseed law for the one render + step
+        // frame instead: the branch below falls through to it, seeds
+        // the buffer with the current scene, and the hold resumes.
+        // (Paused, not frozen, the same fall-through takes the normal
+        // render + step path once — picture and buffer advance together,
+        // exactly A2's behaviour.)
+        if (frozen && accumOn) accumReseedPending = true;
       }
 
       // #823 — a governor cut6/watchdog freeze holds the loop clock: roll
@@ -1844,9 +1930,16 @@ export function createLiveLoop(
       // they step continuously in small dtSec increments, so there is no
       // thaw jump to defend against there, and audio keeps flowing through
       // a GPU freeze.
-      if (getState().slowRender) {
-        loopTimeMs -= clampedDtMs;
-        presentedMs -= presentedDtMs;
+      // #2486: the freeze rollback is skipped on a paused tick — the
+      // paused branch above already rolled both clocks back, and a
+      // paused fall-through (the one-still present) must not walk the
+      // clock backwards a second step. (The inner block keeps its #823
+      // shape verbatim; clock.freeze pins it.)
+      if (!paused) {
+        if (getState().slowRender) {
+          loopTimeMs -= clampedDtMs;
+          presentedMs -= presentedDtMs;
+        }
       }
 
       if (wrapEl) {
@@ -2089,11 +2182,14 @@ export function createLiveLoop(
           }
         }
       }
+      lastPresentedSig = sig; // #2486: the canvas now shows this scene
       frameCount++;
       if (stillRun && --stillRun.left <= 0) stillRun.done(frameCount); // test-only still (#2477)
       // #266 — the tick presented cleanly; counts toward honest recovery.
-      // Ticks that return early (bake in flight / paused) never reach here,
-      // so they neither trip nor clear the fault — only real presents count.
+      // Ticks that return early (bake in flight / paused with an unchanged
+      // scene) never reach here, so they neither trip nor clear the fault —
+      // only real presents count. A #2486 paused still reaches here because
+      // it IS a real present.
       renderFault.noteCleanPresent();
       // #263: the first clean present after a context restore proves the
       // new session is actually drawing — only now does the scene count as
