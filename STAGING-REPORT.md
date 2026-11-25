@@ -1,221 +1,57 @@
-# Staging report — #2481 (A3, the watchdog)
+# STAGING REPORT — #2482 (A4): GOV TUNE recover threshold stuck at 120
 
-**Issue:** "Stress 2026-11-24 A3: Watchdog PERF PAUSED is hard to resume and
-re-trips at contradictory fps readings" (Matt's rulings of 2026-11-24 are in the
-issue comments and are the spec implemented here).
-**Branch:** `feat/2481-watchdog-resume-law`, built on origin/main `f260b748`.
-**Status:** built and verified locally by the builder; not pushed, not merged.
-The eventual PR is meant to close its issue (2481). This is the first item of
-the debug/telemetry line Matt ordered worked full-auto on 2026-11-24; the
-coordinator publishes.
+Branch `feat/2482-govtune-recover-clamp`, base origin/main c5ea53bf (includes the A3 watchdog resume law, PR #2513). Built to the rulings recorded on the issue (Matt, 2026-11-24): (1) clamp recover to what the screen can actually reach; (2) clamp visibly, with a note like "screen max 60"; plus the coordinator's logged assumption that recover sits above shed with a minimum gap, enforced by the same clamp; the typing failure is a plain bug to fix as part of this.
 
-One-writer files (`app/src/gl/liveLoop.mjs`, `liveResolve.mjs`, `particles.js`)
-were not touched. No trip threshold was retuned.
+## 1. Premise verification (against this tree, before building)
 
----
+**The trap is real — confirmed.** `governorRecoverFps` could be set to 120 (the setters in `globalSlice.js` capped at an absolute 120), and the governor's recovery test is `effFps >= recoverFps` where `effFps = min(rAF fps, GPU-implied fps)` (`usePerformanceGovernor.js`). The rAF rate is vsync-bound, so on a 60 Hz display effective fps can never reach 120: once any ladder cut fired, the restore table's `healthy` never turned true and cuts could never auto-clear for the rest of the session — while the panel's own footnote claimed the trap "can't be reintroduced from this panel."
 
-## 1. Verification before building — mechanism findings
+**The typing failure is real — mechanism identified, and it is not a dead field.** `ThresholdRow` was a controlled input bound straight to the store value, writing **every keystroke** through the clamping setter. `setGovernorRecoverFps` floors at `shedFps + 1`; with shed at 20 (the stress session's value), typing "25" went: keystroke `2` → clamped to 21 and written back into the field; keystroke `5` appended to the rewritten field → "215" → capped to 120. Typing "60" walked the same path to 120. The field "stayed 120" because per-keystroke clamping destroys the first digit of any value below shed+1 and appends the rest to the clamp output. (Shed "20" took in the session because shed's own floor is 1 and its ceiling was recover−1 = 119 — no interference.)
 
-The repro was automation-observed on the hosted build. Against this tree, each
-part of the issue's account was established from the code (and, for the Space
-question, from a live headless probe of the pre-change build). The premise
-reproduces, with one sub-account corrected (F4).
+**Writers — the setter is the single clamp point.** Only two callers reach the threshold setters: the GOV TUNE panel and the agent-UI bridge channels (`uiRegistry.mjs`, `dev.govtune-shed` / `dev.govtune-recover`). No presets, Look deals, or persona paths write the pair. Clamping inside the setters therefore covers every writer by construction.
 
-**Where the watchdog lives.** Store slice `app/src/state/slices/globalSlice.js`
-(`tripWatchdog` sets `running=false` + `lastWatchdogReason`; `setRunning` is the
-resume path). Governor hook `app/src/hooks/usePerformanceGovernor.js` (the trip
-sites). Pill `app/src/components/TapeCounter.jsx` (state 2, PERF PAUSED). Event
-log `app/src/gl/governorEventLog.mjs`, rendered by
-`app/src/panels/GovernorXrayPanel.jsx` (EventRow).
+**Correction to the brief's framing — there is no persisted trap.** The pair is session-only by design (#259): never serialized, no localStorage key, defaults 28/30 at every load (verified by grepping every reference to both keys across `app/src` and `app/e2e`). So no out-of-range value survives a reload. The load-shaped hole that *does* exist is in-session: a value written **before the fps meter's first refresh measurement lands** is bound only by the absolute 120 cap. The build closes that hole with a reconcile (§2) instead of a persistence migration, and this report records the correction rather than building the migration the brief imagined.
 
-**What it trips on.** Three perf paths, all in the governor hook:
-fps-critical (effective fps = min(rAF fps, GPU-implied fps) < 10 sustained
-800 ms, ladder-gated), fps-stalled (no completed frame for ≥ 2000 ms),
-fps-crawl (loop time advancing < 25% of wall time across a 4 s window;
-constants in `app/src/hooks/governorCuts.js`). Two correctness trips exist
-outside the hook: `liveLoop` 'accum-nan' and ErrorBoundary 'render-error'.
+## 2. What was built
 
-**F1 — why resume re-tripped instantly (the "RUN click failed / re-paused
-within seconds" mechanism).** The stall/crawl poll explicitly restarts its
-measurements on resume (`stallWasStoppedRef`: "a stop restarts the frame-stall
-clock … resume is never punished for the silence it chose"). The fps-critical
-effect has no such protection: its sustain window (`criticalSinceRef`) is never
-restarted on resume and can mature *during* the stop, so the first effect pass
-after a manual resume re-trips immediately when the loop is still slow. The
-crawl path likewise re-trips about one window (~4 s) after resume because the
-loop is still slow — matching the session's "re-paused within seconds". There
-is no separate RUN defect in the tree: the click resumed (the #264 path,
-`applyAction` SET_RUNNING true), and the stop returned at once via this
-mechanism. The stress session's own numbers support this reading: its headless
-loop ran at eff 1.3–1.5 fps, far under the critical line, so any resume was
-re-tripped by design-of-the-bug within a frame or a crawl window.
+- **`app/src/hooks/fpsMath.mjs` — `estimateRefreshFps(deltas)`.** The measuring stick, in the meter's existing pure core ("the arithmetic is fpsMath's; the tick owns the rhythm"). rAF deltas are integer multiples of the refresh interval — load can only stretch them, never shrink them below it — so the cadence is the window's 10th-percentile delta, floored to whole fps (jitter can only understate). Returns null under 30 usable samples: no measurement, no invented number.
+- **`useFpsMeter.js`** publishes the estimate at its existing ~4 Hz report tick. **`globalSlice.setDisplayMaxFps`** keeps the session's best (raise-only: a loaded window reads low because frames stretched, not because the screen slowed). New store field `displayMaxFps: null`, session-only, documented beside the pair.
+- **`app/src/state/governorThresholds.mjs` — the pair's law, one pure module.** `clampShedFps` / `clampRecoverFps` / `reconcileThresholdPair` / `clampNoteFor`, with named constants (absolute domain 1–120, minimum gap 1 — the existing #259 gap, named, not re-tuned). Both slice setters are now thin shells over it, so the panel, the bridge, and the reconcile can never disagree. The garbage-input contract is preserved exactly (0 / '' / NaN keep the current value).
+- **The screen ceiling binds last in `clampRecoverFps`**, so recover can never exceed the measured max even while the pair is degenerate; shed additionally respects the screen ceiling, keeping each setter independently lawful.
+- **`usePerformanceGovernor.js` — the reconcile.** When a measurement lands or rises, the governor re-derives the stored pair under it (`reconcileGovernorThresholds` in the slice): a pre-measurement 120 is pulled to the measured max and shed is pulled under it. A no-op once the pair is lawful.
+- **`GovernorTunePanel.jsx` — the field, fixed and honest.** `ThresholdRow` now edits a **local draft** and commits on blur/Enter (Escape reverts; a cleared field reverts rather than committing 0) — the codebase's own RangeRow click-to-type pattern. The commit runs the same law module the setter uses, so when a value is clamped the field lands on the clamped value with the note beside it in the panel's amber: `screen max 59`, `must stay above shed`, `must stay below recover`. The footnote under the rows now tells the whole true story, and the header says values commit on Enter/click-away.
+- **Selfchecks.** New `app/src/state/governorThresholds.selfcheck.mjs` (registered in `app/selfcheck.manifest`) pins the law at three levels: the pure clamps + note strings, the **real slice setters** driven headlessly (pre-measurement 120 settable → measurement lands → reconcile corrects → 120 unrepresentable; the untypeable 25 now takes; raise-only measurement), and the panel's source contract (draft state, blur commit, note import, and the absence of the old write-through). `fpsMath.selfcheck.mjs` gains the estimator pins: clean 60/120/144 cadences, load-stretched windows still reading cadence, a saturated window honestly reading its presented rate, too-little-evidence reading null, and the floor's conservative side (a mathematically perfect 60.00 Hz reads 59 — an understated max stays reachable; an overstated one would reopen the trap).
 
-**F2 — why the log printed "2fps < 0" (the threshold that looked broken).**
-The stall and crawl trip sites wrote event records carrying
-`fps: { at: effectiveGovernorFps(...), threshold: 0 }` — a threshold of 0 by
-construction, because neither carve-out compares fps at all (crawl compares a
-loop-rate ratio; stall compares frame silence). EventRow renders every fps
-record as `{at}fps < {threshold}`, producing "2fps < 0". The `at` value (≈2)
-was the GPU-implied fps, **not** the measurement acted on — the actual reading
-lived only in the event `detail` string, which the row never rendered.
-**The trip comparisons themselves are not broken** — nothing ever compared
-fps < 0. The defect is in the log record and its rendering, and in the pill,
-which showed no measurement at all (and never showed `lastWatchdogReason`).
+One-writer files untouched: `liveLoop.mjs`, `liveResolve.mjs`, `particles.js` are not in the diff.
 
-**F3 — the pill showed a display number, not the watchdog's reading.** The pill
-face was a bare "PERF PAUSED"; its tooltip said "tripped (see GOVERNOR X-RAY)".
-Nothing on the stopped surface said what the watchdog measured.
+## 3. Design decisions
 
-**F4 — Space with focus on a panel button: the issue's account is corrected.**
-Pre-change probe (Playwright-core + bundled chromium, swiftshader, route
-interception serving the built app on a fake host; a natural watchdog trip
-occurred under load): Space pressed with focus on a real panel `BUTTON`
-(TeaMatrix cell) **did** resume, and toggled both ways — the shared bubble-phase
-handler in `App.jsx` (`useHotkeys`) reaches fine from a panel button, and the
-button's native Space activation does not consume the keydown. So in the stress
-session, Space's failure is explained by F1: the press resumed and the stop
-returned within a frame — indistinguishable from "Space does nothing" at
-automation sampling rates. One genuine gap did exist: the shared handler stands
-down when focus is in an INPUT / SELECT / TEXTAREA / contentEditable (e.g. the
-value-dock slider) — a broader exclusion than ruling 2's text-field exception —
-and the resume guarantee depended on that shared toggle's focus rules rather
-than on the stop itself. Ruling 2 is therefore implemented as a dedicated
-capture-phase path (§2), not left to the shared handler.
+- **Measure, don't hard-code.** No platform API exposes the refresh rate to this app (the stage-display descriptors already record `refreshRateHz: null` honestly for Tauri), so the ceiling is measured from the running loop's own delta stream — the same stream the governor already trusts for its crawl measurement. On a 120 Hz screen the clamp is 120; the absolute cap only binds before the first measurement (~a second).
+- **Session-best (raise-only) measurement.** A downward revision would let a heavy scene ratchet the performer's recover down mid-session; load cannot fake a *shorter* delta than the refresh interval, so the highest clean estimate is the truthful one. Documented limitation: dragging the window to a slower display mid-session keeps the faster ceiling until reload, when it re-measures.
+- **The estimator floors.** "Screen max 59" on a 60 Hz panel (seen in the live probe below) is the floor working as designed: the clamped value must stay *reachable*, and 59 is; 61 might not be.
+- **Gap stays 1.** The coordinator's assumption said "a minimum gap"; the #259 law's gap is exactly 1 (strictly apart), with SUSTAIN/COOLDOWN damping flap on top. Naming it (`GOVERNOR_MIN_GAP_FPS`) without re-tuning it keeps this slice inside the ruling.
+- **Draft-commit changes how typing feels, deliberately.** Spinner steps and keystrokes now land on commit (Enter/blur) instead of per-keystroke — that write-through *was* the bug, and draft-commit is the house pattern (RangeRow). Committed values are still live on the governor's next tick, and the panel header now says so accurately.
 
----
+## 4. Live probe (preview build, headless Chromium + swiftshader, route interception)
 
-## 2. What changed, per ruling
+The panel was driven through the real DOM (DEV > GOV TUNE), values read back through the shipped `window.__KC_UI__` bridge:
 
-**New pure law module `app/src/state/watchdogLaw.mjs`** — the whole law in one
-testable place:
+- On load in the contended headless environment the meter's first estimate read ~20 (software rendering saturates the main thread), and the reconcile pulled the shipped 28/30 pair to 19/20 on its own; as lighter windows arrived the session-best estimate rose to 59 — the ratchet working as designed.
+- **Recover ← 120:** typed text showed "120" during typing (the draft), committed to **59** with the row reading **"screen max 59"**; bridge state confirmed recover 59.
+- **Shed ← 6** took exactly; **recover ← 10** took exactly (field and store) — typed values land, the stress session's core failure is gone.
+- **Recover ← 5 with shed 6:** floored to **7** with the row reading **"must stay above shed"**.
 
-- `WATCHDOG_RESUME_GRACE_MS = 5000` — **the grace constant: 5 s**, one named
-  constant; every consumer imports it.
-- `watchdogGraceDeadline(now)` / `inWatchdogGrace(until, now)` — grace
-  arithmetic; a timestamp exactly at the deadline is already expired.
-- `isTextEntryTarget(target)` — INPUT, TEXTAREA, SELECT, contentEditable
-  (mirrors the exclusion set the shared hotkey handler already uses; buttons
-  are deliberately NOT text entry — F4).
-- `shouldSpaceResume({ key, repeat, modifiers…, running, watchdogReason,
-  target })` — an unmodified, non-repeat Space press claims the resume only
-  while a watchdog stop is actually up and focus is not in a text field.
-- Reading builders `fpsWatchdogReading` / `crawlWatchdogReading` /
-  `stalledWatchdogReading` / `faultWatchdogReading` — each carries the
-  measurement the watchdog acted on plus short (pill) and long (tooltip/log)
-  text. The crawl text names the loop-rate ratio and never claims an fps
-  figure; the stall text names the silence bound.
+## 5. Verification
 
-**Ruling 1 — grace period.** `globalSlice.js`: new session-only state
-`lastWatchdogReading` and `watchdogGraceUntil`. `tripWatchdog(reason, reading)`
-stores the reading it acted on. `setRunning`'s resume branch — the one path
-every manual resume takes (RUN pill, Space via `useHotkeys` or the new hook,
-#264) — clears the reading and arms `watchdogGraceUntil = now + 5000` whenever
-it clears a watchdog stop. Pause, plain resume, and the cut-6 resume arm no
-grace (pinned in tests). Governor hook: while grace is live, the fps-critical
-effect holds its sustain window at null (the earliest possible re-trip is grace
-end + its own sustain window — the window cannot mature during grace), and the
-stall/crawl poll treats grace like the stopped branch (at grace end it arms the
-same restart the resume path uses, so the stall bound and crawl window start
-fresh). **Grace gates only the three perf trip paths in the governor hook.**
-The correctness trips (accum-nan, render-error) call `tripWatchdog` directly
-and are not gated — a NaN loop should not wait out a grace window; they also do
-not re-fire spuriously, which is the defect class F1 belongs to. The slice's
-one `Date.now()` (arming the deadline) is recorded in
-`app/eslint-rules/determinism-allowlist.mjs` with its reason: session-only
-interaction timing, never serialized, stamped, or read by the sim;
-`determinism.selfcheck` passes ("allowlist exact").
+- Targeted suites: `governorThresholds` (new), `fpsMath`, `watchdog`, `governorCuts` — green. Every suite that names a touched file (18 more, incl. `uiRegistry`, `labelCase`, `governorHostileScene`, `renderFault`, `tapeBudget`) — green. `determinism`, `liveResolve.determinism`, `phase6`, `governorEventLog` — green.
+- Lint: 0 errors (11 warnings, the pre-existing baseline). Format:check: clean (prettier applied to the two files that needed it). Build: green.
+- Full manifest sweep: **823 PASS + 3 FAIL = 826** — every manifest command holds exactly one runner verdict (sweep.log in the worktree root; 5 further "PASS:" lines in the log are suites' own output, identified and not counted). The 3 failures are exactly the known sandbox-environmental set, untouched by this diff: swarmWasm (exit 1), rollSafety (exit 1), accum (abort 134). The first sweep run was OOM-killed by the sandbox at 748 verdicts and resumed from the next un-verdicted command into the same log (marker lines present); the seam reconciles exactly (748 + 78 = 826, no duplicates, no gaps).
 
-**Ruling 2 — Space is a global resume while PERF PAUSED.** New hook
-`app/src/hooks/useWatchdogSpaceResume.js`, mounted in `App.jsx` next to
-`usePerformanceGovernor()`. Capture-phase window keydown: when
-`shouldSpaceResume` claims the press, it `preventDefault()`s +
-`stopPropagation()`s (the shared toggle never sees the press — exactly one
-resume, no double-toggle) and resumes through the exact #264 path
-(`applyAction({ type: A.SET_RUNNING, payload: true })`), so the stop clears,
-the restore is logged, and grace arms. When it does not claim the press (text
-field focus, modified key, auto-repeat, no watchdog stop up), it does nothing
-and the event flows on untouched — typing, button activation, and plain
-pause/resume behavior are unchanged.
+## 6. Before / after
 
-**Ruling 3 — pill and log show the watchdog's own measurement.**
-`TapeCounter.jsx` pill state 2 subscribes `lastWatchdogReading`: the face reads
-`PERF PAUSED · {short reading}` (e.g. "PERF PAUSED · frame stalled",
-"PERF PAUSED · 3fps", "PERF PAUSED · loop crawling") and the tooltip leads with
-the long reading ("Watchdog tripped: no completed frame for 2.0s — …").
-Governor trip sites pass their readings into `tripWatchdog` and into the event
-records.
-
-**Broken-comparison repair (the "<0"), before/after.** This is the one
-threshold-adjacent change, and it is in the record/rendering, not in any trip
-comparison (per F2, no comparison was ever broken and no trip threshold
-moved):
-
-- *Before:* stall/crawl event records carried `fps: { at: <GPU-implied fps>,
-  threshold: 0 }`; the X-RAY row rendered "2fps < 0" — an fps figure the
-  watchdog never acted on, against a threshold that does not exist.
-- *After:* stall/crawl records carry no `fps` field at all — the event
-  `detail` IS the measurement ("no completed frame for 2000ms (frame stall)" /
-  "loop time crawling — loop advanced 300ms in 4000ms wall"). EventRow renders
-  the fps pair only when `threshold > 0`; otherwise the slot renders the detail
-  (ellipsis + full text in the title attribute). Genuine fps-critical records
-  keep the pair with their real threshold (10). Event key set unchanged
-  (`governorEventLog.selfcheck` pins it exactly and passes).
-
-**Tests.** New `app/src/state/watchdogLaw.selfcheck.mjs` (grace arithmetic
-incl. the deadline boundary; the Space-routing matrix — button focus resumes,
-text fields stand down, no stop / modified / repeat all stand down; formatter
-honesty — crawl text never claims fps, stall text names its bound; source pins
-that the hook, slice, governor, pill, and App wiring stay in place), registered
-in `app/selfcheck.manifest` after the watchdog line. Extended
-`app/src/state/watchdog.selfcheck.mjs`: a perf trip stores its reading verbatim
-and a fault trip synthesizes its own; resume of a watchdog stop arms grace
-within [before+5000, after+5000] and clears the reading; pause, plain resume,
-and the cut-6 resume arm no grace.
-
-**Surface/literal sweep:** the pill face gained a suffix — `app/e2e/` specs
-match the pill by the substring `/PERF PAUSED/i`, which still matches; greps
-over all selfchecks and `app/e2e/` for the pill text, the removed
-`threshold: 0` record shape, and every touched file's source-shape pins were
-run, and every suite so found was run green (list in §3).
-
-Files changed (11): `app/src/state/watchdogLaw.mjs` (new),
-`app/src/state/watchdogLaw.selfcheck.mjs` (new),
-`app/src/hooks/useWatchdogSpaceResume.js` (new),
-`app/src/state/slices/globalSlice.js`, `app/src/hooks/usePerformanceGovernor.js`,
-`app/src/components/TapeCounter.jsx`, `app/src/panels/GovernorXrayPanel.jsx`,
-`app/src/App.jsx`, `app/src/state/watchdog.selfcheck.mjs`,
-`app/selfcheck.manifest`, `app/eslint-rules/determinism-allowlist.mjs`.
-
----
-
-## 3. Verification
-
-- **Targeted suites (all green):** watchdogLaw (new), watchdog, governorEventLog,
-  governorCuts, governorHostileScene, accumGuard, phase6, renderFault, plus
-  every suite grep-matching a touched file (selfcheckRunner, the manifest and
-  determinism suites, tapeCounter consumers, and the rest of the grep set).
-- **Lint:** `npm run lint` — 0 errors, 11 warnings (the pre-existing baseline).
-- **Format:** `npm run format:check` clean (new files prettier-formatted;
-  scratch probes deleted).
-- **Build:** `npm run build` green.
-- **Full manifest sweep** (continue-on-error over every line of
-  `app/selfcheck.manifest`; log kept as `sweep.log` in the worktree root):
-  **820 PASS + 3 FAIL = 823 commands, each with exactly one runner verdict.**
-  The first run was cut at 429 verdicts by a sandbox runtime restart and
-  resumed from the next manifest command into the same log (marker line in the
-  log); the tally counts runner verdict lines only, matched against the
-  manifest — a suite's own "PASS:" output lines are not counted. The 3 failures
-  are exactly the known sandbox-environmental set, identical on the base:
-  `swarmWasm` (exit 1), `rollSafety` (exit 1), `accum` (abort, exit 134).
-  Nothing in this change touches their code paths.
-- **Live browser probes** (Playwright-core + bundled chromium, swiftshader,
-  route interception on a fake host, production build via vite preview):
-  - *Pre-change:* natural watchdog trip under load; Space with focus on a panel
-    BUTTON resumed (see F4 — the correction to the issue's sub-account).
-  - *Post-change:* a natural fps-stalled trip at ~6.5 s; the pill face read
-    "PERF PAUSED · frame stalled" and its tooltip "Watchdog tripped: no
-    completed frame for 2.0s…"; Space with a `BUTTON.te-cell` focused cleared
-    the stop by the first sample (0.19 s); **no re-trip occurred inside the
-    5 s grace**; the stop lawfully returned at ~10.07 s (grace end + a fresh
-    2 s stall bound under a genuinely stalled swiftshader loop) — the grace
-    law working end-to-end, not a permanent suppression.
+| | Before | After |
+|---|---|---|
+| Type "25" into recover (shed 20) | Field rewrites mid-typing, lands on 120 | Draft shows "25", commits to 25 |
+| Set recover to 120 on a 60 Hz screen | Stored; cuts can never auto-clear all session | Clamps to the measured max with a "screen max N" note |
+| Recover written before the meter measures | Bound only by the 120 cap, traps the session | The measurement itself reconciles it down when it lands |
+| Panel footnote's promise | Claimed the trap couldn't return; it could | True by construction, and says both laws |

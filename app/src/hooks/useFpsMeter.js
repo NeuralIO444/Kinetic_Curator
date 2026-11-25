@@ -9,7 +9,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
-import { fpsFromCount, frameStats, drainStageAverages } from './fpsMath.mjs';
+import { fpsFromCount, frameStats, drainStageAverages, estimateRefreshFps } from './fpsMath.mjs';
 
 // Module-level sampler: name -> { total, n }. Module-level (not a ref) so
 // non-React pipeline code can report without a hook instance.
@@ -74,6 +74,7 @@ export function timeStage(name, fn) {
 export function useFpsMeter(enabled = true) {
   const setFps = useStore((s) => s.setFps);
   const setStageTimings = useStore((s) => s.setStageTimings);
+  const setDisplayMaxFps = useStore((s) => s.setDisplayMaxFps);
   const framesRef = useRef(0);
   const lastReportRef = useRef(0);
   const rafRef = useRef(null);
@@ -105,6 +106,13 @@ export function useFpsMeter(enabled = true) {
       if (elapsed >= 250) {
         setFps(fpsFromCount(framesRef.current, elapsed));
 
+        // #2482 — the display's reachable rate, estimated from this
+        // window's deltas (fpsMath owns the arithmetic). The store
+        // keeps the session's best; a null estimate (window too small)
+        // publishes nothing — no measurement, no fiction.
+        const refresh = estimateRefreshFps(deltas);
+        if (refresh != null) setDisplayMaxFps(refresh);
+
         // Patrol snapshot: per-stage rolling averages (ms) + frame stats.
         // The arithmetic is fpsMath's (pinned); this tick owns the rhythm.
         const stages = drainStageAverages(stageSamples);
@@ -122,5 +130,5 @@ export function useFpsMeter(enabled = true) {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [enabled, setFps, setStageTimings]);
+  }, [enabled, setFps, setStageTimings, setDisplayMaxFps]);
 }

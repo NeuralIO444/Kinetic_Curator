@@ -39,3 +39,36 @@ export function drainStageAverages(stageSamples) {
   }
   return stages;
 }
+
+/** Minimum delta samples before a refresh estimate is evidence, not noise. */
+export const REFRESH_MIN_SAMPLES = 30;
+
+/**
+ * Estimate the display's refresh rate (whole fps) from a window of rAF
+ * frame deltas — #2482, the GOV TUNE recover clamp's measuring stick.
+ *
+ * rAF is vsync-bound, so every delta is (to timestamp precision) an
+ * integer multiple of the refresh interval: load can only STRETCH a
+ * delta (2x, 3x the interval), never shrink one below it. The cadence
+ * therefore lives at the bottom of the distribution — the 10th
+ * percentile delta is the refresh interval whenever at least a tenth
+ * of the window's frames landed on consecutive vsyncs, and the rate
+ * is floored so timestamp jitter can only ever understate it. A fully
+ * saturated window (every frame missing vsync) honestly reads its
+ * presented rate; the meter keeps the best estimate of the session,
+ * so a later light window raises it to the truth.
+ *
+ * Returns null when the window is too small or holds no usable delta
+ * — an absent measurement, never an invented one (the stage-display
+ * descriptors take the same line: refreshRateHz stays null when the
+ * platform won't say).
+ */
+export function estimateRefreshFps(deltas) {
+  if (!Array.isArray(deltas)) return null;
+  const usable = deltas.filter((d) => Number.isFinite(d) && d > 0).sort((a, b) => a - b);
+  if (usable.length < REFRESH_MIN_SAMPLES) return null;
+  const cadence = usable[Math.floor(usable.length * 0.1)];
+  if (!(cadence > 0)) return null;
+  const fps = Math.floor(1000 / cadence);
+  return fps >= 1 ? fps : null;
+}

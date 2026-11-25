@@ -17,6 +17,7 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useStore } from '../state/store.js';
 import { getFrameDeltas } from '../hooks/useFpsMeter.js';
 import { gpuImpliedFps, effectiveGovernorFps } from '../hooks/governorCuts.js';
+import { clampShedFps, clampRecoverFps, clampNoteFor } from '../state/governorThresholds.mjs';
 import { getGovernorEvents, governorEventLogSize } from '../gl/governorEventLog.mjs';
 
 // Histogram geometry: 5ms buckets, 0–100ms, plus an overflow bucket.
@@ -63,21 +64,57 @@ function flapReport(events) {
     .sort((a, b) => b.cycles - a.cycles);
 }
 
-function ThresholdRow({ label, value, setValue, min, max, hint }) {
+/**
+ * One threshold field. The text is a local DRAFT while editing and
+ * commits on blur/Enter (Escape reverts) — the RangeRow click-to-type
+ * pattern. #2482: the old write-through field sent every keystroke
+ * through the clamping setter, so the shed+1 floor rewrote the first
+ * digit as it was typed ("25" over shed 20 became 21, then 215 → 120)
+ * and the field could never be typed into. The commit runs the pair
+ * law (governorThresholds.mjs — the same arithmetic the setter
+ * applies) so a clamped value lands with its note beside the field,
+ * never as a silent adjustment (ruling 2).
+ */
+function ThresholdRow({ label, value, setValue, min, max, hint, kind, shedFps, recoverFps, displayMaxFps }) {
+  const [draft, setDraft] = useState(null);
+  const [note, setNote] = useState(null);
+
+  const commit = () => {
+    if (draft == null) return;
+    const text = draft.trim();
+    setDraft(null);
+    if (text === '') return; // a cleared field reverts — it is not a commit of 0
+    const outcome =
+      kind === 'recover'
+        ? clampRecoverFps(text, { shedFps, displayMaxFps, current: value })
+        : clampShedFps(text, { recoverFps, displayMaxFps, current: value });
+    setValue(outcome.value);
+    setNote(clampNoteFor(outcome, kind));
+  };
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 12 }}>
       <span style={{ width: 150, color: '#8a93a6' }}>{label}</span>
       <input
         type="number"
-        value={value}
+        value={draft ?? value}
         min={min}
         max={max}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') setDraft(null);
+        }}
         title={hint}
         style={{ width: 64, background: '#141414', color: '#fff', border: '1px solid #2a2a2a', padding: '2px 6px' }}
       />
       <span style={{ color: '#8a93a6' }}>fps</span>
-      <span style={{ color: '#5a6272', fontSize: 11 }}>{hint}</span>
+      {note ? (
+        <span style={{ color: '#ffb454', fontSize: 11 }}>{note}</span>
+      ) : (
+        <span style={{ color: '#5a6272', fontSize: 11 }}>{hint}</span>
+      )}
     </div>
   );
 }
@@ -87,6 +124,7 @@ export function GovernorTunePanel() {
   const stageTimings = useStore((s) => s.stageTimings);
   const shedFps = useStore((s) => s.governorShedFps);
   const recoverFps = useStore((s) => s.governorRecoverFps);
+  const displayMaxFps = useStore((s) => s.displayMaxFps);
   const setShedFps = useStore((s) => s.setGovernorShedFps);
   const setRecoverFps = useStore((s) => s.setGovernorRecoverFps);
   const renderScale = useStore((s) => s.renderScale);
@@ -123,7 +161,7 @@ export function GovernorTunePanel() {
 
       <div style={{ color: '#8a93a6', margin: '8px 0', fontSize: 11 }}>
         The FPS average lies — one 200ms hitch vanishes inside it. The histogram shows what the governor actually reacts
-        to. Thresholds are live: change them and the governor uses the new values on its next tick.
+        to. Thresholds are live: commit a new value (Enter or click away) and the governor uses it on its next tick.
       </div>
 
       <h4 style={{ margin: '10px 0 4px' }}>
@@ -198,6 +236,10 @@ export function GovernorTunePanel() {
         min={1}
         max={120}
         hint="sustained below this → next ladder cut"
+        kind="shed"
+        shedFps={shedFps}
+        recoverFps={recoverFps}
+        displayMaxFps={displayMaxFps}
       />
       <ThresholdRow
         label="Recover at/above"
@@ -206,10 +248,15 @@ export function GovernorTunePanel() {
         min={1}
         max={120}
         hint="cuts auto-clear once FPS is back here"
+        kind="recover"
+        shedFps={shedFps}
+        recoverFps={recoverFps}
+        displayMaxFps={displayMaxFps}
       />
       <div style={{ fontSize: 11, color: '#5a6272', marginTop: 2 }}>
-        Shed must stay below recover — the setters enforce it, so the permanent-shed trap can't be reintroduced from
-        this panel.
+        Shed must stay below recover, and recover can't pass what this screen can reach — the setters enforce both, so
+        the permanent-shed trap can't be reintroduced from this panel. A value that gets clamped says so next to the
+        field.
       </div>
 
       <h4 style={{ margin: '10px 0 4px' }}>Live signal</h4>
