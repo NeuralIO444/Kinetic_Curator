@@ -156,6 +156,19 @@ import { routeBeat } from '../state/beatArbiter.js';
   assert.strictEqual(reason({ evolveSource: 'beat', audioEnabled: true, gen: 1 }), null, 'first beat landed: quiet');
   // Route EVOLVE (not just BOTH) still feeds the gate.
   assert.strictEqual(reason({ evolveSource: 'beat', beatRoute: 'evolve', audioEnabled: true }), 'waiting for a beat');
+  // Metro-only input on a stopped loop: the metro is gated on the loop
+  // running, so no beat can ever arrive — the stopped loop is named at
+  // any gen (QA's gap: this state previously read as a soft wait at
+  // gen 0 and as silence after the first generation).
+  assert.match(reason({ evolveSource: 'beat', audioEnabled: false, beatMetro: true, running: false }), /loop stopped/);
+  assert.match(
+    reason({ evolveSource: 'beat', audioEnabled: false, beatMetro: true, running: false, gen: 5 }),
+    /loop stopped/,
+  );
+  // The asymmetry: mic input fires while the show is stopped, so a
+  // stopped loop is NOT a hold for an audio-fed beat source.
+  assert.strictEqual(reason({ evolveSource: 'beat', audioEnabled: true, running: false }), 'waiting for a beat');
+  assert.strictEqual(reason({ evolveSource: 'beat', audioEnabled: true, running: false, gen: 5 }), null);
 }
 {
   // End-to-end through the real store, in the stress session's own
@@ -212,6 +225,18 @@ import { routeBeat } from '../state/beatArbiter.js';
   // The input dies mid-run: the hard hold returns, gen or no gen.
   S().setAudioEnabled(false);
   assert.match(evolveWaitReason(facts()), /no beat input/, 'mid-run input loss is named');
+
+  // The metro takes over as the only input: live while the loop runs,
+  // and when the show stops the stopped loop is named — at gen 3, not
+  // silence (the metro is gated on the loop running; QA's gap, end to
+  // end through the real store).
+  S().setBeatMetro(true);
+  assert.strictEqual(evolveWaitReason(facts()), null, 'metro live and landed: quiet');
+  S().setRunning(false);
+  assert.match(evolveWaitReason(facts()), /loop stopped/, 'metro-only on a stopped loop is named at gen 3');
+  S().setRunning(true);
+  assert.strictEqual(evolveWaitReason(facts()), null, 'RUN restarts the metro path: quiet again');
+  S().setBeatMetro(false);
 
   // Route the beats away: named even with the input live.
   S().setAudioEnabled(true);

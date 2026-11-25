@@ -133,3 +133,23 @@ fire, the panel is exactly as it was.
   `particles.js` were read for the audit (the loop clock's semantics) and
   not modified; no seam in them is indicted — the time driver's clock
   behaviour is by design (#808).
+
+## QA fix round (2026-11-25)
+
+QA verdict: NOT CLEAN on one SHOULD-FIX, everything else verified —
+diagnosis (shape (c), independently reproduced), no behaviour change,
+byte-identical readout when the run can fire, copy accuracy, pin honesty,
+scope. The gap QA's own gate enumeration found: **beat source + metro-only
+input + stopped loop**. The dial metro is gated on the loop running
+(metroRunning), so in that state no beat can ever arrive — yet the helper
+showed the soft wait at gen 0 and nothing at gen > 0 (QA demonstrated on
+the real store: metro run at GEN 3, show stopped, reason null). Fixed in
+this round: the beat branch names the stopped loop at any gen when the
+metro is the only possible input and the loop is stopped; section D gains
+the truth-table rows (including the asymmetry pin — mic input fires while
+stopped, so an audio-fed beat source on a stopped loop is NOT named) and
+a store-level step (metro lands generations → stop → named → RUN →
+quiet). QA's routing opinion, recorded: full-auto lane once this fix
+landed — the wait line is factual blocker text in the same class as the
+telemetry line's status-honesty surfaces, and the shape that would belong
+to the review lane (changing what EVOLVE does) is what this fix refuses.
