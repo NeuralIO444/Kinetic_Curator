@@ -273,11 +273,14 @@ const fullAll = (w) => {
   ];
   w.ecology.lives[0].fat = 6000;
   stepCultureFoodSense(w.bodies, w.citizens, w.ecology);
+  // LOUD RE-PIN (Phase 6B — RULED: hunger is a DAVIS drive). The senses now carry the belly's EMPTINESS; the recipe's
+  // hunger gene weighs it (was: `pull`, the ecology's weight × emptiness). The desire assertions below are unchanged.
   assert.deepEqual(c.food, {
     x: 800,
     y: 540 - range + 1,
-    pull: CULTURE_HUNGER_PULL * (1 - 6000 / CULTURE_FAT_MAX_TICKS),
+    emptiness: 1 - 6000 / CULTURE_FAT_MAX_TICKS,
   });
+  assert.equal(c.recipe.drives.hunger, CULTURE_HUNGER_PULL, 'the native hunger gene is 6A’s weight');
   w.ecology.morsels = [{ serial: 0, x: 800 + range + 1, y: 540, born: 0 }];
   stepCultureFoodSense(w.bodies, w.citizens, w.ecology);
   assert.equal(c.food, null, 'beyond 3 body-lengths: nothing sensed');
@@ -296,7 +299,7 @@ const fullAll = (w) => {
   const hx = w.bodies.x[c.first];
   const hy = w.bodies.y[c.first];
   const d = Math.hypot(900 - hx, 540 - hy);
-  assert.equal(food.pull, CULTURE_HUNGER_PULL);
+  assert.equal(food.emptiness, 1); // re-pinned (6B): was food.pull === CULTURE_HUNGER_PULL
   assert.equal(withFood.x, without.x + ((900 - hx) / d) * CULTURE_HUNGER_PULL);
   assert.equal(withFood.y, without.y + ((540 - hy) / d) * CULTURE_HUNGER_PULL);
   assert.equal(

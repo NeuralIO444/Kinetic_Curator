@@ -428,7 +428,9 @@ export function cultureBodyFaults(body) {
  */
 function redealBody(src, radii, looks, scale, linkage) {
   const parts = src.parts.map((p, k) => Object.freeze({ ...p, radius: radii[k], look: looks[k] }));
-  const links = src.links.map((l) => Object.freeze({ a: l.a, b: l.b, rest: restOf(parts[l.a].radius, parts[l.b].radius) }));
+  const links = src.links.map((l) =>
+    Object.freeze({ a: l.a, b: l.b, rest: restOf(parts[l.a].radius, parts[l.b].radius) }),
+  );
   let tail = 0;
   parts.forEach((p, k) => {
     if (p.role === 'spine') tail = k;

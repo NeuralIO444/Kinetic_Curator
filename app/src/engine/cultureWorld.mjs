@@ -271,6 +271,20 @@
 //               the beats land, then eating, predation, looting on the settled
 //               frame; metabolism every world step before the soil, which judges
 //               last. Dormant over an uncast world. The hash folds it whole.
+//               Phase 6, slice B (spec §2.8, §3.3, §3.4, §4 Q2; engine/cultureBreed.mjs):
+//               breeding and growth. HUNGER is a recipe gene (RULED): the drive
+//               registry's `hunger`, weighed by the recipe; the native gene is 6A's
+//               weight, so a cast citizen seeks food exactly as in 6A. GROWTH: every
+//               5 morsels eaten earn a stage (1 at birth, at most 3); each stage
+//               scales the body ×1.08 — its discs and joints in the tables, and so the
+//               size predation reads. BREEDING, last of the contacts on the settled
+//               frame: two living same-plan citizens, both fat ≥ 60 and stage ≥ 2,
+//               touching → a baby (each parent pays 25; born with 50, stage 1): per
+//               part a coin flip for look and size from the parents' BORN bodies (a
+//               looted limb is never inherited), the recipes blended, LOIS reading the
+//               baby (a refusal: no birth, no fat). The baby is dealt like a cast
+//               member, on the registered 'culture-breed' channel; at most 32 living.
+//               The Lab still casts fresh each take: a new take is a new world.
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { createFluid, stepFluid, fluidDensity, fluidHash, fluidSeedKey } from './dishFluid.mjs';
 import { createCulture, stepCulture, seedRandom, cultureHash, CULTURE_RULE } from './dishLife.mjs';

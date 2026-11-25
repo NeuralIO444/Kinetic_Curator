@@ -18,9 +18,11 @@
 //        drives give exactly 1 everywhere and leave the gait itself, bit for bit. cultureMoodPresets() are the previews of
 //        each drive pushed high. A citizen carries no DRIVE genes (its drives are its recipe's: wander, ground, rim), so
 //        the mood is the bench's input, neutral by default — never invented from the recipe.
-//   T3 — THE BABY PREVIEW is not here: a citizen's child is a blend of its parents' recipes (spec §2.8) and maybe their
-//        parts (§3.3, unruled) — breeding is Phase 6. The issue's own path (creatureBreed.js breedCreature over the WetLab
-//        bank) is the WetLab creature's, not a citizen's; it is carried, with the WetLab panel, buttons and e2e of T1/T2.
+//   T3 — THE BABY PREVIEW (Phase 6B, the parent issue 2344, ENGINE ONLY): cultureTestDriveBaby(a, b, opts) previews the
+//        child two creatures would have (engine/cultureBreed.mjs cultureBabyPreview — the one deal a dish birth uses: per
+//        part a coin flip for look and size, the recipes blended, LOIS's verdict) and, when LOIS admits it, poses it on
+//        the bench wearing the SAME gait as its parents' drive (the same kind, beats, mood) — "moving with the same gait".
+//        Never banked, nothing written. The WetLab panel that shows it needs Matt's copy and is not built here.
 import { POSE_IDENTITY } from './motionCore/index.js';
 import { GAIT_DEFAULT_BPM } from './gait.js';
 import { canonGaits, CANON_GAIT_KINDS } from '../data/canon/gaits.js';
@@ -29,6 +31,7 @@ import { cultureBodyRestPose } from './cultureBody.mjs';
 import { cultureTreeOf, cultureGaitPose, CULTURE_GAIT_STYLES } from './cultureGait.mjs';
 import { cultureBeastBones, CULTURE_BEAST_STEP_S } from './cultureBeast.mjs';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H } from './cultureSwarm.mjs';
+import { cultureBabyPreview } from './cultureBreed.mjs';
 
 /** The DRIVE genes a mood reads (the WetLab creature's; engine/creatureGenome.js DRIVES). */
 export const CULTURE_MOOD_DRIVES = DRIVES;
@@ -175,4 +178,17 @@ export function cultureTestDrive(member, { kind = 'performing', beats = 0, mood 
     nodes: marks.map((m, k) => ({ x: m.x, y: m.y, pose: poses[k] })),
     ...(bones ? { bones } : {}),
   };
+}
+
+/**
+ * T3 — THE BABY PREVIEW ON THE BENCH (Phase 6B, engine only): the child of creatures `a` and `b` ({ body, recipe } —
+ * a citizen's BORN body, or a Lab candidate's) for the key { seed, serial } (cultureBabyPreview), and — when LOIS admits
+ * it — that child test-driven with the same options as its parents' drive (`drive`: cultureTestDrive's { kind, beats,
+ * mood, reducedMotion }). Returns { baby, drive } — drive null when LOIS refuses the child (its faults are the baby's).
+ * Writes nothing: no world, no take, no bank. Pure.
+ */
+export function cultureTestDriveBaby(a, b, { seed = 0, serial = 0, ...drive } = {}) {
+  const baby = cultureBabyPreview(a, b, { seed, serial });
+  if (!baby.admitted) return { baby, drive: null };
+  return { baby, drive: cultureTestDrive({ body: baby.body, recipe: baby.recipe, phase0: baby.phase0 }, drive) };
 }

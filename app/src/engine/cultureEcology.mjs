@@ -168,11 +168,7 @@ function bornChain(parts, root) {
  * a bred baby's is the breeding law's), `linkFirst` the first of its born joints in the link table, `parents` its two
  * parents' indices (−1 for a cast citizen). Returns the life's index (the citizen's).
  */
-export function enrolCultureLife(
-  eco,
-  c,
-  { fat = CULTURE_FAT_BIRTH_TICKS, linkFirst = -1, parents = [-1, -1] } = {},
-) {
+export function enrolCultureLife(eco, c, { fat = CULTURE_FAT_BIRTH_TICKS, linkFirst = -1, parents = [-1, -1] } = {}) {
   const plan = cultureBodyPlan(c.plan);
   const body = c.body;
   const sockets = plan.sockets.map((d, k) => {
