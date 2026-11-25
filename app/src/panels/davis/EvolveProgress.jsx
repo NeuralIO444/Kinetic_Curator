@@ -2,8 +2,10 @@
 // the candidate seed on screen, the real seconds-per-generation, candidates seen.
 // Stopped: the last run's summary (or an honest idle). Reads the store's own
 // evolve facts (davisSlice.js + data/evolveProgress.js), never a timer of its own.
+// #2485: a running EVOLVE whose source cannot fire names the wait
+// (evolveWaitReason) — a starved run no longer reads as a healthy one.
 import { useStore } from '../../state/store.js';
-import { secPerGen } from '../../data/evolveProgress.js';
+import { secPerGen, evolveWaitReason } from '../../data/evolveProgress.js';
 
 export function EvolveProgress() {
   const evolveMode = useStore((s) => s.evolveMode);
@@ -11,7 +13,25 @@ export function EvolveProgress() {
   const last = useStore((s) => s.evolveLast);
   const seen = useStore((s) => s.evolveSeen);
   const seed = useStore((s) => s.seed);
+  const evolveSource = useStore((s) => s.evolveSource);
+  const beatRoute = useStore((s) => s.beatRoute);
+  const audioEnabled = useStore((s) => s.audioEnabled);
+  const beatMetro = useStore((s) => s.beatMetro);
+  const slowRender = useStore((s) => s.slowRender);
+  const batchPaused = useStore((s) => s.batchPaused);
+  const running = useStore((s) => s.running);
   const spg = secPerGen(run);
+  const wait = evolveWaitReason({
+    evolveMode,
+    evolveSource,
+    beatRoute,
+    audioEnabled,
+    beatMetro,
+    slowRender,
+    batchPaused,
+    running,
+    gen: run ? run.gen : 0,
+  });
   const cell = (label, value) => (
     <span className="davis-progress-cell">
       <i>{label}</i>
@@ -26,6 +46,7 @@ export function EvolveProgress() {
           {cell('SEED', seed)}
           {cell('S/GEN', spg == null ? '—' : spg.toFixed(1))}
           {cell('SEEN', seen)}
+          {wait ? <span className="davis-progress-wait">{wait}</span> : null}
         </>
       ) : (
         <>
