@@ -30,7 +30,6 @@ import {
   BEAST_BAR_PARENT,
 } from './creatureGait.mjs';
 import { CULTURE_GAIT_STYLES } from './cultureGait.mjs';
-import { assembleCreature, creatureTile } from './creatureAssembler.js';
 import { beastTile, dealBeastMeasures } from './beastTile.js';
 import { BEAM_ID } from './beastRig.js';
 import { ASSETS } from '../data/assets/index.js';
@@ -61,17 +60,31 @@ const sha = (s) => createHash('sha256').update(s).digest('hex');
 
 // ── the wearers ──
 const body = ASSETS.find((a) => a.id === 'org_blob_01');
-const record = assembleCreature({
-  assetId: body.id,
-  points: [
-    { x: 50, y: 6, role: 'H' },
-    { x: 12, y: 70, role: 'L' },
-    { x: 88, y: 70, role: 'L' },
-    { x: 80, y: 85 },
-  ],
-  seed: 2475,
-});
-const [CR] = sanitizeOverlay([creatureTile(record, body)]);
+// a banked wet-lab creature's pool tile, as the lab bakes it (body org_blob_01: a head, a 2-bone and a 3-bone limb).
+// Written out as a literal: the stage reaches a creature through its pool TILE alone, never through the lab's records.
+const [CR] = sanitizeOverlay([
+  {
+    id: 'user:cr-a9a0e692',
+    category: 'creature',
+    weight: 'heavy',
+    tags: ['creature', 'wetlab', 'org_blob_01'],
+    compound: true,
+    source: 'wetlab',
+    svg: '<g transform="translate(22.5 22.5) scale(0.55)"><circle cx="50" cy="50" r="40" fill="currentColor"/></g>',
+    rig: {
+      body: 'org_blob_01',
+      bones: [
+        { id: 'h', role: 'head', chain: -1, parent: null, x: 50, y: 25.8, angle: -90, len: 14 },
+        { id: 'l0.0', role: 'limb', chain: 0, parent: null, x: 29.1, y: 61, angle: 140.241, len: 18 },
+        { id: 'l0.1', role: 'limb', chain: 0, parent: 'l0.0', x: 0, y: 0, angle: 24, len: 18 },
+        { id: 'l1.0', role: 'limb', chain: 1, parent: null, x: 70.9, y: 61, angle: 39.759, len: 12 },
+        { id: 'l1.1', role: 'limb', chain: 1, parent: 'l1.0', x: 0, y: 0, angle: -24, len: 12 },
+        { id: 'l1.2', role: 'limb', chain: 1, parent: 'l1.1', x: 0, y: 0, angle: -24, len: 12 },
+      ],
+    },
+  },
+]);
+assert.ok(CR && CR.rig && CR.rig.bones.length === 6, 'the fixture tile passes the overlay door with its rig');
 const [BE] = sanitizeOverlay([beastTile(dealBeastMeasures(7, 0))]);
 const POOL = [CR, BE];
 const styleOf = creatureGaitStyleOf(POOL, ASSETS);
