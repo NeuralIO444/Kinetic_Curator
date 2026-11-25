@@ -189,7 +189,11 @@ nowhere else (`liveResolve.mjs` and `particles.js` untouched). Diff:
   one frame; no new render code. The flag is cleared at the end of that branch,
   so it is consumed whether the frame stepped cleanly or faulted into the plain
   fallback (which presents the live scene directly). The frozen hold resumes
-  from the next frame, untouched otherwise.
+  from the next frame, untouched otherwise. (QA's strengthening of the fault
+  path: if the reseed frame's step faults, the fault handler tears ACCUM down
+  entirely and the fallback presents the live scene; on re-enable, the enable
+  site sets the flag again under the standing freeze, so the recovery frame
+  itself re-seeds — the trap cannot re-form after a fault.)
 - The session-end reset clears the flag beside the #268 `accumFrozen` reset, so
   no reseed outlives its session.
 
@@ -246,3 +250,19 @@ flattens for real, and the reseed frame re-creates the accum object through
 - The outcome remains feel-visible (a held still of the current scene instead
   of black), so — as the report flagged — the published PR belongs in the
   review lane.
+
+## QA Review addendum (2026-11-25)
+
+QA verdict: CLEAN — no blockers, no should-fixes. QA verified the seam
+line-by-line against the spec, proved the exactly-one-frame semantics
+(including the fault path), confirmed all three accumObj.begin sites in
+the loop set the flag, ran the 49 other source-reading suites that pin
+liveLoop.mjs (all pass), and reproduced the pin's discrimination with its
+own runs: on the pre-fix tree the browser section fails at the FREEZE +
+CLEAR group with the session's signature (a flat grid while 646 nodes
+stand); on this tree the suite is 10/10. Two wording NITs, both recorded
+here: the suite's hold group asserts the held frame is the accumulated
+scene (non-flat) rather than literal grid identity — identity in fact
+follows from the diff, since the hold branch is unchanged apart from the
+flag conjunct — and the fault-path sentence in the fix addendum above has
+been strengthened with the teardown-and-reseed detail QA established.
