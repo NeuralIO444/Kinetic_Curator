@@ -27,6 +27,7 @@ import {
   resetTuning,
   onTuningChange,
 } from '../personas/tuning.mjs';
+import { DEV_SWITCHES, devSwitchOn, onDevSwitchChange, setDevSwitch } from '../personas/devSwitches.mjs';
 
 // Every editable leaf under a seat's knobs: numbers, and [lo, hi] ranges as a pair. Opener keys are
 // move choices (content), so an opener contributes only its amount.
@@ -134,6 +135,32 @@ function RangeRow({ path, label }) {
   );
 }
 
+// The DEV switch for the opt-in persona features (Matt, 2026-11-19/20): one row per console flag, off by default,
+// session only, never saved (personas/devSwitches.mjs). Same toggle form as Settings' Dev mode row.
+function DevSwitchRows() {
+  const [, setTick] = useState(0);
+  useEffect(() => onDevSwitchChange(() => setTick((t) => t + 1)), []);
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '6px 0 4px' }}>
+      {DEV_SWITCHES.map((s) => {
+        const on = devSwitchOn(s.id);
+        return (
+          <button
+            key={s.id}
+            type="button"
+            data-dev-switch={s.id}
+            className={`chip-btn act ${on ? 'active' : ''}`}
+            aria-pressed={on}
+            onClick={() => setDevSwitch(s.id, !on)}
+          >
+            {s.label}: {on ? 'on' : 'off'}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function PersonaTunePanel() {
   const [, setTick] = useState(0);
   useEffect(() => onTuningChange(() => setTick((t) => t + 1)), []);
@@ -145,6 +172,7 @@ export function PersonaTunePanel() {
         title="PERSONA TUNE"
         subtitle="kc-persona-tuning/1 · live edits · session only, never saved"
       />
+      <DevSwitchRows />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0 10px', fontSize: 12 }}>
         <button
           type="button"

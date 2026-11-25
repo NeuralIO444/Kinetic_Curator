@@ -16,6 +16,17 @@ export function doctrineLayoutOn() {
   }
 }
 
+/** Set the same switch the console sets (the DEV panel's row): on writes `true`, off removes it. Never saved. */
+export function setDoctrineLayoutOn(value) {
+  try {
+    if (value === true) globalThis.__KC_DOCTRINE_LAYOUT = true;
+    else delete globalThis.__KC_DOCTRINE_LAYOUT;
+  } catch {
+    /* a frozen global: the switch stays as it was */
+  }
+  return doctrineLayoutOn();
+}
+
 export function layoutStanceNow(id) {
   try {
     const read = bandRead(id, getBandView());

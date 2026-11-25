@@ -33,6 +33,17 @@ export function bandOn() {
   }
 }
 
+/** Set the same switch the console sets (the DEV panel's band row): on writes `true`, off removes it. Never saved. */
+export function setBandOn(value) {
+  try {
+    if (value === true) globalThis.__KC_BAND = true;
+    else delete globalThis.__KC_BAND;
+  } catch {
+    /* a frozen global: the switch stays as it was */
+  }
+  return bandOn();
+}
+
 const LOG_MAX = 12;
 let view = null;
 const subs = new Set();

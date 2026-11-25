@@ -778,6 +778,7 @@ node src/personas/personaKernel.selfcheck.mjs
 node src/personas/surfaceRegistry.selfcheck.mjs
 node src/personas/personaTuning.selfcheck.mjs
 node src/personas/band.selfcheck.mjs
+node src/personas/devSwitches.selfcheck.mjs
 node src/personas/chemistry.selfcheck.mjs
 node src/personas/personaAdapters.selfcheck.mjs
 node src/personas/queenView.selfcheck.mjs
