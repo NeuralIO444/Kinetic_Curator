@@ -3540,6 +3540,20 @@ details.ds-dev > summary:hover {
 }
 .te-dock.open {
   transform: translateX(0);
+}
+/* #2484 — the dock's hit footprint is its interactive content, not its
+   painted box. The slab is full-height, but the body below the editor is
+   dead space: while the open dock took pointer events across its whole
+   box, every control under the panel's right strip — a mode row's HIGH
+   segment above all — was silently unclickable, and the tap-outside
+   dismissal could not rescue the tap, because it landed INSIDE the dock.
+   Now the slab itself never takes events (the base rule above); the head
+   and the editor do. A tap on the dead space passes through to the
+   control beneath, whose pointerdown lands outside the dock, so one tap
+   dismisses the editor and applies — the behaviour controls outside the
+   strip already had. */
+.te-dock-head,
+.te-dock-body > * {
   pointer-events: auto;
 }
 .te-dock-head {
