@@ -501,7 +501,7 @@ export function growCultureCitizen(world, idx) {
  * a hungry living citizen's head disc, or (RULED) a strandbeest's planted foot — the NEAREST mouth winning; on an
  * exact tie the earlier citizen, a citizen's head before its feet, the earlier leg (cultureMouthReaching).
  * +10 fat to the mouth's citizen, capped at the max; the meal counts toward its growth (Phase 6B — a stage earned grows it
- * at once, cultureGrowCitizen). Returns how many were eaten.
+ * at once, growCultureCitizen). Returns how many were eaten.
  */
 export function stepCultureEating(world) {
   const { bodies, citizens, ecology: eco } = world;
