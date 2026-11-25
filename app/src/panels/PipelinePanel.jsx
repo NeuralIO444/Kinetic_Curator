@@ -41,6 +41,7 @@ export function PipelinePanel() {
     seedOffsets: s.seedOffsets,
     layoutParams: s.layoutParams,
     quality: s.quality,
+    qualityCeiling: s.qualityCeiling,
     autoQuality: s.autoQuality,
     paletteId: s.paletteId,
     paletteLocks: s.paletteLocks,
@@ -72,6 +73,7 @@ export function PipelinePanel() {
     seedOffsets,
     layoutParams,
     quality,
+    qualityCeiling,
     autoQuality,
     paletteId,
     paletteLocks,
@@ -191,6 +193,7 @@ export function PipelinePanel() {
           caGrid={caGrid}
           enabledAssets={enabledAssets}
           quality={quality}
+          qualityCeiling={qualityCeiling}
           autoQuality={autoQuality}
           assetWeightOverrides={assetWeightOverrides}
           assetKineme={assetKineme}

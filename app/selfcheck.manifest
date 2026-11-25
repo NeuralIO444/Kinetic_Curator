@@ -120,6 +120,7 @@ node src/state/quarantine.selfcheck.mjs
 node src/state/watchdog.selfcheck.mjs
 node src/state/watchdogLaw.selfcheck.mjs
 node src/state/governorThresholds.selfcheck.mjs
+node src/state/budgetCeiling.selfcheck.mjs
 node src/state/renderFault.selfcheck.mjs
 node src/data/normalize.selfcheck.mjs
 node src/data/quality.particleCaps.selfcheck.mjs
