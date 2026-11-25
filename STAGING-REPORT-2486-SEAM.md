@@ -43,7 +43,8 @@ One file of production code: `app/src/gl/liveLoop.mjs`.
 - **Store references/scalars** (zustand replaces these wholesale on write,
   never mutates in place, so reference identity is write identity): seed,
   seedOffsets, layoutParams, paletteId, paletteOverrides, userPalettes,
-  enabledAssets, layers, activeLayerId, light, world, customAssets,
+  enabledAssets, assetWeightOverrides, assetStill, caGrid,
+  dishFluidMagnets, layers, activeLayerId, light, world, customAssets,
   regionKinemes, assetKineme, colorMode, quality, perfTier1,
   exposureStops, morphing / morphFrom / morphTo.
 - **Voice mix by value** (from / to / t): the mix driver rewrites the mix
@@ -158,3 +159,25 @@ distinct change, stop untouched. That is a feel-visible outcome, so this
 branch rides to the performer's review lane stacked behind A2's PR
 (#2480), published by the coordinator when that lane opens. Not pushed,
 no PR opened by this builder.
+
+## QA fix round (2026-11-25)
+
+QA verdict: NOT CLEAN on one SHOULD-FIX, everything else verified — seam
+correctness (unchanged scene = the old hold exactly; changed = one still,
+then the hold resumes; the seam cannot engage live), the ACCUM composition
+(A2's flag, no fork; A2's accumFreezeClear passes unchanged on this
+branch), the #823 wrapper (byte-verbatim, condition correct in all three
+cases), and the pin's discrimination (independently reproduced on a
+pristine base checkout: the recall lands, no present ever arrives, 60s
+timeout at the recall step). The gap was in QA's own enumeration of what
+buildFrame renders from: two resolver inputs a performer can write alone
+while paused were missing from the signature — assetWeightOverrides (the
+Asset Pool weight pip) and caGrid (the CA grid reset) — so a paused write
+to either would have left the stale frame standing, the A8 defect in
+miniature. Fixed in this round: both fields join the signature, joined
+also by assetStill and dishFluidMagnets (QA could not establish that
+either moves a held-clock frame; both are performer-written resolver
+inputs, so they ride the same reference pattern rather than an exclusion
+a future reader would have to re-derive). The suite's source pins now
+name all four fields, so the signature's contract stays pinned. With this
+round the branch is ready to publish stacked behind A2's PR.

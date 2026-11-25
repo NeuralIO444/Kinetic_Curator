@@ -91,6 +91,18 @@ const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..
       'present site must record lastPresentedSig',
     );
   });
+  ok('the signature names the resolver inputs a performer can write alone while paused', () => {
+    const at = src.indexOf('function sceneSignature(s, f)');
+    assert.ok(at >= 0, 'sceneSignature located');
+    const body = src.slice(at, at + 1400);
+    // QA's enumeration: each of these is written alone by a performer
+    // action (the Asset Pool weight pip, the tile STILL pip, the CA grid
+    // reset, a dish-fluid magnet drag) and feeds the resolver — omit one
+    // and a paused write to it leaves the stale frame standing.
+    for (const field of ['s.assetWeightOverrides', 's.assetStill', 's.caGrid', 's.dishFluidMagnets']) {
+      assert.ok(body.includes(field), `sceneSignature must include ${field}`);
+    }
+  });
 }
 
 // ---- B: browser (built-app, bridge-driven) section
