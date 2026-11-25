@@ -71,7 +71,13 @@ import {
   CULTURE_LOOK_SHAPES,
 } from './cultureBody.mjs';
 import { cultureSenses, cultureDesire, normalizeCultureRecipe, CULTURE_RECIPE_BOUNDS } from './cultureMotion.mjs';
-import { kineticAssemble, davisWrite, CULTURE_NATIVE_RECIPES, CULTURE_TAKE_SHEET } from './cultureLab.mjs';
+import {
+  kineticAssemble,
+  davisWrite,
+  CULTURE_NATIVE_RECIPES,
+  CULTURE_TAKE_SHEET,
+  CULTURE_DAVIS_HUNGER_LEAN,
+} from './cultureLab.mjs';
 import { cultureTestDrive, cultureTestDriveBaby } from './cultureTestDrive.mjs';
 import { cultureSwarmHash } from './cultureSwarm.mjs';
 import { hashU01, STRING_CHANNEL_GROUPS } from './kernel/rng.js';
@@ -86,6 +92,19 @@ const T = CULTURE_FAT_TICKS;
 const world = (seed = 7, sheet = { plan: 'dish', count: 3 }) => {
   const w = createCultureWorld({ seed });
   castCultureTake(w, sheet);
+  return w;
+};
+/**
+ * The cast at hunger lean 0 — 6A's hunger: every citizen's gene back at its plan's native (2). The cast itself (bodies,
+ * spots, every other dial) is already lean-independent — LOIS never reads the gene — so this is exactly the world the
+ * lean-0 cast deals.
+ */
+const atLeanZero = (w) => {
+  for (const c of w.citizens.list)
+    c.recipe = normalizeCultureRecipe({
+      ...c.recipe,
+      drives: { ...c.recipe.drives, hunger: CULTURE_NATIVE_RECIPES[c.plan].drives.hunger },
+    });
   return w;
 };
 /** Lay a citizen's born parts at its rest pose at (x, y, heading), still. */
@@ -509,7 +528,15 @@ const deepFreeze = (o) => {
   const w = world(7);
   place(w, 0, 800, 540);
   const c = w.citizens.list[0];
-  assert.equal(c.recipe.drives.hunger, 2, 'the cast carries the native gene');
+  // LOUD RE-PIN (hunger lean, RULED 2026-11-25 — a changed law): was, 'the cast carries the native gene' (exactly 2). Now
+  // DAVIS leans it ±15 % at cast: the gene stands within 2 × [0.85, 1.15], and the cast's genes are not all the native.
+  assert.equal(CULTURE_DAVIS_HUNGER_LEAN, 0.15, 'the ruled lean');
+  for (const cz of w.citizens.list)
+    assert.ok(Math.abs(cz.recipe.drives.hunger - 2) <= 2 * 0.15 + 1e-12, 'the cast gene is the native leaned ≤ 15 %');
+  assert.ok(
+    w.citizens.list.some((cz) => cz.recipe.drives.hunger !== 2),
+    'the cast carries leaned genes, not all the native',
+  );
   w.ecology.morsels = [{ serial: 0, x: 900, y: 540, born: 0 }];
   w.ecology.lives[0].fat = 0;
   stepCultureFoodSense(w.bodies, w.citizens, w.ecology);
@@ -528,33 +555,48 @@ const deepFreeze = (o) => {
   const d4 = desire(4);
   assert.ok(Math.abs(d4.x - none.x - 2 * (d2.x - none.x)) < 1e-12, 'gene 4 pulls twice as hard as gene 2');
   assert.ok(d2.x > none.x, 'the gene pulls toward the morsel');
-  // the native gene reproduces 6A: bodies equal origin/main dcc1ac6 (6A) to the bit — pinned on a pristine worktree.
+  // LOUD RE-PIN (hunger lean, RULED 2026-11-25): the "native hunger reproduces 6A" claim now holds only at lean 0 (every
+  // citizen's gene exactly the native 2 — `atLeanZero`): bodies equal origin/main dcc1ac6 (6A) to the bit, the pins
+  // below, UNCHANGED from 6B. At the ruled lean (0.15) the FED bodies leave 6A's (asserted); the UNFED bodies stay 6A's
+  // — no morsel, no hunger pull, so the gene is never read (asserted at both leans).
   // Unfed (no room) over 60 s: nobody eats, so nobody grows or breeds.
   for (const [seed, pin] of [
     [7, 3213499357],
     [42, 1364707529],
   ]) {
-    const u = world(seed, CULTURE_TAKE_SHEET);
-    for (let s = 0; s < 7200; s++) stepCultureWorld(u);
-    assert.equal(u.ecology.grown + u.ecology.births, 0);
-    assert.equal(cultureSwarmHash(u.bodies), pin, `unfed take sheet, seed ${seed}, 60 s: the bodies are 6A’s`);
+    for (const zero of [true, false]) {
+      const u = world(seed, CULTURE_TAKE_SHEET);
+      if (zero) atLeanZero(u);
+      for (let s = 0; s < 7200; s++) stepCultureWorld(u);
+      assert.equal(u.ecology.grown + u.ecology.births, 0);
+      assert.equal(
+        cultureSwarmHash(u.bodies),
+        pin,
+        `unfed take sheet, seed ${seed}, 60 s, ${zero ? 'lean 0' : 'lean 0.15'}: the bodies are 6A’s`,
+      );
+    }
   }
   // Fed (mid, 120 bpm): 6A's bodies to the bit up to the step before the first growth; the growth then changes them.
   for (const [seed, first, pin, mainAt] of [
     [7, 1976, 774063707, 3615503007],
     [42, 1836, 1179149084, 1254146995],
   ]) {
-    const f = world(seed, CULTURE_TAKE_SHEET);
+    const f = atLeanZero(world(seed, CULTURE_TAKE_SHEET));
     setCultureRoom(f, { energy: 'mid', silent: 0, bpm: 120 });
     for (let s = 1; s < first; s++) stepCultureWorld(f);
     assert.equal(f.ecology.grown, 0);
-    assert.equal(cultureSwarmHash(f.bodies), pin, `fed, seed ${seed}: 6A’s bodies at step ${first - 1}`);
+    assert.equal(cultureSwarmHash(f.bodies), pin, `fed, lean 0, seed ${seed}: 6A’s bodies at step ${first - 1}`);
     stepCultureWorld(f);
     assert.equal(f.ecology.grown, 1, `the first growth at step ${first}`);
     assert.notEqual(cultureSwarmHash(f.bodies), mainAt, 'growth: the bodies leave 6A’s (a new law)');
+    // the ruled lean: the same fed world with the cast's own leaned genes is NOT 6A's — the lean is a changed law.
+    const l = world(seed, CULTURE_TAKE_SHEET);
+    setCultureRoom(l, { energy: 'mid', silent: 0, bpm: 120 });
+    for (let s = 1; s < first; s++) stepCultureWorld(l);
+    assert.notEqual(cultureSwarmHash(l.bodies), pin, `fed, lean 0.15, seed ${seed}: the bodies leave 6A's hunger`);
   }
   ok(
-    'hunger is the recipe’s gene (0 ignores food, 4 = 2 × 2); the native gene is 6A’s hunger, bodies equal to the bit',
+    'hunger is the recipe’s gene (0 ignores food, 4 = 2 × 2); lean 0 (the native gene) reproduces 6A’s bodies to the bit; the ruled ±15 % lean leaves 6A’s fed bodies',
   );
 }
 

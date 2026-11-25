@@ -40,12 +40,14 @@ import {
   CULTURE_CAST_CAP,
   CULTURE_LOIS_BAR,
   CULTURE_DAVIS_LEAN,
+  CULTURE_DAVIS_HUNGER_LEAN,
   CULTURE_CAST_SPACING_BODY_LENGTHS,
   CULTURE_CAST_MARGIN_BODY_LENGTHS,
 } from './cultureLab.mjs';
-import { CULTURE_RECIPE_BOUNDS } from './cultureMotion.mjs';
+import { CULTURE_RECIPE_BOUNDS, normalizeCultureRecipe } from './cultureMotion.mjs';
 import { cultureSoilSample } from './cultureSoil.mjs';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H } from './cultureSwarm.mjs';
+import { hashU01 } from './kernel/rng.js';
 import { createCultureWorld, advanceCultureWorld } from './cultureWorld.mjs';
 import { STAGE_COLS, STAGE_ROWS } from './dishLifeStage.mjs';
 import { STRING_CHANNEL_GROUPS, startStringChannelObservation, endStringChannelObservation } from './kernel/rng.js';
@@ -290,6 +292,59 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   ok('DAVIS: whole recipes, every dial in bounds and within his lean of the native; seeded, never chance');
 }
 
+// 4b — DAVIS leans the hunger gene ±15 % at cast (RULED by Matt, 2026-11-25).
+{
+  // LOUD RE-PIN (changed law): was lean 0 (the native gene exactly). The ruled lean is pinned here.
+  assert.equal(CULTURE_DAVIS_HUNGER_LEAN, 0.15, 'the ruled lean is ±15 %');
+  const nativeH = CULTURE_NATIVE_RECIPES[CULTURE_PLAN_DISH].drives.hunger;
+  assert.equal(nativeH, 2, 'the native gene is 2');
+  const [lo, hi] = CULTURE_RECIPE_BOUNDS.drives.hunger;
+  assert.deepEqual([lo, hi], [0, 4], 'the gene bounds');
+  // the gene's own draw: index 16 (after the sixteen temperament dials) on the 'culture-recipe' channel
+  let below = 0;
+  let above = 0;
+  let spread = 0;
+  for (const plan of Object.keys(CULTURE_NATIVE_RECIPES)) {
+    for (let cand = 0; cand < 60; cand++) {
+      const u = hashU01(7, 'culture-recipe', cand * 32 + 16) * 2 - 1;
+      const h = davisWrite(plan, 7, cand).recipe.drives.hunger;
+      const nat = CULTURE_NATIVE_RECIPES[plan].drives.hunger;
+      assert.equal(
+        h,
+        Math.min(hi, Math.max(lo, nat * (1 + 0.15 * u))),
+        'native × (1 + u·0.15), u from the gene’s own draw',
+      );
+      assert.ok(Math.abs(h - nat) <= nat * 0.15 + 1e-12, 'the bound: never beyond ±15 %');
+      if (h < nat) below++;
+      if (h > nat) above++;
+      spread = Math.max(spread, Math.abs(h - nat) / nat);
+      // lean 0 reproduces 6A: the gene exactly native, and EVERY other dial and the phase bit-for-bit the same draws
+      const z = davisWrite(plan, 7, cand, 0);
+      assert.equal(z.recipe.drives.hunger, nat, 'lean 0: the native gene exactly (6A)');
+      const strip = (r) => JSON.stringify({ ...r, drives: { ...r.drives, hunger: 0 } });
+      assert.equal(strip(z.recipe), strip(davisWrite(plan, 7, cand).recipe), 'no other dial’s draw moved');
+      assert.equal(z.phase0, davisWrite(plan, 7, cand).phase0, 'the birth phase unchanged');
+    }
+  }
+  assert.ok(below > 20 && above > 20, 'the lean goes both ways');
+  assert.ok(spread > 0.12, 'the lean spans nearly the whole ±15 %');
+  // the gene's draw index is its own: no temperament dial reads draw 16 (every dial's u differs from the gene's)
+  const g = (c) => hashU01(7, 'culture-recipe', c * 32 + 16);
+  for (let d = 0; d < 16; d++)
+    assert.notEqual(g(3), hashU01(7, 'culture-recipe', 3 * 32 + d), `the gene’s draw is not dial ${d}’s`);
+  // the clamp: an over-wide lean never leaves [0, 4]
+  let hit = 0;
+  for (let cand = 0; cand < 60; cand++) {
+    const wide = davisWrite(CULTURE_PLAN_DISH, 7, cand, 5).recipe.drives.hunger;
+    assert.ok(wide >= lo && wide <= hi, 'clamped inside the gene bounds');
+    if (wide === lo || wide === hi) hit++;
+  }
+  assert.ok(hit > 10, 'the clamp actually bit');
+  ok(
+    'DAVIS leans the hunger gene ±15 % from its own draw (index 16), clamped to [0, 4]; lean 0 is the native, no other dial moves',
+  );
+}
+
 // 5 — LOIS gates and ranks.
 {
   const body = assembleCultureBody(CULTURE_PLAN_DISH);
@@ -316,6 +371,11 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
     close(v.praise, 0.5 * 1 + 0.25 * 1 + 0.25 * (1 - dist / n), 1e-12),
     'praise: ½ fertility + ¼ graphic + ¼ temperament',
   );
+  // LOIS never reads the hunger gene: any gene value (the bounds' far ends included) leaves her praise bit-identical.
+  for (const h of [0, 1, 2, 3.7, 4]) {
+    const r2 = normalizeCultureRecipe({ ...recipe, drives: { ...recipe.drives, hunger: h } });
+    assert.equal(loisGate({ ...cand, recipe: r2 }, live).praise, v.praise, `praise ignores the hunger gene (${h})`);
+  }
   const vn = loisGate({ ...cand, recipe: native }, live);
   assert.ok(close(vn.praise, 1), 'the native recipe on full fertility with the whole vocabulary: full praise');
   assert.deepEqual([...loisGate(cand, dead).faults], ['head on dead ground']);
@@ -428,4 +488,4 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   ok('the Lab draws on registered channels only');
 }
 
-console.log(`cultureLab.selfcheck: ${checks}/8 groups OK`);
+console.log(`cultureLab.selfcheck: ${checks}/9 groups OK`);
