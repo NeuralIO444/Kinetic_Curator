@@ -484,7 +484,7 @@ export function growCultureCitizen(world, idx) {
     links.rest[life.linkFirst + j] = l.rest;
   });
   life.sockets = life.sockets.map((s) =>
-    s.looted || s.bornLocal < 0 || !s.slots.length
+    s.looted || !s.slots.length
       ? s
       : {
           ...s,

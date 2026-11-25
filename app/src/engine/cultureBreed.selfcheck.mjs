@@ -59,6 +59,7 @@ import {
   cultureCitizenSize,
   cultureWornBody,
   cultureEcologyHash,
+  cultureHeadTouches,
 } from './cultureEcology.mjs';
 import {
   assembleCultureBody,
@@ -214,6 +215,16 @@ const deepFreeze = (o) => {
   place(tail, 2, 1500, 300);
   ready(tail, [0, 1]);
   assert.equal(stepCultureBreeding(tail), 1, 'B’s head on A’s body is contact (either way)');
+  // the partner is the first in cast order that touches EITHER way: B's head on A's tail (A's head touches only C)
+  const order = world(7);
+  place(order, 0, 600, 500, 0);
+  const oc = order.citizens.list[0];
+  place(order, 1, order.bodies.x[oc.first + 4] - order.bodies.radius[oc.first + 4], 500, 0);
+  place(order, 2, 600 + order.bodies.radius[oc.first], 500, 0);
+  ready(order, [0, 1, 2]);
+  assert.equal(cultureHeadTouches(order.bodies, oc, order.citizens.list[1], order.ecology.lives[1]), false);
+  assert.equal(stepCultureBreeding(order), 1);
+  assert.deepEqual(cultureCitizenLife(order, kidOf(order)).parents, [0, 1], 'A breeds with B, touched by B’s head');
   // one birth a parent a step: three eligible dish creatures all touching
   const three = world(7);
   place(three, 0, 600, 500, 0);
@@ -308,6 +319,24 @@ const deepFreeze = (o) => {
     ],
     'the plan’s born sockets: the parent’s looted limb is not inherited',
   );
+  // the genotype: a grown parent passes on its BORN size, never its growth
+  const gw = world(7);
+  touchPair(gw);
+  const g0 = gw.ecology.lives[0];
+  g0.meals = 9;
+  g0.fat = 10 * T;
+  const gc = gw.citizens.list[0];
+  gw.ecology.morsels = [{ serial: 0, x: gw.bodies.x[gc.first], y: gw.bodies.y[gc.first], born: 0 }];
+  stepCultureEating(gw);
+  assert.equal(g0.stage, 3);
+  ready(gw, [0, 1], 80 * T, 3);
+  assert.equal(stepCultureBreeding(gw), 1);
+  const gk = gw.ecology.lives[kidOf(gw)].bornBody;
+  gk.parts.forEach((p, k) => {
+    const r1 = gw.ecology.lives[1].bornBody.parts[k].radius;
+    assert.ok(p.radius === g0.bornBody.parts[k].radius || p.radius === r1, `part ${k}: a parent's BORN size`);
+    if (r1 !== gc.body.parts[k].radius) assert.notEqual(p.radius, gc.body.parts[k].radius, `part ${k}: not grown`);
+  });
   ok(
     'the body mix: per part a coin flip — look and size exactly one parent’s; the linkage whole; looted limbs never inherited',
   );
@@ -657,8 +686,13 @@ const deepFreeze = (o) => {
     );
   const par = life.parents;
   poke(
-    'the parents',
-    () => (life.parents = [par[1], par[0]]),
+    'parent A',
+    () => (life.parents = [par[0] + 100, par[1]]),
+    () => (life.parents = par),
+  );
+  poke(
+    'parent B',
+    () => (life.parents = [par[0], par[1] + 100]),
     () => (life.parents = par),
   );
   for (const k of ['births', 'birthsRefused', 'birthsCapped', 'birthsNoRoom', 'grown'])
