@@ -43,17 +43,25 @@ a "shedding" indicator while the governor is active.
 
 - `budgetCeiling.selfcheck` PASS; `sceneApply.selfcheck` OK (extended
   for the round-trip).
-- `npm run lint`: 0 errors, 11 warnings (the standing baseline; none in
-  touched files).
+- `npm run lint`: 0 errors, 11 warnings (the standing baseline; the one
+  warning located in a touched file — DataExportRow.jsx's
+  exhaustive-deps — is byte-identical on the base, in code this diff
+  doesn't touch).
 - `npm run format:check`: clean after the coordinator ran prettier on
   the two flagged files (the new selfcheck and sceneApply's).
 - `npm run build`: green.
 - Full manifest sweep (827 entries, log `sweep-2483.log` in the
   worktree root; *.log is gitignored in this repo): 821 pass, 6 fail — swarmWasm (exit 1), rollSafety (1),
-  accum (134), vortex (1), livingMotion (1), phase6 (1). Every one of
-  these was A/B-proven to fail identically on pristine origin/main in a
-  fresh detached worktree (proven during the A12 #2490 build's sweep
-  accounting, same sandbox, same day); livingMotion is the documented
-  wall-clock flake. No failure touches this slice's files.
+  accum (134), vortex (1), livingMotion (1), phase6 (1). QA's A/B in a
+  fresh detached worktree at the base settled their nature: they are
+  load-dependent — vortex, livingMotion and phase6 passed on pristine
+  main in a quiet run and failed under load on both trees (wall-clock
+  perf-budget asserts and a headless-browser crash, per the log
+  signatures), and swarmWasm/rollSafety/accum are the standing
+  sandbox-environmental set. Two of the six (phase6, livingMotion)
+  import a touched file (projectDocument.js), but their document
+  assertions passed and no causal path runs from the serialize change
+  to a timing or browser-crash failure. livingMotion is the documented
+  wall-clock flake.
 - One-writer files (liveLoop.mjs, liveResolve.mjs, particles.js)
   untouched.

@@ -17,7 +17,7 @@
 // underneath it, and the knob shows a "shedding" tag while it does.
 
 import assert from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createGlobalSlice } from './slices/globalSlice.js';
 import { applyAction } from './applyAction.js';
 import { SET_QUALITY } from './actions.js';
@@ -127,6 +127,10 @@ function governorRestore(s) {
     'the knob\u2019s pressed button derives from the ceiling, not the live tier',
   );
   assert.ok(!knob.includes('quality === tierId'), 'the knob no longer reads the live tier as the choice');
+  assert.ok(
+    knob.includes('tierId === qualityCeiling'),
+    'the knob’s no-op guard compares the pressed tier against the ceiling, not the live tier',
+  );
   assert.ok(knob.includes('qualityShedFrom != null'), 'the shedding state derives from the governor\u2019s claim');
   assert.ok(knob.includes('shedding'), 'the knob renders the shedding indicator');
 
@@ -139,6 +143,28 @@ function governorRestore(s) {
   assert.ok(
     apply.includes('store.setQualityCeiling(payload)'),
     'the SET_QUALITY dispatch is the ceiling\u2019s session writer',
+  );
+
+  // The writer set, tree-wide: the setter may be CALLED from exactly one
+  // file in src — the SET_QUALITY dispatch. (Suites are excluded: they
+  // name the setter in assertions like this one. The rig load writes the
+  // field directly through the slice spread, never through the setter.)
+  const callers = [];
+  const walk = (dir, prefix) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) walk(new URL(`${e.name}/`, dir), `${prefix}${e.name}/`);
+      else if (/\.(js|jsx|mjs)$/.test(e.name) && !e.name.includes('.selfcheck.')) {
+        if (readFileSync(new URL(e.name, dir), 'utf8').includes('setQualityCeiling(')) {
+          callers.push(`${prefix}${e.name}`);
+        }
+      }
+    }
+  };
+  walk(new URL('../', import.meta.url), '');
+  assert.deepStrictEqual(
+    callers,
+    ['state/applyAction.js'],
+    'the ceiling setter has exactly one call site in src: the SET_QUALITY dispatch',
   );
 
   const doc = readFileSync(new URL('./projectDocument.js', import.meta.url), 'utf8');
