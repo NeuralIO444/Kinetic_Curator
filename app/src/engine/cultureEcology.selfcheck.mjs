@@ -78,6 +78,7 @@ import { cultureBodyRestPose, cultureBodyFaults, CULTURE_BODY_REST_OVERLAP } fro
 import { cultureSenses, cultureDesire, cultureSenseRange } from './cultureMotion.mjs';
 import { CULTURE_CITIZEN_CAUSES } from './cultureCitizens.mjs';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H } from './cultureSwarm.mjs';
+import { CULTURE_DAVIS_HUNGER_LEAN } from './cultureLab.mjs';
 import { hashU01 } from './kernel/rng.js';
 
 let checks = 0;
@@ -280,7 +281,12 @@ const fullAll = (w) => {
     y: 540 - range + 1,
     emptiness: 1 - 6000 / CULTURE_FAT_MAX_TICKS,
   });
-  assert.equal(c.recipe.drives.hunger, CULTURE_HUNGER_PULL, 'the native hunger gene is 6A’s weight');
+  // LOUD RE-PIN (hunger lean, RULED 2026-11-25 — a changed law): DAVIS leans the hunger gene ±15 % at cast, so the cast
+  // citizen no longer carries exactly 6A's weight; it carries the native weight × (1 + u·0.15), u in [-1, 1].
+  assert.ok(
+    Math.abs(c.recipe.drives.hunger - CULTURE_HUNGER_PULL) <= CULTURE_HUNGER_PULL * CULTURE_DAVIS_HUNGER_LEAN + 1e-12,
+    'the hunger gene is 6A’s weight leaned at most ±15 %',
+  );
   w.ecology.morsels = [{ serial: 0, x: 800 + range + 1, y: 540, born: 0 }];
   stepCultureFoodSense(w.bodies, w.citizens, w.ecology);
   assert.equal(c.food, null, 'beyond 3 body-lengths: nothing sensed');
@@ -300,8 +306,10 @@ const fullAll = (w) => {
   const hy = w.bodies.y[c.first];
   const d = Math.hypot(900 - hx, 540 - hy);
   assert.equal(food.emptiness, 1); // re-pinned (6B): was food.pull === CULTURE_HUNGER_PULL
-  assert.equal(withFood.x, without.x + ((900 - hx) / d) * CULTURE_HUNGER_PULL);
-  assert.equal(withFood.y, without.y + ((540 - hy) / d) * CULTURE_HUNGER_PULL);
+  // re-pinned (hunger lean): the pull is the cast citizen's own gene (was the native weight, exactly 2).
+  const gene = c.recipe.drives.hunger;
+  assert.equal(withFood.x, without.x + ((900 - hx) / d) * gene);
+  assert.equal(withFood.y, without.y + ((540 - hy) / d) * gene);
   assert.equal(
     Object.prototype.hasOwnProperty.call(cultureSenses(w.bodies, field, c), 'food'),
     false,

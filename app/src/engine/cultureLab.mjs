@@ -219,18 +219,20 @@ const DIALS = Object.freeze(
 /** The hunger gene's own draw index on the 'culture-recipe' channel (after the 16 temperament dials; 31 is the phase). */
 const HUNGER_DRAW = DIALS.length;
 /**
- * DAVIS's lean on the HUNGER gene at cast (Phase 6B): 0 — RULED, the native recipes' hunger gene reproduces 6A's hunger
- * exactly at birth, so a cast citizen carries the native gene as it stands. Breeding blends it (engine/cultureBreed.mjs).
- * A named constant, so iteration can open it (the draw index is already reserved).
+ * DAVIS's lean on the HUNGER gene at cast: ±15 % (RULED by Matt, 2026-11-25 — the follow-up to Phase 6B's lean 0).
+ * Each cast citizen's gene is native (2) × (1 + u · 0.15), u uniform in [−1, 1] from the gene's own draw index
+ * (HUNGER_DRAW — no temperament dial's draw moves), held inside the gene bounds [0, 4]. Breeding blends it
+ * (engine/cultureBreed.mjs); LOIS reads only the temperament dials, never this gene. Lean 0 reproduces 6A's hunger
+ * (the native 2) bit for bit — the cultureBreed proof runs at lean 0 through `davisWrite`'s `hungerLean` argument.
  */
-export const CULTURE_DAVIS_HUNGER_LEAN = 0;
+export const CULTURE_DAVIS_HUNGER_LEAN = 0.15;
 
 /**
  * DAVIS: the candidate's recipe — the plan's native recipe, each dial leaned by a seeded share of
  * at most ±CULTURE_DAVIS_LEAN and held inside its bounds (TIMING rounds to whole steps; the hunger gene by
- * CULTURE_DAVIS_HUNGER_LEAN, 0 — the native gene) — plus the stroke's birth phase 0..1. The recipe passes the one reading before it leaves his desk.
+ * CULTURE_DAVIS_HUNGER_LEAN, ±15 %, its own draw) — plus the stroke's birth phase 0..1. The recipe passes the one reading before it leaves his desk.
  */
-export function davisWrite(plan, seed, candidate) {
+export function davisWrite(plan, seed, candidate, hungerLean = CULTURE_DAVIS_HUNGER_LEAN) {
   const native = CULTURE_NATIVE_RECIPES[plan];
   const out = { name: native.name, drives: {}, physics: {}, seasoning: {} };
   DIALS.forEach(([g, k], d) => {
@@ -243,14 +245,14 @@ export function davisWrite(plan, seed, candidate) {
   {
     const u = hashU01(seed, 'culture-recipe', candidate * 32 + HUNGER_DRAW) * 2 - 1;
     const [lo, hi] = CULTURE_RECIPE_BOUNDS.drives.hunger;
-    out.drives.hunger = Math.min(hi, Math.max(lo, native.drives.hunger * (1 + CULTURE_DAVIS_HUNGER_LEAN * u)));
+    out.drives.hunger = Math.min(hi, Math.max(lo, native.drives.hunger * (1 + hungerLean * u)));
   }
   return { recipe: normalizeCultureRecipe(out), phase0: hashU01(seed, 'culture-recipe', candidate * 32 + 31) };
 }
 
 /**
  * How far a recipe stands from its plan's native, 0 (the native itself) .. 1 (every dial at a bound's far side) — over
- * the temperament dials (the hunger gene is appetite, not temperament: 6B keeps LOIS's read, and so the cast, exactly 6A's).
+ * the temperament dials (the hunger gene is appetite, not temperament: LOIS never reads it, so the gene cannot move her praise or the cast).
  */
 function recipeDistance(plan, recipe) {
   const native = CULTURE_NATIVE_RECIPES[plan];

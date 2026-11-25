@@ -61,6 +61,19 @@ import { stepCultureSolver } from './cultureSolver.mjs';
 import { cultureTreeOf, cultureGaitHash } from './cultureGait.mjs';
 import { CULTURE_FAT_BIRTH_TICKS, CULTURE_UPKEEP_BODY_TICKS, CULTURE_STARVE_STEPS } from './cultureEcology.mjs';
 
+/**
+ * The cast at hunger lean 0 — 6A/6B's hunger: every citizen's gene back at its plan's native (2). The cast itself
+ * (bodies, spots, every other dial) is lean-independent (LOIS never reads the gene), so this is exactly the lean-0 cast.
+ */
+const atLeanZero = (w) => {
+  for (const c of w.citizens.list)
+    c.recipe = normalizeCultureRecipe({
+      ...c.recipe,
+      drives: { ...c.recipe.drives, hunger: CULTURE_NATIVE_RECIPES[c.plan].drives.hunger },
+    });
+  return w;
+};
+
 /** Phase 6A: an unfed citizen cast at step 0 starves on this world step (fat 0 at 6,000, then 600 steps at 0). */
 const STARVED_AT = CULTURE_FAT_BIRTH_TICKS / CULTURE_UPKEEP_BODY_TICKS + CULTURE_STARVE_STEPS - 1;
 import {
@@ -551,17 +564,34 @@ const recipeWith = (base, patch) =>
     ],
   };
   const quietPins = [
-    // LOUD RE-PIN (Phase 6B — RULED: hunger is a DAVIS drive, a recipe gene). The citizens hash folds every recipe
-    // dial, so it moves by the new gene (was, origin/main 75985b0: 4206198939, 3805670001, 2382023884, 2589181518,
-    // 331514779, 3816371860); the swarm and gait hashes are UNCHANGED from 75985b0 — the bodies are 6A's to the bit.
+    // LOUD RE-PIN (hunger lean, RULED 2026-11-25 — a changed law): DAVIS leans the hunger gene ±15 % at cast, and the
+    // citizens hash folds every recipe dial, so it moves again (was, at lean 0 = Phase 6B's: 2760788251, 2284435313,
+    // 4286813388, 3374000142, 3500107867, 193247732 — still reproduced at lean 0 by the lean-0 loop below). The swarm and
+    // gait hashes are UNCHANGED from origin/main 75985b0 — no room, no morsel, so the gene is never read.
     // [sheet, seed, swarm hash, citizens hash, gait hash] — room off, 1,200 steps
-    [CULTURE_CAST_SHEET, 7, 13186533, 2760788251, 1766681291],
-    [CULTURE_CAST_SHEET, 42, 1934605904, 2284435313, 1766681291],
-    [ROSTER_5B, 7, 736812686, 4286813388, 1766681291],
-    [ROSTER_5B, 42, 223519438, 3374000142, 1766681291],
-    [CULTURE_TAKE_SHEET, 7, 2791955768, 3500107867, 1766681291],
-    [CULTURE_TAKE_SHEET, 42, 735201613, 193247732, 1766681291],
+    [CULTURE_CAST_SHEET, 7, 13186533, 434725841, 1766681291],
+    [CULTURE_CAST_SHEET, 42, 1934605904, 2907873094, 1766681291],
+    [ROSTER_5B, 7, 736812686, 2333414505, 1766681291],
+    [ROSTER_5B, 42, 223519438, 2003383088, 1766681291],
+    [CULTURE_TAKE_SHEET, 7, 2791955768, 1180817175, 1766681291],
+    [CULTURE_TAKE_SHEET, 42, 735201613, 1897956750, 1766681291],
   ];
+  // lean 0 (the native gene in every citizen): Phase 6B's citizens hashes, to the bit.
+  const quietPinsLeanZero = [
+    [CULTURE_CAST_SHEET, 7, 2760788251],
+    [CULTURE_CAST_SHEET, 42, 2284435313],
+    [ROSTER_5B, 7, 4286813388],
+    [ROSTER_5B, 42, 3374000142],
+    [CULTURE_TAKE_SHEET, 7, 3500107867],
+    [CULTURE_TAKE_SHEET, 42, 193247732],
+  ];
+  for (const [sheet, seed, cit] of quietPinsLeanZero) {
+    const w = createCultureWorld({ seed });
+    castCultureTake(w, sheet);
+    atLeanZero(w);
+    for (let s = 0; s < 1200; s++) stepCultureWorld(w);
+    assert.equal(cultureCitizensHash(w.citizens), cit, `room off, lean 0 (seed ${seed}): the citizens are 6B's`);
+  }
   for (const [sheet, seed, swarm, cit, gait] of quietPins) {
     const w = createCultureWorld({ seed });
     castCultureTake(w, sheet);
@@ -575,7 +605,9 @@ const recipeWith = (base, patch) =>
     // LOUD RE-PIN (Phase 6B — the hunger gene and the new ecology state fold into the world hash; was, 6A's:
     // 3241583243, 1396512032, 1755287174, 548154483). Nobody grows or breeds in these 10 s, so the swarm and gait hashes
     // must be origin/main dcc1ac6's (6A's) to the bit — pinned from a pristine detached worktree: the hunger gene
-    // reproduces 6A's hunger exactly.
+    // reproduces 6A's hunger exactly. LOUD RE-PIN (hunger lean, RULED 2026-11-25): that claim now holds ONLY at lean 0 —
+    // these pins are asserted on worlds cast at lean 0 (`atLeanZero`: every gene the native 2), unchanged from 6B; the
+    // leaned pins follow.
     // [sheet, seed, world hash, swarm hash (= 6A's), gait hash (= 6A's)] — room on (high, 128 bpm), 1,200 steps
     [CULTURE_CAST_SHEET, 7, 3778793516, 1751784904, 2446235502],
     [CULTURE_CAST_SHEET, 42, 2137699268, 1765348224, 2446235502],
@@ -585,13 +617,38 @@ const recipeWith = (base, patch) =>
   for (const [sheet, seed, pin, swarmPin, gaitPin] of roomPins) {
     const w = createCultureWorld({ seed });
     castCultureTake(w, sheet);
+    atLeanZero(w);
     setCultureRoom(w, { energy: 'high', silent: 0, bpm: 128 });
     for (let s = 0; s < 1200; s++) stepCultureWorld(w);
     assert.ok(w.ecology.eaten > 0, 'room on: the beats fed somebody');
     assert.equal(w.ecology.grown + w.ecology.births, 0, 'room on, 10 s: nobody grows or breeds yet');
-    assert.equal(cultureSwarmHash(w.bodies), swarmPin, `room on (seed ${seed}): the bodies are 6A's to the bit`);
-    assert.equal(cultureGaitHash(w.gait), gaitPin, `room on (seed ${seed}): the gait is 6A's to the bit`);
-    assert.equal(cultureWorldHash(w), pin, `swimmers' world, room on (seed ${seed}): re-pinned under the ecology`);
+    assert.equal(
+      cultureSwarmHash(w.bodies),
+      swarmPin,
+      `room on, lean 0 (seed ${seed}): the bodies are 6A's to the bit`,
+    );
+    assert.equal(cultureGaitHash(w.gait), gaitPin, `room on, lean 0 (seed ${seed}): the gait is 6A's to the bit`);
+    assert.equal(cultureWorldHash(w), pin, `swimmers' world, room on, lean 0 (seed ${seed}): 6B's world hash`);
+  }
+  const leanedRoomPins = [
+    // LOUD RE-PIN (hunger lean, RULED 2026-11-25 — a changed law): the cast's own leaned genes, fed. The bodies leave 6A's
+    // (a hungrier or less hungry swimmer turns toward the beats differently), so the swarm hashes move; the gait hash
+    // of the cast sheet (no strandbeest) and of the 5B roster is unchanged. Computed on this branch, twin-checked above.
+    // [sheet, seed, world hash, swarm hash, gait hash] — room on (high, 128 bpm), 1,200 steps
+    [CULTURE_CAST_SHEET, 7, 2186576465, 3511416458, 2446235502],
+    [CULTURE_CAST_SHEET, 42, 3819731255, 2732997930, 2446235502],
+    [ROSTER_5B, 7, 351445135, 2439431368, 1298961053],
+    [ROSTER_5B, 42, 3880720211, 3448273385, 1298961053],
+  ];
+  for (const [sheet, seed, pin, swarmPin, gaitPin] of leanedRoomPins) {
+    const w = createCultureWorld({ seed });
+    castCultureTake(w, sheet);
+    setCultureRoom(w, { energy: 'high', silent: 0, bpm: 128 });
+    for (let s = 0; s < 1200; s++) stepCultureWorld(w);
+    assert.ok(w.ecology.eaten > 0, 'room on: the beats fed somebody');
+    assert.equal(cultureSwarmHash(w.bodies), swarmPin, `room on, leaned (seed ${seed}): the bodies, re-pinned`);
+    assert.equal(cultureGaitHash(w.gait), gaitPin, `room on, leaned (seed ${seed}): the gait`);
+    assert.equal(cultureWorldHash(w), pin, `swimmers' world, room on, leaned (seed ${seed}): re-pinned`);
   }
   ok(
     'determinism: twin worlds and layouts bit-identical; the hash covers the crank and the genes; quiet swimmer worlds equal origin/main (bodies, citizens, gait); fed worlds re-pinned',
