@@ -99,6 +99,11 @@ export function GovernorXrayPanel() {
 
   const [eventsVersion, setEventsVersion] = useState(0);
 
+  // #2492 — the measurement age is computed against the moment the panel
+  // opened; the clock is read once, in the state initializer, so render
+  // itself stays pure.
+  const [nowMs] = useState(() => Date.now());
+
   // Dev-only poll: the event log is a module-level ring buffer, not store
   // state — refresh the tail view every second while the panel is open.
   useEffect(() => {
@@ -131,9 +136,9 @@ export function GovernorXrayPanel() {
     ],
   );
 
-  const { cuts, passes } = useMemo(
-    () => buildXray({ tiers: allCostTiers(), measuredMs: MEASURED_COSTS, shed }),
-    [shed],
+  const { cuts, passes, measuredAgeDays } = useMemo(
+    () => buildXray({ tiers: allCostTiers(), measuredMs: MEASURED_COSTS, measuredAt: MEASURED_AT, now: nowMs, shed }),
+    [shed, nowMs],
   );
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,7 +154,9 @@ export function GovernorXrayPanel() {
         <span style={{ color: TIER_COLORS[2] }}> · 2 quality-scaler</span>
         <span style={{ color: TIER_COLORS[3] }}> · 3 cosmetic</span>
         <span style={{ color: TIER_COLORS[0] }}> · 0 structural</span>. Measurements from{' '}
-        {MEASURED_AT ? new Date(MEASURED_AT).toLocaleDateString() : '—'}.
+        {MEASURED_AT ? new Date(MEASURED_AT).toLocaleDateString() : '—'}
+        {measuredAgeDays != null && measuredAgeDays >= 1 ? ` (${measuredAgeDays} days ago)` : ''}. Numbers marked{' '}
+        <span style={{ color: '#e8e8e8' }}>est.</span> were committed by hand, never measured.
       </div>
 
       <h4 style={{ margin: '10px 0 4px' }}>Governor cuts (the shed ladder)</h4>
@@ -172,7 +179,7 @@ export function GovernorXrayPanel() {
               <th style={{ textAlign: 'left', padding: '4px 6px' }}>tier</th>
               <th style={{ textAlign: 'right', padding: '4px 6px' }}>est</th>
               <th style={{ textAlign: 'right', padding: '4px 6px' }}>measured</th>
-              <th style={{ textAlign: 'right', padding: '4px 6px' }}>working set</th>
+              <th style={{ textAlign: 'right', padding: '4px 6px' }}>working set (est.)</th>
               <th style={{ textAlign: 'left', padding: '4px 6px' }}>state</th>
             </tr>
           </thead>
@@ -187,7 +194,23 @@ export function GovernorXrayPanel() {
                   {p.declaredMs ? `${p.declaredMs}ms` : '—'}
                 </td>
                 <td style={{ padding: '3px 6px', textAlign: 'right' }}>
-                  {p.measuredMs != null ? `${p.measuredMs.toFixed(1)}ms` : '—'}
+                  {/* #2492 — provenance on the number itself: an estimate is
+                      labeled "est." and never renders as a measurement; a
+                      measurement not from the current session carries its
+                      age (· Nd) right on the value. */}
+                  {p.measuredMs == null ? (
+                    '—'
+                  ) : p.measuredKind === 'estimate' ? (
+                    <span style={{ color: '#8a93a6' }} title="estimate — committed by hand, not measured by the sweep">
+                      {p.measuredMs.toFixed(1)}ms est.
+                    </span>
+                  ) : p.measuredAgeDays != null && p.measuredAgeDays >= 1 ? (
+                    <span title={p.measuredAt ? `measured ${new Date(p.measuredAt).toLocaleDateString()}` : undefined}>
+                      {p.measuredMs.toFixed(1)}ms · {p.measuredAgeDays}d
+                    </span>
+                  ) : (
+                    `${p.measuredMs.toFixed(1)}ms`
+                  )}
                 </td>
                 <td style={{ padding: '3px 6px', textAlign: 'right', color: '#8a93a6' }}>{p.memoryMB}</td>
                 <td

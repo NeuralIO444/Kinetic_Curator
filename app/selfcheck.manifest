@@ -411,6 +411,7 @@ node src/gl/phase6.selfcheck.mjs
 node src/gl/costTiers.selfcheck.mjs
 node src/engine/kernel/creatureCost.selfcheck.mjs
 node src/gl/governorEventLog.selfcheck.mjs
+node src/gl/governorXray.selfcheck.mjs
 node src/assets/ingest.selfcheck.mjs
 node src/assets/gradient.selfcheck.mjs
 node src/assets/overlay.selfcheck.mjs
