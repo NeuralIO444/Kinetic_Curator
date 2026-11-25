@@ -47,6 +47,13 @@ The session's "HIGH narrow / MID wide" phrasing is the automation's
 impression of the dock-covered matrix; the cells are in fact equal-width,
 and what varies is how much of each the dock covers.
 
+One inference, stated plainly (QA's note): the filed issue does not record
+whether the session had an editor open. The open-dock mechanism is the
+only covering mechanism that exists in the code — the dock-closed case is
+clean at every size tested — and it reproduces the session's symptom
+exactly, including the verbatim "covered" refusal, so the reproduction
+above is read as the session's state.
+
 ## Root cause
 
 Three facts compose it:
