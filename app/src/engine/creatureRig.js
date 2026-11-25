@@ -20,6 +20,7 @@
 // Units: the tile's 100-unit box, y down, angles in degrees clockwise (the SVG / contract convention). Browser-safe,
 // pure, deterministic: same record → same bones; same seed + same stage → same parts; same time → same pose.
 
+import { wearCreatureGait, sanitizeGaitWorn, beastBoneParent } from './creatureGait.mjs'; // #2475 — the QUEEN's gait picks, worn over the pose
 import { roleFits } from '../assets/assetRoles.js'; // #1945 — Davis reads role fits, never re-derives them
 import {
   sanitizeLinkage,
@@ -640,6 +641,7 @@ function expandBeast(
     seedOffset,
     tileKey,
     pullSampler,
+    wear = null,
   },
 ) {
   const linkage = { ...rig.linkage, phase: rig.linkage.phase + phase };
@@ -681,10 +683,26 @@ function expandBeast(
   const co = Math.cos(th);
   const si = Math.sin(th);
   const flip = it.scaleX < 0 ? -1 : 1;
-  const legs = pose
-    .filter((p) => p.role === 'limb')
-    .map((p) => placePart(it, p, dealt.get(p.name), glow, co, si, flip));
-  const beam = placePart(it, pose[0], dealt.get(BEAM_ID), glow, co, si, flip);
+  const legBones = pose.filter((p) => p.role === 'limb');
+  let legs = legBones.map((p) => placePart(it, p, dealt.get(p.name), glow, co, si, flip));
+  let beam = placePart(it, pose[0], dealt.get(BEAM_ID), glow, co, si, flip);
+  // #2475 — the QUEEN's gait, worn OVER the linkage's own pose: the beam is the root, each bar hangs off the bar it
+  // pivots on. A frozen frame, or a beast nobody picked, keeps the very instances above.
+  if (wear && !frozen) {
+    const worn = wearCreatureGait(
+      [
+        { inst: beam, id: pose[0].id, parent: null },
+        ...legBones.map((p, i) => ({ inst: legs[i], id: p.id, parent: beastBoneParent(p.id) })),
+      ],
+      it,
+      wear,
+      seed,
+    );
+    if (worn) {
+      beam = worn[0];
+      legs = worn.slice(1);
+    }
+  }
   // #1868 S5b — the feet's signed trace, set down behind everything: a fading ovoid per crank turn. A frozen frame, a
   // beast walking in place, and `trace === false` (the A/B switch) leave none.
   const trail =
@@ -768,9 +786,11 @@ export function expandCreatureInstances(
     poseFigure = null,
     sourcePalette = null,
     pullField = null,
+    gaitWorn = null,
   } = {},
 ) {
   if (!overlayById) return instances;
+  const wear = sanitizeGaitWorn(gaitWorn); // #2475 — null (no creature pick) = every tile poses exactly as before
   const rigOf = (id) => {
     const rec = overlayById.get(id);
     return rec && rec.category === 'creature' && rec.source === 'wetlab' ? sanitizeRig(rec.rig) : null;
@@ -850,6 +870,7 @@ export function expandCreatureInstances(
           seedOffset: it.seedOffset,
           tileKey: it.key,
           pullSampler,
+          wear,
         }),
       );
       continue;
@@ -875,11 +896,34 @@ export function expandCreatureInstances(
       const bone = rig.bones.find((b) => b.id === p.id);
       return {
         role: p.role,
+        id: p.id,
+        parent: bone && bone.parent != null ? bone.parent : null,
         inst: placePart(it, p, dealPart(pile, seed, hand, bone, variety, boneIndex, roleDeal), glow, co, si, flip),
       };
     });
+    // #2475 — the QUEEN's gait, worn OVER the creature's own pose ("Creature pose still composes UNDER the gait"): the
+    // body is the root, each bone hangs off its parent bone (a head or a chain's first bone off the body). A frozen
+    // frame, or a creature nobody picked, keeps the very instances above.
+    let body = it;
+    if (wear && !frozen) {
+      const worn = wearCreatureGait(
+        [
+          { inst: it, id: '#body', parent: null },
+          ...parts.map((p) => ({ inst: p.inst, id: p.id, parent: p.parent ?? '#body' })),
+        ],
+        it,
+        wear,
+        seed,
+      );
+      if (worn) {
+        body = worn[0];
+        parts.forEach((p, i) => {
+          p.inst = worn[i + 1];
+        });
+      }
+    }
     for (const p of parts) if (p.role === 'limb') out.push(p.inst);
-    out.push(it);
+    out.push(body);
     for (const p of parts) if (p.role === 'head') out.push(p.inst);
   }
   return out;
