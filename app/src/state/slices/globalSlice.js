@@ -286,6 +286,20 @@ export const createGlobalSlice = (set, get) => ({
   fps: 60,
   nodeCount: 0,
   quality: 'balanced',
+  /**
+   * The performer's budget ceiling (#2483): the tier the performer chose
+   * on the BudgetKnob. `quality` above is the LIVE tier — the governor
+   * sheds it downward under pressure and restores it on recovery — so
+   * when the knob read `quality` as the chosen ceiling, a governor shed
+   * silently moved the pressed button (FULL became SHOW with no click),
+   * contradicting the knob's own tooltip. This field is performer-only
+   * by construction: its only writers are the SET_QUALITY dispatch (the
+   * knob and the agent-UI bridge funnel through it) and a rig load (the
+   * performer's own saved document, whose `quality` key carries this
+   * value). The governor never writes it, and a document saved mid-shed
+   * serializes this field, never the shed live tier.
+   */
+  qualityCeiling: 'balanced',
   autoQuality: true,
   isFullscreen: false,
   curatorConfidence: 0,
@@ -838,6 +852,10 @@ export const createGlobalSlice = (set, get) => ({
     }),
   /** #264 — the governor records the tier its quality shed stepped from. */
   setQualityShedFrom: (tier) => set({ qualityShedFrom: tier }),
+  /** #2483 — the performer's ceiling. Called only by the SET_QUALITY
+   * dispatch; a rig load writes the field directly from the document.
+   * The governor sheds `quality` underneath this and never calls this. */
+  setQualityCeiling: (tier) => set({ qualityCeiling: tier }),
   /** #264 — lets the badge return to clean once a watchdog stop is gone.
    * #2481 — the trip's reading goes with the reason: both are the badge's. */
   clearWatchdogReason: () => set({ lastWatchdogReason: null, lastWatchdogReading: null }),

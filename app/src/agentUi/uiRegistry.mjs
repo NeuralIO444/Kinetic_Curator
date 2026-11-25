@@ -454,9 +454,9 @@ const UI_CONTROLS_1 = Object.freeze([
         ['EXPORT_AUTO_QUALITY', true],
       ]),
       options: Object.freeze(['high', 'balanced', 'performance']),
-      reads: R('quality', 'autoQuality'),
+      reads: R('quality', 'qualityCeiling', 'autoQuality'),
       source: 'components/BudgetKnob.jsx',
-      note: 'Option values are the quality tier ids; the labels shown are FULL (high), SHOW (balanced), LEAN (performance).',
+      note: 'Option values are the quality tier ids; the labels shown are FULL (high), SHOW (balanced), LEAN (performance). Choosing sets qualityCeiling (the performer\u2019s ceiling) and the live tier together; quality alone is the live tier the governor sheds underneath the ceiling.',
     },
   ),
   ctl('transport.undo', 'transport', 'Undo (↶)', 'button', 'Steps one change back.', {

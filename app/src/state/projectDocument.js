@@ -142,7 +142,10 @@ export function serializeProject(state) {
     paletteId: state.paletteId,
     layoutParams: normalizeLayoutParams(state.layoutParams),
     enabledAssets: { ...state.enabledAssets },
-    quality: state.quality || 'balanced',
+    // #2483 — the document's quality key carries the performer's ceiling,
+    // never the governor's shed live tier: a save made mid-shed must not
+    // demote the performer's choice on the next load.
+    quality: state.qualityCeiling || state.quality || 'balanced',
     // #310: the AUTO toggle left performer sight, but the governor still
     // reads autoQuality — the document carries it so a set's choice survives.
     autoQuality: state.autoQuality !== false,
