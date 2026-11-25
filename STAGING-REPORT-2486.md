@@ -104,13 +104,27 @@ All inside `app/src/gl/liveLoop.mjs`:
     peek at current state (the `captureFrame` discipline — buildFrame
     with dtSec 0 at the held clock — is the standing precedent), never a
     physics step.
-  - ACCUM: the frame build already folds `running === false` into the
-    accum `freeze` input (line 1455). The still must not step or re-begin
-    the feedback buffer behind the performer's back; present the resolved
-    frame the way the frozen branch presents its texture, or follow the
-    A2 slice's one-frame reseed law — the loop owner's call, but after
-    the still + resume, the buffer must be indistinguishable from the
-    no-recall case apart from the new scene.
+  - ACCUM: the still must not step or re-begin the feedback buffer
+    behind the performer's back — with the one specified exception
+    below. Note the frame's `accumFrozen` flag is the loop's FREEZE flag
+    only; it is NOT folded with `running` (the line-1455 fold feeds the
+    wet frame), so two sub-cases exist. Paused, not frozen, ACCUM on:
+    one normal-branch frame renders + steps + presents the buffer — the
+    A2 reseed behavior; picture and buffer both advance to the recalled
+    scene. Paused AND frozen, ACCUM on (FREEZE standing when the stop
+    trips): the frozen branch would present the buffer's CURRENT texture
+    — the pre-recall trails — which cannot satisfy this spec's
+    requirement, so that option is struck: the specified treatment is
+    the A2 slice's one-frame reseed law (one render+step frame seeds the
+    buffer with the current scene, then the hold resumes). After the
+    still + resume, the buffer must be indistinguishable from the
+    no-recall case apart from the new scene. (QA correction, 2026-11-25:
+    the first cut offered the frozen-texture present as the loop owner's
+    choice; it cannot show the recall, so it is not a choice.)
+  - Resize/DPR while paused: the change signature includes the
+    presented size — a canvas resize while paused re-presents the held
+    scene once at the new size, rather than leaving a cleared buffer
+    blank until resume or a scene change. (Scoped in by QA, 2026-11-25.)
   - The stop stays authoritative: presenting a still must not clear
     `running`, `slowRender`, or any badge/log state. PERF PAUSED keeps
     reading paused; only the picture changes.
@@ -182,3 +196,22 @@ and a report. The eventual seam changes exactly one visible thing: while
 PERF PAUSED (or user-paused), the stage picture will update to a recalled
 hit instead of holding a stale frame. Live (unpaused) behaviour is
 untouched by both this branch and the seam as specified.
+
+## QA fix round (2026-11-25)
+
+QA verdict: CLEAN on the disposition — shape (c) independently reproduced
+with different values (hit resolves 69 nodes through the real resolver
+while paused; the stop fields exactly as the trip left them; resume holds
+the hit field-for-field), the gate audit verified line by line (the paused
+branch returns before all five present sites; the count publishes inside
+buildFrame, before the gate), and the builder's mutation reproduced
+verbatim. One SHOULD-FIX, applied in this round: the seam spec's ACCUM
+bullet offered the frozen-branch texture present as an option — in the
+paused∧frozen sub-case that presents the pre-recall buffer and cannot
+meet the spec's own requirement. The bullet now names the sub-case and
+specifies the A2 one-frame reseed law as the treatment; a resize/DPR
+sentence scopes the presented size into the change signature. NIT closed
+in the same round: the suite now pins seedOffsets (non-default hit
+offsets, a differing standing stage), which the summary already claimed.
+The issue itself stays open for the seam; this branch is the evidence +
+store-side pin only.

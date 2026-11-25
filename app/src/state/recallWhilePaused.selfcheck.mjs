@@ -33,6 +33,7 @@ const { useStore } = await import('./store.js');
 const { createLiveResolver } = await import('../gl/liveResolve.mjs');
 const { DEFAULT_LAYOUT_PARAMS } = await import('../data/layout-modes.js');
 const { captureFavorite } = await import('./slices/davisSlice.js');
+const { normalizeSeedOffsets } = await import('../engine/kernel/rng.js');
 
 const S = () => useStore.getState();
 const resolver = createLiveResolver();
@@ -100,11 +101,13 @@ const bootOn = Object.keys(bootEnabledAssets || {}).filter((k) => bootEnabledAss
 assert.ok(bootOn.length > 2, 'boot pool has assets to narrow');
 const narrowedCast = { ...bootEnabledAssets, [bootOn[0]]: false, [bootOn[1]]: false };
 setStage(20202, 'cyanotype', 120, narrowedCast);
+useStore.setState({ seedOffsets: { spatial: 5, color: 3 } });
 const favB = captureFavorite(S(), S().paletteId);
 assert.ok(favB.config.assets.length > 0, 'hit carries a cast');
 assert.ok(!favB.config.assets.includes(bootOn[0]) && !favB.config.assets.includes(bootOn[1]), 'hit cast is narrowed');
 const hitNodes = nodeCount();
 assert.ok(hitNodes > 0, `hit resolves a live stage (${hitNodes} nodes)`);
+const hitOffsets = normalizeSeedOffsets(favB.seedOffsets);
 
 // What a landed recall must produce, field for field (the davisSlice recall
 // contract: keep stack, seed, stream offsets, layout, palette, cast).
@@ -112,6 +115,7 @@ function assertLanded(label) {
   const s = S();
   assert.strictEqual(s.seed, favB.seed, `${label}: seed is the hit's`);
   assert.strictEqual(s.paletteId, favB.config.palette.id, `${label}: palette is the hit's`);
+  assert.deepStrictEqual(s.seedOffsets, hitOffsets, `${label}: seed offsets are the hit's`);
   assert.strictEqual(s.layoutParams.count, favB.config.layout.count, `${label}: layout count is the hit's`);
   assert.strictEqual(s.layoutParams.mode, favB.config.layout.mode, `${label}: layout mode is the hit's`);
   assert.deepStrictEqual(
@@ -125,11 +129,13 @@ function assertLanded(label) {
 
 // ── Control: a LIVE recall lands in full.
 setStage(10101, 'hydra', 300, bootEnabledAssets);
+useStore.setState({ seedOffsets: { spatial: 9, color: 1 } });
 S().recallFavorite(favB);
 assertLanded('live recall');
 
 // ── The A8 act: the watchdog stop stands (PERF PAUSED), then the recall.
 setStage(10101, 'hydra', 300, bootEnabledAssets);
+useStore.setState({ seedOffsets: { spatial: 9, color: 1 } });
 S().tripWatchdog('fps-critical');
 assert.strictEqual(S().running, false, 'watchdog stop: running is false');
 assert.strictEqual(S().slowRender, true, 'watchdog stop: slowRender stands');
