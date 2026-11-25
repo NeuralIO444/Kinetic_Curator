@@ -8,10 +8,21 @@
 // a fixed 60 frames to fixed /tmp paths. They stay here, unchanged, until they
 // read the live canvas and pick a destination — then they can graduate.
 //
+// Browser law (issue 2490 in the session report's numbering; Matt's ruling
+// 2026-11-24): in the browser build every control below stays visible but
+// disabled, labelled "Native app only", and no click reaches the Tauri bridge
+// — the calls live behind nativeLab.mjs, which shares the app's one desktop
+// gate (platform/desktop.mjs). In the desktop app a genuine native failure
+// shows plain words via onMessage; the raw error string goes to nativeLab's
+// diagnostic log, never to the panel.
+//
 // Code moved verbatim; not yet routed through the event bus (follow-up).
 import { useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
 import { useApp } from '../../state/AppContext.jsx';
+import { isTauriRuntime } from '../../platform/desktop.mjs';
+import { createNativeLab, NATIVE_APP_ONLY_LABEL } from './nativeLab.mjs';
+
+const nativeLab = createNativeLab();
 
 export function NativeLabBlock({ onMessage }) {
   const setMessage = onMessage;
@@ -21,92 +32,90 @@ export function NativeLabBlock({ onMessage }) {
     curatorLatencyMs: s.curatorLatencyMs,
   }));
 
+  // The desktop shell is fixed for the life of the window; read the shared
+  // gate once per render. False in a browser: controls render disabled.
+  const desktop = isTauriRuntime();
+  const naSuffix = desktop ? '' : ` — ${NATIVE_APP_ONLY_LABEL}`;
+  const naTitle = desktop ? undefined : NATIVE_APP_ONLY_LABEL;
+
   const [metalStats, setMetalStats] = useState(null);
   const [metalDispatchTime, setMetalDispatchTime] = useState(null);
   const [metalBusy, setMetalBusy] = useState(false);
 
   const handleTestNativeIO = async () => {
-    try {
-      // 1x1 valid PNG binary header & chunk payload (67 bytes)
-      const dummyBytes = new Uint8Array([
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00,
-        0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
-        0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d,
-        0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
-      ]);
-      const bytesWritten = await invoke('write_batch_frame', {
-        data: Array.from(dummyBytes),
-        path: '/tmp/kc_native_test.png',
-      });
-      setMessage(`Native I/O OK: ${bytesWritten} bytes -> /tmp/kc_native_test.png`);
-    } catch (err) {
-      console.error('Native I/O test failed:', err);
-      setMessage(`Native I/O: ${err?.message || err}`);
+    // 1x1 valid PNG binary header & chunk payload (67 bytes)
+    const dummyBytes = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00,
+      0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0a, 0x49,
+      0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00,
+      0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    ]);
+    const res = await nativeLab.testDiskIO(Array.from(dummyBytes), '/tmp/kc_native_test.png');
+    if (res.ok) {
+      setMessage(`Native I/O OK: ${res.value} bytes -> /tmp/kc_native_test.png`);
+    } else {
+      setMessage(res.plain);
     }
   };
 
   const handleMetalInit = async () => {
-    try {
-      setMetalBusy(true);
-      const stats = await invoke('metal_init', {
-        width: 1440,
-        height: 900,
-        particleCount: 2048,
-      });
-      setMetalStats(stats);
-      setMessage(`Metal Ready: ${stats.device_name} (UMA: ${stats.has_unified_memory ? 'YES' : 'NO'})`);
-    } catch (err) {
-      console.error('Metal Init failed:', err);
-      setMessage(`Metal Error: ${err?.message || err}`);
-    } finally {
-      setMetalBusy(false);
+    setMetalBusy(true);
+    const res = await nativeLab.metalInit({
+      width: 1440,
+      height: 900,
+      particleCount: 2048,
+    });
+    setMetalBusy(false);
+    if (res.ok) {
+      setMetalStats(res.value);
+      setMessage(`Metal Ready: ${res.value.device_name} (UMA: ${res.value.has_unified_memory ? 'YES' : 'NO'})`);
+    } else {
+      setMessage(res.plain);
     }
   };
 
   const handleMetalStep = async () => {
-    try {
-      setMetalBusy(true);
-      const t0 = performance.now();
-      await invoke('metal_step_boids', {
+    setMetalBusy(true);
+    const t0 = performance.now();
+    const res = await nativeLab.metalStep(
+      {
         deltaTime: 0.016,
         maxSpeed: 60.0,
         attractorX: 720.0,
         attractorY: 450.0,
         strength: 650.0,
-      });
-      const updatedStats = await invoke('metal_step_accum', {
+      },
+      {
         fade: 0.96,
         bgR: 0.0,
         bgG: 0.0,
         bgB: 0.0,
         bgA: 1.0,
-      });
-      const dt = performance.now() - t0;
+      },
+    );
+    const dt = performance.now() - t0;
+    setMetalBusy(false);
+    if (res.ok) {
       setMetalDispatchTime(dt.toFixed(2));
-      setMetalStats(updatedStats);
-      setMessage(`Metal Pass #${updatedStats.frame_counter} dispatched in ${dt.toFixed(2)}ms`);
-    } catch (err) {
-      console.error('Metal Step failed:', err);
-      setMessage(`Metal Step: ${err?.message || err}`);
-    } finally {
-      setMetalBusy(false);
+      setMetalStats(res.value);
+      setMessage(`Metal Pass #${res.value.frame_counter} dispatched in ${dt.toFixed(2)}ms`);
+    } else {
+      setMessage(res.plain);
     }
   };
 
   const [curatorBusy, setCuratorBusy] = useState(false);
 
   const handleCuratorEval = async () => {
-    try {
-      setCuratorBusy(true);
-      const res = await invoke('curator_evaluate_frame');
+    setCuratorBusy(true);
+    const res = await nativeLab.curatorEval();
+    setCuratorBusy(false);
+    if (res.ok) {
       setMessage(
-        `ANE Curation: ${(res.score * 100).toFixed(1)}% (${res.latency_ms.toFixed(1)}ms on ${res.compute_units})`,
+        `ANE Curation: ${(res.value.score * 100).toFixed(1)}% (${res.value.latency_ms.toFixed(1)}ms on ${res.value.compute_units})`,
       );
-    } catch (err) {
-      console.error('Curator ANE eval failed:', err);
-      setMessage(`ANE Eval: ${err?.message || err}`);
-    } finally {
-      setCuratorBusy(false);
+    } else {
+      setMessage(res.plain);
     }
   };
 
@@ -114,6 +123,9 @@ export function NativeLabBlock({ onMessage }) {
   const [mediaBusy, setMediaBusy] = useState(false);
 
   useEffect(() => {
+    // The progress event only exists in the desktop shell; in a browser there
+    // is no bridge to listen on.
+    if (!isTauriRuntime()) return undefined;
     let unlisten = null;
     let cancelled = false;
 
@@ -142,42 +154,52 @@ export function NativeLabBlock({ onMessage }) {
   }, []);
 
   const handleMediaVideoExport = async () => {
-    try {
-      setMediaBusy(true);
-      const res = await invoke('start_media_engine_export', {
-        path: '/tmp/kc_export_media_engine.mov',
-        frameCount: 60,
-        fps: 60,
-        codec: 'hevc',
-      });
-      setMessage(`Media Engine: ${res}`);
-    } catch (err) {
-      console.error('Media engine export failed:', err);
-      setMessage(`Media Export: ${err?.message || err}`);
-    } finally {
-      setMediaBusy(false);
+    setMediaBusy(true);
+    const res = await nativeLab.mediaExport({
+      path: '/tmp/kc_export_media_engine.mov',
+      frameCount: 60,
+      fps: 60,
+      codec: 'hevc',
+    });
+    setMediaBusy(false);
+    if (res.ok) {
+      setMessage(`Media Engine: ${res.value}`);
+    } else {
+      setMessage(res.plain);
     }
   };
 
   const handleECoreBatchDump = async () => {
-    try {
-      setMediaBusy(true);
-      const res = await invoke('dump_image_batch', {
-        targetDir: '/tmp/kc_batch_export_ecore',
-        count: 60,
-        format: 'raw', // #1744: the dump writes raw RGBA32F frames; it never encoded PNG
-      });
-      setMessage(`E-Core Dump: ${res}`);
-    } catch (err) {
-      console.error('E-Core dump failed:', err);
-      setMessage(`E-Core Dump: ${err?.message || err}`);
-    } finally {
-      setMediaBusy(false);
+    setMediaBusy(true);
+    const res = await nativeLab.ecoreDump({
+      targetDir: '/tmp/kc_batch_export_ecore',
+      count: 60,
+      format: 'raw', // #1744: the dump writes raw RGBA32F frames; it never encoded PNG
+    });
+    setMediaBusy(false);
+    if (res.ok) {
+      setMessage(`E-Core Dump: ${res.value}`);
+    } else {
+      setMessage(res.plain);
     }
   };
 
   return (
     <>
+      {!desktop && (
+        <div
+          style={{
+            marginTop: '4px',
+            marginBottom: '8px',
+            color: 'var(--text-muted, #aaa)',
+            fontSize: '10px',
+            fontFamily: 'var(--font-mono, monospace)',
+          }}
+        >
+          {NATIVE_APP_ONLY_LABEL} — these controls run in the desktop app; here they are shown disabled.
+        </div>
+      )}
+
       <div
         style={{
           marginTop: '4px',
@@ -262,12 +284,13 @@ export function NativeLabBlock({ onMessage }) {
               background: 'rgba(0, 229, 255, 0.08)',
               color: '#00e5ff',
               padding: '4px 6px',
-              cursor: mediaBusy ? 'wait' : 'pointer',
+              cursor: !desktop ? 'not-allowed' : mediaBusy ? 'wait' : 'pointer',
             }}
-            disabled={mediaBusy}
+            disabled={!desktop || mediaBusy}
+            title={naTitle}
             onClick={handleMediaVideoExport}
           >
-            {mediaBusy ? 'STREAMING...' : '⚡ RECORD HEVC VIDEO'}
+            {mediaBusy ? 'STREAMING...' : `⚡ RECORD HEVC VIDEO${naSuffix}`}
           </button>
           <button
             type="button"
@@ -280,12 +303,13 @@ export function NativeLabBlock({ onMessage }) {
               background: 'rgba(0, 229, 255, 0.08)',
               color: '#00e5ff',
               padding: '4px 6px',
-              cursor: mediaBusy ? 'wait' : 'pointer',
+              cursor: !desktop ? 'not-allowed' : mediaBusy ? 'wait' : 'pointer',
             }}
-            disabled={mediaBusy}
+            disabled={!desktop || mediaBusy}
+            title={naTitle}
             onClick={handleECoreBatchDump}
           >
-            {mediaBusy ? 'DUMPING...' : '⚡ DUMP BATCH (E-CORES)'}
+            {mediaBusy ? 'DUMPING...' : `⚡ DUMP BATCH (E-CORES)${naSuffix}`}
           </button>
         </div>
       </div>
@@ -300,16 +324,18 @@ export function NativeLabBlock({ onMessage }) {
             border: '1px dashed var(--accent, #00ff88)',
             color: 'var(--accent, #00ff88)',
             padding: '6px 8px',
-            cursor: 'pointer',
+            cursor: !desktop ? 'not-allowed' : 'pointer',
             width: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '6px',
           }}
+          disabled={!desktop}
+          title={naTitle}
           onClick={handleTestNativeIO}
         >
-          ⚡ TEST NATIVE DISK I/O
+          {`⚡ TEST NATIVE DISK I/O${naSuffix}`}
         </button>
       </div>
 
@@ -391,12 +417,13 @@ export function NativeLabBlock({ onMessage }) {
                 border: '1px solid var(--accent, #00ff88)',
                 color: 'var(--accent, #00ff88)',
                 padding: '4px 6px',
-                cursor: metalBusy ? 'wait' : 'pointer',
+                cursor: !desktop ? 'not-allowed' : metalBusy ? 'wait' : 'pointer',
               }}
-              disabled={metalBusy}
+              disabled={!desktop || metalBusy}
+              title={naTitle}
               onClick={handleMetalInit}
             >
-              {metalBusy ? 'INITIALIZING...' : '⚡ INIT METAL UMA'}
+              {metalBusy ? 'INITIALIZING...' : `⚡ INIT METAL UMA${naSuffix}`}
             </button>
           ) : (
             <button
@@ -410,12 +437,13 @@ export function NativeLabBlock({ onMessage }) {
                 background: 'rgba(0, 255, 136, 0.1)',
                 color: 'var(--accent, #00ff88)',
                 padding: '4px 6px',
-                cursor: metalBusy ? 'wait' : 'pointer',
+                cursor: !desktop ? 'not-allowed' : metalBusy ? 'wait' : 'pointer',
               }}
-              disabled={metalBusy}
+              disabled={!desktop || metalBusy}
+              title={naTitle}
               onClick={handleMetalStep}
             >
-              {metalBusy ? 'COMPUTING...' : '⚡ DISPATCH METAL PASS'}
+              {metalBusy ? 'COMPUTING...' : `⚡ DISPATCH METAL PASS${naSuffix}`}
             </button>
           )}
         </div>
@@ -490,12 +518,13 @@ export function NativeLabBlock({ onMessage }) {
             background: 'rgba(255, 170, 0, 0.08)',
             color: '#ffaa00',
             padding: '6px 8px',
-            cursor: curatorBusy ? 'wait' : 'pointer',
+            cursor: !desktop ? 'not-allowed' : curatorBusy ? 'wait' : 'pointer',
           }}
-          disabled={curatorBusy}
+          disabled={!desktop || curatorBusy}
+          title={naTitle}
           onClick={handleCuratorEval}
         >
-          {curatorBusy ? 'EVALUATING ON ANE...' : '⚡ EVALUATE FRAME ON ANE'}
+          {curatorBusy ? 'EVALUATING ON ANE...' : `⚡ EVALUATE FRAME ON ANE${naSuffix}`}
         </button>
       </div>
     </>

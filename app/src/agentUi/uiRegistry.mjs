@@ -2312,7 +2312,7 @@ export const UI_CONTROLS_4 = Object.freeze([
     'Desktop-bridge diagnostics: native info, windows, stage window controls.',
     {
       stress: 'skip',
-      note: 'These call the Tauri invoke bridge directly; in a browser they fail with a raw IPC error — that failure is filed as issue 2490 in the numbering of the session report. No store/bus channel exists to register.',
+      note: 'These call the Tauri invoke bridge through a gated core; in a browser they render disabled and labelled "Native app only" and never fire the bridge — the raw IPC error they used to print is issue 2490 in the numbering of the session report. No store/bus channel exists to register.',
       source: 'panels/PipelinePanel.jsx',
     },
   ),
