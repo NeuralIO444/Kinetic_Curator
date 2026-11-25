@@ -107,10 +107,16 @@ function rig(x, y, heading, recipe = NATIVE) {
     /physics\.tone = undefined/,
     'a missing dial',
   );
+  // LOUD RE-PIN (Phase 6B — RULED: hunger is a DAVIS drive, a recipe gene). Was: a hunger dial refused as unknown
+  // ("feeding is Phase 6: no hunger drive yet"). Now the hunger gene is a dial like any other, and a recipe WITHOUT it
+  // is the one refused; an unknown dial is still refused by name.
+  assert.equal(normalizeCultureRecipe({ ...NATIVE, drives: { ...NATIVE.drives, hunger: 1 } }).drives.hunger, 1);
+  const { hunger: _h, ...noHunger } = NATIVE.drives;
+  void _h;
+  assert.throws(() => normalizeCultureRecipe({ ...NATIVE, drives: noHunger }), /drives\.hunger = undefined/);
   assert.throws(
-    () => normalizeCultureRecipe({ ...NATIVE, drives: { ...NATIVE.drives, hunger: 1 } }),
-    /unknown drives dial "hunger"/,
-    'feeding is Phase 6: no hunger drive yet',
+    () => normalizeCultureRecipe({ ...NATIVE, drives: { ...NATIVE.drives, thirst: 1 } }),
+    /unknown drives dial "thirst"/,
   );
   for (const g of Object.keys(CULTURE_RECIPE_BOUNDS))
     for (const k of Object.keys(CULTURE_RECIPE_BOUNDS[g])) {
@@ -153,7 +159,8 @@ function rig(x, y, heading, recipe = NATIVE) {
 
 // 3 — the drives.
 {
-  assert.deepEqual([...CULTURE_DRIVE_NAMES], ['wander', 'ground', 'rim']);
+  // LOUD RE-PIN (Phase 6B — RULED: hunger joins the registry as a drive, LAST, so the desire's sum keeps 6A's order).
+  assert.deepEqual([...CULTURE_DRIVE_NAMES], ['wander', 'ground', 'rim', 'hunger']);
   const { bodies, c, body } = rig(900, 500, 0.4);
   assert.equal(cultureSenseRange(body), body.length * CULTURE_SENSE_BODY_LENGTHS);
   assert.equal(CULTURE_SENSE_BODY_LENGTHS, 3, 'the defaults table: 3 body-lengths');

@@ -251,6 +251,11 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // so the spatial stream, keyed by the morsel's serial at the world seed. A channel of its own, so no cast, recipe,
   // wander or linkage draw moves; it only runs behind the cultureDish gate. No offsets are passed (identity).
   'culture-morsel': 'spatial',
+  // CULTURE Phase 6B — a bred child's deal (engine/cultureBreed.mjs cultureBabyPreview): the per-part coin flips (which
+  // parent each part's look and size come from), the linkage's flip, the stroke's birth phase and the heading it is born
+  // facing, keyed by the birth's serial at the world seed. A body's build, like 'culture-linkage', so the spatial stream; a
+  // channel of its own, so no cast, recipe, wander, linkage or morsel draw moves; behind the gate. No offsets (identity).
+  'culture-breed': 'spatial',
 });
 
 const OFFSET_GROUP_OF = new Map([

@@ -38,7 +38,12 @@ import {
   CULTURE_BODY_SCALE_MIN,
   CULTURE_BODY_SCALE_MAX,
 } from './cultureBody.mjs';
-import { normalizeCultureRecipe, cultureRecipeFaults, CULTURE_RECIPE_BOUNDS } from './cultureMotion.mjs';
+import {
+  normalizeCultureRecipe,
+  cultureRecipeFaults,
+  CULTURE_RECIPE_BOUNDS,
+  CULTURE_NATIVE_HUNGER,
+} from './cultureMotion.mjs';
 import { cultureSoilSample } from './cultureSoil.mjs';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H } from './cultureSwarm.mjs';
 import { JANSEN_RELATIVE, MEASURE_IDS, MEASURE_RANGES } from './jansenMeasures.js';
@@ -73,7 +78,7 @@ export const CULTURE_KINETIC_MEASURE_LEAN = 0.06;
 export const CULTURE_NATIVE_RECIPES = Object.freeze({
   [CULTURE_PLAN_DISH]: normalizeCultureRecipe({
     name: 'dish/native',
-    drives: { wander: 0.6, ground: 1, rim: 2 },
+    drives: { wander: 0.6, ground: 1, rim: 2, hunger: CULTURE_NATIVE_HUNGER },
     physics: { thrust: 0.35, headMass: 60, partMass: 20, paddle: 0.1, tone: 0.6 },
     seasoning: {
       timing: 72,
@@ -95,7 +100,7 @@ export const CULTURE_NATIVE_RECIPES = Object.freeze({
   // anatomy; `paddle` here is its amplitude.
   [CULTURE_PLAN_MOTH]: normalizeCultureRecipe({
     name: 'moth/native',
-    drives: { wander: 0.8, ground: 1, rim: 2.2 },
+    drives: { wander: 0.8, ground: 1, rim: 2.2, hunger: CULTURE_NATIVE_HUNGER },
     physics: { thrust: 0.34, headMass: 60, partMass: 20, paddle: 0.35, tone: 0.5 },
     seasoning: {
       timing: 48,
@@ -119,7 +124,7 @@ export const CULTURE_NATIVE_RECIPES = Object.freeze({
   // read by this plan (its gait is its geometry); it stands at the dish creature's value so DAVIS leans it as ever.
   [CULTURE_PLAN_STRANDBEEST]: normalizeCultureRecipe({
     name: 'strandbeest/native',
-    drives: { wander: 0.5, ground: 1, rim: 2.4 },
+    drives: { wander: 0.5, ground: 1, rim: 2.4, hunger: CULTURE_NATIVE_HUNGER },
     physics: { thrust: 0.85, headMass: 60, partMass: 60, paddle: 0.5, tone: 0.8 },
     seasoning: {
       timing: 60,
@@ -201,15 +206,29 @@ export function kineticAssemble(plan, seed, candidate) {
   return assembleCultureBody(plan, { scale, measures: kineticMeasures(seed, candidate) });
 }
 
-/** The dials of a recipe in canonical order: [group, key] pairs over the bounds table. */
+/**
+ * The TEMPERAMENT dials in canonical order: [group, key] pairs over the bounds table, every dial but the hunger gene.
+ * DAVIS leans these at cast with draw index = position (exactly the 5A–6A draws — the hunger gene, added in 6B, takes a
+ * draw index of its own after them, so no earlier dial's draw moves), and LOIS's temperament reads exactly these.
+ */
 const DIALS = Object.freeze(
-  Object.keys(CULTURE_RECIPE_BOUNDS).flatMap((g) => Object.keys(CULTURE_RECIPE_BOUNDS[g]).map((k) => [g, k])),
+  Object.keys(CULTURE_RECIPE_BOUNDS)
+    .flatMap((g) => Object.keys(CULTURE_RECIPE_BOUNDS[g]).map((k) => [g, k]))
+    .filter(([g, k]) => !(g === 'drives' && k === 'hunger')),
 );
+/** The hunger gene's own draw index on the 'culture-recipe' channel (after the 16 temperament dials; 31 is the phase). */
+const HUNGER_DRAW = DIALS.length;
+/**
+ * DAVIS's lean on the HUNGER gene at cast (Phase 6B): 0 — RULED, the native recipes' hunger gene reproduces 6A's hunger
+ * exactly at birth, so a cast citizen carries the native gene as it stands. Breeding blends it (engine/cultureBreed.mjs).
+ * A named constant, so iteration can open it (the draw index is already reserved).
+ */
+export const CULTURE_DAVIS_HUNGER_LEAN = 0;
 
 /**
  * DAVIS: the candidate's recipe — the plan's native recipe, each dial leaned by a seeded share of
- * at most ±CULTURE_DAVIS_LEAN and held inside its bounds (TIMING rounds to whole steps) — plus the
- * stroke's birth phase 0..1. The recipe passes the one reading before it leaves his desk.
+ * at most ±CULTURE_DAVIS_LEAN and held inside its bounds (TIMING rounds to whole steps; the hunger gene by
+ * CULTURE_DAVIS_HUNGER_LEAN, 0 — the native gene) — plus the stroke's birth phase 0..1. The recipe passes the one reading before it leaves his desk.
  */
 export function davisWrite(plan, seed, candidate) {
   const native = CULTURE_NATIVE_RECIPES[plan];
@@ -221,10 +240,18 @@ export function davisWrite(plan, seed, candidate) {
     if (k === 'timing') v = Math.min(hi, Math.max(lo, Math.round(v)));
     out[g][k] = v;
   });
+  {
+    const u = hashU01(seed, 'culture-recipe', candidate * 32 + HUNGER_DRAW) * 2 - 1;
+    const [lo, hi] = CULTURE_RECIPE_BOUNDS.drives.hunger;
+    out.drives.hunger = Math.min(hi, Math.max(lo, native.drives.hunger * (1 + CULTURE_DAVIS_HUNGER_LEAN * u)));
+  }
   return { recipe: normalizeCultureRecipe(out), phase0: hashU01(seed, 'culture-recipe', candidate * 32 + 31) };
 }
 
-/** How far a recipe stands from its plan's native, 0 (the native itself) .. 1 (every dial at a bound's far side). */
+/**
+ * How far a recipe stands from its plan's native, 0 (the native itself) .. 1 (every dial at a bound's far side) — over
+ * the temperament dials (the hunger gene is appetite, not temperament: 6B keeps LOIS's read, and so the cast, exactly 6A's).
+ */
 function recipeDistance(plan, recipe) {
   const native = CULTURE_NATIVE_RECIPES[plan];
   let sum = 0;
@@ -233,6 +260,22 @@ function recipeDistance(plan, recipe) {
     sum += Math.abs(recipe[g][k] - native[g][k]) / (hi - lo);
   }
   return sum / DIALS.length;
+}
+
+/** LOIS's praise of a body and recipe standing on a ground reading (the formula loisGate ranks by; she only reads). */
+function loisPraiseOn(body, recipe, ground) {
+  const graphic = new Set(body.parts.map((p) => p.look.shape)).size / CULTURE_LOOK_SHAPES.length;
+  const temperament = 1 - recipeDistance(body.plan, recipe);
+  return 0.5 * ground.fertility + 0.25 * graphic + 0.25 * temperament;
+}
+
+/**
+ * LOIS's praise, 0..1, of a body and recipe at a point of the soil — the same formula her gate ranks a cast by (half the
+ * ground's fertility, a quarter the graphic range, a quarter the temperament). Phase 6B records it on a bred baby (born
+ * where its parents met); it gates nothing there (the birth's gate is the body's and the recipe's faults). Pure.
+ */
+export function loisPraise(body, recipe, field, x, y) {
+  return loisPraiseOn(body, recipe, cultureSoilSample(field, x, y));
 }
 
 /**
@@ -255,9 +298,7 @@ export function loisGate(candidate, field, earlier = []) {
   const spacing = CULTURE_CAST_SPACING_BODY_LENGTHS * body.length;
   for (const e of earlier) if (Math.hypot(e.x - x, e.y - y) < spacing) faults.push('crowding an earlier cast member');
   if (faults.length) return Object.freeze({ admitted: false, praise: 0, faults: Object.freeze(faults) });
-  const graphic = new Set(body.parts.map((p) => p.look.shape)).size / CULTURE_LOOK_SHAPES.length;
-  const temperament = 1 - recipeDistance(body.plan, recipe);
-  const praise = 0.5 * ground.fertility + 0.25 * graphic + 0.25 * temperament;
+  const praise = loisPraiseOn(body, recipe, ground);
   if (!(praise >= CULTURE_LOIS_BAR))
     return Object.freeze({ admitted: false, praise, faults: Object.freeze(['under the bar']) });
   return Object.freeze({ admitted: true, praise, faults: Object.freeze([]) });

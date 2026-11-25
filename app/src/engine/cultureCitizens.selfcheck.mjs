@@ -78,7 +78,9 @@ const cast = (seed) => {
 const INERT = normalizeCultureRecipe({
   ...CULTURE_NATIVE_RECIPES.dish,
   name: 'test/inert',
-  drives: { wander: 0, ground: 0, rim: 0 },
+  // LOUD RE-PIN (Phase 6B — a changed recipe shape: hunger is a DAVIS drive, a recipe gene, RULED): the inert
+  // fixture names every drive, the hunger gene included, at 0 — inert as before.
+  drives: { wander: 0, ground: 0, rim: 0, hunger: 0 },
   physics: { ...CULTURE_NATIVE_RECIPES.dish.physics, thrust: 0, paddle: 0, tone: 0 },
 });
 const headOf = (w, c) => [w.bodies.x[c.first], w.bodies.y[c.first]];

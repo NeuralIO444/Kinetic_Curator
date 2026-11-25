@@ -303,8 +303,11 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   const native = CULTURE_NATIVE_RECIPES[CULTURE_PLAN_DISH];
   let dist = 0;
   let n = 0;
+  // LOUD RE-PIN (Phase 6B — hunger is a recipe gene, RULED): LOIS's temperament reads the sixteen temperament dials,
+  // not the hunger gene (appetite, not temperament — so the cast's praise, and the cast, stay exactly 6A's).
   for (const g of Object.keys(CULTURE_RECIPE_BOUNDS))
     for (const k of Object.keys(CULTURE_RECIPE_BOUNDS[g])) {
+      if (g === 'drives' && k === 'hunger') continue;
       const [lo, hi] = CULTURE_RECIPE_BOUNDS[g][k];
       dist += Math.abs(recipe[g][k] - native[g][k]) / (hi - lo);
       n++;

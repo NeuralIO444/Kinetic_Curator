@@ -74,6 +74,7 @@ export const CULTURE_BEAST_DIAL_READING = Object.freeze({
   'drives.wander': 'the desire (shared registry)',
   'drives.ground': 'the desire (shared registry)',
   'drives.rim': 'the desire (shared registry)',
+  'drives.hunger': 'the desire (shared registry; Phase 6B — the hunger gene, toward the nearest sensed morsel)',
   'physics.thrust': 'ADVANCE — the share of the stance stroke that becomes travel, min(1, thrust) (0 walks in place)',
   'physics.headMass': 'the front hub’s mass',
   'physics.partMass':
