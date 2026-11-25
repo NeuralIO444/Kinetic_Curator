@@ -413,6 +413,13 @@ export function createLiveLoop(
   let accumObj = null;
   let accumActive = false;
   let accumFrozen = false;
+  // #2480: a buffer begin() that lands while frozen (CLEAR, the enable
+  // path, a dpr rebuild) leaves the held buffer flat, and the frozen
+  // branch would present that flat background forever while the resolver
+  // count stays high. This flag asks the tick for exactly one render +
+  // step frame to re-seed the buffer with the current scene; the hold
+  // then resumes.
+  let accumReseedPending = false;
   let lastAccumOn = false;
   // #1490 — the spectral feedback warp's driver: its per-bin attenuated state lives here, private to
   // the feedback pass (the spectrum core is never smoothed for anyone else's sake).
@@ -1908,15 +1915,22 @@ export function createLiveLoop(
                 accumObj = live.ensureAccum(payload.width, payload.height);
                 accumObj.begin(bgCss);
                 accumActive = true;
+                // #2480: a freeze already standing (set via MIDI with
+                // ACCUM off — the panel disables its button then, the
+                // MIDI target does not check) would hold this fresh flat
+                // buffer forever; ask for one reseed frame instead.
+                if (frozen) accumReseedPending = true;
               } catch (e) {
                 noteAccumFault(e);
               }
             }
           }
           lastAccumOn = true;
-          if (frozen && accumObj) {
+          if (frozen && accumObj && !accumReseedPending) {
             // FREEZE: hold the feedback image, skip render + step.
             // #309: the pair is half-res — present upscaled.
+            // #2480: a pending reseed (a begin landed while frozen)
+            // falls through to the render + step branch for one frame.
             live.presentUpscaled(accumObj.texture());
           } else if (accumObj) {
             try {
@@ -1926,6 +1940,10 @@ export function createLiveLoop(
               if (fresh !== accumObj) {
                 accumObj = fresh;
                 accumObj.begin(bgCss);
+                // #2480: the same trap as CLEAR if a freeze is standing
+                // (a reseed frame itself can land here) — this frame
+                // steps anyway, and the flag is cleared below.
+                if (frozen) accumReseedPending = true;
               }
               const { target, fxFinishChains } = renderMixedFrame(payload, true, mix);
               const bands = audioBands || { rms: 0, beatPulse: 0 };
@@ -2025,6 +2043,10 @@ export function createLiveLoop(
               const { target, fxFinishChains: fin } = renderMixedFrame(payload, transparent, mix);
               live.present(live.applyFinishChains(target, fin)); // #1069
             }
+            // #2480: the reseed frame has stepped (or faulted into the
+            // plain fallback above, which presents the live scene
+            // directly) — the frozen hold resumes from the next frame.
+            accumReseedPending = false;
           } else {
             // ACCUM unavailable this frame (enable failed or cooling down).
             const { target, fxFinishChains: fin } = renderMixedFrame(payload, transparent, mix);
@@ -2046,6 +2068,7 @@ export function createLiveLoop(
             // (not the frame's read-only copy), or re-enabling ACCUM shows
             // no trails while the panel reads inactive (two-press FREEZE trap).
             accumFrozen = false;
+            accumReseedPending = false; // #2480: no reseed outlives its session
           }
           lastAccumOn = false;
           // #1069 — with ACCUM off there is no feedback loop for grain to
@@ -2390,6 +2413,11 @@ export function createLiveLoop(
           }
         }
         accumObj.begin(beginBg);
+        // #2480: while frozen, no later frame would step the scene back
+        // into this freshly flat buffer — the hold would present the
+        // flat background while the count stays high. Ask the tick for
+        // one reseed frame; the hold resumes right after it.
+        if (accumFrozen) accumReseedPending = true;
       }
     },
   };
