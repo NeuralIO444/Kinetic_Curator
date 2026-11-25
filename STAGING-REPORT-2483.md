@@ -48,8 +48,8 @@ a "shedding" indicator while the governor is active.
 - `npm run format:check`: clean after the coordinator ran prettier on
   the two flagged files (the new selfcheck and sceneApply's).
 - `npm run build`: green.
-- Full manifest sweep (827 entries, log `sweep-2483.log` committed
-  alongside): 821 pass, 6 fail — swarmWasm (exit 1), rollSafety (1),
+- Full manifest sweep (827 entries, log `sweep-2483.log` in the
+  worktree root; *.log is gitignored in this repo): 821 pass, 6 fail — swarmWasm (exit 1), rollSafety (1),
   accum (134), vortex (1), livingMotion (1), phase6 (1). Every one of
   these was A/B-proven to fail identically on pristine origin/main in a
   fresh detached worktree (proven during the A12 #2490 build's sweep
