@@ -47,16 +47,16 @@ export function sanitizeUserVoice(raw) {
   if (!st) return null;
   const { params } = validateLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, ...(st.params || {}) });
   const pal = st.palette && typeof st.palette === 'object' ? st.palette : {};
-  const assets =
-    st.assets === 'all'
-      ? 'all'
-      : st.assets && typeof st.assets === 'object'
-        ? Object.fromEntries(
-            Object.entries(st.assets)
-              .filter(([, v]) => typeof v === 'boolean')
-              .slice(0, 400),
-          )
-        : 'all';
+  const assetMap =
+    st.assets && typeof st.assets === 'object'
+      ? Object.fromEntries(
+          Object.entries(st.assets)
+            .filter(([, v]) => typeof v === 'boolean')
+            .slice(0, 400),
+        )
+      : null;
+  // #2522 — a voice whose asset map turns nothing on ({} or all-off) would commit an empty stage: it is 'all'.
+  const assets = assetMap && Object.values(assetMap).some(Boolean) ? assetMap : 'all';
   // #1153 — the layer stack an earned voice brings back: refused whole if it does not expand, and bounded in size
   const stack =
     st.stack && JSON.stringify(st.stack).length < 60000 && expandStack(st.stack).ok
@@ -288,10 +288,11 @@ export const createVoiceSlice = (set) => ({
       // palette pairing) — leave paletteId/paletteOverrides exactly as they
       // are, so a plain composition swap doesn't freeze the current colors
       // into a stray override.
-      if (to.assets === 'all') {
-        const m = {};
-        for (const k of Object.keys(state.enabledAssets || {})) m[k] = true;
-        next.enabledAssets = m;
+      const toAssets = to.assets === 'all' || !Object.values(to.assets || {}).some(Boolean) ? 'all' : to.assets;
+      if (toAssets === 'all') {
+        // #2522 — 'all' over a null/empty live map stays null (the resolver's "everything"); {} would be an empty whitelist.
+        const keys = Object.keys(state.enabledAssets || {});
+        next.enabledAssets = keys.length ? Object.fromEntries(keys.map((k) => [k, true])) : null;
       } else {
         next.enabledAssets = { ...to.assets };
       }
