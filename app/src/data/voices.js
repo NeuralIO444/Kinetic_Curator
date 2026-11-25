@@ -862,7 +862,8 @@ export function captureLiveVoiceState(s) {
   }
   const enabled = s.enabledAssets || {};
   const ids = Object.keys(enabled);
-  const allOn = ids.length > 0 && ids.every((id) => !!enabled[id]);
+  // #2522 — a null/empty live map means "everything" to the resolver, so it captures as 'all', never as a stored {}.
+  const allOn = ids.length === 0 || ids.every((id) => !!enabled[id]);
   return {
     params: validateLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, ...params }).params,
     palette: {

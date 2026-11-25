@@ -208,4 +208,45 @@ assert.strictEqual(state.userVoices.length, MAX_USER_VOICES, 'cap holds');
 api.loadVoice('nope');
 assert.strictEqual(state.voiceMix, null);
 
+// ── #2522: no path may turn a voice into an empty stage ──
+{
+  const voice = (assets) => ({
+    id: 'uv-g',
+    name: 'G',
+    state: { params: { mode: 'grid' }, palette: {}, fx: {}, assets, blendSeconds: 2 },
+  });
+  // 2/3 — sanitize: an empty or all-off asset map is 'all', a real subset passes through verbatim.
+  assert.strictEqual(sanitizeUserVoice(voice({})).state.assets, 'all', 'an empty map is not a whitelist');
+  assert.strictEqual(sanitizeUserVoice(voice({ a: false, b: false })).state.assets, 'all', 'all-off becomes all');
+  assert.deepStrictEqual(sanitizeUserVoice(voice({ a: true, b: false })).state.assets, { a: true, b: false });
+  // 3 — capture over a null/empty live map stores 'all', never {}.
+  const { captureLiveVoiceState } = await import('../data/voices.js');
+  assert.strictEqual(captureLiveVoiceState({ layoutParams: {}, enabledAssets: null }).assets, 'all');
+  assert.strictEqual(captureLiveVoiceState({ layoutParams: {}, enabledAssets: {} }).assets, 'all');
+  assert.deepStrictEqual(captureLiveVoiceState({ layoutParams: {}, enabledAssets: { a: true, b: false } }).assets, {
+    a: true,
+    b: false,
+  });
+  // 1/2 — commit: 'all' over a null live map leaves the resolver's "everything" (null); all-off target never lands.
+  const land = (liveAssets, toAssets) => {
+    state.voiceMix = {
+      from: captureLiveVoiceState(state),
+      to: {
+        params: { ...state.layoutParams },
+        palette: { bg: '#000000', ink: '#ffffff', swatches: ['#888888'] },
+        assets: toAssets,
+      },
+      t: 1,
+      auto: false,
+    };
+    state.enabledAssets = liveAssets;
+    api.commitVoiceMix();
+    return state.enabledAssets;
+  };
+  assert.strictEqual(land(null, 'all'), null, "'all' over a null map stays null, not {}");
+  assert.strictEqual(land({}, 'all'), null, "'all' over {} stays null, not {}");
+  assert.deepStrictEqual(land({ a: false, b: true }, 'all'), { a: true, b: true }, "'all' enables every known asset");
+  assert.strictEqual(land(null, { a: false }), null, 'an all-off target is treated as all');
+}
+
 console.log('voiceSlice.selfcheck: OK');
