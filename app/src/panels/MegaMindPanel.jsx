@@ -267,7 +267,9 @@ function Vision({ record }) {
 // lives here is the rest of the §6b register: pacing proposals, crown drafts, narration, Davis's reason
 // prose, and the docs guide. Every button is gated on its capability consumer and a LOCAL record (a
 // cloud pointer enables none of this), every reply is validated before it renders, and a discarded
-// reply shows as an honest error line — this is a dev surface, not a performance surface.
+// reply shows as an honest error line — except narration (#2489): a discarded narration falls back
+// to the machine-written line and the reply lands in the discard log below, never on the surface.
+// This is a dev surface, not a performance surface.
 function Surfaces({ record }) {
   const [driver] = useState(() => ensureSurfacesDriver());
   const [sv, setSv] = useState(getSurfacesView);
@@ -327,6 +329,21 @@ function Surfaces({ record }) {
         <p style={{ margin: '4px 0' }}>
           <strong>census:</strong> {sv.censusLine}
         </p>
+      )}
+      {sv.discards && sv.discards.length > 0 && (
+        <div style={{ margin: '4px 0' }}>
+          <p style={{ margin: '0 0 2px' }}>
+            <strong>discard log</strong>{' '}
+            <span style={{ opacity: 0.7 }}>
+              — replies the checker threw out, kept for diagnosis; they are never shown as narration:
+            </span>
+          </p>
+          {sv.discards.slice(-4).map((d) => (
+            <p key={d.seq} style={{ margin: '0 0 2px', opacity: 0.75 }}>
+              {d.surface} · failed {d.stage} — {d.reason} · reply: {d.reply || '(unparseable)'}
+            </p>
+          ))}
+        </div>
       )}
       {sv.drift && (
         <p style={{ margin: '4px 0' }}>
