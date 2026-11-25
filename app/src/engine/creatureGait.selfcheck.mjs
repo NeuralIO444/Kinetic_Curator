@@ -49,7 +49,10 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { useStore } from '../state/store.js';
 
 let n = 0;
+// KC_ONLY=<prefix> runs only the checks whose name starts with it (the mutation probes isolate one law at a time)
+const only = process.env.KC_ONLY || null;
 const ok = (name, fn) => {
+  if (only && !name.startsWith(only)) return;
   fn();
   n++;
   console.log(`  [ok] ${name}`);
@@ -209,6 +212,20 @@ ok('applied: a creature wearing a moving gait has its body and parts moved; the 
   const bodyA = plain.instances.find((i) => i.key === 'c');
   const bodyB = g.instances.find((i) => i.key === 'c');
   assert.ok(bodyA.x !== bodyB.x || bodyA.y !== bodyB.y || bodyA.scaleX !== bodyB.scaleX, 'the body moves as root');
+  // the body is the ROOT: under a root-only drift every part rides the body by exactly the body's move
+  const drift = { roles: { root: { drivers: [{ id: 'drift', amount: 0.5 }] } }, cascade: 0 };
+  const d = contract({ gaitWorn: wornOf([[CR.id, drift]]) });
+  const mv = (key) => {
+    const p = plain.instances.find((i) => i.key === key);
+    const q = d.instances.find((i) => i.key === key);
+    return [q.x - p.x, q.y - p.y];
+  };
+  const root = mv('c');
+  assert.ok(Math.hypot(...root) > 0.5, 'the body wanders');
+  for (const p of partsOf(plain, 'c').filter((i) => i.key !== 'c')) {
+    const m = mv(p.key);
+    assert.ok(Math.abs(m[0] - root[0]) < 2e-3 && Math.abs(m[1] - root[1]) < 2e-3, `${p.key} rides the body`);
+  }
   // the stage's own shapes never move
   for (let i = 0; i < STAGE.length; i++)
     assert.deepEqual(
@@ -327,9 +344,10 @@ const stamps = (() => {
 })();
 const stampAt = (f) => stamps[Math.min(ROOM.length - 1, Math.floor(f / PHRASE))];
 /** The creature tiles' contract instances for the frame just resolved (the loop's own doc read, through the seam). */
-function creatureFrame(out, f) {
+function creatureFrame(out, f, { plain = false } = {}) {
+  const fields = plain ? {} : roomContractFields(lastResolvedInput()); // plain: the contract with no gait read at all
   const c = buildSceneContract({
-    doc: { seed: 7, customAssets: POOL, kinemeTime: f / 60, ...roomContractFields(lastResolvedInput()) },
+    doc: { seed: 7, customAssets: POOL, kinemeTime: f / 60, ...fields },
     resolvedLayers: out,
   });
   return sha(JSON.stringify(c.instances.filter((i) => isCreaturePart(i))));
@@ -337,7 +355,7 @@ function creatureFrame(out, f) {
 const creatureKeys = new Set();
 const isCreaturePart = (i) => [...creatureKeys].some((k) => i.key === k || i.key.startsWith(`${k}#`));
 
-function liveTake({ withGaits = true, record = true } = {}) {
+function liveTake({ withGaits = true, record = true, frames = FRAMES } = {}) {
   const recorder = record ? createPerformanceRecorder() : null;
   const resolver = withResolveTap(createLiveResolver);
   if (recorder) {
@@ -349,7 +367,7 @@ function liveTake({ withGaits = true, record = true } = {}) {
   let frame = 0;
   const hashes = [];
   let t = 0;
-  for (frame = 0; frame < FRAMES; frame++) {
+  for (frame = 0; frame < frames; frame++) {
     for (const p of picksLog) if (withGaits && p.frame === frame) useStore.getState().assignGait(p.e);
     t += 1000 / 60;
     const g = withGaits ? stampAt(frame) : null;
@@ -376,15 +394,17 @@ function replay(perf, { seekTo = null } = {}) {
   assert.equal(startPlayback(JSON.parse(JSON.stringify(perf))), true);
   const resolver = withResolveTap(createLiveResolver);
   const hashes = [];
+  const plainHashes = [];
   const from = seekTo ?? 0;
   if (seekTo !== null) seekPlayback(seekTo);
   for (let f = from; f < FRAMES; f++) {
     const out = resolver.resolveLayers({ ...STABLE, loopTimeMs: 0, dtSec: 1 / 60 }); // the live input is ignored
     hashes[f] = creatureFrame(out, f);
+    plainHashes[f] = creatureFrame(out, f, { plain: true });
   }
   resolver.dispose();
   stopPlayback();
-  return hashes;
+  return { hashes, plain: plainHashes };
 }
 
 useStore.setState({ gaitAssignments: {}, customAssets: POOL });
@@ -418,11 +438,11 @@ ok(
 );
 
 ok('replay: the take replays the creature and beast parts byte-identical, linear and after a seek', () => {
-  const r = replay(live.perf);
+  const r = replay(live.perf).hashes;
   assert.equal(live.perf.frames, FRAMES, 'the whole take is in the file');
   assert.deepEqual(r, live.hashes, 'linear playback');
   const seekTo = PHRASE + 20; // mid-phrase, mid-wear
-  const s = replay(live.perf, { seekTo });
+  const s = replay(live.perf, { seekTo }).hashes;
   assert.deepEqual(s.slice(seekTo), live.hashes.slice(seekTo), 'a seek lands on the recorded pose');
 });
 
@@ -430,8 +450,10 @@ ok('old take: a take without creature picks replays with none — even right aft
   // the live session above left the fold's readouts standing; an older take (no creature stamp, no gaits section)
   const old = { ...bare.perf };
   delete old.gaits;
-  liveTake({ withGaits: true, record: false }); // the readout holds a creature pick right now
-  assert.deepEqual(replay(old), bare.hashes, 'no picks, exactly as recorded');
+  liveTake({ withGaits: true, record: false, frames: 2 * PHRASE }); // stops mid-wear: a pick stands right now
+  const r = replay(old);
+  assert.deepEqual(r.hashes, r.plain, 'no picks: every frame is the contract with no gait read at all');
+  assert.deepEqual(r.hashes, bare.hashes, 'and exactly as recorded');
   assert.deepEqual(gaitAssignmentsAt(undefined, 10), {}, 'a missing section stands up no assignment');
   assert.equal(checkGaitRecord(undefined), null);
 });
