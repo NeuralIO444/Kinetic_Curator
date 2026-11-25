@@ -34,6 +34,7 @@ node src/panels/pipeline/SnapshotGallery.selfcheck.mjs
 node src/panels/pipeline/bundleFile.selfcheck.mjs
 node src/panels/pipeline/paletteImportCopy.selfcheck.mjs
 node src/panels/pipeline/pipelineNotices.selfcheck.mjs
+node src/panels/pipeline/nativeLab.selfcheck.mjs
 node src/hooks/useMediaExport.selfcheck.mjs
 node src/hooks/governorCuts.selfcheck.mjs
 node src/hooks/governorCreatureShed.selfcheck.mjs
