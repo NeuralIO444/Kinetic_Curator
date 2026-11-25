@@ -217,7 +217,7 @@ function AppInner() {
     });
     // #2329 — gait M3: once a phrase each standing construct's gait is picked among its style's Canon defaults
     // (still / idle / performing) from the audio envelope; a user lock wins; muted while a take plays.
-    // #2475 — and the creature and beast tiles in the stage pool (Matt's M5 ruling: the QUEEN picks for every wearer,
+    // #2475 — and the creature and beast tiles in the stage pool (Matt's M5 ruling: every wearer is picked for,
     // same rules as constructs). They ride the same gate: the picks reach the stage only on the constructs' stamp.
     const constructStyle = new Map(ASSETS_CONSTRUCTS.map((a) => [a.id, a.style]));
     let creatureStyleMemo = { custom: undefined, births: undefined, styleOf: () => null };
