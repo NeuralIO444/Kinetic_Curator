@@ -1,6 +1,7 @@
 # STAGING REPORT — CULTURE Phase 6, slice B: breeding, growth, and casting per take
 
-Branch `feat/culture-phase6b-breeding`, built on origin/main `dcc1ac6` (#2512, the 6A follow-up). Behind the
+Branch `feat/culture-phase6b-breeding`, built on origin/main `dcc1ac6` (#2512, the 6A follow-up), origin/main
+`079c1f2` merged in before publishing. Behind the
 `cultureDish` gate; zero live-stage change. No issue owns this slice; the umbrella (1183) and the test-drive issues stay
 as they are (T3's WetLab UI still waits on Matt's copy). Nothing here is merged.
 Session: https://claude.ai/code/session_01EoZUDnFJMovETsv13jZSbR
@@ -225,6 +226,10 @@ branch 1.11 ms (11 living) — the population is larger; the cap bounds it.
   `ef4636852999efc078d2b99f3c0bf709cbfd57756ac38aa2f680e5073d68c6d3`; 23 motion sources, 56 cost tiers — identical on
   both, and identical to 6A's recorded values. No bus subscription with the gate off: the hook and the bridge are
   untouched (cultureRoomLive and useCultureWorld green, unmodified).
+
+- **After merging origin/main `079c1f2`** (#2513, #2515, #2516, #2517 — none touches the dish): every culture suite,
+  kernel/rng and the project-document suites re-run green (31/31); lint, format:check and build green; the gate-off
+  probe re-run against a fresh detached worktree at `079c1f2` — every hash identical to the values above.
 
 ## Open questions (multiple choice + recommendation)
 
