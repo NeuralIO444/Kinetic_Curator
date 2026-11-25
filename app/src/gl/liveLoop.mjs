@@ -428,6 +428,12 @@ export function createLiveLoop(
   // the new scene instead of leaving the stale frame on the canvas
   // until RUN.
   let lastPresentedSig = null;
+  // #2486: the previous tick's paused fold. The first paused tick ADOPTS
+  // the scene as it stands (see the paused branch): writes that landed
+  // at or before the stop — the watchdog trip's own tier shed flips
+  // perfTier1, which is a signature field — belong to the running loop's
+  // last frame, not to the hold, so they must not fire a still.
+  let prevTickPaused = false;
   let lastAccumOn = false;
   // #1490 — the spectral feedback warp's driver: its per-bin attenuated state lives here, private to
   // the feedback pass (the spectrum core is never smoothed for anyone else's sake).
@@ -1896,6 +1902,8 @@ export function createLiveLoop(
       // #2486: what the canvas currently shows, in identity terms — the
       // paused branch below compares, and the present site records.
       const sig = sceneSignature(getState(), frame);
+      const pauseEntry = paused && !prevTickPaused;
+      prevTickPaused = paused;
 
       if (paused) {
         // Spine B (#388): paused holds the last presented frame; roll back loopTimeMs since physics did not step.
@@ -1911,7 +1919,13 @@ export function createLiveLoop(
         // clock, never a physics step, and the stop itself is untouched
         // (running / slowRender / badges all stand). An unchanged scene
         // returns here as before — at most one still per distinct
-        // change, so the stop's cost bound holds.
+        // change, so the stop's cost bound holds. Pause entry adopts
+        // the scene as it stands: the signature is re-baselined without
+        // a present, so only writes made DURING the hold fire a still.
+        if (pauseEntry) {
+          lastPresentedSig = sig;
+          return;
+        }
         if (sameSceneSignature(sig, lastPresentedSig)) return;
         // Paused AND frozen with ACCUM on, the frozen branch would
         // present the buffer's pre-change texture — the recall could

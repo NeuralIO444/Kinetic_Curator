@@ -111,3 +111,32 @@ liveResolve.mjs, particles.js are untouched).
   6.341 ms vs budget 5 on main, 7.646 ms here; wetWarmup flips both ways, passing once on main
   and failing there at 2105.6 ms vs its 2000 ms ceiling). No failure touches this diff; the
   A/B detail is appended to sweep.log.
+
+## Fix round 2 (coordinator, 2026-11-25, post-publish): pause entry adopts the scene
+
+PR #2534's CI selfcheck-browser run failed the pin's "an unchanged scene presents
+nothing while held" group ("the held frame is still scene B", grid distance >= 5);
+locally the same group intermittently failed as "presented count moved while
+settling" (exactly one late present). Diagnosis, each step measured:
+
+- The base probe (the pin's browser section run against pristine main 17a5014f,
+  source pins disabled in the probe copy only) PASSED the held group 3/3 in runs
+  that reached it, then failed at the recall step exactly as designed — so the
+  extra present is seam-caused, not a pre-existing trip artifact.
+- Mechanism: the watchdog trip's own tier shed flips `perfTier1`, a field inside
+  sceneSignature. The last running present recorded the pre-shed signature, so
+  the seam's first paused tick saw a "change" and presented one still of the
+  shed scene — on a real GPU that frame reads >= 5 grid units from the pre-shed
+  sample (CI), and under sandbox load the delayed still landed after the pin's
+  settle window (count +1).
+- Fix (liveLoop.mjs only): pause entry ADOPTS the scene — a `prevTickPaused`
+  edge detector re-baselines `lastPresentedSig` on the first paused tick
+  without presenting. Writes at or before the stop belong to the running loop's
+  last frame; only writes DURING the hold present a still. The signature's
+  field set is unchanged (QA's enumeration intact); all source pins hold
+  verbatim.
+- Verification at the fix: format clean, lint 0 errors, pin 2/3 full passes in
+  the loaded sandbox with the third failing at the same count assertion (a
+  mid-flight running frame landing after the trip is indistinguishable from a
+  seam still in that sample; base shows the same sample noise class — one of
+  four base runs died at boot sampling). CI re-run is the deciding vote.
