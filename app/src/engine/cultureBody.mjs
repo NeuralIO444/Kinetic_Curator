@@ -417,3 +417,92 @@ export function cultureBodyFaults(body) {
   } else if (body.linkage) faults.push('a linkage on a plan that has none');
   return faults;
 }
+
+// ── Phase 6B: bodies re-dealt — a bred child's mix and a grown body ──────────────────────────────────────────────────
+
+/**
+ * A body re-dealt from a source body's STRUCTURE (its parts' ids, roles, parents, sockets and limb kinds — the plan's)
+ * with each part's radius and look handed in, its joints' rests recomputed by the overlap rule from the new radii (never
+ * scaled from the old rests: LOIS reads rests against radii), its length measured as KINETIC measures it, and the given
+ * scale and linkage. Frozen all the way down, the assembled body's shape.
+ */
+function redealBody(src, radii, looks, scale, linkage) {
+  const parts = src.parts.map((p, k) => Object.freeze({ ...p, radius: radii[k], look: looks[k] }));
+  const links = src.links.map((l) => Object.freeze({ a: l.a, b: l.b, rest: restOf(parts[l.a].radius, parts[l.b].radius) }));
+  let tail = 0;
+  parts.forEach((p, k) => {
+    if (p.role === 'spine') tail = k;
+  });
+  let length = parts[0].radius + parts[tail].radius;
+  for (const l of links) if (parts[l.b].role === 'spine') length += l.rest;
+  const body = {
+    plan: src.plan,
+    scale,
+    parts: Object.freeze(parts),
+    links: Object.freeze(links),
+    sockets: src.sockets,
+    socketCap: src.socketCap,
+    limbs: src.limbs,
+    length,
+  };
+  if (linkage) body.linkage = linkage;
+  return Object.freeze(body);
+}
+
+/** Do two bodies share one structure (the same plan, the same parts by id, role, parent and limb, the same sockets)? */
+export function cultureBodiesKin(a, b) {
+  if (!a || !b || a.plan !== b.plan || a.parts.length !== b.parts.length || a.sockets.length !== b.sockets.length)
+    return false;
+  for (let k = 0; k < a.parts.length; k++) {
+    const p = a.parts[k];
+    const q = b.parts[k];
+    if (p.id !== q.id || p.role !== q.role || p.parent !== q.parent || p.limb !== q.limb || p.socket !== q.socket)
+      return false;
+  }
+  for (let k = 0; k < a.sockets.length; k++)
+    if (a.sockets[k].id !== b.sockets[k].id || a.sockets[k].occupant !== b.sockets[k].occupant) return false;
+  return true;
+}
+
+/**
+ * THE BODY MIX (Phase 6B, RULED — spec §3.3: "body parts mix as well as recipes"). Two bodies of ONE plan (their BORN
+ * bodies: a looted limb is worn, never inherited — it is not in a born body) make a child body: for each part, the
+ * coin flip `fromB[k]` (0 = parent a, 1 = parent b) picks the parent whose look AND size (radius) that part takes —
+ * whole, never averaged. A linkage plan's legs share one crank (the epic's law 4: one measure set for every leg), so the
+ * linkage is one more part with one flip (`linkageFromB`): its measure genes and its size (the body scale its bones are
+ * laid at) come whole from that parent. A swimmer's scale (read by nothing but the hash) is its head's parent's. Joints
+ * re-dealt at the overlap rule. Refused loudly: bodies of different plans or structures, a flip per part missing.
+ * The child is not judged here — LOIS reads it (cultureBodyFaults). Pure.
+ */
+export function mixCultureBodies(a, b, fromB, linkageFromB = 0) {
+  if (!a || !b || a.plan !== b.plan)
+    throw new Error(`cultureBody: a child needs two parents of one plan ("${a && a.plan}", "${b && b.plan}")`);
+  if (!cultureBodiesKin(a, b)) throw new Error('cultureBody: the parents’ bodies do not share one structure');
+  if (!fromB || fromB.length !== a.parts.length || !Array.from(fromB).every((f) => f === 0 || f === 1))
+    throw new Error(`cultureBody: one coin flip (0 | 1) per part — ${a.parts.length}`);
+  const pick = (k) => (fromB[k] ? b : a);
+  const radii = a.parts.map((_, k) => pick(k).parts[k].radius);
+  const looks = a.parts.map((_, k) => pick(k).parts[k].look);
+  if (a.linkage || b.linkage) {
+    const src = linkageFromB ? b : a;
+    return redealBody(a, radii, looks, src.scale, src.linkage);
+  }
+  return redealBody(a, radii, looks, pick(0).scale, null);
+}
+
+/**
+ * GROWTH (Phase 6B): the body at `factor` × its size — every part's radius × factor, the joints re-dealt at the overlap
+ * rule, the length re-measured, the scale × factor (so a strandbeest's bones grow with its discs); looks, sockets and the
+ * linkage's genes kept. factor 1 returns the body itself. Refused loudly: a factor that is not finite and ≥ 1. Pure.
+ */
+export function growCultureBody(body, factor) {
+  if (!Number.isFinite(factor) || factor < 1) throw new Error(`cultureBody: growth factor "${String(factor)}" — ≥ 1`);
+  if (factor === 1) return body;
+  return redealBody(
+    body,
+    body.parts.map((p) => p.radius * factor),
+    body.parts.map((p) => p.look),
+    body.scale * factor,
+    body.linkage || null,
+  );
+}

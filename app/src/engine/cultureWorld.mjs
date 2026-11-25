@@ -344,7 +344,17 @@ import {
   cultureEcologyHash,
   cultureLifeReading,
   cultureCarriedLayout,
+  cultureHeadTouches,
+  CULTURE_FAT_TICKS,
 } from './cultureEcology.mjs';
+import {
+  cultureBabyPreview,
+  cultureBreedAllowed,
+  CULTURE_BIRTH_COST_FAT,
+  CULTURE_BABY_FAT,
+  CULTURE_POPULATION_CAP,
+} from './cultureBreed.mjs';
+import { loisPraise, CULTURE_CAST_MARGIN_BODY_LENGTHS } from './cultureLab.mjs';
 import { simLawFor, KNOWN_SIM_BACKENDS, DEFAULT_SIM_BACKENDS } from './kernel/simBackends.js';
 
 /** The backend id this world stamps, in the simBackends vocabulary: JS, versioned. */
@@ -646,6 +656,8 @@ export function stepCultureWorld(world) {
       stepCultureEating(world);
       stepCulturePredation(world);
       stepCultureLooting(world);
+      // Phase 6B — breeding on the settled frame, last of the contacts: eligible same-plan pairs that touch.
+      stepCultureBreeding(world);
     }
   }
   // Metabolism (Phase 6A), every world step: upkeep, the starvation clock, corpse decay, morsel spoilage.
@@ -847,6 +859,39 @@ export function dealCultureHandCurrent(world, spec) {
 }
 
 /**
+ * Deal one member into the ordinary tables — the cast's deal (Phase 5A), shared since 6B with a birth: its parts appended
+ * as contiguous body slots at the body's rest pose (alive, still, each at its part radius and the recipe's mass), its
+ * joints dealt through the link door at their declared rests, the citizen enrolled with its recipe instilled and its
+ * seed (the world seed mixed with its index, 1-based — the cast's own formula, counted on through births), and its
+ * life enrolled (`life`: enrolCultureLife's options — fat, parents; the first joint is recorded here). The caller has
+ * checked the tables' room. Returns the citizen's index.
+ */
+function dealCultureMember(world, m, life = {}) {
+  const { bodies, citizens } = world;
+  const first = bodies.count;
+  const pose = cultureBodyRestPose(m.body, m.x, m.y, m.heading);
+  const masses = cultureRecipeMasses(m.body, m.recipe);
+  m.body.parts.forEach((p, k) => {
+    const i = first + k;
+    bodies.alive[i] = 1;
+    bodies.x[i] = pose[k].x;
+    bodies.y[i] = pose[k].y;
+    bodies.vx[i] = 0;
+    bodies.vy[i] = 0;
+    bodies.mass[i] = masses[k];
+    bodies.radius[i] = p.radius;
+  });
+  bodies.count += m.body.parts.length;
+  const linkFirst = world.links.count;
+  for (const l of m.body.links) addCultureLink(world, first + l.a, first + l.b, l.rest);
+  const slot = citizens.list.length;
+  const seed = (world.seed ^ Math.imul(slot + 1, 0x9e3779b9)) >>> 0;
+  const idx = enrolCultureCitizen(citizens, { ...m, seed }, first, world.step);
+  enrolCultureLife(world.ecology, citizens.list[idx], { ...life, linkFirst });
+  return idx;
+}
+
+/**
  * THE LAB'S DOOR — cast this world's citizens (Phase 5, slice A; spec §4 Q2:
  * "The Lab casts fresh each take … A take does not inherit a standing zoo
  * population"). The only way a citizen enters the dish. Runs the Lab
@@ -879,28 +924,99 @@ export function castCultureTake(world, sheet = CULTURE_CAST_SHEET) {
       `cultureWorld: the cast needs ${nLinks} links; the table holds ${world.links.capacity - world.links.count} more`,
     );
   ensureCultureFeelSource();
-  members.forEach((m, slot) => {
-    const first = bodies.count;
-    const pose = cultureBodyRestPose(m.body, m.x, m.y, m.heading);
-    const masses = cultureRecipeMasses(m.body, m.recipe);
-    m.body.parts.forEach((p, k) => {
-      const i = first + k;
-      bodies.alive[i] = 1;
-      bodies.x[i] = pose[k].x;
-      bodies.y[i] = pose[k].y;
-      bodies.vx[i] = 0;
-      bodies.vy[i] = 0;
-      bodies.mass[i] = masses[k];
-      bodies.radius[i] = p.radius;
-    });
-    bodies.count += m.body.parts.length;
-    for (const l of m.body.links) addCultureLink(world, first + l.a, first + l.b, l.rest);
-    const seed = (world.seed ^ Math.imul(slot + 1, 0x9e3779b9)) >>> 0;
-    const idx = enrolCultureCitizen(citizens, { ...m, seed }, first, world.step);
-    enrolCultureLife(world.ecology, citizens.list[idx]);
-  });
+  for (const m of members) dealCultureMember(world, m);
   citizens.cast = 1;
   return { cast: members.length, refused };
+}
+
+/** A creature as breeding reads it: its plan, its BORN body (never the worn or grown one) and its recipe. */
+const parentOf = (world, idx) => {
+  const c = world.citizens.list[idx];
+  return { body: world.ecology.lives[idx].bornBody, recipe: c.recipe };
+};
+
+/**
+ * BREEDING (Phase 6B, RULED — engine/cultureBreed.mjs): on the settled frame, after looting. Each living citizen in cast
+ * order, not yet a parent this step, finds the first other living citizen (cast order; the citizens standing when the
+ * step began — a newborn waits) with which the breeding law allows it (same plan, both fat ≥ 60 and stage ≥ 2) and which
+ * it TOUCHES (6A's contact, either way: one's head disc on any living part of the other). The baby is the preview at
+ * (world seed, birth serial): LOIS refuses it → no birth, no fat paid (counted); the dish at its living cap → no birth,
+ * no fat paid (counted); a table with no room → the same (counted). Otherwise each parent pays 25 fat, and the baby is
+ * dealt like a cast member (dealCultureMember) at the parents' heads' midpoint — held inside the cast's staging margin —
+ * facing its drawn heading, born with 50 fat, stage 1, its parents recorded, LOIS's praise recorded (it gates nothing
+ * here). One birth a parent a step. Returns the births.
+ */
+export function stepCultureBreeding(world) {
+  const { bodies, citizens, ecology: eco } = world;
+  const list = citizens.list;
+  const n0 = list.length;
+  const done = new Uint8Array(n0);
+  let living = 0;
+  for (const c of list) if (c.alive) living++;
+  let births = 0;
+  for (let a = 0; a < n0; a++) {
+    const A = list[a];
+    if (!A.alive || done[a]) continue;
+    const lifeA = eco.lives[a];
+    for (let b = 0; b < n0; b++) {
+      const B = list[b];
+      if (b === a || !B.alive || done[b]) continue;
+      const lifeB = eco.lives[b];
+      if (!cultureBreedAllowed(A.plan, lifeA, B.plan, lifeB, CULTURE_FAT_TICKS)) continue;
+      if (!cultureHeadTouches(bodies, A, B, lifeB) && !cultureHeadTouches(bodies, B, A, lifeA)) continue;
+      done[a] = 1;
+      done[b] = 1;
+      if (living >= CULTURE_POPULATION_CAP) {
+        eco.birthsCapped += 1;
+        break;
+      }
+      const baby = cultureBabyPreview(parentOf(world, a), parentOf(world, b), { seed: world.seed, serial: eco.births });
+      if (!baby.admitted) {
+        eco.birthsRefused += 1;
+        break;
+      }
+      if (
+        bodies.count + baby.body.parts.length > bodies.capacity ||
+        world.links.count + baby.body.links.length > world.links.capacity
+      ) {
+        eco.birthsNoRoom += 1;
+        break;
+      }
+      lifeA.fat -= CULTURE_BIRTH_COST_FAT * CULTURE_FAT_TICKS;
+      lifeB.fat -= CULTURE_BIRTH_COST_FAT * CULTURE_FAT_TICKS;
+      const m = CULTURE_CAST_MARGIN_BODY_LENGTHS * baby.body.length;
+      const hold = (v, hi) => Math.min(hi - m, Math.max(m, v));
+      const x = hold((bodies.x[A.first] + bodies.x[B.first]) / 2, CULTURE_SWARM_WORLD_W);
+      const y = hold((bodies.y[A.first] + bodies.y[B.first]) / 2, CULTURE_SWARM_WORLD_H);
+      const praise = loisPraise(baby.body, baby.recipe, world.life.field, x, y);
+      dealCultureMember(
+        world,
+        { body: baby.body, recipe: baby.recipe, phase0: baby.phase0, x, y, heading: baby.heading, praise },
+        { fat: CULTURE_BABY_FAT * CULTURE_FAT_TICKS, parents: [a, b] },
+      );
+      lifeA.children += 1;
+      lifeB.children += 1;
+      eco.births += 1;
+      living += 1;
+      births += 1;
+      break;
+    }
+  }
+  return births;
+}
+
+/**
+ * THE BABY PREVIEW'S DOOR (Phase 6B, T3 — the parent issue 2344, engine only): the child two citizens of this world
+ * would have if they bred NEXT (the world seed, the next birth serial) — their born bodies and recipes through
+ * cultureBabyPreview. Reads only: no world state changes. Refused loudly: an index outside the cast, a citizen with
+ * itself, or citizens of different plans.
+ */
+export function cultureBabyPreviewOf(world, a, b) {
+  const n = world.citizens.list.length;
+  for (const i of [a, b])
+    if (!Number.isInteger(i) || i < 0 || i >= n) throw new Error(`cultureWorld: no citizen at index "${String(i)}"`);
+  if (a === b) throw new Error('cultureWorld: a citizen does not breed with itself');
+  return cultureBabyPreview(parentOf(world, a), parentOf(world, b), { seed: world.seed, serial: world.ecology.births });
 }
 
 /**

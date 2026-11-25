@@ -44,8 +44,15 @@
 //
 // DORMANT over an uncast world: no lives, no morsels, no steps counted — an uncast world hashes as before.
 import { hashU01 } from './kernel/rng.js';
-import { cultureBodyPlan, cultureBodyFaults, CULTURE_SOCKET_ANY, CULTURE_BODY_REST_OVERLAP } from './cultureBody.mjs';
-import { cultureSenseRange } from './cultureMotion.mjs';
+import {
+  cultureBodyPlan,
+  cultureBodyFaults,
+  growCultureBody,
+  CULTURE_SOCKET_ANY,
+  CULTURE_BODY_REST_OVERLAP,
+} from './cultureBody.mjs';
+import { cultureSenseRange, cultureBodyBraces, CULTURE_NATIVE_HUNGER } from './cultureMotion.mjs';
+import { cultureGrowthStage, cultureGrowthScale } from './cultureBreed.mjs';
 import { CULTURE_SWARM_WORLD_W, CULTURE_SWARM_WORLD_H } from './cultureSwarm.mjs';
 import { CULTURE_WRAP_SPAN_X, CULTURE_WRAP_SPAN_Y } from './cultureCitizens.mjs';
 import { cultureBeastFeet } from './cultureBeast.mjs';
@@ -87,8 +94,12 @@ export const CULTURE_MORSEL_RADIUS = 6;
 export const CULTURE_FOOT_EATS = true;
 /** Morsels land at least this far inside the dish's border (the rim drive keeps citizens off the edge). */
 export const CULTURE_MORSEL_MARGIN = 240;
-/** The hunger pull's weight at an empty belly, in the drives' units (scaled by 1 − fat/max; builder's default). */
-export const CULTURE_HUNGER_PULL = 2;
+/**
+ * 6A's hunger pull weight at an empty belly, in the drives' units. Phase 6B (RULED): hunger is a DAVIS drive — the
+ * recipe's `drives.hunger` gene weighs the pull (engine/cultureMotion.mjs); this is the native gene's value, kept under
+ * its 6A name. The ecology no longer weighs the pull: it only senses the food and the belly's emptiness.
+ */
+export const CULTURE_HUNGER_PULL = CULTURE_NATIVE_HUNGER;
 
 const STEP_TICKS = (fatPerS) => (fatPerS * CULTURE_FAT_TICKS) / CULTURE_ECOLOGY_STEP_HZ;
 /** Ticks a world step: the body's upkeep (2) and one looted limb's (1). */
@@ -125,6 +136,15 @@ export function createCultureEcology() {
     /** Limbs looted and attached; loots the tables had no room for (refused, counted — never silent). */
     loots: 0,
     lootsNoRoom: 0,
+    /**
+     * Phase 6B — births dealt; births refused by LOIS (the baby's body or recipe), by the population cap, and by a full
+     * table (each costs the parents nothing, counted — never silent); growth events.
+     */
+    births: 0,
+    birthsRefused: 0,
+    birthsCapped: 0,
+    birthsNoRoom: 0,
+    grown: 0,
     /** One life per citizen, in cast order (enrolCultureLife). */
     lives: [],
   };
@@ -144,9 +164,15 @@ function bornChain(parts, root) {
 /**
  * Enrol one cast citizen's life: fat at birth, no starvation clock, and its sockets in PLAN order — each with its
  * host part (local and absolute slot), angle, the kind it accepts, and its occupant: a born limb's chain as absolute
- * slots with each part's original look and radius, or empty. Returns the life's index (the citizen's).
+ * slots with each part's original look and radius, or empty. Phase 6B: `fat` in ticks (a cast citizen's 50 by default;
+ * a bred baby's is the breeding law's), `linkFirst` the first of its born joints in the link table, `parents` its two
+ * parents' indices (−1 for a cast citizen). Returns the life's index (the citizen's).
  */
-export function enrolCultureLife(eco, c) {
+export function enrolCultureLife(
+  eco,
+  c,
+  { fat = CULTURE_FAT_BIRTH_TICKS, linkFirst = -1, parents = [-1, -1] } = {},
+) {
   const plan = cultureBodyPlan(c.plan);
   const body = c.body;
   const sockets = plan.sockets.map((d, k) => {
@@ -168,7 +194,23 @@ export function enrolCultureLife(eco, c) {
       parts: chain.map((i) => Object.freeze({ radius: body.parts[i].radius, look: body.parts[i].look })),
     };
   });
-  eco.lives.push({ fat: CULTURE_FAT_BIRTH_TICKS, starve: 0, removed: 0, killer: -1, loots: 0, sockets });
+  eco.lives.push({
+    fat,
+    starve: 0,
+    removed: 0,
+    killer: -1,
+    loots: 0,
+    sockets,
+    // Phase 6B — growth and lineage: the stage (1 at birth, cast or bred), the morsels eaten, the first of the
+    // citizen's born joints in the link table (growth re-deals their rests), its BORN body (the genotype breeding reads;
+    // the citizen's own `body` is the grown one), its parents (−1 for a cast citizen) and how many children it has had.
+    stage: 1,
+    meals: 0,
+    linkFirst,
+    bornBody: body,
+    parents: Object.freeze([parents[0], parents[1]]),
+    children: 0,
+  });
   return eco.lives.length - 1;
 }
 
@@ -279,7 +321,7 @@ const touches = (bodies, i, j) => {
 };
 
 /** Does citizen a's head touch any living part of citizen b (born or carried)? */
-function headTouches(bodies, a, b, lifeB) {
+export function cultureHeadTouches(bodies, a, b, lifeB) {
   const h = a.first;
   if (!bodies.alive[h]) return false;
   for (const i of livingSlots(bodies, b, lifeB)) if (touches(bodies, h, i)) return true;
@@ -333,8 +375,9 @@ export function landCultureBeats(eco, seed, room, b0, b1, step) {
 /**
  * SENSES — the hunger pull (before the muscle, on the swarm's cadence): each living citizen that is not full finds the
  * nearest morsel to its head within its sensory range (ties to the earlier morsel) and carries it as `food`
- * { x, y, pull } — pull = CULTURE_HUNGER_PULL × (1 − fat / max). A full citizen, or none in range: no food (null).
- * The muscle's desire reads it (cultureMotion cultureDesire); with no food the desire is exactly the drives'.
+ * { x, y, emptiness } — emptiness = 1 − fat / max. A full citizen, or none in range: no food (null). The HUNGER drive
+ * reads it (Phase 6B — engine/cultureMotion.mjs CULTURE_DRIVES.hunger, weighed by the recipe's hunger gene); with no
+ * food the desire is exactly the other drives'.
  */
 export function stepCultureFoodSense(bodies, citizens, eco) {
   citizens.list.forEach((c, idx) => {
@@ -359,7 +402,7 @@ export function stepCultureFoodSense(bodies, citizens, eco) {
         bd = d2;
       }
     }
-    c.food = best ? { x: best.x, y: best.y, pull: CULTURE_HUNGER_PULL * (1 - life.fat / CULTURE_FAT_MAX_TICKS) } : null;
+    c.food = best ? { x: best.x, y: best.y, emptiness: 1 - life.fat / CULTURE_FAT_MAX_TICKS } : null;
   });
 }
 
@@ -426,10 +469,43 @@ export function cultureMouthReaching(mouths, eco, m) {
 }
 
 /**
+ * GROWTH (Phase 6B): the citizen's body becomes its BORN body at its stage's size (cultureGrowthScale — every part's
+ * radius, the joints re-dealt at the overlap rule, the length, the scale), and the tables follow: each born part's disc
+ * radius and each born joint's rest in place (masses kept); its braces re-read from the grown body; and each born limb
+ * still on its socket records its grown radii (a looter takes the limb at the size it had). Carried (looted) limbs keep
+ * their original size — they are worn, not grown. Refused loudly for a life with no joints on record.
+ */
+export function growCultureCitizen(world, idx) {
+  const { bodies, links, citizens, ecology: eco } = world;
+  const c = citizens.list[idx];
+  const life = lifeAt(eco, idx);
+  if (!(life.linkFirst >= 0)) throw new Error(`cultureEcology: citizen ${idx} has no joints on record to grow`);
+  const grown = growCultureBody(life.bornBody, cultureGrowthScale(life.stage));
+  c.body = grown;
+  c.brace = cultureBodyBraces(grown);
+  for (let k = 0; k < c.n; k++) bodies.radius[c.first + k] = grown.parts[k].radius;
+  grown.links.forEach((l, j) => {
+    links.rest[life.linkFirst + j] = l.rest;
+  });
+  life.sockets = life.sockets.map((s) =>
+    s.looted || s.bornLocal < 0 || !s.slots.length
+      ? s
+      : {
+          ...s,
+          parts: s.slots.map((i, k) =>
+            Object.freeze({ radius: grown.parts[i - c.first].radius, look: s.parts[k].look }),
+          ),
+        },
+  );
+  eco.grown += 1;
+}
+
+/**
  * EATING (the settled frame, the swarm's cadence): each morsel, oldest first, goes to the mouth that reaches it —
  * a hungry living citizen's head disc, or (RULED) a strandbeest's planted foot — the NEAREST mouth winning; on an
  * exact tie the earlier citizen, a citizen's head before its feet, the earlier leg (cultureMouthReaching).
- * +10 fat to the mouth's citizen, capped at the max. Returns how many were eaten.
+ * +10 fat to the mouth's citizen, capped at the max; the meal counts toward its growth (Phase 6B — a stage earned grows it
+ * at once, cultureGrowCitizen). Returns how many were eaten.
  */
 export function stepCultureEating(world) {
   const { bodies, citizens, ecology: eco } = world;
@@ -442,6 +518,13 @@ export function stepCultureEating(world) {
     const life = eco.lives[who];
     life.fat = Math.min(CULTURE_FAT_MAX_TICKS, life.fat + CULTURE_MORSEL_TICKS);
     eco.eaten += 1;
+    // Phase 6B — GROWTH: every morsel counts; each CULTURE_GROWTH_MEALS-th earns a stage, to the cap
+    life.meals += 1;
+    const stage = cultureGrowthStage(life.meals);
+    if (stage > life.stage) {
+      life.stage = stage;
+      growCultureCitizen(world, who);
+    }
     eaten++;
     return false;
   });
@@ -465,7 +548,7 @@ export function stepCulturePredation(world) {
     for (let b = 0; b < list.length; b++) {
       if (b === a || !list[b].alive) continue;
       const lifeB = lifeAt(eco, b);
-      if (!headTouches(bodies, A, list[b], lifeB)) continue;
+      if (!cultureHeadTouches(bodies, A, list[b], lifeB)) continue;
       if (!culturePredationAllowed(lifeA.fat, sizeA, cultureCitizenSize(bodies, list[b], lifeB))) continue;
       die(world, b, 'predation', a);
       kills++;
@@ -562,7 +645,7 @@ export function stepCultureLooting(world) {
     for (let b = 0; b < list.length && !done; b++) {
       if (b === a || list[b].alive || eco.lives[b].removed) continue;
       const lifeB = lifeAt(eco, b);
-      if (!headTouches(bodies, A, list[b], lifeB)) continue;
+      if (!cultureHeadTouches(bodies, A, list[b], lifeB)) continue;
       for (let s = 0; s < lifeB.sockets.length && !done; s++) {
         const src = lifeB.sockets[s];
         if (socketFree(bodies, src)) continue;
@@ -657,6 +740,10 @@ export function cultureLifeReading(world, idx) {
     cause: c.cause,
     killer: life.killer,
     loots: life.loots,
+    stage: life.stage,
+    meals: life.meals,
+    parents: [life.parents[0], life.parents[1]],
+    children: life.children,
     sockets: life.sockets.map((s) => ({
       id: s.id,
       accepts: s.accepts,
@@ -730,7 +817,21 @@ export function cultureEcologyHash(eco) {
   };
   mixU32(eco.step);
   mixU32(eco.serial);
-  for (const k of ['eaten', 'spoiled', 'displaced', 'starved', 'preyed', 'removed', 'loots', 'lootsNoRoom'])
+  for (const k of [
+    'eaten',
+    'spoiled',
+    'displaced',
+    'starved',
+    'preyed',
+    'removed',
+    'loots',
+    'lootsNoRoom',
+    'births',
+    'birthsRefused',
+    'birthsCapped',
+    'birthsNoRoom',
+    'grown',
+  ])
     mixU32(eco[k]);
   mixU32(eco.morsels.length);
   for (const m of eco.morsels) {
@@ -746,6 +847,20 @@ export function cultureEcologyHash(eco) {
     mix(life.removed);
     mixU32(life.killer | 0);
     mixU32(life.loots);
+    // Phase 6B: growth, lineage, and the born body (the genotype — each part's radius and look)
+    mixU32(life.stage);
+    mixU32(life.meals);
+    mixU32(life.linkFirst | 0);
+    mixU32(life.parents[0] | 0);
+    mixU32(life.parents[1] | 0);
+    mixU32(life.children);
+    mixFloat(life.bornBody.scale);
+    mixU32(life.bornBody.parts.length);
+    for (const p of life.bornBody.parts) {
+      mixFloat(p.radius);
+      mixStr(p.look.shape);
+      mixStr(p.look.tone);
+    }
     mixU32(life.sockets.length);
     for (const s of life.sockets) {
       mixStr(s.id);

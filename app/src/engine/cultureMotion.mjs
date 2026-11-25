@@ -68,6 +68,13 @@ export const CULTURE_FEEL_EASE_S = 0.5;
 /** The wither fade: a part fully withered reads at this much less opacity (the soil's verdict, drawn). */
 export const CULTURE_WITHER_FADE = 0.5;
 
+/**
+ * The native HUNGER gene (Phase 6B): every plan's native recipe carries this weight — exactly 6A's ecology-law pull
+ * (2, in the drives' units), so a citizen born with the native gene seeks food exactly as 6A's did. 2 is a power of
+ * two, so the drive's (direction × emptiness) × 2 is bit-identical to 6A's direction × (2 × emptiness).
+ */
+export const CULTURE_NATIVE_HUNGER = 2;
+
 /** The Motion Core source id of the feel layer's look. */
 export const CULTURE_FEEL_SOURCE_ID = 'culture:feel';
 /** Its cost tier: scalar math per part on the CPU, no GPU pass (measured in the staging report). */
@@ -84,6 +91,12 @@ export const CULTURE_RECIPE_BOUNDS = Object.freeze({
     wander: Object.freeze([0, 1]),
     ground: Object.freeze([0, 2]),
     rim: Object.freeze([0, 3]),
+    /**
+     * HUNGER (Phase 6B — RULED, Matt 2026-11-24: hunger is a DAVIS drive, a recipe gene, blended by breeding). The
+     * weight of the pull toward the nearest sensed morsel; the drive itself scales by the belly's emptiness. It
+     * replaces 6A's ecology-law pull (CULTURE_NATIVE_HUNGER is 6A's weight, so a native gene reproduces 6A exactly).
+     */
+    hunger: Object.freeze([0, 4]),
   }),
   physics: Object.freeze({
     /** Velocity added to the head per swarm step at the stroke's peak (the swarm clamp is the ceiling). */
@@ -211,6 +224,10 @@ export function cultureSenseRange(body) {
  *   rim     the dish's edge: within CULTURE_RIM_BODY_LENGTHS of the dish's border, a push back inward,
  *           growing to 1 at the border — the body is one body, it does not cross the swarm's
  *           wrap seam (beyond the grid is dead ground anyway).
+ *   hunger  (Phase 6B) creatures eat beats: toward the nearest morsel the ecology handed the senses
+ *           (`senses.food` — { x, y, emptiness }, engine/cultureEcology.mjs stepCultureFoodSense), at the
+ *           belly's emptiness (1 − fat / max). No food sensed (full, none in range, or no ecology): no desire.
+ *           Last in the registry, so the sum is the drives' and then the hunger pull — 6A's order, bit for bit.
  */
 export const CULTURE_DRIVES = Object.freeze({
   wander(senses, c) {
@@ -254,6 +271,15 @@ export const CULTURE_DRIVES = Object.freeze({
     const m = Math.sqrt(x * x + y * y);
     return m > 1 ? { x: x / m, y: y / m } : { x, y };
   },
+  hunger(senses) {
+    const f = senses.food;
+    if (!f) return { x: 0, y: 0 };
+    const fx = f.x - senses.x;
+    const fy = f.y - senses.y;
+    const fm = Math.sqrt(fx * fx + fy * fy);
+    if (!(fm > 1e-9)) return { x: 0, y: 0 };
+    return { x: (fx / fm) * f.emptiness, y: (fy / fm) * f.emptiness };
+  },
 });
 
 /** The drive names, in the registry's canonical order (the sum is taken in this order). */
@@ -279,7 +305,7 @@ export function cultureSenses(bodies, field, c) {
     range: cultureSenseRange(c.body),
   };
   // Phase 6A: the nearest morsel in range, when the ecology handed the citizen one (engine/cultureEcology.mjs
-  // stepCultureFoodSense) — { x, y, pull }. Absent, the senses are exactly slice C's.
+  // stepCultureFoodSense) — { x, y, emptiness } (6B: the hunger DRIVE reads it). Absent, the senses are slice C's.
   if (c.food) senses.food = c.food;
   return senses;
 }
@@ -295,19 +321,8 @@ export function cultureDesire(senses, c) {
     x += d.x * w;
     y += d.y * w;
   }
-  // Phase 6A — HUNGER: creatures eat beats (spec §2.5). A sensed morsel pulls the desire toward it at the ecology's
-  // weight (CULTURE_HUNGER_PULL × emptiness). It is the ecology's law, not a recipe dial (DAVIS's recipe shape is
-  // unchanged); with no food sensed the sum is exactly the drives'.
-  const f = senses.food;
-  if (f) {
-    const fx = f.x - senses.x;
-    const fy = f.y - senses.y;
-    const fm = Math.sqrt(fx * fx + fy * fy);
-    if (fm > 1e-9) {
-      x += (fx / fm) * f.pull;
-      y += (fy / fm) * f.pull;
-    }
-  }
+  // Phase 6B — HUNGER is a drive in the registry above (the recipe's `drives.hunger` gene, RULED), no longer a pull
+  // the ecology adds here; with no food sensed it contributes nothing and the sum is exactly the other drives'.
   const m = Math.sqrt(x * x + y * y);
   return { x, y, strength: Math.min(1, m) };
 }
