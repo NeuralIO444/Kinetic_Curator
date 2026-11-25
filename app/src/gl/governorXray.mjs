@@ -26,24 +26,43 @@ export function formatMemoryMB(bytes) {
  * @param {object} args
  *   { tiers: [{id, tier, timeMs, memoryBytes, notes}],        // allCostTiers()
  *     measuredMs: (id) => number|undefined | Record<string, number>,
+ *     measuredAt: ISO stamp of the measurement sweep (MEASURED_AT),
+ *     now: ms epoch for the age computation, passed in by the caller
+ *          (the determinism law keeps clocks out of gl/ — omit it and
+ *          measured rows carry the date with no age),
  *     shed: { fxaaShed, perfTier1, renderScale, assetThin, perfClampOverride,
  *             slowRender, watchdogTripped } }                  // store state
- * @returns { cuts: [...], passes: [...] }
+ * @returns { cuts: [...], passes: [...], measuredAt, measuredAgeDays }
  *   cuts: one row per shed-ladder step with its live state:
  *     { step, cutKind, label, active, state }
  *   passes: one row per registered pass, in shed-first order:
- *     { id, tier, tierName, declaredMs, measuredMs, memoryMB, notes,
- *       shed, shedBy }
+ *     { id, tier, tierName, declaredMs, measuredMs, measuredKind,
+ *       measuredAt, measuredAgeDays, memoryMB, notes, shed, shedBy }
+ *   measuredKind is 'measured' | 'estimate' | null (#2492): an entry whose
+ *   method is 'estimate' was committed by hand, never swept — it must never
+ *   render as a measurement. Only 'measured' rows carry the stamp + age.
  */
-export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
+export function buildXray({ tiers = [], measuredMs = {}, shed = {}, measuredAt = null, now = null }) {
   // Accepts a lookup fn, a plain { id: ms } map, or the item-3 measurement
-  // shape { id: { ms, method, draws } }.
-  const asMs = (v) => {
-    if (typeof v === 'number' && Number.isFinite(v)) return v;
-    if (v && typeof v.ms === 'number' && Number.isFinite(v.ms)) return v.ms;
-    return undefined;
+  // shape { id: { ms, method, draws } }. Provenance survives the lookup:
+  // method 'estimate' → kind 'estimate'; any other method (the sweep's
+  // 'wall'/'hw') or a bare number → kind 'measured'.
+  const asEntry = (v) => {
+    if (typeof v === 'number' && Number.isFinite(v)) return { ms: v, kind: 'measured' };
+    if (v && typeof v.ms === 'number' && Number.isFinite(v.ms)) {
+      return { ms: v.ms, kind: v.method === 'estimate' ? 'estimate' : 'measured' };
+    }
+    return null;
   };
-  const lookup = typeof measuredMs === 'function' ? (id) => asMs(measuredMs(id)) : (id) => asMs(measuredMs?.[id]);
+  const lookupEntry =
+    typeof measuredMs === 'function' ? (id) => asEntry(measuredMs(id)) : (id) => asEntry(measuredMs?.[id]);
+  const lookup = (id) => lookupEntry(id)?.ms;
+  // Age of the sweep stamp in whole days, at the caller-supplied `now`.
+  // A stamp from the current session ages 0; anything older shows its
+  // age on the number. No `now` (or no stamp) → no age.
+  const stampMs = measuredAt ? Date.parse(measuredAt) : NaN;
+  const measuredAgeDays =
+    Number.isFinite(stampMs) && Number.isFinite(now) ? Math.max(0, Math.floor((now - stampMs) / 86400000)) : null;
   const s = {
     fxaaShed: !!shed.fxaaShed,
     perfTier1: !!shed.perfTier1,
@@ -129,13 +148,19 @@ export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
   const passes = ids.map((id) => {
     const t = byId.get(id) ?? { id, tier: 3, timeMs: 0, memoryBytes: 0, notes: '' };
     const tierShed = t.tier === 1 && s.perfTier1;
-    const measured = lookup(id);
+    const entry = lookupEntry(id);
+    const isMeasured = entry?.kind === 'measured';
     return {
       id,
       tier: t.tier,
       tierName: COST_TIER_INFO[t.tier]?.name ?? 'unknown',
       declaredMs: t.timeMs,
-      measuredMs: typeof measured === 'number' && Number.isFinite(measured) ? measured : null,
+      measuredMs: entry ? entry.ms : null,
+      measuredKind: entry ? entry.kind : null,
+      // Only a genuine measurement carries the sweep's date + age; an
+      // estimate has no measurement date to show (#2492 ruling 2).
+      measuredAt: isMeasured ? (measuredAt ?? null) : null,
+      measuredAgeDays: isMeasured ? measuredAgeDays : null,
       memoryMB: formatMemoryMB(t.memoryBytes),
       notes: t.notes ?? '',
       shed: tierShed,
@@ -143,5 +168,5 @@ export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
     };
   });
 
-  return { cuts, passes };
+  return { cuts, passes, measuredAt: measuredAt ?? null, measuredAgeDays };
 }

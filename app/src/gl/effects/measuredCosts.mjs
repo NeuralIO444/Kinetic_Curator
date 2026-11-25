@@ -56,8 +56,8 @@ export const MEASURED_COSTS = {
   // #1022 — added by hand, not re-measured: both are a handful of taps of pure
   // ALU like fx/edge and fx/solarize (tier 3, no cost band), so the number is
   // informational. Re-bless with `npm run measure-costs` on a real GPU.
-  'fx/sharpen': { ms: 0.3, method: 'wall', draws: 90 },
-  'fx/haze': { ms: 0.3, method: 'wall', draws: 90 },
+  'fx/sharpen': { ms: 0.3, method: 'estimate', draws: 90 },
+  'fx/haze': { ms: 0.3, method: 'estimate', draws: 90 },
   // #2443 — added by hand, same precedent as #1022, but measured first:
   // the wall method on the sandbox rig read 26.9 ms/draw against grade's
   // 29.9 in the same run (a single tap + a 5-stop ramp of pure ALU —
@@ -69,15 +69,15 @@ export const MEASURED_COSTS = {
   // #1610 — added by hand, same precedent as #1022: a pure-ALU tier-3 pass
   // (one tap, a bit-formula threshold — fx/edge's class). Re-bless with
   // `npm run measure-costs` on a real GPU.
-  'fx/dither': { ms: 0.3, method: 'wall', draws: 90 },
+  'fx/dither': { ms: 0.3, method: 'estimate', draws: 90 },
   // #2008 — added by hand, same precedent as #1610: a pure-ALU tier-3 pass
   // (two taps, a multiply — fx/dither's class). Re-bless with
   // `npm run measure-costs` on a real GPU.
-  'fx/riso': { ms: 0.3, method: 'wall', draws: 90 },
+  'fx/riso': { ms: 0.3, method: 'estimate', draws: 90 },
   // #2038 — added by hand, same precedent as #1610: a pure-ALU tier-3 pass
   // (one tap, a distance threshold — fx/dither's class). Re-bless with
   // `npm run measure-costs` on a real GPU.
-  'fx/stipple': { ms: 0.3, method: 'wall', draws: 90 },
+  'fx/stipple': { ms: 0.3, method: 'estimate', draws: 90 },
   'fx/solarize': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/tear': { ms: 0.3, method: 'wall', draws: 90 },
   // #740 — added by hand from a `measure-costs` run (software GL, wall clock). The pair is
@@ -92,24 +92,24 @@ export const MEASURED_COSTS = {
   // timer/throughput noise, not signal — the committed 0.3 ms class number
   // stands until a hardware (gpu timer) re-bless. Ratio to the declared
   // 0.2 ms estimate is 1.5, inside the tier-3 band (<= 4).
-  'math/gain': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/lift': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/contrast': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/saturate': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/threshold': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/quantize': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/knee': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/tempTint': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/vignette': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/channelMix': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/hueRotate': { ms: 0.3, method: 'wall', draws: 90 },
-  'math/levelsFixed': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/gain': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/lift': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/contrast': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/saturate': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/threshold': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/quantize': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/knee': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/tempTint': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/vignette': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/channelMix': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/hueRotate': { ms: 0.3, method: 'estimate', draws: 90 },
+  'math/levelsFixed': { ms: 0.3, method: 'estimate', draws: 90 },
   // #1183 — added by hand, following the #740/#1010 precedent (a full re-bless on software GL in a loaded VM
   // replaces every committed number with noise). Derived, not invented: on 2026-10-12 a full `measure-costs` run
   // (SwiftShader, wall clock, worst case "sun + matte") put all four shadow passes at 12.0x that run's median; 12.0
   // x this file's median (0.3 ms) = 3.6 ms. Conservative: the three half-size passes run at full lab size here.
   // Tier 2 carries no cost band, so the number is informational. Re-bless on hardware (gpu timer).
-  'gl/contact-shadow': { ms: 3.6, method: 'wall', draws: 90 },
+  'gl/contact-shadow': { ms: 3.6, method: 'estimate', draws: 90 },
   // #1482 — an ESTIMATE, not a sweep: spectrum marks are three texelFetch per instance in the existing quad vertex
   // stage (no extra pass, no extra draw), so there is no pass to sweep. 0.05 ms is that work at the lab's 90 draws,
   // errring up. Tier 2 carries no cost band, so the number is informational. Re-bless on hardware (gpu timer).
@@ -124,5 +124,5 @@ export const MEASURED_COSTS = {
   // the creature/deposit budget, not the governor's perfTier1 GL-pass cut),
   // so it is exempt from measurement by contract; the row is kept anyway
   // as the honest price on record.
-  'beast/trails': { ms: 0.02, method: 'wall', draws: 90 },
+  'beast/trails': { ms: 0.02, method: 'estimate', draws: 90 },
 };
