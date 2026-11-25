@@ -24,6 +24,8 @@ import {} from '../projectNormalize.js';
 import { clampCycleGens, FIELD_CYCLE_GENS } from '../../engine/dishLifeField.mjs'; // #1923 Phase 4: the re-seed interval's detents
 import { sanitizeMagnets, clampFluidDial, clampFluidRung, MAX_MAGNETS } from '../../engine/dishFluid.mjs'; // #1997: the ferrofluid's stamped-state sanitizers
 import { emit, Events } from '../../composition/eventBus.js';
+import { watchdogGraceDeadline, faultWatchdogReading } from '../watchdogLaw.mjs'; // #2481: resume grace + trip readings
+import { clampShedFps, clampRecoverFps, reconcileThresholdPair } from '../governorThresholds.mjs'; // #2482: the threshold pair's law
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
 import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { chapterMemorySummary } from '../../curator/chapterMemory.mjs'; // #1858: the book-memory line
@@ -284,6 +286,20 @@ export const createGlobalSlice = (set, get) => ({
   fps: 60,
   nodeCount: 0,
   quality: 'balanced',
+  /**
+   * The performer's budget ceiling (#2483): the tier the performer chose
+   * on the BudgetKnob. `quality` above is the LIVE tier — the governor
+   * sheds it downward under pressure and restores it on recovery — so
+   * when the knob read `quality` as the chosen ceiling, a governor shed
+   * silently moved the pressed button (FULL became SHOW with no click),
+   * contradicting the knob's own tooltip. This field is performer-only
+   * by construction: its only writers are the SET_QUALITY dispatch (the
+   * knob and the agent-UI bridge funnel through it) and a rig load (the
+   * performer's own saved document, whose `quality` key carries this
+   * value). The governor never writes it, and a document saved mid-shed
+   * serializes this field, never the shed live tier.
+   */
+  qualityCeiling: 'balanced',
   autoQuality: true,
   isFullscreen: false,
   curatorConfidence: 0,
@@ -370,13 +386,28 @@ export const createGlobalSlice = (set, get) => ({
    * governorRecoverFps. These MUST stay apart: the trap was one shared
    * threshold (32) sitting above a machine's sustainable rate (29.9 on a
    * 30Hz-locked loop), so the governor walked the whole ladder and could
-   * never recover. The setters enforce shed < recover — the trap is
-   * unrepresentable by construction.
+   * never recover. The setters enforce shed < recover — and, since
+   * #2482, recover <= the measured display max (displayMaxFps below):
+   * a recover the screen can never reach is the same trap through the
+   * other door. Both laws live in governorThresholds.mjs.
    * Session-only, never serialized (machine-specific, like frameLock).
    * Live-overridable from the dev-only GOV TUNE panel.
    */
   governorShedFps: 28,
   governorRecoverFps: 30,
+  /**
+   * The display's reachable frame rate (#2482), measured from the fps
+   * meter's rAF delta window (fpsMath.estimateRefreshFps) and published
+   * by useFpsMeter. Recover may never be set above it — the governor's
+   * effective rate is vsync-bound, so an unreachable recover made shed
+   * cuts un-clearable for the session. Null until the first measurement
+   * lands; until then only the pair's absolute cap (120) binds.
+   * Raise-only within a session (setDisplayMaxFps): load can stretch
+   * frame deltas to multiples of the refresh interval but never below
+   * it, so the best measurement is the truthful one. Session-only,
+   * never serialized — it is this tab's hardware, not the project.
+   */
+  displayMaxFps: null,
   /**
    * Showrunner frame-lock show mode: a USER choice, not a degradation.
    * When on, the life/breathing tick (the dominant per-frame re-render
@@ -403,6 +434,23 @@ export const createGlobalSlice = (set, get) => ({
   /** Last string passed to tripWatchdog(reason) — surfaced for debugging why
    * the session is paused (e.g. 'fps-critical' vs a render-error label). */
   lastWatchdogReason: null,
+  /**
+   * #2481 (ruling 3) — the watchdog's OWN measurement at the current
+   * trip: a state/watchdogLaw.mjs reading in the terms the trip acted
+   * on (effective fps vs its floor, loop-time ratio, frame silence, or
+   * the fault label). The PERF PAUSED pill and the governor log show
+   * this — never a display fps that contradicts it. Set by tripWatchdog,
+   * cleared on manual resume alongside the reason. Session-only.
+   */
+  lastWatchdogReading: null,
+  /**
+   * #2481 (ruling 1) — the grace deadline (wall-clock ms) a manual
+   * resume arms: until it passes, the governor's perf trip paths may
+   * not re-trip, so a resume lands and the loop gets a few seconds to
+   * settle instead of re-pausing within a frame. 0 = no grace armed.
+   * Session-only, like the rest of the watchdog state.
+   */
+  watchdogGraceUntil: 0,
   /**
    * RENDER FAULT (#266): a deterministic per-frame fault in the live loop
    * (frame building / rendering / presenting throwing on consecutive ticks)
@@ -600,10 +648,21 @@ export const createGlobalSlice = (set, get) => ({
       // outright — slowRender, its source, and the badge's reason. The cut-6
       // soft freeze is NOT cleared here; it auto-clears on FPS recovery in
       // the governor hook.
+      // #2481 — the same resume arms the grace deadline (ruling 1): the
+      // governor's perf trips hold off until it passes, so this resume
+      // cannot be undone by a sustain window that matured during the stop.
       const resumeWatchdog = !!running && state.slowRenderSource === 'watchdog';
       return {
         running,
-        ...(resumeWatchdog ? { slowRender: false, slowRenderSource: null, lastWatchdogReason: null } : {}),
+        ...(resumeWatchdog
+          ? {
+              slowRender: false,
+              slowRenderSource: null,
+              lastWatchdogReason: null,
+              lastWatchdogReading: null,
+              watchdogGraceUntil: watchdogGraceDeadline(Date.now()),
+            }
+          : {}),
       };
     }),
   setFps: (fps) => set({ fps }),
@@ -793,8 +852,13 @@ export const createGlobalSlice = (set, get) => ({
     }),
   /** #264 — the governor records the tier its quality shed stepped from. */
   setQualityShedFrom: (tier) => set({ qualityShedFrom: tier }),
-  /** #264 — lets the badge return to clean once a watchdog stop is gone. */
-  clearWatchdogReason: () => set({ lastWatchdogReason: null }),
+  /** #2483 — the performer's ceiling. Called only by the SET_QUALITY
+   * dispatch; a rig load writes the field directly from the document.
+   * The governor sheds `quality` underneath this and never calls this. */
+  setQualityCeiling: (tier) => set({ qualityCeiling: tier }),
+  /** #264 — lets the badge return to clean once a watchdog stop is gone.
+   * #2481 — the trip's reading goes with the reason: both are the badge's. */
+  clearWatchdogReason: () => set({ lastWatchdogReason: null, lastWatchdogReading: null }),
   setBatchPaused: (paused) => set({ batchPaused: !!paused }),
   setPerfTier1: (on) => set({ perfTier1: !!on }),
   setFxaaShed: (on) => set({ fxaaShed: !!on }),
@@ -805,26 +869,58 @@ export const createGlobalSlice = (set, get) => ({
   },
   setAssetThin: (on) => set({ assetThin: !!on }),
   /**
-   * Live governor threshold overrides (GOV TUNE panel). Clamped to 1–120
-   * and to each other: shed must stay strictly below recover, or the
-   * permanent-shed trap returns.
+   * The measured display ceiling (#2482). Raise-only: a later window
+   * under load reads low because frames stretched, not because the
+   * screen slowed — the session's best measurement stands. Non-numbers
+   * and non-positive values are ignored (no measurement, no fiction).
+   */
+  setDisplayMaxFps: (v) =>
+    set((state) => {
+      const n = Math.floor(Number(v));
+      if (!Number.isFinite(n) || n < 1) return {};
+      if (state.displayMaxFps != null && n <= state.displayMaxFps) return {};
+      return { displayMaxFps: n };
+    }),
+  /**
+   * Live governor threshold overrides (GOV TUNE panel + the agent-UI
+   * bridge — the only two writers, both through here). The pair's law
+   * lives in governorThresholds.mjs: shed strictly below recover (#259),
+   * and recover never above the measured display max (#2482), or the
+   * permanent-shed trap returns wearing a new disguise.
    */
   setGovernorShedFps: (v) =>
     set((state) => ({
-      governorShedFps: Math.min(
-        Math.max(1, Math.round(Number(v) || state.governorShedFps)),
-        120,
-        state.governorRecoverFps - 1,
-      ),
+      governorShedFps: clampShedFps(v, {
+        recoverFps: state.governorRecoverFps,
+        displayMaxFps: state.displayMaxFps,
+        current: state.governorShedFps,
+      }).value,
     })),
   setGovernorRecoverFps: (v) =>
     set((state) => ({
-      governorRecoverFps: Math.max(
-        Math.min(120, Math.round(Number(v) || state.governorRecoverFps)),
-        1,
-        state.governorShedFps + 1,
-      ),
+      governorRecoverFps: clampRecoverFps(v, {
+        shedFps: state.governorShedFps,
+        displayMaxFps: state.displayMaxFps,
+        current: state.governorRecoverFps,
+      }).value,
     })),
+  /**
+   * Re-derive the stored pair under the current display measurement
+   * (#2482). The governor calls this when the measurement lands: a
+   * recover written in the first moments of a session — before the
+   * meter's first estimate, when only the absolute cap bound it — is
+   * corrected by the measurement itself instead of trapping the
+   * session. A no-op once the pair is lawful.
+   */
+  reconcileGovernorThresholds: () =>
+    set((state) => {
+      const pair = reconcileThresholdPair(
+        { shedFps: state.governorShedFps, recoverFps: state.governorRecoverFps },
+        state.displayMaxFps,
+      );
+      if (pair.shedFps === state.governorShedFps && pair.recoverFps === state.governorRecoverFps) return {};
+      return { governorShedFps: pair.shedFps, governorRecoverFps: pair.recoverFps };
+    }),
   setFrameLock: (on) => set({ frameLock: !!on }),
   /** Live-GL context health signal (#263) — one of 'ok' | 'lost' | 'restoring'. */
   setGlContext: (v) => set({ glContext: v === 'lost' ? 'lost' : v === 'restoring' ? 'restoring' : 'ok' }),
@@ -836,7 +932,7 @@ export const createGlobalSlice = (set, get) => ({
    * Cross-slice write (evolveMode lives in davisSlice): already precedented
    * by setQuality reaching into layoutParams above.
    */
-  tripWatchdog: (reason) =>
+  tripWatchdog: (reason, reading) =>
     set((state) => ({
       slowRender: true,
       slowRenderSource: 'watchdog',
@@ -845,6 +941,11 @@ export const createGlobalSlice = (set, get) => ({
       perfTier1: true,
       watchdogTripGen: state.watchdogTripGen + 1,
       lastWatchdogReason: reason,
+      // #2481 (ruling 3) — the measurement this trip acted on, in its own
+      // terms (state/watchdogLaw.mjs). Callers that measure pass theirs;
+      // the correctness trips (accum-nan, render-error) pass none, and
+      // their reading is the fault label itself.
+      lastWatchdogReading: reading !== undefined ? reading : faultWatchdogReading(reason),
     })),
   setWebcamEnabled: (enabled) => set({ webcamEnabled: enabled }),
   /**

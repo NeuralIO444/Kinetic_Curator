@@ -181,7 +181,9 @@ const pick = (keys) => Object.fromEntries(keys.map((k) => [k, clone(st()[k] ?? n
       DOC_FIELD_CLASS[SCENE_STORE_NAME[k] || k] === 'scene' || SNAPSHOT_ONLY.has(k),
       `${k} is set by the scene half, so it must be a scene key`,
     );
-  const STORE_NAME = { projectTitle: 'title' }; // the one rig field whose store name differs from its document key
+  // #2483 — qualityCeiling joins projectTitle here: its document key is the
+  // standing `quality` key (the ceiling rides it), so the store name differs.
+  const STORE_NAME = { projectTitle: 'title', qualityCeiling: 'quality' };
   const rigKeys = Object.keys(rigFieldsFromDoc(doc, state));
   for (const k of rigKeys)
     assert.strictEqual(

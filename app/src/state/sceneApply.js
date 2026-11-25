@@ -62,9 +62,16 @@ export function wholeEnabledAssets(map) {
 
 /** The rig half of a document load: the performer's own setup (DOC_FIELD_CLASS `rig`). Only `applyProject` calls this. */
 export function rigFieldsFromDoc(doc, state) {
+  // #2483 — the document's quality key carries the performer's ceiling:
+  // one sanitized value sets the ceiling and the live tier together (the
+  // governor may shed the live tier afterward, never the ceiling). A
+  // dangling key falls back to the standing ceiling rather than the
+  // possibly shed live tier.
+  const rigQuality = sanitizeQuality(doc.quality, state.qualityCeiling || state.quality || 'balanced');
   const next = {
     // #103 Track B — a dangling quality key must never reach the caps lookup.
-    quality: sanitizeQuality(doc.quality, state.quality || 'balanced'),
+    quality: rigQuality,
+    qualityCeiling: rigQuality,
     // #310: AUTO left performer sight, but the governor still reads the
     // flag — the document carries the hidden default.
     autoQuality: doc.autoQuality !== false,

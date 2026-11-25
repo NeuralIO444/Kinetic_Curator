@@ -3,6 +3,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { shedSummary } from '../hooks/governorCuts.js';
 import { activeFxKinds, sceneFxCost } from '../hooks/sceneCost.js';
 import { getGovernorEvents } from '../gl/governorEventLog.mjs';
+import { watchdogReadingShort, watchdogReadingLong } from '../state/watchdogLaw.mjs';
 import { FRAME_BUDGET_MS, isTapeFull } from '../state/tapeBudget.js';
 
 // TapeCounter — the governor's one budget readout (#295, R1 of the
@@ -51,6 +52,7 @@ export function TapeCounter() {
     slowRender: s.slowRender,
     slowRenderSource: s.slowRenderSource,
     lastWatchdogReason: s.lastWatchdogReason,
+    lastWatchdogReading: s.lastWatchdogReading,
     renderFault: s.renderFault,
     renderFaultReason: s.renderFaultReason,
     autoQuality: s.autoQuality,
@@ -70,6 +72,7 @@ export function TapeCounter() {
     slowRender = false,
     slowRenderSource = null,
     lastWatchdogReason = null,
+    lastWatchdogReading = null,
     renderFault = false,
     renderFaultReason = null,
     autoQuality = true,
@@ -132,14 +135,21 @@ export function TapeCounter() {
 
   // --- state 2: watchdog hard stop (green: paused is safe to look away — never auto-resumes) ---
   if (watchdog) {
+    // #2481 (ruling 3) — the pill shows the watchdog's OWN measurement:
+    // the reading the trip acted on, in its own terms (watchdogLaw),
+    // on the face in compact form and in the tooltip in full. The thing
+    // that stopped the show explains itself — never a display fps that
+    // contradicts it.
+    const readingShort = watchdogReadingShort(lastWatchdogReading);
+    const readingLong = watchdogReadingLong(lastWatchdogReading);
     return (
       <div
         className="status-pill"
         style={GREEN}
-        title="Watchdog tripped: running and evolve are off and will not resume on their own. Press space or ▶ RUN to resume."
+        title={`Watchdog tripped${readingLong ? `: ${readingLong}` : ''}. Running and evolve are off and will not resume on their own. Press space or ▶ RUN to resume.`}
       >
         <span className="status-dot" style={{ background: 'var(--kc-ok)' }} />
-        PERF PAUSED
+        PERF PAUSED{readingShort ? ` · ${readingShort}` : ''}
       </div>
     );
   }

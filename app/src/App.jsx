@@ -17,6 +17,7 @@ import { useAudioInput } from './hooks/useAudioInput.js';
 import { useColumnResize } from './hooks/useColumnResize.js';
 import { useFpsMeter } from './hooks/useFpsMeter.js';
 import { usePerformanceGovernor } from './hooks/usePerformanceGovernor.js';
+import { useWatchdogSpaceResume } from './hooks/useWatchdogSpaceResume.js'; // #2481: Space = global resume while PERF PAUSED
 import { useBeatDecay } from './hooks/useBeatDecay.js';
 import { usePhraseLoop } from './hooks/usePhraseLoop.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
@@ -545,6 +546,7 @@ function AppInner() {
 
   useFpsMeter(true);
   usePerformanceGovernor();
+  useWatchdogSpaceResume();
   useBeatDecay();
   usePhraseLoop();
   useMorphEvolve();

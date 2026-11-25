@@ -33,7 +33,10 @@ export function applyAction(action, store = useStore.getState()) {
       // #264 — a manual quality choice cancels any governor quality-shed
       // claim, so recovery never overrides the operator's own tier. (The
       // governor sheds via the store directly, not this dispatch path.)
+      // #2483 — this dispatch is the ceiling's only session writer: a
+      // performer's choice sets the ceiling and the live tier together.
       store.setQuality(payload);
+      store.setQualityCeiling(payload);
       store.setQualityShedFrom(null);
       return;
     }

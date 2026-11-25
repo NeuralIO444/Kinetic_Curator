@@ -118,6 +118,9 @@ node src/state/firewall.selfcheck.mjs
 node src/state/personaUndo.selfcheck.mjs
 node src/state/quarantine.selfcheck.mjs
 node src/state/watchdog.selfcheck.mjs
+node src/state/watchdogLaw.selfcheck.mjs
+node src/state/governorThresholds.selfcheck.mjs
+node src/state/budgetCeiling.selfcheck.mjs
 node src/state/renderFault.selfcheck.mjs
 node src/data/normalize.selfcheck.mjs
 node src/data/quality.particleCaps.selfcheck.mjs
@@ -662,6 +665,7 @@ node src/curator/megamindVoice.selfcheck.mjs
 node src/curator/megamindVision.selfcheck.mjs
 node src/curator/megamindEmbed.selfcheck.mjs
 node src/curator/megamindRecap.selfcheck.mjs
+node src/curator/megamindSurfaces.selfcheck.mjs
 node src/curator/backendIndicator.selfcheck.mjs
 node src/curator/mindPresence.selfcheck.mjs
 node src/curator/directorRoom.selfcheck.mjs

@@ -162,12 +162,48 @@ export function buildNarrationRequest(kind, facts) {
   ];
 }
 
+/**
+ * The narration check, staged (#2489): the same law validateNarration has always applied, but
+ * returning WHERE a reply failed — 'shape' (not an object, no usable line, over the bound, or out
+ * of English) or 'grounding' (a clean line that quotes none of the numbers it was given) — so a
+ * discard can be logged with its reason instead of vanishing.
+ */
+function checkNarration(raw, facts) {
+  if (!isObj(raw)) return { stage: 'shape', detail: 'the reply was not a JSON object' };
+  if (typeof raw.line !== 'string' || !raw.line.trim()) return { stage: 'shape', detail: 'the reply carried no line' };
+  if (raw.line.trim().length > 300) return { stage: 'shape', detail: 'the line ran over 300 characters' };
+  if (hasCjk(raw.line)) return { stage: 'shape', detail: 'the line left English (CJK characters)' };
+  const line = raw.line.trim();
+  if (!lineQuotesFacts(line, facts))
+    return { stage: 'grounding', detail: 'the line quoted none of the numbers it was given' };
+  return { line };
+}
+
 /** A narration line, or null: bounded, English, and grounded in a quoted fact. */
 export function validateNarration(raw, facts) {
-  if (!isObj(raw)) return null;
-  const line = cleanLine(raw.line, 300);
-  if (!line) return null;
-  return lineQuotesFacts(line, facts) ? { line } : null;
+  const out = checkNarration(raw, facts);
+  return out.line ? { line: out.line } : null;
+}
+
+/** Why a narration reply was discarded ({ stage, detail }), or null when it would have passed. */
+export function narrationDiscardReason(raw, facts) {
+  const out = checkNarration(raw, facts);
+  return out.line ? null : { stage: out.stage, detail: out.detail };
+}
+
+/**
+ * The fallback narration (#2489, Matt's ruling): when the model's narration is discarded, the panel
+ * falls back to a line composed HERE, deterministically, from the very facts the model was shown —
+ * every number in it is one of those values verbatim, so it cannot be ungrounded — and labeled
+ * machine-written in its own text, so any surface rendering the line carries the label. Null when
+ * there are no usable facts to compose from.
+ */
+export function buildFallbackNarration(facts) {
+  const parts = (Array.isArray(facts) ? facts : [])
+    .filter((f) => f && typeof f.label === 'string' && f.label && factForms(f.value).length > 0)
+    .map((f) => `${f.label} ${f.value}`);
+  if (!parts.length) return null;
+  return `Machine-written from the live counters (the model's narration was discarded): ${parts.join(' · ')}.`;
 }
 
 // ── the hook amendment: Davis reason prose + drift narration ───────────────────────────────────────────────

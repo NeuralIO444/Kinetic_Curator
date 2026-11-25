@@ -17,12 +17,14 @@ import {
   GUIDE_DECLINE,
   buildCrownRequest,
   buildDriftRequest,
+  buildFallbackNarration,
   buildGuideCorpus,
   buildGuideRequest,
   buildNarrationRequest,
   buildPacingRequest,
   buildReasonRequest,
   judgePacingProposal,
+  narrationDiscardReason,
   parseSurfaceReply,
   retrieveGuide,
   validateCrownDraft,
@@ -32,6 +34,7 @@ import {
   validatePacingProposal,
   validateReasonLine,
 } from './megamindSurfaces.mjs';
+import { readDiscards, recordDiscard } from './megamindDiscardLog.mjs';
 import { getDavisCitation, setDavisReasonProse, tasteAgreement } from './tasteHead.js';
 import { readCrowns } from './diceCrowns.js';
 import { ledgerCounts, parseLedger, readLedgerText } from './tasteLedger.js';
@@ -66,7 +69,10 @@ export function createSurfacesDriver({
     pacing: null, // { proposal, judgement }
     crownDraft: null, // { note, caption, lookNames, forLayout }
     telemetryLine: null,
+    telemetryMachineWritten: false, // #2489: the standing line is the fallback, not the model's
     censusLine: null,
+    censusMachineWritten: false,
+    discards: [], // #2489: the discard log's tail, for the panel's diagnosis list
     drift: null, // { line, proposeRetrain, agreement }
     reason: null, // { clause, line }
     guide: null, // { query, answer, sources }
@@ -117,16 +123,31 @@ export function createSurfacesDriver({
     }),
   ];
 
-  /** Ask the model for one surface reply and validate it; one re-ask on a discarded reply. */
-  async function ask(consumerId, messages, validate) {
+  /**
+   * Ask the model for one surface reply and validate it; one re-ask on a discarded reply.
+   * `hooks.onDiscard({ text, parsed })` hears about each thrown-out reply (the narration path
+   * logs them, #2489); the double-discard error is marked `discarded` so a caller can tell a
+   * checker rejection apart from the model being down.
+   */
+  async function ask(consumerId, messages, validate, hooks = {}) {
     const rec = surfaceRecord(consumerId);
     if (!rec) throw new Error('that surface is not enabled by the linked model');
     for (let attempt = 0; attempt < 2; attempt++) {
       const text = await askSurfaceText({ fetchImpl, record: rec, messages });
-      const out = validate(parseSurfaceReply(text));
+      const parsed = parseSurfaceReply(text);
+      const out = validate(parsed);
       if (out) return out;
+      if (hooks && typeof hooks.onDiscard === 'function') {
+        try {
+          hooks.onDiscard({ text, parsed });
+        } catch {
+          /* a discard listener must not break the ask */
+        }
+      }
     }
-    throw new Error('the reply was discarded — shape or grounding failed twice');
+    const err = new Error('the reply was discarded — shape or grounding failed twice');
+    err.discarded = true;
+    throw err;
   }
 
   const run = async (name, fn) => {
@@ -139,6 +160,46 @@ export function createSurfacesDriver({
       set({ busy: null });
     }
   };
+
+  /**
+   * One narration ask over a SINGLE facts snapshot (#2489): the model is shown these facts and is
+   * judged against these same facts — never a fresher read (the telemetry tally moves with live
+   * bus traffic while the model thinks, and judging a reply against numbers it never saw discards
+   * compliant replies). On a double discard, Matt's ruling applies: every discarded reply goes to
+   * the discard log with the check it failed, and the panel falls back to the machine-written
+   * narration composed from the same facts — it never goes silent. A model that is DOWN is not a
+   * discard: that error still surfaces honestly, with no fallback and nothing logged.
+   */
+  async function narrate(kind, facts, apply) {
+    const thrown = [];
+    try {
+      const out = await ask(
+        'devpanel.narration',
+        buildNarrationRequest(kind, facts),
+        (raw) => validateNarration(raw, facts),
+        {
+          onDiscard: ({ text, parsed }) => {
+            const reason = narrationDiscardReason(parsed, facts);
+            thrown.push({
+              text,
+              stage: reason ? reason.stage : 'shape',
+              detail: reason ? reason.detail : 'the reply failed validation',
+            });
+          },
+        },
+      );
+      apply({ line: out.line, machineWritten: false });
+    } catch (e) {
+      if (!e || e.discarded !== true) throw e;
+      for (const d of thrown) {
+        recordDiscard({ surface: `narration.${kind}`, stage: d.stage, reason: d.detail, reply: d.text, facts });
+      }
+      const line = buildFallbackNarration(facts);
+      if (!line) throw e;
+      apply({ line, machineWritten: true });
+      set({ discards: readDiscards() });
+    }
+  }
 
   const telemetryFacts = () => [
     { label: 'persona decisions', value: tally.decisions },
@@ -223,20 +284,21 @@ export function createSurfacesDriver({
     /** Dev-panel narration of this session's consultation telemetry. */
     narrateTelemetry() {
       return run('telemetry', async () => {
-        const out = await ask('devpanel.narration', buildNarrationRequest('telemetry', telemetryFacts()), (raw) =>
-          validateNarration(raw, telemetryFacts()),
+        // ONE snapshot, shown and judged (#2489): the tally is live bus traffic and moves while
+        // the model thinks — re-reading it in the validator discarded compliant replies.
+        const facts = telemetryFacts();
+        await narrate('telemetry', facts, ({ line, machineWritten }) =>
+          set({ telemetryLine: line, telemetryMachineWritten: machineWritten }),
         );
-        set({ telemetryLine: out.line });
       });
     },
     /** Dev-panel narration of the census + the live agreement readout. */
     narrateCensus() {
       return run('census', async () => {
         const { facts } = censusFacts();
-        const out = await ask('devpanel.narration', buildNarrationRequest('census', facts), (raw) =>
-          validateNarration(raw, facts),
+        await narrate('census', facts, ({ line, machineWritten }) =>
+          set({ censusLine: line, censusMachineWritten: machineWritten }),
         );
-        set({ censusLine: out.line });
       });
     },
     /** Drift narration over the T2 readout; a retrain proposal survives only on real divergence. */

@@ -13,6 +13,7 @@ export const PROJECT_STATE_KEYS = Object.freeze([
   'layoutParams',
   'enabledAssets',
   'quality',
+  'qualityCeiling', // #2483 — serializeProject reads the ceiling into the document's quality key, so a ceiling change must wake the autosave
   'autoQuality',
   'assetWeightOverrides',
   'projectTitle',

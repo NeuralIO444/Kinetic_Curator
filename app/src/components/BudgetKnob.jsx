@@ -16,6 +16,13 @@ import { QUALITY_PRESETS, getBudgetName } from '../data/quality.js';
 // quality-shed claim via SET_QUALITY, so recovery never overrides the
 // operator's own tier — the existing #264 contract.)
 //
+// #2483 — the ceiling is its own store field (qualityCeiling), written
+// only through that SET_QUALITY choice and by project load. The governor
+// sheds the separate live tier (`quality`) underneath it, so the pressed
+// button here always shows the performer's choice exactly as set; while
+// a shed claim is active the knob adds a small "shedding" tag instead of
+// moving the button.
+//
 // The store's autoQuality flag stays exactly as the governor reads it;
 // this knob only ever arms, never disarms. A legacy project saved with
 // the governor off keeps it off (compatibility) — the knob reads dimmed
@@ -24,11 +31,20 @@ import { QUALITY_PRESETS, getBudgetName } from '../data/quality.js';
 const CEILING_ORDER = ['high', 'balanced', 'performance'];
 
 export function BudgetKnob() {
-  const { state } = useApp((s) => ({ quality: s.quality, autoQuality: s.autoQuality }));
-  const { quality = 'balanced', autoQuality = true } = state;
+  const { state } = useApp((s) => ({
+    quality: s.quality,
+    qualityCeiling: s.qualityCeiling,
+    qualityShedFrom: s.qualityShedFrom,
+    autoQuality: s.autoQuality,
+  }));
+  const { quality = 'balanced', qualityCeiling = 'balanced', qualityShedFrom = null, autoQuality = true } = state;
+
+  // The governor is underneath the ceiling right now: it holds a shed
+  // claim (qualityShedFrom) and the live tier sits below the choice.
+  const shedding = autoQuality && qualityShedFrom != null;
 
   const choose = (tierId) => {
-    if (tierId === quality && autoQuality) return;
+    if (tierId === qualityCeiling && autoQuality) return;
     emit(Events.EXPORT_QUALITY, tierId);
     emit(Events.EXPORT_AUTO_QUALITY, true);
   };
@@ -54,7 +70,7 @@ export function BudgetKnob() {
       </span>
       {CEILING_ORDER.map((tierId) => {
         const preset = QUALITY_PRESETS[tierId];
-        const active = quality === tierId && autoQuality;
+        const active = qualityCeiling === tierId && autoQuality;
         return (
           <button
             key={tierId}
@@ -68,6 +84,15 @@ export function BudgetKnob() {
           </button>
         );
       })}
+      {shedding ? (
+        <span
+          className="lbl"
+          title={`The governor is shedding below your ceiling to hold frame rate (currently ${getBudgetName(quality)}). It restores back up to your ceiling when frames recover.`}
+          style={{ marginLeft: 4, color: 'var(--kc-warn)', fontSize: '9px', letterSpacing: '0.08em' }}
+        >
+          shedding
+        </span>
+      ) : null}
     </div>
   );
 }
