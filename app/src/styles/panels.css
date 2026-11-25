@@ -969,6 +969,12 @@
 .davis-progress.running {
   border-color: var(--ink);
 }
+/* #2485: the wait line — why a running EVOLVE cannot fire, full width under the cells */
+.davis-progress-wait {
+  grid-column: 1 / -1;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+}
 /* idle: the label and its value share a line, so the resting box is one row, not two (#1126 fits the panel without a scroll) */
 .davis-progress:not(.running) .davis-progress-cell {
   flex-direction: row;

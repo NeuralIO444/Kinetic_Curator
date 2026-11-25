@@ -6,11 +6,16 @@
 //     the evolve step itself is unchanged (seed still steps, timestamp set).
 //  C. the panel: three labelled sections in order, and EVERY existing control
 //     is still there (nothing deleted, no behaviour change beyond grouping).
+//  D. #2485: the wait reason — a running EVOLVE whose source cannot fire
+//     names why (the truth table), the stress session's own configuration
+//     end-to-end through the real store + beat arbiter, and the panel
+//     rendering the reason.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
-import { startRun, tickRun, finishRun, secPerGen } from './evolveProgress.js';
+import { startRun, tickRun, finishRun, secPerGen, evolveWaitReason } from './evolveProgress.js';
 import { loopClock } from '../gl/loopClock.js';
 import { useStore } from '../state/store.js';
+import { routeBeat } from '../state/beatArbiter.js';
 
 // ── A ────────────────────────────────────────────────────────────────────
 {
@@ -104,5 +109,134 @@ import { useStore } from '../state/store.js';
   assert.ok(/subtitle=\{subtitle\}/.test(panel), 'the header status line is kept');
   // nothing new that controls phrase/MIDI: the panel reports, it does not duplicate PLAY
   assert.ok(!/DAVIS_PHRASE/.test(panel), 'phrase controls stay in PLAY (#248)');
+}
+
+// ── D ────────────────────────────────────────────────────────────────────
+{
+  // The truth table. Base facts: a healthy time-source run.
+  const base = {
+    evolveMode: true,
+    evolveSource: 'time',
+    beatRoute: 'both',
+    audioEnabled: false,
+    beatMetro: true,
+    slowRender: false,
+    batchPaused: false,
+    running: true,
+    gen: 0,
+  };
+  const reason = (over) => evolveWaitReason({ ...base, ...over });
+
+  assert.strictEqual(evolveWaitReason(null), null, 'no facts, no claim');
+  assert.strictEqual(reason({ evolveMode: false }), null, 'a stopped EVOLVE waits for nothing');
+  assert.strictEqual(reason({}), null, 'time source, loop running: fires within one interval');
+  assert.strictEqual(reason({ gen: 7 }), null, 'a landed run on a live source stays quiet');
+
+  // Hard holds gate BOTH sources (#107 §4/§5) and are named at any gen.
+  assert.match(reason({ slowRender: true }), /governor/, 'cut-6 freeze holds the time driver');
+  assert.match(reason({ slowRender: true, evolveSource: 'beat', audioEnabled: true, gen: 3 }), /governor/);
+  assert.match(reason({ batchPaused: true }), /batch export/, 'a batch holds the time driver');
+  assert.match(reason({ batchPaused: true, evolveSource: 'beat', audioEnabled: true }), /batch export/);
+
+  // Time source, loop stopped: the loop clock cannot advance, so the
+  // interval can never elapse — named, not silent.
+  assert.match(reason({ running: false }), /loop stopped/, 'a stopped loop starves the time source');
+
+  // Beat source: the route is the hardest blocker — with route PHRASE,
+  // beats arrive and EVOLVE still gets none.
+  assert.match(reason({ evolveSource: 'beat', beatRoute: 'phrase', audioEnabled: true }), /PHRASE/);
+  assert.match(reason({ evolveSource: 'beat', beatRoute: 'phrase', audioEnabled: true, gen: 5 }), /PHRASE/);
+  // No input at all (the stress session's state): named at any gen, so a
+  // mid-run input loss speaks too.
+  assert.match(reason({ evolveSource: 'beat', audioEnabled: false, beatMetro: false }), /no beat input/);
+  assert.match(reason({ evolveSource: 'beat', audioEnabled: false, beatMetro: false, gen: 5 }), /no beat input/);
+  // Input live, nothing landed yet: the soft wait, only before gen 1.
+  assert.strictEqual(reason({ evolveSource: 'beat', audioEnabled: true }), 'waiting for a beat');
+  assert.strictEqual(reason({ evolveSource: 'beat', audioEnabled: false, beatMetro: true }), 'waiting for a beat');
+  assert.strictEqual(reason({ evolveSource: 'beat', audioEnabled: true, gen: 1 }), null, 'first beat landed: quiet');
+  // Route EVOLVE (not just BOTH) still feeds the gate.
+  assert.strictEqual(reason({ evolveSource: 'beat', beatRoute: 'evolve', audioEnabled: true }), 'waiting for a beat');
+}
+{
+  // End-to-end through the real store, in the stress session's own
+  // configuration: A1's flurry left target ALL + source BEAT; audio off,
+  // dial metro off. EVOLVE on: no fire is possible, and now the surface
+  // can say so — the facts the panel reads are the store's own.
+  const S = () => useStore.getState();
+  const facts = () => {
+    const s = S();
+    return {
+      evolveMode: s.evolveMode,
+      evolveSource: s.evolveSource,
+      beatRoute: s.beatRoute,
+      audioEnabled: s.audioEnabled,
+      beatMetro: s.beatMetro,
+      slowRender: s.slowRender,
+      batchPaused: s.batchPaused,
+      running: s.running,
+      gen: s.evolveRun ? s.evolveRun.gen : 0,
+    };
+  };
+  useStore.setState({
+    evolveMode: false,
+    evolveRun: null,
+    evolveLast: null,
+    evolveSeen: 0,
+    slowRender: false,
+    batchPaused: false,
+    running: true,
+  });
+  S().setEvolveTarget('all');
+  S().setEvolveSource('beat');
+  S().setBeatRoute('both');
+  S().setAudioEnabled(false);
+  S().setBeatMetro(false);
+  S().setEvolveMode(true);
+  assert.strictEqual(S().evolveRun.gen, 0);
+  assert.match(evolveWaitReason(facts()), /no beat input/, 'the session stall names itself');
+
+  // Audio on: the input is live — the soft wait until the first beat.
+  S().setAudioEnabled(true);
+  assert.strictEqual(evolveWaitReason(facts()), 'waiting for a beat');
+  // Deliver beats the way App.jsx onBeat does (the arbiter decides; the
+  // store fires on its word): the first landed generation ends the wait.
+  for (let i = 0; i < 3; i++) {
+    const s = S();
+    const d = routeBeat(s);
+    assert.strictEqual(d.fireEvolve, true, 'the arbiter arms evolve on a live beat');
+    if (d.fireEvolve) s.triggerEvolve({ loopTimeMs: loopClock.ms });
+  }
+  assert.strictEqual(S().evolveRun.gen, 3, 'beats land generations');
+  assert.strictEqual(evolveWaitReason(facts()), null, 'a firing run is quiet');
+
+  // The input dies mid-run: the hard hold returns, gen or no gen.
+  S().setAudioEnabled(false);
+  assert.match(evolveWaitReason(facts()), /no beat input/, 'mid-run input loss is named');
+
+  // Route the beats away: named even with the input live.
+  S().setAudioEnabled(true);
+  S().setBeatRoute('phrase');
+  assert.match(evolveWaitReason(facts()), /PHRASE/, 'a PHRASE route starves the gate, named');
+  S().setBeatRoute('both');
+
+  // Time source on a stopped loop, then a governor hold.
+  S().setEvolveSource('time');
+  assert.strictEqual(evolveWaitReason(facts()), null, 'time source, loop running: quiet');
+  S().setRunning(false);
+  assert.match(evolveWaitReason(facts()), /loop stopped/);
+  S().setRunning(true);
+  S().setSlowRender(true, 'cut6');
+  assert.match(evolveWaitReason(facts()), /governor/, 'the governor hold outranks the source');
+  S().setSlowRender(false);
+
+  S().setEvolveMode(false);
+  assert.strictEqual(evolveWaitReason(facts()), null, 'stopped: no wait to name');
+  useStore.setState({ evolveMode: false, evolveRun: null, evolveLast: null, evolveSeen: 0 });
+}
+{
+  // The panel renders the reason inside the running readout.
+  const progress = readFileSync(new URL('../panels/davis/EvolveProgress.jsx', import.meta.url), 'utf8');
+  assert.ok(progress.includes('evolveWaitReason'), 'EvolveProgress reads the wait reason');
+  assert.ok(progress.includes('davis-progress-wait'), 'and renders it as the wait line');
 }
 console.log('evolveProgress.selfcheck: OK');
