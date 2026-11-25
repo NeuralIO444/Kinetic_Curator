@@ -7,6 +7,7 @@
 
 import { LOIS_FACES } from './loisFace.js';
 import { DAVIS_STATES } from './davisState.js';
+import { gaitContractFields } from '../engine/creatureGait.mjs'; // #2475 — the creatures' worn gaits ride the same seam
 
 const LOIS = new Set(Object.keys(LOIS_FACES));
 const DAVIS = new Set(Object.keys(DAVIS_STATES));
@@ -36,5 +37,12 @@ export function readRoomCodes() {
 /** The contract fields for a frame, from its effective resolver input (a take's recorded input during playback). */
 export function roomContractFields(input) {
   const { lois, davis } = sanitizeRoomCodes(input && input.room);
-  return { ...(lois ? { loisFace: lois } : {}), ...(davis ? { davisMood: davis } : {}) };
+  return {
+    ...(lois ? { loisFace: lois } : {}),
+    ...(davis ? { davisMood: davis } : {}),
+    // #2475 — what the creature and beast tiles wear this frame (the QUEEN's picks, eased by the resolver's fold for this
+    // very input): the rigs' other contract read, on the seam the live loop already hands the effective input through.
+    // No creature pick → no key: the contract is exactly what it was.
+    ...gaitContractFields(input),
+  };
 }

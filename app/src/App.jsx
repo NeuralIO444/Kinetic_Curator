@@ -81,6 +81,9 @@ import { startLean } from './curator/leanLive.js'; // #1640: the dial lean, appl
 import { startGaitPick } from './curator/gaitLive.js'; // #2329: each construct's gait is picked once a phrase
 import { replayGaitFrame, endGaitReplay } from './curator/gaitRecord.mjs'; // #2329: a take re-publishes its gait picks
 import { ASSETS_CONSTRUCTS } from './data/assets/index.js'; // #2329: the house constructs (the gait wearers) and their styles
+import { ASSETS } from './data/assets/index.js'; // #2475: a creature's body style is read from the catalogue
+import { creatureGaitTargets, creatureGaitStyleOf } from './engine/creatureGait.mjs'; // #2475: creatures and beasts wear gaits too
+import { poolWithBirths } from './engine/kineticBirths.mjs'; // #2475: the stage-born creatures are wearers like the banked ones
 import { startTrio, getTrioView } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
 import { startBand, bandOn } from './personas/bandLive.js'; // #2387: the band plays on the phrase clock (opt-in, off by default)
 import { getTaste } from './curator/tasteStore.js'; // #2394: the loaded taste carries the personas heads
@@ -214,15 +217,30 @@ function AppInner() {
     });
     // #2329 — gait M3: once a phrase each standing construct's gait is picked among its style's Canon defaults
     // (still / idle / performing) from the audio envelope; a user lock wins; muted while a take plays.
+    // #2475 — and the creature and beast tiles in the stage pool (Matt's M5 ruling: the QUEEN picks for every wearer,
+    // same rules as constructs). They ride the same gate: the picks reach the stage only on the constructs' stamp.
     const constructStyle = new Map(ASSETS_CONSTRUCTS.map((a) => [a.id, a.style]));
+    let creatureStyleMemo = { custom: undefined, births: undefined, styleOf: () => null };
+    const creatureStyleOf = (st) => {
+      if (creatureStyleMemo.custom !== st.customAssets || creatureStyleMemo.births !== st.stageBirths)
+        creatureStyleMemo = {
+          custom: st.customAssets,
+          births: st.stageBirths,
+          styleOf: creatureGaitStyleOf(poolWithBirths(st.customAssets, st.stageBirths), ASSETS),
+        };
+      return creatureStyleMemo.styleOf;
+    };
     const stopGaitPick = startGaitPick({
       getTargets: () => {
         const st = useStore.getState();
+        if (st.constructLead !== true) return [];
         const pool = st.enabledAssets; // { assetId: true } (null = the whole library, which never places a construct)
-        if (st.constructLead !== true || !pool || typeof pool !== 'object') return [];
-        return Object.keys(pool).filter((id) => pool[id] && constructStyle.has(id));
+        const constructs =
+          pool && typeof pool === 'object' ? Object.keys(pool).filter((id) => pool[id] && constructStyle.has(id)) : [];
+        const creatures = creatureGaitTargets(poolWithBirths(st.customAssets, st.stageBirths), pool);
+        return creatures.length ? [...constructs, ...creatures] : constructs;
       },
-      styleOf: (id) => constructStyle.get(id) ?? null,
+      styleOf: (id) => constructStyle.get(id) ?? creatureStyleOf(useStore.getState())(id),
       getAssignments: () => useStore.getState().gaitAssignments,
       assign: (e) => useStore.getState().assignGait(e),
       isReplaying: isPlaybackActive,

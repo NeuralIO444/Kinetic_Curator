@@ -1,5 +1,7 @@
 import { ASSETS, ASSETS_CONSTRUCTS } from '../../data/assets/index.js';
 import { applyGaitAssign, restGaitIdFor } from '../../engine/gaitAssign.js'; // #2329: who wears which gait
+import { creatureGaitStyleOf } from '../../engine/creatureGait.mjs'; // #2475: creature and beast wearers' styles
+import { poolWithBirths } from '../../engine/kineticBirths.mjs'; // #2475: the stage-born creatures lock like the banked ones
 import { noteGaitAssign } from '../../curator/gaitRecord.mjs'; // #2329: a landed assignment rides the take
 import { getQualityCaps } from '../../data/quality.js';
 import {
@@ -521,7 +523,11 @@ export const createGlobalSlice = (set, get) => ({
    */
   lockGait: (target, locked = true) => {
     const cur = get().gaitAssignments[target];
-    const style = ASSETS_CONSTRUCTS.find((a) => a.id === target)?.style ?? null;
+    const st = get();
+    // #2475 — a creature or beast tile locks on its own Canon style's `still` too (the user lock wins for every wearer)
+    const style =
+      ASSETS_CONSTRUCTS.find((a) => a.id === target)?.style ??
+      creatureGaitStyleOf(poolWithBirths(st.customAssets, st.stageBirths), ASSETS)(target);
     const gaitId = cur ? cur.gaitId : restGaitIdFor(style);
     if (!gaitId) return { applied: false, reason: 'invalid' };
     return get().assignGait({ target, gaitId, by: 'user', locked: !!locked });

@@ -775,6 +775,9 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         fitOf,
         poseFigure,
         pullField: pullFieldOf(doc), // #2178 — the ferrofluid's pull, when the frame's fluid runs
+        // #2475 — the QUEEN's gait picks the creature and beast tiles wear this frame (engine/creatureGait.mjs
+        // gaitContractFields, from the frame's effective input); absent = every tile poses exactly as before
+        gaitWorn: doc.gaitWorn || null,
         sourcePalette: sourcePalette.length ? sourcePalette : null,
         pileOnly: Array.isArray(doc.kitPool) && doc.kitPool.length ? new Set(doc.kitPool.map(String)) : null,
         seed: Number(doc.seed) || 0,

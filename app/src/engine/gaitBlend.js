@@ -120,6 +120,20 @@ export function checkBlendSnapshot(snap) {
 
 const copy = (v) => JSON.parse(JSON.stringify(v));
 
+// #2475 — the step readout. The live stage's creature and beast tiles are posed at contract time (gl/sceneContract.js →
+// engine/creatureRig.js), downstream of the resolver that owns the fold; the contract reads what each wearer wears THIS
+// frame from here (engine/creatureGait.mjs gaitContractFields), keyed by the very stamp the step was handed — the
+// frame input's own `gaits` object, or its absence. A CULTURE fold steps with stamps of its own (a fresh object, or
+// null), so it can never be read as the stage's. Never part of a step's output, never in a snapshot: the fold it reads
+// is the resolver's, which a take restores and replays exactly, so the readout replays with it.
+const stepsByStamp = new WeakMap(); // stamp object → { driverSec, worn }
+let absentStep = null; // the last step handed NO stamp (undefined): { driverSec, worn }
+/** The last step() handed exactly this stamp (an object, or undefined): { driverSec, worn } or null. */
+export function gaitBlendStepFor(stamp) {
+  if (stamp === undefined) return absentStep;
+  return isObj(stamp) ? stepsByStamp.get(stamp) || null : null;
+}
+
 /**
  * The fold. step(stamp, driverSec) once per frame, BEFORE any layer deals its constructs, returns what each wearer
  * wears this frame: a Map target → { gait, bpm } (the stage's input; engine/gaitStage.js gaitStageOptionsFor), or null
@@ -141,6 +155,13 @@ export function createGaitBlend() {
   }
 
   function step(stamp, driverSec) {
+    const out = stepFold(stamp, driverSec);
+    if (stamp === undefined) absentStep = { driverSec, worn: out };
+    else if (isObj(stamp)) stepsByStamp.set(stamp, { driverSec, worn: out });
+    return out;
+  }
+
+  function stepFold(stamp, driverSec) {
     const want = gaitsOfStamp(stamp); // target → the stamped (moving) Canon record
     if (!want && !worn.size && !fades.size) return null; // the hard gate: nothing worn, nothing easing
     const bpm = isObj(stamp) && fin(stamp.bpm) && stamp.bpm > 0 ? stamp.bpm : null;
