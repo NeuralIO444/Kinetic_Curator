@@ -367,6 +367,7 @@ node src/gl/canvasSizes.selfcheck.mjs
 node src/gl/accumGuard.selfcheck.mjs
 node src/gl/accumFreezeClear.selfcheck.mjs
 node src/gl/pausedRecallPresent.selfcheck.mjs
+node src/gl/bgWhiteScene.selfcheck.mjs
 node src/gl/trailGrid.selfcheck.mjs
 node src/gl/atlasKeyGuard.selfcheck.mjs
 node src/gl/atlas.skip.selfcheck.mjs
