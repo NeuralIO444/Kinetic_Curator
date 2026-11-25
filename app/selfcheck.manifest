@@ -177,6 +177,7 @@ node src/state/bundleParts.selfcheck.mjs
 node src/state/bundleKeys.selfcheck.mjs
 node src/state/hitsExport.selfcheck.mjs
 node src/state/queueTransport.selfcheck.mjs
+node src/state/playUndoStage.selfcheck.mjs
 node src/curator/recipeFeatures.selfcheck.mjs
 node src/curator/tasteHead.selfcheck.mjs
 node src/curator/personaHeadsBridge.selfcheck.mjs
