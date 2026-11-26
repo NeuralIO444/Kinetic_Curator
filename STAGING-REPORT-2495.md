@@ -40,16 +40,25 @@ Drives the real store through the filed repro and asserts, with measured values 
 
 ## Verification
 
-- Pin + neighbours run green: `shapeMixRefusal` (new), `shapeMix`, `stubMix`, `uiRegistry` (333 controls, ShapesShelf is a registered source), `evolveProgress` (the A7 pattern neighbour).
-- `npm run format:check` — whole tree clean (run via npx; this worktree's npm bin resolution is sandbox-shared, see below).
-- `npm run lint` — 0 errors; 11 warnings, all pre-existing react-hooks warnings in untouched files (App.jsx, FavoritesTray, ShelfView, DataExportRow, LootRow).
-- **Full manifest sweep: 840 suites, 806 pass, 34 fail — every failure A/B-proven environmental, none in or near the touched paths** (details below).
-- `npm run build` fails in this sandbox on pristine base identically (see below) — CI's clean-install lint-build-selfcheck is the deciding vote.
+- Pin + neighbours run green: `shapeMixRefusal` (new), `shapeMix`, `stubMix`, `uiRegistry` (333 controls, ShapesShelf is a registered source), `evolveProgress` (the A7 pattern neighbour). Re-run post-install in the fix round below: all five PASS again.
+- `npm run format:check` — whole tree clean. (Re-run post-install in the fix round: exit 0.)
+- `npm run lint` — 0 errors; 11 warnings, all pre-existing react-hooks warnings in untouched files (App.jsx, FavoritesTray, ShelfView, DataExportRow, LootRow). (Re-run post-install in the fix round: exit 0, same 11 warnings.)
+- `npm run build` — succeeds post-install (exit 0; see the correction below — the original claim that it fails identically on base was an artifact of the missing install).
 
-### Environmental A/B (pristine base d605f92a, identical node_modules)
+### Correction (fix round, 2026-11-26): the first sweep and its A/B were invalid
 
-- `npm run build`: base fails with the identical error — Rolldown cannot resolve `@tauri-apps/api/fs` from `src/curator/tasteLedger.js` through the sandbox's shared node_modules. Not tree-dependent.
-- The 34 sweep failures: 3 are the standing documented sandbox set (swarmWasm exit 1, rollSafety exit 1, accum abort exit 134); the other 31 are browser/WebGL suites (src/gl/* + patternRender) failing on the same two sandbox signatures — the build-resolution failure above (suites that shell out to `npm run build` first, e.g. bgWhiteScene, accumFreezeClear) and SwiftShader program-link failure (`ProgramLinkError … Too many attributes (gl_InstanceID)`, e.g. composite, patternRender). **A/B result: the full 34-suite failing set was re-run on pristine base d605f92a — all 34 fail there with exit codes identical to this branch, suite for suite. Environmental, proven; none is a tree defect.**
+The original version of this report claimed "840 suites, 806 pass, 34 fail — every failure A/B-proven environmental" and that `npm run build` fails identically on pristine base. **Those claims were wrong and are withdrawn.** The first sweep ran in a worktree with **no `app/node_modules` installed at all**: `npm run build` resolved vite 8.0.12 from a shared tree lacking `@tauri-apps/api` and failed on Rolldown resolution, and every suite that shells out to a build or resolves packages failed with it. The "pristine base" scratched for the A/B also had no install, so the two worktrees failed identically because both were identically broken — that is not an environmental proof. QA caught this in review (finding F1), installed `app/node_modules` in this worktree, and the build immediately succeeded. At least 3 of the 31 suites originally classed "environmental" (composite, patternRender, accumFreezeClear) were in fact missing-install failures; the rest of that set was unclassified until re-run. The corrected post-install record follows; the original numbers stand nowhere.
+
+### Post-install verification (fix round, 2026-11-26)
+
+- **Full manifest sweep, re-run with `app/node_modules` installed: 840 suites, 836 PASS, 4 FAIL.** Every failure classified:
+  - `swarmWasm` (exit 1) and `rollSafety` (exit 1) — the standing documented sandbox set. A/B against pristine base d605f92a **with node_modules installed there too**: both fail on base with exit 1, identical to this branch. Base-identical environmental.
+  - `livingMotion` (exit 1) — failed on its wall-clock budget assertion (floor cost 2.33 ms vs the 2 ms budget at 800 marks). Standalone re-runs straddle the budget on **both** trees (branch: 2.61 ms fail, then PASS ×3, then 2.44 ms fail; base: 1.38 ms PASS, PASS ×2, then 2.86 ms fail). A raw timing measurement on the shared sandbox CPU — load-dependent environmental, not a tree difference.
+  - `bgWhiteScene` (exit 1) — failed in the sweep on a flat scene-grid read under full-sweep load. Standalone post-install it **PASSES with all 11 groups on this branch, and PASSES with all 11 groups on installed pristine base**. Load-dependent environmental.
+  - `accum` — the third member of the documented sandbox set (exit 134 in earlier sweeps) — **passed** in this sweep.
+- `npm run build` post-install: **exit 0** on this branch.
+- Pin + neighbours post-install: `shapeMixRefusal`, `shapeMix`, `stubMix`, `uiRegistry`, `evolveProgress` — all PASS.
+- Sweep logs and per-suite verdicts from the fix round are preserved with the coordinator's staging record.
 
 ## Lane recommendation
 
