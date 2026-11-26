@@ -184,3 +184,84 @@ sampling the first present. If a REAL seam defect ever appears (a still
 per tick, a recall that never presents the recalled scene, a store move
 during a hold), the pin still fails: stability attempts exhaust, the
 convergence poll times out, and the bounded budget still binds.
+
+## Round 2 — QA finding F1, plus F2, Note 2, and an F3 the proof batch found
+
+QA Review of round 1 (915b19f7) passed scope, assertion strength,
+budget binding, threshold integrity and helper honesty — but its
+independent runs went 1 FAIL / 2 PASS, on a case the round-1 protocol
+does not govern:
+
+- **F1 (blocking).** The held group's assertion "the held frame is
+  still scene B" (`dist(gHold.grid, hold.ref) >= 5`) fired once in
+  QA's 3 runs. Mechanism (QA's read, confirmed in the code):
+  `hold.ref` was seeded from `gB.grid` — the `waitScene` sample of
+  scene B taken while the scene was still RUNNING/animating. The
+  standing still after the trip is a different animation instant,
+  whose 8×8 grid can sit ≥ 5 from the running sample with no bake
+  landing and no count move — nothing for `stableHold` to re-baseline
+  against. The assertion compared two legitimately different frames
+  of the same scene.
+- **F1 fix (QA's suggested direction).** `stableHold` no longer takes
+  a caller-supplied reference. It returns `ref` = the standing
+  attempt's first settled paused frame — the standing still itself —
+  and `grid` = that attempt's soak re-read. The held group now asserts
+  the property it exists to pin: **the hold does not drift from the
+  standing still**, at the same < 5 threshold. Both call sites updated
+  (the ACCUM variant's call consumes only the count; its behaviour is
+  unchanged). No other assertion was touched: the recall must still
+  present the recalled scene, an unchanged scene must still present
+  nothing beyond budget, the ≤ 2 budget still binds, and `waitScene`'s
+  ~170 luminance threshold is untouched.
+- **F2.** Every grid-distance assertion message now carries the actual
+  measured distance(s): the held group (new message), the RUN group
+  (dA/dB added), and both reseed-group asserts. The scene-B, recall-
+  still and frozen-hold messages already carried theirs.
+- **QA Note 2.** The held group's
+  `assert.equal(gHold.n, nHold, 'presented count moved while settling')`
+  was vacuous — both sides came from the same `stableHold` return —
+  and is removed. Count-standing is genuinely enforced inside
+  `stableHold`/`boundedSettle`, which throw when a count never stands.
+- **F3 (found by round 2's own first proof batch, attempt 4).** The
+  ACCUM variant's FREEZE group compared the frozen buffer absolutely
+  (< 8) against `gB2`, the running `waitScene` sample — but the buffer
+  kept accumulating between that first light read and the freeze
+  landing, and the assertion fired at d 9.7 with nothing defective:
+  the F1 disease one group over. Fix, same pattern: the group now
+  reads B2's identity relatively (the frozen buffer is closer to `gB2`
+  than to `gAacc` — the pin's standing scene-identity criterion) and
+  asserts the hold against its own first frozen frame across a 700 ms
+  soak, at the group's original < 8 threshold. The proof batch was
+  restarted from zero on the fixed file.
+
+### Round-2 proof (final pin file; `liveLoop.mjs` still byte-identical to main)
+
+- Batch A (pre-F3 file): 3 PASS (286 s, 358 s, 310 s); attempt 4 FAIL
+  = F3 above (147 s, 14 groups in); attempt 5 stopped when the batch
+  was pulled to fix F3.
+- Batch B (final file): reached **7 PASS in 11 attempts** (passes
+  274 s, 300 s, 206 s, 369 s, 382 s, 303 s, 348 s; the 4 failures all
+  `waitScene` threshold family — light 163.0 at scene B, light 159.1
+  and 167.0 at scene B2, dark 101.0 at scene A under ACCUM) when a
+  sandbox service restart wiped `/tmp` and the batch's logs with it.
+  The tallies above were observed live in polling before the restart;
+  the batch was restarted with durable logs rather than resting the
+  proof on unlogged numbers.
+- Batch C (final file, durable logs): **10 full-run PASSes (18 groups
+  each) in 14 attempts.** Pass durations 136–319 s. The 4 failures are
+  all the pre-existing `waitScene` threshold family in running-phase
+  reads, none in any paused group: attempt 5, the scene-A boot read
+  ("scene A never presented", 5 groups in, 309 s); attempts 6, 8, 12,
+  the B2 light read at last luminance 164.9 / 152.6 / 116.7 vs the 170
+  threshold (14 groups in — the entire main paused section already
+  green in each). The threshold was left untouched, as in round 1.
+  Across all three batches, no run of the round-2 protocol failed any
+  paused-group assertion.
+- Duration honesty (CI budget): the passes are slow under sandbox
+  contention — batch B ran alongside another builder's manifest sweeps
+  at 206–386 s per pass; batch C at 136–319 s; failures are inflated
+  by `waitScene`'s 180 s timeout (up to 476 s). Every attempt
+  terminated with a verdict; nothing hung. CI's selfcheck-browser
+  should budget minutes for this suite.
+- `npm run format:check`: clean. `npm run lint`: 0 errors (11
+  warnings, the standing count). The diff remains the pin file only.

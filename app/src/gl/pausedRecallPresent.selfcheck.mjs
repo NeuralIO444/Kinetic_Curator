@@ -55,6 +55,22 @@
 // immediately before the act under test, so a landing that belongs to
 // the previous scene never spends the act's present budget; and a hold
 // baseline is only trusted once a soak re-read agrees the count stands.
+//
+// #2537 round 2 — the held group's reference is the standing still
+// itself: stableHold returns the first settled paused frame of its
+// standing attempt as the reference and the soak re-read as the held
+// frame, and the group asserts the hold does not drift from the
+// standing still (< 5). The earlier reference — the running waitScene
+// sample of scene B — is a different animation instant from the
+// standing still, so the old comparison could fire on two legitimate
+// frames of the same scene with no landing and no count move (QA F1).
+// The same disease sat in the ACCUM variant's FREEZE group (F3, found
+// by round 2's own proof batch): the frozen buffer was compared
+// absolutely (< 8) to the running waitScene sample of B2, but the
+// buffer kept accumulating between that sample and the freeze landing
+// (fired at d 9.7). It now reads B2's identity relatively (closer to
+// B2 than to A) and asserts the hold against its own first frozen
+// frame across a soak, at the same threshold.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -254,23 +270,27 @@ if (!skipped) {
   };
   // #2537 — a hold baseline that survives a late atlas-bake landing: the
   // count must be settled AND stand across a soak re-read. A landing in
-  // between moves the count once; the soak then re-baselines (the latest
-  // read becomes the reference frame) and the loop re-settles — but only
+  // between moves the count once and the loop re-settles — but only
   // while the store still holds the expected scene (a store move is a
   // real change, not a landing, and fails the pin). A count that never
   // stands (a still per tick is a defect) exhausts the attempts.
-  const stableHold = async (refGrid, expectStore) => {
-    let ref = refGrid;
+  // Round 2: the returned reference (ref) is the standing attempt's
+  // first settled paused frame — the standing still itself — and the
+  // returned grid is that attempt's soak re-read, so the caller can
+  // assert the hold did not drift from the standing still. (The
+  // pre-round-2 reference, the caller's RUNNING scene sample, is a
+  // different animation instant and could sit ≥ 5 from the still with
+  // nothing having moved — QA F1.)
+  const stableHold = async (expectStore) => {
     for (let attempt = 0; attempt < 4; attempt++) {
       const n0 = await settledCount();
       const g0 = await grid();
       await page.waitForTimeout(700);
       const g1 = await grid();
-      if (g0 && g1 && g1.n === g0.n && g0.n === n0) return { n: n0, grid: g0.grid, ref };
+      if (g0 && g1 && g1.n === g0.n && g0.n === n0) return { n: n0, grid: g1.grid, ref: g0.grid };
       const st = await store();
       assert.equal(st.seed, expectStore.seed, 'the scene moved during the hold — not a bake landing');
       assert.equal(st.paletteId, expectStore.paletteId, 'the scene moved during the hold — not a bake landing');
-      if (g1) ref = g1.grid;
     }
     throw new Error('presented count never stabilised while held');
   };
@@ -378,14 +398,16 @@ if (!skipped) {
       assert.equal(tripState.slowRender, true, 'the trip must stand slowRender');
       assert.equal(tripState.slowRenderSource, 'watchdog', 'the stop is the watchdog’s');
     });
-    const hold = await stableHold(gB.grid, sB);
+    const hold = await stableHold(sB);
     const nHold = hold.n;
     const gHold = { n: hold.n, grid: hold.grid };
     const sHold = await store();
     ok('an unchanged scene presents nothing while held', () => {
       assert.equal(sHold.running, false, 'the stop must stand');
-      assert.equal(gHold.n, nHold, 'presented count moved while settling');
-      assert.ok(dist(gHold.grid, hold.ref) < 5, 'the held frame is still scene B');
+      assert.ok(
+        dist(gHold.grid, hold.ref) < 5,
+        `the held frame drifted from the standing still (d ${dist(gHold.grid, hold.ref).toFixed(1)}, threshold 5)`,
+      );
     });
 
     // — The A8 act: recall the hit through the Hits tray's own channel.
@@ -469,7 +491,10 @@ if (!skipped) {
     const sRun = await store();
     ok('RUN resumes and the recalled scene is what continues', () => {
       assert.equal(sRun.running, true, 'RUN must resume');
-      assert.ok(dist(gRun.grid, gA.grid) < dist(gRun.grid, gB.grid), 'the resumed stage is not the recalled scene');
+      assert.ok(
+        dist(gRun.grid, gA.grid) < dist(gRun.grid, gB.grid),
+        `the resumed stage is not the recalled scene (dA ${dist(gRun.grid, gA.grid).toFixed(1)}, dB ${dist(gRun.grid, gB.grid).toFixed(1)})`,
+      );
     });
 
     // — Variant: paused AND frozen, ACCUM on. The frozen branch alone would
@@ -498,10 +523,25 @@ if (!skipped) {
     assert.equal(fr.ok, true, 'FREEZE act failed');
     await page.waitForTimeout(1200); // the frozen hold presents the buffer each tick
     const gFrozenHold = await grid();
+    await page.waitForTimeout(700); // soak: the frozen hold must stand
+    const gFrozenHold2 = await grid();
     ok('FREEZE holds the accumulated B2 buffer (the hold itself is not the defect)', () => {
+      // #2537 round 2 (F3, found by the round-2 proof batch): scene
+      // identity is read relatively — the frozen buffer is B2's, not
+      // A's — because the buffer kept accumulating between the running
+      // waitScene sample (gB2, first light read) and the freeze
+      // landing, so an absolute distance to that early sample is not a
+      // sound bound (it fired at d 9.7 vs the old < 8 with nothing
+      // defective: the F1 disease one group over). The hold itself is
+      // asserted against its own first frozen frame across the soak,
+      // at the group's original threshold.
       assert.ok(
-        dist(gFrozenHold.grid, gB2.grid) < 8,
-        `held buffer drifted from B2 (d ${dist(gFrozenHold.grid, gB2.grid).toFixed(1)})`,
+        dist(gFrozenHold.grid, gB2.grid) < dist(gFrozenHold.grid, gAacc.grid),
+        `the frozen buffer is not B2's (dB2 ${dist(gFrozenHold.grid, gB2.grid).toFixed(1)}, dA ${dist(gFrozenHold.grid, gAacc.grid).toFixed(1)})`,
+      );
+      assert.ok(
+        dist(gFrozenHold2.grid, gFrozenHold.grid) < 8,
+        `the frozen hold drifted across the soak (d ${dist(gFrozenHold2.grid, gFrozenHold.grid).toFixed(1)}, threshold 8)`,
       );
     });
     // The pause here is RUN off, not a second watchdog trip: a trip sheds
@@ -509,7 +549,7 @@ if (!skipped) {
     // the variant could exercise it. RUN off is the other pause the seam
     // serves (the loop's gate is !running either way).
     await page.evaluate(() => window.__kcStore.getState().setRunning(false));
-    const frozenHold = await stableHold(gFrozenHold.grid, sB2);
+    const frozenHold = await stableHold(sB2);
     const nFrozen = frozenHold.n;
     // #2537: same protocol as the main recall — baseline immediately
     // before the act, still read by convergence.
@@ -533,11 +573,11 @@ if (!skipped) {
       assert.ok(gReseed.n >= nPre2 + 1, 'the recall presented nothing — the stale buffer texture survived');
       assert.ok(
         dist(gReseed.grid, gFrozenHold.grid) > 3,
-        'the presented frame did not move — the stale buffer texture is still showing',
+        `the presented frame did not move (d ${dist(gReseed.grid, gFrozenHold.grid).toFixed(1)}, threshold 3) — the stale buffer texture is still showing`,
       );
       assert.ok(
         dist(gReseed.grid, gAacc.grid) < dist(gFrozenHold.grid, gAacc.grid),
-        'the reseeded frame did not move toward the recalled scene',
+        `the reseeded frame did not move toward the recalled scene (dReseed ${dist(gReseed.grid, gAacc.grid).toFixed(1)}, dHold ${dist(gFrozenHold.grid, gAacc.grid).toFixed(1)})`,
       );
       assert.equal(sReseed.running, false, 'the reseed must not resume the loop');
       assert.equal(sReseed.seed, sA.seed, 'the store holds the hit’s seed');
