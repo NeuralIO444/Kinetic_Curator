@@ -41,6 +41,20 @@
 //               one more when its atlas bake lands), with the stop still
 //               standing and no drift after; RUN continues the same scene;
 //               and the paused∧frozen ACCUM variant reseeds the same way.
+//
+// #2537 — read protocol: a scene transition's atlas bake can still be in
+// flight when the hold begins (presents continue on last-good cells,
+// Spine B), and its landing — the standing scene with its completed
+// atlas — is a real change the seam presents once, even while held. That
+// landing can fall after a settle baseline or in the settle→recall gap,
+// so a read that takes the FIRST present after an act as that act's
+// still races it (CI: the "recall" still read as the pre-recall scene,
+// dB 3.6, because it was the pre-recall bake landing, not the recall's
+// still). Scene reads therefore poll for convergence, exactly as
+// waitScene does for running reads; count baselines are re-taken
+// immediately before the act under test, so a landing that belongs to
+// the previous scene never spends the act's present budget; and a hold
+// baseline is only trusted once a soak re-read agrees the count stands.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -238,6 +252,64 @@ if (!skipped) {
     await page.waitForFunction((t) => (window.__kcPresentedGrid(8)?.n ?? -1) >= t, target, { timeout: timeoutMs });
     return grid();
   };
+  // #2537 — a hold baseline that survives a late atlas-bake landing: the
+  // count must be settled AND stand across a soak re-read. A landing in
+  // between moves the count once; the soak then re-baselines (the latest
+  // read becomes the reference frame) and the loop re-settles — but only
+  // while the store still holds the expected scene (a store move is a
+  // real change, not a landing, and fails the pin). A count that never
+  // stands (a still per tick is a defect) exhausts the attempts.
+  const stableHold = async (refGrid, expectStore) => {
+    let ref = refGrid;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const n0 = await settledCount();
+      const g0 = await grid();
+      await page.waitForTimeout(700);
+      const g1 = await grid();
+      if (g0 && g1 && g1.n === g0.n && g0.n === n0) return { n: n0, grid: g0.grid, ref };
+      const st = await store();
+      assert.equal(st.seed, expectStore.seed, 'the scene moved during the hold — not a bake landing');
+      assert.equal(st.paletteId, expectStore.paletteId, 'the scene moved during the hold — not a bake landing');
+      if (g1) ref = g1.grid;
+    }
+    throw new Error('presented count never stabilised while held');
+  };
+  // #2537 — a post-act settle with a present budget: the count must
+  // settle AND stand across a soak re-read, with the total presents
+  // since the baseline never exceeding the budget (the act's still +
+  // at most its bake landing, whenever the landing falls). A landing
+  // during the soak re-enters the loop (the budget binds at every
+  // step, and the store must still hold the expected scene — a store
+  // move is a real change, not a landing); a count that never stands,
+  // or a present beyond the budget, fails. Two back-to-back settled
+  // counts are NOT enough here: a single bake landing can fall between
+  // them, after the first already read stable.
+  const boundedSettle = async (nPre, maxPresents, expectStore) => {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const n0 = await settledCount();
+      assert.ok(n0 - nPre <= maxPresents, `presents since the act exceeded the budget (${n0 - nPre} > ${maxPresents})`);
+      await page.waitForTimeout(700);
+      const g1 = await grid();
+      if (g1 && g1.n === n0) return n0;
+      const st = await store();
+      assert.equal(st.seed, expectStore.seed, 'the scene moved during the settle — not a bake landing');
+      assert.equal(st.paletteId, expectStore.paletteId, 'the scene moved during the settle — not a bake landing');
+    }
+    throw new Error('presented count never stabilised after the act');
+  };
+  // #2537 — poll the presented grid until a frame past the baseline count
+  // satisfies the caller's scene criterion (convergence, as waitScene),
+  // instead of reading the first present after an act: a pre-act bake
+  // landing can be that first present, and it shows the previous scene.
+  const waitPresented = async (nPre, isExpected, timeoutMs = 120000, what = 'the expected scene') => {
+    const t0 = Date.now();
+    for (;;) {
+      const g = await grid();
+      if (g && g.n > nPre && isExpected(g)) return g;
+      if (Date.now() - t0 > timeoutMs) throw new Error(`presented grid never showed ${what}`);
+      await page.waitForTimeout(400);
+    }
+  };
 
   try {
     // — Scene A standing and presented; keep it as a hit through the panel's
@@ -283,6 +355,7 @@ if (!skipped) {
       paletteId: 'transit',
     });
     const gB = await waitScene('light');
+    const sB = await store();
     ok('scene B is a visibly different stage from A (the pin can tell them apart)', () => {
       assert.ok(dist(gA.grid, gB.grid) > 20, `A/B grid distance ${dist(gA.grid, gB.grid).toFixed(1)} too small`);
     });
@@ -305,16 +378,23 @@ if (!skipped) {
       assert.equal(tripState.slowRender, true, 'the trip must stand slowRender');
       assert.equal(tripState.slowRenderSource, 'watchdog', 'the stop is the watchdog’s');
     });
-    const nHold = await settledCount();
-    const gHold = await grid();
+    const hold = await stableHold(gB.grid, sB);
+    const nHold = hold.n;
+    const gHold = { n: hold.n, grid: hold.grid };
     const sHold = await store();
     ok('an unchanged scene presents nothing while held', () => {
       assert.equal(sHold.running, false, 'the stop must stand');
       assert.equal(gHold.n, nHold, 'presented count moved while settling');
-      assert.ok(dist(gHold.grid, gB.grid) < 5, 'the held frame is still scene B');
+      assert.ok(dist(gHold.grid, hold.ref) < 5, 'the held frame is still scene B');
     });
 
     // — The A8 act: recall the hit through the Hits tray's own channel.
+    // #2537: the count baseline is re-taken immediately before the act,
+    // so a pre-recall bake landing (counted in nPre) never spends the
+    // recall's present budget; the still is read by convergence, not as
+    // the first present after the act.
+    const gPre = await grid();
+    const nPre = gPre ? gPre.n : nHold;
     const rec = await page.evaluate((p) => window.__KC_UI__.act('transport.hit-recall', undefined, p), {
       favorite: fav.favorite,
       index: fav.index,
@@ -322,10 +402,15 @@ if (!skipped) {
     assert.equal(rec.ok, true, 'hit-recall act failed');
     const sLanded = await store();
     assert.equal(sLanded.seed, sA.seed, 'the recall itself must land through the tray channel');
-    const gStill = await waitCount(nHold + 1);
+    const gStill = await waitPresented(
+      nPre,
+      (g) => dist(g.grid, gA.grid) < dist(g.grid, gB.grid),
+      120000,
+      'the recalled scene after the paused recall',
+    );
     const sStill = await store();
     ok('the paused recall presents a still of the recalled scene, with the stop standing', () => {
-      assert.ok(gStill.n >= nHold + 1, 'the recall presented nothing');
+      assert.ok(gStill.n >= nPre + 1, 'the recall presented nothing');
       assert.ok(
         dist(gStill.grid, gA.grid) < dist(gStill.grid, gB.grid),
         `still reads closer to B than A (dA ${dist(gStill.grid, gA.grid).toFixed(1)}, dB ${dist(gStill.grid, gB.grid).toFixed(1)}) — the stale frame survived`,
@@ -338,16 +423,18 @@ if (!skipped) {
     });
     // Bounded: the scene still, plus at most one more when the recall's
     // atlas bake lands (new cells are a real change to the presented
-    // frame) — then the count is stable. A still per tick would never
-    // settle, and that is what this pair of reads catches.
-    const nStill = await settledCount();
-    const nStillStable = await settledCount();
+    // frame) — then the count stands. The budget is measured from nPre
+    // (taken immediately before the act): a landing that belongs to the
+    // PRE-recall scene is already inside nPre and never spends this
+    // budget (#2537). boundedSettle returns only once the count stands
+    // across a soak with the budget intact — that standing is the
+    // no-drift evidence; a still per tick never stands and fails.
+    const nStill = await boundedSettle(nPre, 2, sA);
     ok('the still is bounded: at most the scene still and its bake, then no drift', () => {
       assert.ok(
-        nStill - nHold >= 1 && nStill - nHold <= 2,
-        `recall produced ${nStill - nHold} presents over the hold — expected the scene still (+ its bake)`,
+        nStill - nPre >= 1 && nStill - nPre <= 2,
+        `recall produced ${nStill - nPre} presents over the hold — expected the scene still (+ its bake)`,
       );
-      assert.equal(nStillStable, nStill, `presented count drifted ${nStill} → ${nStillStable} with no change`);
     });
 
     // — A resize while paused re-presents the held scene once, at the new
@@ -356,7 +443,12 @@ if (!skipped) {
       canvasW: 760,
       canvasH: 532,
     });
-    const gResize = await waitCount(nStill + 1);
+    const gResize = await waitPresented(
+      nStill,
+      (g) => g.width !== gStill.width || g.height !== gStill.height,
+      60000,
+      'the held scene at the new size after the resize',
+    );
     ok('a canvas resize while paused presents the held scene at the new size', () => {
       assert.ok(gResize.n >= nStill + 1, 'the resize presented nothing');
       assert.ok(
@@ -401,6 +493,7 @@ if (!skipped) {
       paletteId: 'transit',
     });
     const gB2 = await waitScene('light'); // scene B2 accumulates
+    const sB2 = await store();
     const fr = await page.evaluate(() => window.__KC_UI__.act('directors.accum-freeze', true));
     assert.equal(fr.ok, true, 'FREEZE act failed');
     await page.waitForTimeout(1200); // the frozen hold presents the buffer each tick
@@ -416,7 +509,12 @@ if (!skipped) {
     // the variant could exercise it. RUN off is the other pause the seam
     // serves (the loop's gate is !running either way).
     await page.evaluate(() => window.__kcStore.getState().setRunning(false));
-    const nFrozen = await settledCount();
+    const frozenHold = await stableHold(gFrozenHold.grid, sB2);
+    const nFrozen = frozenHold.n;
+    // #2537: same protocol as the main recall — baseline immediately
+    // before the act, still read by convergence.
+    const gPre2 = await grid();
+    const nPre2 = gPre2 ? gPre2.n : nFrozen;
     const rec2 = await page.evaluate((p) => window.__KC_UI__.act('transport.hit-recall', undefined, p), {
       favorite: fav2.favorite,
       index: fav2.index,
@@ -424,10 +522,15 @@ if (!skipped) {
     assert.equal(rec2.ok, true, 'hit-recall act (accum) failed');
     const sLanded2 = await store();
     assert.equal(sLanded2.seed, sA.seed, 'the recall itself must land through the tray channel (accum)');
-    const gReseed = await waitCount(nFrozen + 1);
+    const gReseed = await waitPresented(
+      nPre2,
+      (g) => dist(g.grid, gFrozenHold.grid) > 3 && dist(g.grid, gAacc.grid) < dist(gFrozenHold.grid, gAacc.grid),
+      120000,
+      'the reseeded recalled scene after the paused∧frozen recall',
+    );
     const sReseed = await store();
     ok('paused∧frozen recall reseeds the buffer and shows the recalled scene', () => {
-      assert.ok(gReseed.n >= nFrozen + 1, 'the recall presented nothing — the stale buffer texture survived');
+      assert.ok(gReseed.n >= nPre2 + 1, 'the recall presented nothing — the stale buffer texture survived');
       assert.ok(
         dist(gReseed.grid, gFrozenHold.grid) > 3,
         'the presented frame did not move — the stale buffer texture is still showing',
@@ -439,17 +542,14 @@ if (!skipped) {
       assert.equal(sReseed.running, false, 'the reseed must not resume the loop');
       assert.equal(sReseed.seed, sA.seed, 'the store holds the hit’s seed');
     });
-    const nFrozenAfter = await settledCount();
-    const nFrozenStable = await settledCount();
+    // #2537: same bounded settle as the main group — the count must
+    // stand across a soak within the budget, however the reseed's bake
+    // landing interleaves with the reads.
+    const nFrozenAfter = await boundedSettle(nPre2, 2, sA);
     ok('the frozen hold resumes after the reseed (bounded, then no drift)', () => {
       assert.ok(
-        nFrozenAfter - nFrozen >= 1 && nFrozenAfter - nFrozen <= 2,
-        `recall produced ${nFrozenAfter - nFrozen} presents over the frozen hold — expected the reseed (+ its bake)`,
-      );
-      assert.equal(
-        nFrozenStable,
-        nFrozenAfter,
-        `presented count drifted ${nFrozenAfter} → ${nFrozenStable} with no change`,
+        nFrozenAfter - nPre2 >= 1 && nFrozenAfter - nPre2 <= 2,
+        `recall produced ${nFrozenAfter - nPre2} presents over the frozen hold — expected the reseed (+ its bake)`,
       );
     });
     await page.evaluate(() => window.__kcStore.getState().setRunning(true));
