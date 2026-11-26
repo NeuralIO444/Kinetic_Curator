@@ -1,6 +1,6 @@
 // DEV → UNITS. One section per open PR. RUN tests the files that PR changed.
 import { useEffect, useState } from 'react';
-import { makeUnit, pushUnitCheck } from '../dev/unitMaker.mjs';
+import { makeUnit, pushUnitCheck, unitMadeLine } from '../dev/unitMaker.mjs';
 
 export function UnitsPanel() {
   const [prs, setPrs] = useState([]);
@@ -9,6 +9,7 @@ export function UnitsPanel() {
   const [issue, setIssue] = useState('722');
   const [name, setName] = useState('behave ease');
   const [made, setMade] = useState(() => makeUnit({ issue: '722', name: 'behave ease' }));
+  const [pressed, setPressed] = useState(false);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -32,7 +33,8 @@ export function UnitsPanel() {
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
       <p style={{ opacity: 0.75 }}>
-        Press U. Each open PR runs the tests next to its files. This is the dev server only.
+        Press U. Each open PR runs the tests next to its files — running them is dev server only. MAKE drafts a unit
+        template in any build; you save the file yourself.
       </p>
       {error && <p>{error}</p>}
       {prs.map((pr) => {
@@ -62,9 +64,18 @@ export function UnitsPanel() {
       <div style={{ marginTop: 12 }}>
         <input value={issue} onChange={(e) => setIssue(e.target.value)} style={{ width: 64 }} aria-label="Issue" />
         <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: 140 }} aria-label="Unit name" />
-        <button type="button" className="chip-btn" onClick={() => setMade(makeUnit({ issue, name }))}>
+        <button
+          type="button"
+          className="chip-btn"
+          onClick={() => {
+            setMade(makeUnit({ issue, name }));
+            setPressed(true);
+          }}
+        >
           MAKE
         </button>
+        {pressed && <p style={{ opacity: 0.75 }}>{unitMadeLine(made)}</p>}
+        <div style={{ opacity: 0.75 }}>{made.file}</div>
         <pre style={{ whiteSpace: 'pre-wrap' }}>{made.src}</pre>
       </div>
     </div>
