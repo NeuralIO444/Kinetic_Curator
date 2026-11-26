@@ -384,6 +384,7 @@ node src/gl/squash.selfcheck.mjs
 node src/gl/audioRoutes.selfcheck.mjs
 node src/gl/patternAudio.selfcheck.mjs
 node src/gl/stimuliAuto.selfcheck.mjs
+node src/panels/stimulus/modMatrixDepth.selfcheck.mjs
 node src/gl/beatClock.selfcheck.mjs
 node src/state/rollScope.selfcheck.mjs
 node src/gl/hueAudio.selfcheck.mjs
