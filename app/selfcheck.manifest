@@ -168,6 +168,7 @@ node src/components/dishFluidChip.selfcheck.mjs
 node src/components/genomeTimeline.selfcheck.mjs
 node src/components/genomeMaterial.selfcheck.mjs
 node src/components/lineageTree.selfcheck.mjs
+node src/components/lineageThirdParent.selfcheck.mjs
 node src/components/strandBank.selfcheck.mjs
 node src/components/cultivate.selfcheck.mjs
 node src/components/cultivatePress.selfcheck.mjs
