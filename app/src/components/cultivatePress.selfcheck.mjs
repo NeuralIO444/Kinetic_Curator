@@ -22,6 +22,18 @@
 // And the panel's uncultivated line names that press, so the state can never again
 // sit silent about what it is waiting for (the A7/#2485 discipline).
 //
+// #2541: the browser group's seed assertion originally baselined before.seed
+// from the live scene, then navigated and pressed — a window seconds wide in
+// which the project seed lawfully moves (layout builds stamp their build
+// seed, bumpSeed re-rolls it, DAVIS evolve and phrase wrap advance it). A
+// roll inside the window failed the assertion with the panel behaving
+// correctly (PR #2540's CI: note seed 2451053944 vs sampled 1391772584). The
+// group now takes the seed sample and the press in ONE synchronous page
+// turn — no mover can run inside a single evaluate — so the baseline is the
+// seed current at the press: the invariant's own terms, at full strength
+// (the #2537/#2538 lesson — never baseline a standing frame against a
+// moving scene).
+//
 //   A source    the press wiring in WetLab.jsx + the honest line in
 //               CreatureCultivate.jsx (runs everywhere).
 //   B browser   (skipped when no Playwright browser is present) the BUILT app:
@@ -319,14 +331,44 @@ if (!skipped) {
         assert.equal(before.running, true, 'variant precondition: the loop is running');
         await selectRecord(childId);
         assert.equal(await cultivatedOf(childId), null, 'the child starts uncultivated');
-        await press(chip());
-        assert.equal(
-          await chip().getAttribute('aria-pressed'),
-          'true',
-          'the chip stands pressed (the filed observation)',
-        );
+        // #2541: sample the seed and press in ONE synchronous page turn.
+        // The project seed is a live value while the loop runs — layout
+        // builds stamp their build seed over it (layoutSlice), bumpSeed
+        // XOR-re-rolls it, DAVIS evolve and phrase wrap advance it — so a
+        // sample taken before the press can be stale by the time the note
+        // is stamped, and the assertion fails with the panel behaving
+        // correctly. Inside a single evaluate no other script can run, so
+        // the seed read here IS the seed current at the press: the
+        // invariant's own baseline, at full strength. The DOM click is
+        // this pin's own established press fallback (the same real click
+        // event on the same button); the press's effects are still polled
+        // and asserted strictly below.
+        const seedAtPress = await page.evaluate(() => {
+          const seed = window.__kcStore.getState().seed;
+          document.querySelector('[data-testid="record-cultivate"]')?.click();
+          return seed;
+        });
+        // The pressed state renders a beat behind the press; converge on
+        // the read (the #2538 discipline) instead of sampling it once.
+        {
+          const t0 = Date.now();
+          let pressed = await chip().getAttribute('aria-pressed');
+          while (pressed !== 'true' && Date.now() - t0 < 15000) {
+            await page.waitForTimeout(250);
+            pressed = await chip().getAttribute('aria-pressed');
+          }
+          assert.equal(
+            pressed,
+            'true',
+            `the chip stands pressed (the filed observation) — aria-pressed read ${pressed}`,
+          );
+        }
         const note = await waitCultivated(childId);
-        assert.equal(note.seed, before.seed, 'the note is stamped with the project seed — the panel’s own derivation');
+        assert.equal(
+          note.seed,
+          seedAtPress,
+          `the note is stamped with the project seed current at the press — the panel’s own derivation (note seed ${note.seed}, seed at press ${seedAtPress})`,
+        );
         await waitNoteShown();
         const text = await page.locator('[data-testid="creature-cultivate"]').innerText();
         assert.ok(!text.includes('not cultivated yet'), 'the panel opens on the reads, not the waiting line');
