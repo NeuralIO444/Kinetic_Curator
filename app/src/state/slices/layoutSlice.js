@@ -984,6 +984,7 @@ export const createLayoutSlice = (set) => ({
    */
   colorMode: 'FADE',
   shapeLevels: {}, // #733 shape mixer intensities { chipId: 1|2|3 } — live only while the pool matches (liveShapeLevels)
+  shapeMixRefusal: null, // #2495 — the last cap-refused shape chip { id }, banked by cycleShapeLevel; the shelf names it while the mix stands full. Session-only.
   caGrid: null,
   historyUndoStack: [],
   historyRedoStack: [],
@@ -1381,6 +1382,9 @@ export const createLayoutSlice = (set) => ({
    * intensities the placer weights by. The last chip cannot go off — an empty
    * pool renders nothing — so at 3 it stays 3. Same single-axis contract as
    * loadShapeSet: shapes only, no MIX, never touches layout/motion/colour.
+   * #2495: a cap refusal banks `shapeMixRefusal` ({ id }) on the same press,
+   * so the shelf can name what was refused — the mix itself is untouched and
+   * no undo entry is made. Any cycle that lands clears the record.
    */
   cycleShapeLevel: (id) =>
     set((state) => {
@@ -1388,7 +1392,7 @@ export const createLayoutSlice = (set) => ({
       const cur = liveShapeLevels(state.shapeLevels, state.enabledAssets);
       const at = cur[id] || 0;
       const on = Object.keys(cur).filter((k) => cur[k] > 0).length;
-      if (at === 0 && on >= SHAPE_MIX_MAX) return {}; // the refusal is the visible constraint
+      if (at === 0 && on >= SHAPE_MIX_MAX) return { shapeMixRefusal: { id } }; // refused — and named (#2495), never evicts
       const next = { ...cur };
       const level = (at + 1) % 4;
       if (level === 0) delete next[id];
@@ -1399,7 +1403,7 @@ export const createLayoutSlice = (set) => ({
       const map = {};
       for (const assetId of shapeMixIds(next)) if (known.has(assetId)) map[assetId] = true;
       if (!Object.keys(map).length) return {};
-      return { ...pushToUndo(state, true), enabledAssets: map, shapeLevels: next };
+      return { ...pushToUndo(state, true), enabledAssets: map, shapeLevels: next, shapeMixRefusal: null };
     }),
 
   toggleParamLock: (key) =>

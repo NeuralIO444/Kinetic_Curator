@@ -638,6 +638,24 @@ export function liveShapeLevels(levels, enabledAssets) {
   return on.length === ids.length && ids.every((id) => enabledAssets[id]) ? levels : {};
 }
 
+/**
+ * #2495 — the one line that names a refused fifth chip. `refusal` is the
+ * record cycleShapeLevel banks on the cap refusal ({ id }); `levels` is the
+ * standing live levels map. The line stands only while the record still
+ * describes the stage: the refused chip still off and the mix still full.
+ * Anything else — a chip went off, the pool was rewritten, no refusal — is
+ * null, so a stale record can never name a state that no longer holds.
+ */
+export function shapeMixRefusalLine(refusal, levels) {
+  if (!refusal || !refusal.id) return null;
+  const lv = levels || {};
+  const on = Object.values(lv).filter((x) => x > 0).length;
+  if (lv[refusal.id] > 0 || on < SHAPE_MIX_MAX) return null;
+  const set = SHAPE_SETS.find((x) => x.id === refusal.id);
+  if (!set) return null;
+  return `${set.name} stays off — shapes full (${on}/${SHAPE_MIX_MAX} on)`;
+}
+
 /** A motion chip reads as active while every param it sets is at its value. */
 export const isMotionActive = (layoutParams, motion) =>
   Object.entries(motion.params).every(([k, v]) => layoutParams?.[k] === v);
