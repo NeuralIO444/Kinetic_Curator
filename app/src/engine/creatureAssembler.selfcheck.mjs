@@ -406,6 +406,9 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'engine/creaturePaint.selfcheck.mjs',
     // #2341: PAINT's genome-card suite — a test of the hand-edit door, not a stage reader
     'components/genomeMaterial.selfcheck.mjs',
+    // #2488: the CULTIVATE-press suite — a test: it banks and breeds through the store's own actions and
+    // reads the bank back to prove the chip press wrote the note; not a stage reader
+    'components/cultivatePress.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

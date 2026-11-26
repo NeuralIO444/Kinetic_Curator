@@ -36,6 +36,7 @@ import { BeastSettings } from '../components/BeastSettings.jsx';
 import { GenomeTimeline } from '../components/GenomeTimeline.jsx'; // #1870
 import { LineageTree } from '../components/LineageTree.jsx'; // #2030
 import { CreatureCultivate } from '../components/CreatureCultivate.jsx'; // #1872
+import { cultivationNote } from '../components/cultivate.model.mjs'; // #2488 — the chip press derives the note it writes
 import { CreatureMiniature } from '../components/CreatureMiniature.jsx'; // #1872 — the stage is this, scaled up (#2034)
 import { lineageTree } from '../components/lineageTree.model.mjs'; // #2030 — a tile's generation is derived, never stored
 import { sanitizeRig } from '../engine/creatureRig.js'; // #1872 — a beast row's linkage, read for its cultivate panel
@@ -151,6 +152,7 @@ export function WetLab({ assetId, onClose }) {
   const beastNote = useStore((s) => s.beastAssembleNote);
   const breedCreature = useStore((s) => s.breedCreature); // #1852
   const breedNote = useStore((s) => s.creatureBreedNote);
+  const cultivateCreature = useStore((s) => s.cultivateCreature); // #1872 — the dry-run's door; the chip press writes through it (#2488)
   const dealNote = useStore((s) => s.creatureDealNote); // #2232 — what the last KIN tap did
   // the rail's mode: which panel the right zone holds. #2232 — opened with no shape (the empty lab), there is nothing
   // to assemble from, so it opens on the genome panel and the KIN strip is the way in
@@ -594,7 +596,19 @@ export function WetLab({ assetId, onClose }) {
                     aria-pressed={cultivateOpen}
                     data-testid="record-cultivate"
                     title={`Cultivate ${selRecord.id} — dry-run it before stage injection`}
-                    onClick={() => setCultivateOpen((cur) => !cur)}
+                    onClick={() => {
+                      // #2488 — the press is the dry-run for an uncultivated record: the reads are a
+                      // synchronous derivation, so the note is written through the door as the panel
+                      // opens and the panel opens on the reads. A standing note is never silently
+                      // re-run — re-cultivation stays the panel's own press. (Before this, the chip
+                      // only opened the panel and the dry-run waited on a second, identically
+                      // labelled press inside it, with nothing saying so: the panel sat at 'not
+                      // cultivated yet' indefinitely, in any loop state.)
+                      if (!cultivateOpen && !selRecord.cultivated) {
+                        cultivateCreature(selRecord.id, cultivationNote(selRecord, selBodyAsset, seed));
+                      }
+                      setCultivateOpen((cur) => !cur);
+                    }}
                   >
                     cultivate
                   </button>
