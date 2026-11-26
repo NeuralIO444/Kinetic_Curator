@@ -152,7 +152,22 @@ the invariant half of the evidence (the lawful paths were never broken).
   wetLab PASS · hornLines PASS · shapeMix PASS · uiRegistry PASS.
 - format:check — clean. lint — 0 errors (11 warnings, the pre-existing set on base).
   build — ✓ built in 9.26s.
-- Full manifest sweep: SWEEP-TALLY-TBD.
+- Full manifest sweep: **839 PASS / 6 FAIL** over all 845 manifest commands (log kept in the
+  worktree during the run). The six failures classify as follows, each with its evidence:
+  - `swarmWasm` (exit 1), `rollSafety` (exit 1), `accum` (abort) — the documented
+    sandbox-environmental set, A/B-proven identical on pristine main by this line's standing
+    record and untouched by this change (none loads the lineage model).
+  - `accumFreezeClear`, `pausedRecallPresent`, `bgWhiteScene` — browser suites that failed
+    inside the sweep under contention (300 s per-command cap on a shared 1.5-CPU sandbox).
+    Standalone tiebreakers on this branch, run with nothing else competing: accumFreezeClear
+    PASS (10 groups), pausedRecallPresent PASS (18 groups), bgWhiteScene PASS (11 groups).
+    bgWhiteScene was A/B'd explicitly because its first standalone run also failed (at
+    "shuffled white grid — marks missing on white", a frame read of a nearly uniform frame):
+    on pristine base d605f92a it fails too, at a different presentation group ("frozen white
+    grid — held frame blank"), and on this branch it then passes in full — a
+    presentation-timing suite whose sandbox verdict moves run to run in both directions,
+    never near this diff (it reads BG palette rendering; nothing it loads imports the lineage
+    model). CI remains authoritative for it, as for the whole browser family.
 - One-writer files byte-identical to base; diff is the model expression + comment, the census
   registration, the new pin, one manifest line, and this report.
 
