@@ -13,6 +13,11 @@
  * the real gate. A beast's reads are derived live from its measures — its tile's door carries no
  * cultivation field, so nothing is written for a beast.
  *
+ * #2488 — the lab's CULTIVATE chip press performs the dry-run for an uncultivated record as it opens
+ * this panel (the reads are a synchronous derivation; nothing about them rides the stage loop, so no
+ * loop state can stall them). This panel's own press remains the explicit re-run ('cultivate again'),
+ * and the uncultivated line names that press, so the state never sits silent about what it waits for.
+ *
  * Discrete facts render TE (KC-1 DS): scores, verdicts, seeds as plain digits and labels; the sketch is
  * continuous motion and renders Davis.
  */
@@ -119,7 +124,7 @@ export function CreatureCultivate({ subject, assets = [], stageIds = [], overlay
         </>
       ) : (
         <div style={noteLine} title="The dry-run writes its reads onto the record">
-          not cultivated yet
+          not cultivated yet — press cultivate to run the dry-run
         </div>
       )}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
