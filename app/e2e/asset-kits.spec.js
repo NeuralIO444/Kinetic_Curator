@@ -36,8 +36,13 @@ test('Kanji + Big Shapes + Botanica: all three slots set, a roll deals only from
     const st = window.__kcStore.getState();
     return Object.keys(st.enabledAssets).filter((id) => st.enabledAssets[id]);
   });
-  expect(dealt.length).toBeGreaterThanOrEqual(3);
-  expect(dealt.length).toBeLessThanOrEqual(6);
+  // #2544 re-pin (cause: the stage deal, Matt's ruling 2026-11-26 — a CHAOS roll now also deals
+  // creature and construct tiles into the mix): the kit deal's own law is unchanged — 3–6 ASSETS —
+  // and anything else enabled is a dealt creature/construct tile, by id shape.
+  const dealtTiles = dealt.filter((id) => /^user:(cr|cn)-[0-9a-f]{8}$/.test(id));
+  const assetIds = dealt.filter((id) => !dealtTiles.includes(id));
+  expect(assetIds.length).toBeGreaterThanOrEqual(3);
+  expect(assetIds.length).toBeLessThanOrEqual(6);
   // survives reload through the project doc? the slots at least show the store
   await expect(page.getByLabel('kit 2')).toHaveValue('big-shapes');
   expect(errors).toEqual([]);

@@ -39,10 +39,15 @@ assert.ok(compIds.has(s.layoutParams.composition), `composition ${s.layoutParams
 assert.strictEqual(s.layoutParams.density, lockedDensity, 'locked density survives the roll');
 
 // 4. assets — non-empty pool of known ids.
+// #2544 re-pin (cause: the stage deal, Matt's ruling 2026-11-26 — a CHAOS roll now also deals creature
+// and construct tiles into the mix): the ASSET part of the pool is known ids, exactly as before; anything
+// else enabled is a dealt creature/construct tile, by id shape.
 const on = Object.keys(s.enabledAssets || {}).filter((k) => s.enabledAssets[k]);
-assert.ok(on.length > 0, 'asset pool is never empty after a roll');
+const dealtTiles = on.filter((id) => /^user:(cr|cn)-[0-9a-f]{8}$/.test(id));
+const assetOn = on.filter((id) => !dealtTiles.includes(id));
+assert.ok(assetOn.length > 0, 'asset pool is never empty after a roll');
 assert.ok(
-  on.every((id) => assetIds.has(id)),
+  assetOn.every((id) => assetIds.has(id)),
   'every enabled asset is a known id',
 );
 

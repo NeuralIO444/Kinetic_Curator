@@ -241,9 +241,10 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
   ok('a missing style or an unjoinable vocabulary assembles nothing; a messy rule is cleaned');
 }
 
-// 7 — not on stage yet: only the document and the store's bank read the assembler (records are saved and
-// loaded); no render, curator or stage deal path does. The WetLab ladder's CONSTRUCT and CREATURE rungs read it
-// (wetlab-ladder-spec §13, §14): the WetLab is not the stage, and each file is named here, so anything else still trips.
+// 7 — the assembler's readers, named: the document and the store's bank (records are saved and loaded),
+// the WetLab ladder's CONSTRUCT and CREATURE rungs (wetlab-ladder-spec §13, §14 — the WetLab is not the
+// stage), and — since #2544 (Matt's ruling, 2026-11-26: construct recipes join the stage roll) — the one
+// stage path that banks what it deals. Each file is named here, so anything else still trips.
 {
   const root = join(here, '..');
   const allowed = new Set([
@@ -257,6 +258,10 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
     'panels/ladderPools.selfcheck.mjs', // its suite builds real constructs to test against
     'engine/gait.selfcheck.mjs', // #2328: its suite derives join trees from real house constructs (a test)
     'engine/gait.js', // #2328 (gait M2): the join-tree adapter reads where a piece's own point lands (constructPartPoint) — geometry only, no stage path
+    'state/stageKineticDeal.mjs', // #2544: the stage deal — banks dealt construct recipes through bankConstructRecord and enables their tiles over the roll (the stage path Matt's ruling adds)
+    'state/stageKineticDeal.selfcheck.mjs', // #2544: its suite reads the banked records back to prove the deal (a test)
+    'state/rollPool.selfcheck.mjs', // #2544 re-pin: the suite reads isConstructTileId to tell dealt tiles from assets in a roll (a test)
+    'state/kineticSweep.selfcheck.mjs', // #2544 re-pin: the suite reads isConstructTileId to tell dealt tiles from assets in the LOOK pool (a test)
   ]);
   const importers = [];
   const walk = (dir) => {
@@ -272,8 +277,8 @@ const SEEDS = Array.from({ length: 200 }, (_, i) => (i * 2654435761) >>> 0);
     }
   };
   walk(root);
-  assert.deepEqual(importers, [], 'no stage path reads the construct assembler in this slice');
-  ok('only the project document and the bank read the assembler (nothing on stage yet)');
+  assert.deepEqual(importers, [], 'a construct-assembler reader is not on the named list');
+  ok('only the named paths read the assembler (the document, the bank, the WetLab rungs, the stage deal)');
 }
 
 // 8 — the tile: a pure function of the record; one group per piece; each piece drawn where it was joined.

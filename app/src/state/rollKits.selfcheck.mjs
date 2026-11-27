@@ -277,7 +277,12 @@ const union = new Set(kits3.flatMap((x) => [...poolOf(x)]));
 for (let i = 0; i < 8; i++) {
   S().kineticRoll();
   const on = Object.keys(S().enabledAssets).filter((id) => S().enabledAssets[id]);
-  assert.ok(on.length >= 3 && on.every((a) => union.has(a)), 'CHAOS rolls from the standing triad');
+  // #2544 re-pin (cause: the stage deal, Matt's ruling 2026-11-26 — a CHAOS roll now also deals
+  // creature and construct tiles into the mix): the ASSET part of the roll comes from the standing
+  // triad, exactly as before; anything else enabled is a dealt tile, by id shape.
+  const dealtTiles = on.filter((id) => /^user:(cr|cn)-[0-9a-f]{8}$/.test(id));
+  const assets = on.filter((id) => !dealtTiles.includes(id));
+  assert.ok(assets.length >= 3 && assets.every((a) => union.has(a)), 'CHAOS rolls from the standing triad');
 }
 S().setKitTriad([]);
 S().kineticRoll();

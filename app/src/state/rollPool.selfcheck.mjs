@@ -8,6 +8,8 @@ import { FAMILIES } from '../data/assetStyle.js';
 import { SHAPE_SETS } from '../data/voices.js';
 import { mkRng } from '../engine/prng.js';
 import { dealableRecords, dealMixedPool, dealPoolFor, poolToEnabled, POOL_MIN, POOL_MAX } from './rollPool.mjs';
+import { isCreatureTileId } from '../engine/creatureTileId.js'; // #2544: a dealt creature's tile id shape
+import { isConstructTileId } from '../engine/constructAssembler.js'; // #2544: a dealt construct's tile id shape
 
 const records = dealableRecords(ASSETS);
 const rng = mkRng(1767);
@@ -64,15 +66,29 @@ assert.ok(withImport.some((r) => r.id === 'user:koi' && r.family === 'imported')
 assert.deepEqual(poolToEnabled(['a', 'b']), { a: true, b: true });
 
 // 7. the store: a chaos roll lands a known, mixed pool (one undo step is pinned by kineticRoll.selfcheck)
+// #2544 re-pin (cause: the stage deal, Matt's ruling 2026-11-26 — a pool-dealing press now also deals
+// creature and construct tiles into the mix): the ASSET part of the pool keeps its law exactly — known,
+// mixed, the creature citizen never dealt — and anything else enabled must be a dealt tile, by id shape.
 const { useStore } = await import('./store.js');
 const known = new Set(ASSETS.map((a) => a.id));
 const storeSeen = new Set();
+const dealtSeen = new Set();
 for (let i = 0; i < 30; i++) {
   useStore.getState().kineticRoll();
   const on = Object.keys(useStore.getState().enabledAssets).filter((k) => useStore.getState().enabledAssets[k]);
-  assert.ok(on.length >= POOL_MIN && on.every((id) => known.has(id)) && !on.includes('creature'));
-  for (const id of on) storeSeen.add(id);
+  const dealt = on.filter((id) => isCreatureTileId(id) || isConstructTileId(id));
+  const assets = on.filter((id) => !dealt.includes(id));
+  assert.ok(
+    assets.length >= POOL_MIN && assets.every((id) => known.has(id)) && !on.includes('creature'),
+    `roll ${i}: the asset pool is known and mixed (${assets.length} assets, ${dealt.length} dealt tiles)`,
+  );
+  for (const id of assets) storeSeen.add(id);
+  for (const id of dealt) dealtSeen.add(id);
 }
+assert.ok(
+  dealtSeen.size > 0,
+  `30 store rolls deal creature/construct tiles into the mix (${dealtSeen.size} distinct tiles seen)`,
+);
 assert.ok(
   storeSeen.size > 60,
   `30 store rolls already reach ${storeSeen.size} assets (the old deck's ceiling was ${setReach.size})`,

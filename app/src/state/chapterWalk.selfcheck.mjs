@@ -223,8 +223,14 @@ for (const c of CHAPTERS) {
     'the dealt look belongs to the landed chapter',
   );
   const poolIds = Object.keys(S().enabledAssets).filter((k) => S().enabledAssets[k]);
+  // #2544 re-pin (cause: the stage deal, Matt's ruling 2026-11-26 — the LOOK pass now also deals
+  // creature and construct tiles into the mix, from the stage's whole library): the ASSET part of the
+  // dealt pool belongs to the landed chapter, exactly as before; anything else enabled is a dealt
+  // tile, by id shape.
+  const dealtTiles = poolIds.filter((id) => /^user:(cr|cn)-[0-9a-f]{8}$/.test(id));
+  const assetPool = poolIds.filter((id) => !dealtTiles.includes(id));
   assert.ok(
-    poolIds.every((id) => chapterAssets(landing.chapterId).includes(id)),
+    assetPool.every((id) => chapterAssets(landing.chapterId).includes(id)),
     'the dealt pool belongs to the landed chapter',
   );
   S().kineticVoicePass();

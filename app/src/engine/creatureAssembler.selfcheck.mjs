@@ -409,6 +409,13 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // #2488: the CULTIVATE-press suite — a test: it banks and breeds through the store's own actions and
     // reads the bank back to prove the chip press wrote the note; not a stage reader
     'components/cultivatePress.selfcheck.mjs',
+    // #2544: the stage deal — the stage's own KINETIC presses now deal creatures (Matt's ruling,
+    // 2026-11-26: they join the roll): the pure core reads the bank to know who already stands and
+    // builds each dealt creature's tile the bank's way (creatureTile over skeletonFounder); dealt
+    // creatures stand as stage births, and the stage still reaches every creature, dealt, born or
+    // banked, through its pool TILE alone. Its suite is a test.
+    'state/stageKineticDeal.mjs',
+    'state/stageKineticDeal.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

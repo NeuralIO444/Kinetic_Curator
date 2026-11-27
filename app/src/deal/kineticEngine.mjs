@@ -5,7 +5,8 @@
 // OFF → WEAK → MED → KOZ, whatever an editor's own ladder is) and the press: ask the adapter for a wide deal under
 // the ceiling, bound what it hands back by a draw budget, drop what the gate refuses, drop duplicates, keep a hand.
 // What it does not own: what a candidate is, what "wide" means, and what happens to a hand (the host applies a pick).
-// The stage's own KINETIC buttons do not run on this yet (the stage keeps its store actions until Matt orders a change).
+// #2544 (Matt's order, 2026-11-26): the stage's pool-dealing KINETIC presses now run on this too — the LOOK pass
+// and the CHAOS roll deal creatures and construct recipes into the roll (state/stageKineticDeal.mjs).
 import { assertAdapter, clampInt, collectHand } from './dealAdapter.mjs';
 
 /** Matt's ruling (2026-11-16): KIN deals a hand of 6. A named constant, tuned in one place. */
