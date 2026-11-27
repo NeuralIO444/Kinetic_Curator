@@ -107,6 +107,7 @@ node src/state/projectNaming.selfcheck.mjs
 node src/state/poolCitizenship.selfcheck.mjs
 node src/state/shelfPersist.selfcheck.mjs
 node src/state/sessionOnly.selfcheck.mjs
+node src/state/frameLock.selfcheck.mjs
 node src/state/allEraGolden.selfcheck.mjs
 node src/state/recipes.selfcheck.mjs
 node src/state/recipeUrls.selfcheck.mjs
