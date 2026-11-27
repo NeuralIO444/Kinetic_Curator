@@ -162,7 +162,7 @@ if (!skipped) {
       return { nodes: s.nodeCount, accum: !!s.layoutParams.accumulation, tier1: s.perfTier1, fault: s.renderFault };
     });
   const gridStats = async () => {
-    const g = await page.evaluate(() => window.__kcPresentedGrid(8));
+    const g = await page.evaluate(() => window.__kcPresentedGrid(32));
     if (!g) return null;
     const cells = [];
     for (let i = 0; i < g.grid.length; i += 3) cells.push([g.grid[i], g.grid[i + 1], g.grid[i + 2]]);
@@ -183,9 +183,21 @@ if (!skipped) {
     );
     return gridStats();
   };
-  // A flat-background frame is one uniform colour: distinct ≈ 1, range ≈ 0.
-  // A presented scene (48–600 nodes) reads distinct ≥ 28, range ≥ 99 in the sandbox.
-  const notFlat = (g) => !!g && g.distinct >= 8 && g.range >= 40;
+  // A flat-background frame is one uniform colour at any sampling density:
+  // distinct 1, range 1 — re-measured on the pre-fix tree through this same
+  // read path (three FREEZE + CLEARs, 41 nodes standing; 8-, 16- and 32-cell
+  // grids all read 1/1). Healthy frames are scene-dependent, and the reseed
+  // frame is the weakest read in this suite: the #2548 characterization
+  // (21 post-CLEAR reads over 7 dealt scenes in the sandbox, plus the CI
+  // samples that opened the issue) put its floor at the old 8-cell read at
+  // distinct 6 / range 13 — too close to the defect for a bar with margin
+  // on both sides. At 32 cells the same frames floor at distinct 32 /
+  // range 64, so the grid moves to 32 cells and the bar sits between the
+  // two populations: 2.7x under the healthy floor on both metrics, 12x /
+  // 24x over the defect signature. (Scene, hold and thaw reads floor at
+  // or above the reseed floor.) Full data: docs/archive/staging/
+  // STAGING-REPORT-2548-RECALIBRATION.md.
+  const notFlat = (g) => !!g && g.distinct >= 12 && g.range >= 24;
 
   try {
     const on = await page.evaluate(() => window.__KC_UI__.act('directors.accum', true));
