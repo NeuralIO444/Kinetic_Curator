@@ -1,6 +1,6 @@
 # STAGING REPORT — #2500 (A23): WetLab LINEAGE drive lines are truncated (missing third parent value)
 
-**Branch:** feat/2500-a23 · **Base:** d605f92a (current main) · **Builder verdict: (i), narrowly — the
+**Branch:** feat/2500-a23 (built) → feat/2500-parent-summary-gene-publish (publish) · **Base:** d605f92a at build; publish base cef57e92 — the lineage files are byte-identical between the two bases, so every measurement below describes the publish tree · **Builder verdict: (i), narrowly — the
 record's values are never dropped by any lawful path; the one place the line can stand a valueless slot
 after a parent's colon is a formatter fall-back that claimed "retained" for a gene the parent's summary
 does not hold and printed a bare JS `null` for its value. That fall-back is fixed to name the state in
