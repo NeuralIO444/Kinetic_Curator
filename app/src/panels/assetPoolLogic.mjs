@@ -117,6 +117,18 @@ export function activeChips({ cat = 'all', text = '', facets = {}, role = {} } =
   return chips;
 }
 
+/**
+ * #2494 — the pool's empty line. When a narrowing filter (search text, a facet or a role chip) matches
+ * nothing, the bulk shown on/off act on that empty set: the press is a true no-op, so the line names the
+ * consequence instead of letting the press read as broken. Un-narrowed (a category lens only), the bulk
+ * buttons still act on the whole category view, so the plain line stands.
+ */
+export function poolEmptyNote({ narrowed = false } = {}) {
+  return narrowed
+    ? 'nothing matches — shown on/off have nothing to act on — remove a filter above'
+    : 'nothing matches — remove a filter above';
+}
+
 /** Toggle a facet term in a filter map (immutable). */
 export function toggleFacet(facets, facet, term) {
   const cur = facets[facet] || [];

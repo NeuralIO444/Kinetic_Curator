@@ -19,6 +19,7 @@ import {
   activeChips,
   toggleFacet,
   nextSelection,
+  poolEmptyNote,
 } from './assetPoolLogic.mjs';
 
 const ROLE_STEPS = [0.6, 0.8]; // a role chip cycles: off → ≥ .6 → ≥ .8 → off
@@ -407,7 +408,7 @@ export function AssetPoolPanel() {
         )}
       </div>
       <div className={`pool-body ${poolView}`}>
-        {filtered.length === 0 && <div className="pool-empty">nothing matches — remove a filter above</div>}
+        {filtered.length === 0 && <div className="pool-empty">{poolEmptyNote({ narrowed })}</div>}
         <div className="asset-grid">
           {filtered.map((a) => {
             const w = effectiveWeight(a);
