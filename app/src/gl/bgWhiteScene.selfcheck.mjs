@@ -36,6 +36,27 @@
 //               bar cleared (distinct >= 8, range >= 40; a blank reads ~1/~0)
 //               — across the full recorded sequence and a light palette
 //               (smoke).
+//
+// Hardening (2026-11-26) — the browser reads are convergence waits budgeted
+// in presented frames, not single samples (or two re-reads) taken after a
+// wall-clock race. The failure this answers: on a docs-only branch (zero
+// code diff vs a main that passed the full job the same evening) the
+// standing-scene read below failed with the presented count at n:24 and a
+// flat light-grey modal [199,197,190] — the grid was sampled at the
+// earliest possible moment, right after the first forced stills, before
+// the scene had converged into the presented grid. Convergence is a
+// function of presented frames (the resolver/bake advances per present);
+// under runner CPU contention the still race expires early and the first
+// presents still show the pre-scene flat field, so a single early sample
+// reads flat on a healthy app. waitForGrid keeps forcing frames and
+// re-reading until the criterion is met, the presented count has advanced
+// by a generous frame budget, or the count stops advancing entirely
+// (hang detector). The flatness bar (distinct >= 8, range >= 40) and the
+// marksOnWhite criterion are unchanged: a truly blank frame is stable
+// (the #2487 blank held across a frozen buffer), so a blank spends the
+// whole budget and still fails — the wait cannot mask the defect this
+// pin guards. Same pattern as the pausedRecallPresent hardening
+// (PR #2540).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -231,22 +252,56 @@ if (!skipped) {
   // legitimately reads devShare 0.026 while carrying 29 distinct colours at
   // range 90 (measured), so gating on it would fail healthy scenes.
   const marksOnWhite = (g) => !!g && g.modal.every((v) => v >= 170) && g.distinct >= 8 && g.range >= 40;
-  // Sample a white-mode state, with up to two re-reads. Under sandbox load a
-  // forceFrames race can expire before the stills present, leaving a stale
-  // grid; a re-read after a few more frames absorbs that artifact. A truly
-  // blank frame is stable (the #2487 blank held across a frozen buffer), so
-  // the retries cannot mask the defect this pin guards — they only refuse to
-  // fail on a frame that was never presented.
-  const sampleWhite = async (frames, budgetMs) => {
-    let g = await forceFrames(frames, budgetMs);
-    for (let i = 0; i < 2 && !marksOnWhite(g); i++) g = await forceFrames(6, 60000);
-    return g;
+  // Hardening (2026-11-26): sampling a presented state is a convergence
+  // wait budgeted in PRESENTED FRAMES, not one sample (or two re-reads)
+  // after a wall-clock race — see the header note. FRAME_BUDGET is the
+  // same 2400 the pausedRecallPresent hardening uses (≈6–8× its observed
+  // convergence), and the wall clock survives only as a hang detector:
+  // a presented count that stops advancing entirely for HANG_MS fails
+  // as a hang. A truly blank frame is stable (the #2487 blank held
+  // across a frozen buffer), so the wait cannot mask the defect this
+  // pin guards — a blank spends the whole budget and still fails, with
+  // the last grid carried in the failure message.
+  const FRAME_BUDGET = 2400;
+  const HANG_MS = 120000;
+  const waitForGrid = async (criterion, what, seedFrames, seedBudgetMs) => {
+    let g = await forceFrames(seedFrames, seedBudgetMs);
+    if (criterion(g)) return g;
+    let baseline = g ? g.n : null;
+    let lastN = g ? g.n : -1;
+    let lastAdvance = Date.now();
+    for (;;) {
+      g = await forceFrames(6, 60000);
+      const now = Date.now();
+      if (g) {
+        if (baseline === null) baseline = g.n;
+        if (g.n !== lastN) {
+          lastN = g.n;
+          lastAdvance = now;
+        }
+        if (criterion(g)) return g;
+        if (lastN - baseline >= FRAME_BUDGET) {
+          throw new Error(
+            `presented grid never showed ${what} after ${lastN - baseline} presented frames (last grid ${JSON.stringify(g)})`,
+          );
+        }
+      }
+      if (now - lastAdvance > HANG_MS) {
+        throw new Error(
+          `presented count stopped advancing waiting for ${what} — hang (last n ${lastN}, last grid ${JSON.stringify(g)})`,
+        );
+      }
+    }
   };
+  // Sample a white-mode state: converge until the marks-on-white
+  // criterion holds (or the wait above spends its budget and throws).
+  const sampleWhite = async (frames, budgetMs) =>
+    waitForGrid(marksOnWhite, 'marks on the white field', frames, budgetMs);
 
   try {
     const chip = await act('topbar.palette-chip', undefined, 'praystation');
     assert.equal(chip.ok, true, 'palette-chip act failed');
-    const gScene = await forceFrames(24, 150000);
+    const gScene = await waitForGrid((g) => !!g && g.distinct >= 8 && g.range >= 40, 'a standing scene', 24, 150000);
     const stScene = await state();
     ok('a standing scene is up (count > 0, frame not flat)', () => {
       assert.ok(stScene.nodes > 0, `nodeCount ${stScene.nodes}`);
