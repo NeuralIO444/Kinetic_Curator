@@ -2,6 +2,8 @@
 
 Branch `feat/2496-a18`, base `d605f92a` (current main). Local commits only; no push, no PR.
 
+**Publish record (added at publish-prep):** the fix was cherry-picked onto `cef57e92` as branch `feat/2496-units-make-publish` (single commit `f76f2878`, cherry-pick of `05b9fa9b`, zero conflicts); this report was relocated from the repo root to `docs/archive/staging/` per the archive convention. The body below is the original staging record from the build lane, unedited.
+
 ## Verdict shape: (e/b) — behaviour lawful by design, but silent and mislabelled
 
 MAKE is not broken, and it is not native-only or dev-server-only. It never
