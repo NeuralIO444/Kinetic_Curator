@@ -2,7 +2,7 @@
 
 **Issue (verbatim title):** "Stress 2026-11-24 A22: SHELF fill receipt and KEEPS SHELF list contain the same keep three times"
 **Filed observation:** the last fill receipt's slots 4, 5, 6 are all "stratified · persona-davis · seed 4140623821"; the same keep also appears three times in the KEEPS SHELF collection list.
-**Branch:** feat/2499-a22, base d605f92a. Local commits only — no push, no PR.
+**Branch:** built on feat/2499-a22, base d605f92a (local commits only at build time); publish branch feat/2499-same-plate-keeps-publish, composed on cef57e92. The build base and the publish base are byte-identical in every file this slice touches (verified in the publish lane's QA pass), so the base demo below carries over unchanged.
 
 ## Verdict: shape (c) — lawful duplicates; the defect is presentation
 
