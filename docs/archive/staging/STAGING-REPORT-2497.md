@@ -1,7 +1,7 @@
 # STAGING REPORT — #2497 (Stress 2026-11-24 A20)
 
 **Issue (verbatim title):** "Stress 2026-11-24 A20: STIMULI modulation-matrix spinbuttons show [invalid] rounding mismatches"
-**Branch:** feat/2497-a20 · **Base:** d605f92a (current main) · **Verdict shape: (a)** — stored values are lawful; only the field's declared validation law disagreed with them. One-line fix at the shared point (the one spinbutton every route row renders), plus an invariant pin.
+**Branch:** feat/2497-a20 (build) → feat/2497-matrix-spinbutton-publish (publish, base cef57e92) · **Base:** d605f92a (build) · **Verdict shape: (a)** — stored values are lawful; only the field's declared validation law disagreed with them. One-line fix at the shared point (the one spinbutton every route row renders), plus an invariant pin.
 
 ## What was filed
 
