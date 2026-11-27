@@ -129,10 +129,10 @@ removing it restores PASS.
      derive `store.fps` from presented frames. This half is NOT in a one-writer
      file (useFpsMeter.js / fpsMath.mjs) but belongs in the same slice — shipping
      (1) without (2) re-files this exact issue.
-  Also in that slice: MasterBar's title copy and the uiRegistry description
-  become true as written ("Locks the frame rate to 30 fps.") — no copy change
-  needed; pin group B's census gains `gl/liveLoop.mjs` and group C is reworked
-  to the presented-frame derivation, in the same PR.
+     Also in that slice: MasterBar's title copy and the uiRegistry description
+     become true as written ("Locks the frame rate to 30 fps.") — no copy change
+     needed; pin group B's census gains `gl/liveLoop.mjs` and group C is reworked
+     to the presented-frame derivation, in the same PR.
 - **Option 2 — remove the toggle.** Delete the button (MasterBar), the field +
   setter (globalSlice), and the registry control. Zero feel change; the bar
   stops promising a lock that doesn't exist. Pin groups B/D are reworked to
@@ -175,3 +175,29 @@ the question the issue actually turns on (why nothing happens) with a pinned
 verdict. The follow-up fix is **Matt's ruling first** (Option 1 vs 2 above);
 Option 1 then goes to his review lane as a designated-writer slice (feel change),
 Option 2 as an auto-lane removal once ruled.
+
+## 7. Coordinator re-verification (2026-11-27, before the publish queue)
+
+This slice was found already built (commit 20748c81, 2026-11-26) when the
+A-line reached it; it was re-verified rather than rebuilt:
+
+- **Premise re-checked against current main (cef57e92):** the production
+  census is unchanged — `frameLock` is mentioned only by globalSlice.js
+  (field + setter), MasterBar.jsx (button + label), uiRegistry.mjs
+  (declaration), plus the showrunner selfcheck's fixture. No reader has
+  appeared; the dead-control verdict stands on the current tree.
+- **Pin re-run:** frameLock PASS (4 groups). Neighbours: fpsMath PASS ·
+  showrunner PASS · sessionOnly PASS (4 checks) · uiRegistry PASS
+  (333 controls). State-family manifest sweep: 82/82 PASS.
+- **Lint/format:** eslint clean on the pin; prettier clean on the pin
+  (the publish ritual's format:check runs in app/; this report was
+  prettier-formatted to match its archive siblings).
+- **Relocation:** the report moved from the repo root to
+  docs/archive/staging/ per the archive convention that landed after
+  this slice was built. The pin references the basename only, so no
+  pin text changed.
+- **Ruling on record:** Matt ruled Option 2 (remove the toggle) on the
+  issue, 2026-11-26. The removal is staged as its own slice and, at its
+  composition, retires this pin (superseded by
+  frameLockRemoval.selfcheck.mjs). This evidence slice publishes first,
+  in line order.
