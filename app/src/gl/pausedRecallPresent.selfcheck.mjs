@@ -71,6 +71,23 @@
 // (fired at d 9.7). It now reads B2's identity relatively (closer to
 // B2 than to A) and asserts the hold against its own first frozen
 // frame across a soak, at the same threshold.
+//
+// PR #2540 hardening (2026-11-26) — the convergence waits are budgeted
+// in presented frames, not wall seconds. The A/B diagnosis (10 runs on
+// the PR tree, 12 on pristine main, byte-identical suite code) proved
+// the CI failures were this suite's wall clocks expiring under CPU
+// contention, not a production defect: after the A→B setState the
+// presented grid's mean luminance parked at 138.9–169.4 against the
+// >170 threshold for the full 180 s budget, two runs missing the
+// threshold by 1–4 points. The scene converges over presented frames
+// (the bake/resolver pipeline advances per present), and contention
+// starves the frame count long before it starves the clock. Every run
+// that got past scene B passed all 18 groups, both paused-recall
+// groups included. waitScene / waitPresented now poll until the
+// criterion is met, the presented count has advanced by a generous
+// frame budget, or the count stops advancing entirely (the wall clock
+// remains only as that hang detector). The boot gate maintains the
+// scene-A set inside the read's own page turn. Criteria unchanged.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -241,13 +258,54 @@ if (!skipped) {
   // the two test palettes are chosen for coarse-grid legibility (hydra's
   // ground is near-black, transit's near-white), so the presented frame's
   // mean luminance names the scene outright.
-  const waitScene = async (kind, timeoutMs = 180000) => {
-    const t0 = Date.now();
+  //
+  // PR #2540 hardening: the budget is PRESENTED FRAMES, not wall seconds
+  // (see the header note). Passing runs present the light scene within a
+  // few hundred frames even when slow, so FRAME_BUDGET allows ≈6–8×
+  // that. The wall clock survives only as a hang detector: a presented
+  // count that stops advancing entirely for HANG_MS fails as a hang.
+  const FRAME_BUDGET = 2400;
+  const HANG_MS = 120000;
+  const waitScene = async (kind, { maintainSceneA = false } = {}) => {
+    let startN = null;
+    let lastN = -1;
+    let lastAdvance = Date.now();
+    let lastLum = null;
     for (;;) {
-      const g = await grid();
-      if (g && g.n > 0 && (kind === 'dark' ? meanLum(g) < 70 : meanLum(g) > 170)) return g;
-      if (Date.now() - t0 > timeoutMs) {
-        throw new Error(`presented grid never showed the ${kind} scene (last ${g ? meanLum(g).toFixed(1) : 'none'})`);
+      // With maintainSceneA (the boot gate), sample-and-act share one
+      // page turn: the store is read and the scene-A set re-applied in
+      // the same synchronous turn that reads the presented grid, so a
+      // boot hydration landing between polls is corrected on this very
+      // read, and one inside the turn is impossible (single-threaded) —
+      // the #2542 pattern.
+      const g = maintainSceneA
+        ? await page.evaluate(() => {
+            const s = window.__kcStore.getState();
+            if (s.paletteId !== 'hydra' || s.paletteMixSeconds !== 0) {
+              window.__kcStore.setState({ paletteId: 'hydra', paletteMixSeconds: 0 });
+            }
+            return window.__kcPresentedGrid(8);
+          })
+        : await grid();
+      const now = Date.now();
+      if (g) {
+        if (startN === null) startN = g.n;
+        if (g.n !== lastN) {
+          lastN = g.n;
+          lastAdvance = now;
+        }
+        lastLum = meanLum(g);
+        if (g.n > 0 && (kind === 'dark' ? lastLum < 70 : lastLum > 170)) return g;
+        if (lastN - startN >= FRAME_BUDGET) {
+          throw new Error(
+            `presented grid never showed the ${kind} scene after ${lastN - startN} presented frames (last luminance ${lastLum.toFixed(1)}, threshold ${kind === 'dark' ? '< 70' : '> 170'})`,
+          );
+        }
+      }
+      if (now - lastAdvance > HANG_MS) {
+        throw new Error(
+          `presented count stopped advancing in the ${kind} scene wait — hang (last n ${lastN}, last luminance ${lastLum === null ? 'none' : lastLum.toFixed(1)})`,
+        );
       }
       await page.waitForTimeout(600);
     }
@@ -321,12 +379,39 @@ if (!skipped) {
   // satisfies the caller's scene criterion (convergence, as waitScene),
   // instead of reading the first present after an act: a pre-act bake
   // landing can be that first present, and it shows the previous scene.
-  const waitPresented = async (nPre, isExpected, timeoutMs = 120000, what = 'the expected scene') => {
-    const t0 = Date.now();
+  // #2537 — poll the presented grid until a frame past the baseline count
+  // satisfies the caller's scene criterion (convergence, as waitScene),
+  // instead of reading the first present after an act: a pre-act bake
+  // landing can be that first present, and it shows the previous scene.
+  // PR #2540 hardening: same frame budget + hang detector as waitScene;
+  // the failure message carries the measured values (last n, nPre, and
+  // the caller's describe() of the last frame — dA/dB at the recall
+  // sites) so a future failure is diagnosable from the log alone.
+  const waitPresented = async (nPre, isExpected, what = 'the expected scene', describe = null) => {
+    let lastN = -1;
+    let lastAdvance = Date.now();
+    let lastG = null;
     for (;;) {
       const g = await grid();
-      if (g && g.n > nPre && isExpected(g)) return g;
-      if (Date.now() - t0 > timeoutMs) throw new Error(`presented grid never showed ${what}`);
+      const now = Date.now();
+      if (g) {
+        lastG = g;
+        if (g.n !== lastN) {
+          lastN = g.n;
+          lastAdvance = now;
+        }
+        if (g.n > nPre && isExpected(g)) return g;
+        if (g.n - nPre >= FRAME_BUDGET) {
+          throw new Error(
+            `presented grid never showed ${what} after ${g.n - nPre} presented frames past the baseline (last n ${g.n}, nPre ${nPre}${describe ? `, ${describe(g)}` : ''})`,
+          );
+        }
+      }
+      if (now - lastAdvance > HANG_MS) {
+        throw new Error(
+          `presented grid never showed ${what} and the presented count stopped advancing — hang (last n ${lastN}, nPre ${nPre}${describe && lastG ? `, ${describe(lastG)}` : ''})`,
+        );
+      }
       await page.waitForTimeout(400);
     }
   };
@@ -340,18 +425,15 @@ if (!skipped) {
     // top-level store field, not a layout param, so no favourite carries
     // it and it stays 0 for the whole run.
     // Boot gate: the stage must be live (the loop resolving and
-    // presenting) before the scene is set — and the set is re-applied
-    // once if the app's own boot hydration lands after it and overwrites
-    // the palette (a race the read below would otherwise time out on).
+    // presenting) before the scene is set. PR #2540 hardening: the set
+    // is no longer applied once (or twice) ahead of the read — the read
+    // itself maintains it: every poll samples the store and re-applies
+    // the scene-A set in the same page turn (maintainSceneA in
+    // waitScene), so a boot hydration landing after the set, which
+    // overwrites the palette, is corrected on the very next read
+    // instead of stranding the wait.
     await page.waitForFunction(() => window.__KC_UI__.stage().nodeCount > 0, null, { timeout: 180000 });
-    let gA = null;
-    for (let attempt = 0; attempt < 2 && !gA; attempt++) {
-      await page.evaluate(({ paletteId }) => window.__kcStore.setState({ paletteId, paletteMixSeconds: 0 }), {
-        paletteId: 'hydra',
-      });
-      gA = await waitScene('dark', attempt === 0 ? 90000 : 180000).catch(() => null);
-    }
-    assert.ok(gA, 'scene A never presented');
+    const gA = await waitScene('dark', { maintainSceneA: true });
     const stA = await stage();
     const sA = await store();
     ok('boot scene A is presented (count > 0)', () => {
@@ -427,8 +509,8 @@ if (!skipped) {
     const gStill = await waitPresented(
       nPre,
       (g) => dist(g.grid, gA.grid) < dist(g.grid, gB.grid),
-      120000,
       'the recalled scene after the paused recall',
+      (g) => `dA ${dist(g.grid, gA.grid).toFixed(1)}, dB ${dist(g.grid, gB.grid).toFixed(1)}`,
     );
     const sStill = await store();
     ok('the paused recall presents a still of the recalled scene, with the stop standing', () => {
@@ -468,8 +550,8 @@ if (!skipped) {
     const gResize = await waitPresented(
       nStill,
       (g) => g.width !== gStill.width || g.height !== gStill.height,
-      60000,
       'the held scene at the new size after the resize',
+      (g) => `presented size ${g.width}x${g.height}, expected a change from ${gStill.width}x${gStill.height}`,
     );
     ok('a canvas resize while paused presents the held scene at the new size', () => {
       assert.ok(gResize.n >= nStill + 1, 'the resize presented nothing');
@@ -565,8 +647,9 @@ if (!skipped) {
     const gReseed = await waitPresented(
       nPre2,
       (g) => dist(g.grid, gFrozenHold.grid) > 3 && dist(g.grid, gAacc.grid) < dist(gFrozenHold.grid, gAacc.grid),
-      120000,
       'the reseeded recalled scene after the paused∧frozen recall',
+      (g) =>
+        `dFrozen ${dist(g.grid, gFrozenHold.grid).toFixed(1)}, dA ${dist(g.grid, gAacc.grid).toFixed(1)}, dFrozenToA ${dist(gFrozenHold.grid, gAacc.grid).toFixed(1)}`,
     );
     const sReseed = await store();
     ok('paused∧frozen recall reseeds the buffer and shows the recalled scene', () => {
