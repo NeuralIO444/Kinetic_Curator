@@ -5,7 +5,8 @@
 // off-state law is the empty-hand law pinned in 5: when nothing can be dealt, the press is exactly as it was.
 //   1. the scope mapping: creatures take the stage's own ladder; constructs take ANY at every stage scope
 //   2. a press deals creatures when the library supports them: stage births, tiles enabled, never banked
-//   3. a press deals construct recipes for every style in play: assembled, banked, tiles enabled
+//   3. a press deals construct recipes for the style in play: assembled, banked, tiles enabled
+//   10. two styles in play: one style per press (the ANY pick is seeded by press), rotating across presses
 //   4. no style in play: no construct candidates, no error (empty shelf, below the floor, junk entries)
 //   5. the empty-hand law: no dealable creatures and nothing drawable to build from → null, the press untouched
 //   6. never dealt twice: a standing creature is skipped; a banked recipe banks nothing new, its tile still joins
@@ -222,6 +223,27 @@ const shelf = VOCAB.slice(0, 2).map((asset) => ({ style: STYLE, asset }));
   assert.match(src, /landStageDeal\(state, finalEnabled\)/, 'the CHAOS roll runs the deal');
   assert.match(src, /landStageDeal\(state, passEnabled\)/, 'the LOOK pass runs the deal');
   ok('always in the mix: the deal runs on both pool-dealing presses and never reads the CONSTRUCTS chip');
+}
+
+// 10 — two styles in play: the ANY pick deals ONE style per press, and the styles rotate across presses.
+{
+  const twoStyles = CONSTRUCT_STYLE_IDS.map((s) => [s, constructVocabularyIds(s)]).filter(([, v]) => v.length >= 2);
+  const [STYLE_B, VOCAB_B] = twoStyles[1];
+  const shelfTwo = [...shelf, ...VOCAB_B.slice(0, 2).map((asset) => ({ style: STYLE_B, asset }))];
+  const seen = new Set();
+  for (let press = 1; press <= 12; press++) {
+    const r = resolveStageDeal(base({ shapeShelf: shelfTwo }), press, commit);
+    assert.ok(r && r.constructs.length === 6, `press ${press}: a full construct hand deals`);
+    const styles = new Set(r.constructs.map((rec) => rec.style));
+    assert.equal(styles.size, 1, `press ${press}: one style per press (measured ${[...styles]})`);
+    seen.add([...styles][0]);
+  }
+  assert.deepEqual(
+    [...seen].sort(),
+    [STYLE, STYLE_B].sort(),
+    `across 12 presses both styles in play are dealt (measured ${[...seen]})`,
+  );
+  ok('two styles in play: each press deals a single style, and the styles rotate across presses');
 }
 
 console.log(`stageKineticDeal.selfcheck: OK (${checks} checks)`);
