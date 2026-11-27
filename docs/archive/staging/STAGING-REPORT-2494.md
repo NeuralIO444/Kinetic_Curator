@@ -145,3 +145,20 @@ classified by A/B or standalone tiebreaker — none is this slice's:
   tree, both **PASS** — accumFreezeClear ok (10 groups), pausedRecallPresent ok
   (18 groups). Load failures, settled by the standalone tiebreaker.
 - The new pin, `assetPoolEmptyBulk`, is one of the 834 passes.
+
+## Publish composition note (coordinator, 2026-11-27)
+
+- Composed onto origin/main 2ea36431 by cherry-pick of the staged commit b075cd34 —
+  zero conflicts. The report was relocated from the repo root to docs/archive/staging/
+  per the current convention.
+- The sweep tally and source line numbers in the body above are from the builder's base
+  (c587a618). On the composed tree: the new pin plus all 16 suites that read the touched
+  files PASS, uiRegistry PASS (333 controls), lint 0 errors, format:check clean,
+  production build green. The full manifest sweep was NOT re-run on the composed tree.
+- QA Review (independent pass on the composed diff): CLEAN. The reviewer re-proved
+  discrimination against current origin/main — the pin alone on pristine 2ea36431 FAILS
+  with the filed assertion and PASSES on the composed tree — and independently measured
+  the 266-record / 1155-asset figures and the filter counts. Minor non-blocking notes:
+  state-level pinning covers the ON behaviour (OFF symmetry rests on the source pins;
+  acceptable — the filed defect is ALL ON), and the narrowed formula is pinned verbatim
+  at source level rather than behaviourally for every chip kind.
