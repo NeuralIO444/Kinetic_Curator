@@ -137,12 +137,18 @@ function Row({ row, route, index, table, onEdit }) {
             onEdit((t) => patchRoute(t, index, { depth: defaultDepthFor(route.input, route.target) }), false)
           }
         />
+        {/* #2497: depth is a continuous value — the sanitizer clamps it to ±max
+            and never to a step grid (the default table itself holds products:
+            0.55 × 0.28 = 0.154). A grid step here made the browser flag lawful
+            depths [invalid] (stepMismatch), so the field declares step="any",
+            the PersonaTunePanel pattern for float fields; min/max still bound
+            it. The slider keeps the grid: stepping is the slider's own law. */}
         <input
           type="number"
           aria-label={`Route ${index + 1} depth value`}
           min={range.min}
           max={range.max}
-          step={range.step}
+          step="any"
           value={shown}
           onChange={(e) => {
             const v = Number(e.target.value);
