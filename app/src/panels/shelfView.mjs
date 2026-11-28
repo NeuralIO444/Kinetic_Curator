@@ -65,6 +65,22 @@ export function rowSeedSegment(row) {
 }
 
 /**
+ * The kept moment as a caption segment (#2499): the date AND the time
+ * of day. A keep's identity is its record — the same plate kept twice
+ * is two keeps, one per deliberate act — and the act's instant is the
+ * one fact that always tells two same-plate keeps apart. The date
+ * alone left same-day repeats reading as one keep listed thrice, on
+ * the shelf and in the fill receipt alike; the time is the
+ * distinguishing field, carried at caption weight. Absent stays
+ * absent: a legacy keep with no stamp says so, never an invented one.
+ */
+export function keptCaption(keptAt) {
+  if (!keptAt) return 'kept (legacy)';
+  const d = new Date(keptAt);
+  return `kept ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+}
+
+/**
  * The caption under the identity (P0-1): the seed segment first, then
  * the facts the row always carried — families, origin, kept state,
  * staged state — at caption weight. Location is NOT here anymore: it
@@ -77,7 +93,7 @@ export function rowMeta(row) {
   if (seed) parts.push(seed);
   if (row?.families?.length) parts.push(row.families.join(' '));
   if (row?.origin) parts.push(row.origin);
-  parts.push(row?.keptAt ? `kept ${new Date(row.keptAt).toLocaleDateString()}` : 'kept (legacy)');
+  parts.push(keptCaption(row?.keptAt));
   parts.push(row?.stagedCount ? `staged ×${row.stagedCount}` : 'never staged');
   return parts;
 }

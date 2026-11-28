@@ -6,6 +6,7 @@
 // this panel computes nothing, it reads the ledger.
 import { useStore } from '../state/store.js';
 import { shelfRow } from '../curator/shelf.mjs';
+import { keptCaption } from './shelfView.mjs';
 import { DEFAULT_SHELF_PREFS, RULE_ORDER, tableName } from '../curator/shelfPrefs.mjs';
 import { anchorAccount, DEFAULT_EXPORT_PREFS } from '../curator/shelfDisk.mjs';
 import { ASSETS } from '../data/assets/index.js';
@@ -37,6 +38,13 @@ export function ShelfDevPanel() {
     const k = byId.get(id) || shelfDiskRecords[id];
     if (k) return shelfRow(k, keepStage, { assetsById, palettesById }).label;
     return shelfDiskStubs[id]?.label || id;
+  };
+  // #2499 — two keeps of the same plate share the label word for word;
+  // the receipt cell also carries the kept moment, the one fact that
+  // tells them apart, in the panel's own timestamp form.
+  const keptOf = (id) => {
+    const k = byId.get(id) || shelfDiskRecords[id];
+    return k?.keptAt ? ` · ${keptCaption(k.keptAt)}` : '';
   };
   const undealt = lastFill?.undealt || [];
   const acct = anchorAccount({
@@ -129,7 +137,10 @@ export function ShelfDevPanel() {
                 <tr key={i}>
                   <td style={cell}>{i + 1}</td>
                   <td style={cell}>{s.rule}</td>
-                  <td style={cell}>{labelOf(s.keepId)}</td>
+                  <td style={cell}>
+                    {labelOf(s.keepId)}
+                    {keptOf(s.keepId)}
+                  </td>
                 </tr>
               ))}
             </tbody>
