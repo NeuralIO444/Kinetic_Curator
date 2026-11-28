@@ -91,8 +91,16 @@ with Playwright probes against the built app at the stress width (1904px) and be
   storyLive, helpCopy, radii, selects, casingInCss. e2e grep: no spec asserts the old surfaces
   (footer specs read `.footer-bar` text, which is unchanged; dev-switches.spec does not touch
   the footnote).
-- Lint: 0 errors (11 warnings, the standing set). format:check: clean (Prettier applied to the
-  two table panels after the scripted wrapper pass).
+- Lint: 0 errors (11 warnings, the standing set). format:check: clean — after the QA round below
+  (Prettier applied to the two table panels after the scripted wrapper pass, and to the new suite
+  after QA caught it unformatted).
+- QA Review (round 1): one blocking finding — the new suite file itself was not Prettier-clean
+  (one over-long line), which would have reddened CI's lint-build-selfcheck; fixed and re-verified.
+  Two non-blocking findings, both addressed in the same pass: the B21 source pin did not
+  discriminate (the pre-fix source also holds one copy of the footnote — inside the seats map),
+  so the pin now asserts the footnote stands after the map's close (verified against both trees);
+  and the suite's fixed sleeps were load-sensitive (QA saw one 0-of-13 DEV-tabs read on a busy
+  box), so the browser section now waits on panel-specific markers instead of guessed delays.
 - Full manifest sweep: see the PR body for the final tally (run at publish time).
 
 ## What was NOT done

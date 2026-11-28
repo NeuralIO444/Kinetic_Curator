@@ -107,13 +107,19 @@ const flat = (s) => s.replace(/\s+/g, ' ');
     const panels = read('src/styles/panels.css');
     assert.match(flat(panels), /\.dev-table-scroll \{ overflow-x: auto; max-width: 100%;/);
   });
-  ok('B21: the band footnote stands exactly once in PersonaTune, after the seats', () => {
+  ok('B21: the band footnote stands once in PersonaTune — after the seats map, not inside it', () => {
     const src = read('src/panels/PersonaTunePanel.jsx');
     const copies = (src.match(/band: solo length/g) || []).length;
     assert.equal(copies, 1, `expected one band footnote, found ${copies}`);
+    // The pre-fix source also held one copy — inside the TUNING_SEATS.map
+    // callback, which rendered it once per seat. The pin that discriminates
+    // is position: the footnote must stand after the map's own close.
+    const mapStart = src.indexOf('TUNING_SEATS.map');
+    const mapClose = src.indexOf('\n      })}', mapStart);
+    assert.ok(mapStart >= 0 && mapClose > mapStart, 'the seats map and its close are located');
     assert.ok(
-      src.indexOf('band: solo length') > src.indexOf('TUNING_SEATS.map'),
-      'the footnote stands after the seat sections, not under each one',
+      src.indexOf('band: solo length') > mapClose,
+      'the footnote stands after the seat sections, not inside the per-seat render',
     );
   });
 }
@@ -217,7 +223,12 @@ if (!skipped) {
     const m = await page.evaluate(() => {
       const bar = document.querySelector('.master-bar');
       const rr = document.querySelector('.master-right').getBoundingClientRect();
-      return { barCW: bar.clientWidth, barSW: bar.scrollWidth, rightRight: Math.round(rr.right), vw: window.innerWidth };
+      return {
+        barCW: bar.clientWidth,
+        barSW: bar.scrollWidth,
+        rightRight: Math.round(rr.right),
+        vw: window.innerWidth,
+      };
     });
     ok(`B1: at ${w}px the transport stays inside the window and the bar does not overflow`, () => {
       assert.ok(m.rightRight <= m.vw, `transport right edge ${m.rightRight} beyond window ${m.vw}`);
@@ -246,7 +257,7 @@ if (!skipped) {
   });
 
   assert.equal(await clickTab(page, 'ASSETS', null), 'ok');
-  await page.waitForTimeout(1000);
+  await page.waitForFunction(() => !!document.querySelector('.cat-filter'), null, { timeout: 30000 });
   const cat = await page.evaluate(() => {
     const cf = document.querySelector('.cat-filter');
     return { cw: cf.clientWidth, sw: cf.scrollWidth };
@@ -258,12 +269,12 @@ if (!skipped) {
   // B8: crown a keep through the bridge, deal it onto the shelf stage, and
   // read the slot's + row's tooltips.
   await page.evaluate(() => window.__KC_UI__.act('directors.favorite'));
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => (window.__kcStore.getState().keeps || []).length > 0, null, { timeout: 30000 });
   await page.evaluate(() => document.querySelector('.shelf-fill-btn')?.click());
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => !!document.querySelector('.shelf-slot:not(.ghost)'), null, { timeout: 30000 });
   // The collection rows render in the shelf's expanded size.
   await page.evaluate(() => document.querySelector('[title="Open the shelf over the canvas"]')?.click());
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => !!document.querySelector('.shelf-row'), null, { timeout: 30000 });
   const shelf = await page.evaluate(() => {
     const slot = document.querySelector('.shelf-slot:not(.ghost)');
     const slotLabel = slot?.querySelector('.shelf-slot-label');
@@ -287,7 +298,12 @@ if (!skipped) {
   });
 
   assert.equal(await clickTab(page, 'DEV', null), 'ok');
-  await page.waitForTimeout(1200);
+  // Wait for the tab strip itself, not a fixed sleep — under load the lazy
+  // DEV chunk can land later than any guessed delay (QA round 1 caught a
+  // 0-of-13 read from a fixed 1200ms sleep on a busy box).
+  await page.waitForFunction(() => document.querySelectorAll('.panel-dev .panel-tab-label').length === 13, null, {
+    timeout: 30000,
+  });
   const devTabs = await page.evaluate(() =>
     [...document.querySelectorAll('.panel-dev .panel-tab-label')].map((l) => ({
       label: l.textContent.trim(),
@@ -301,7 +317,17 @@ if (!skipped) {
   });
 
   assert.equal(await clickTab(page, 'MIND', '.panel-dev'), 'ok');
-  await page.waitForTimeout(1500);
+  // Wait for MIND's own presence table (its 'half-life d' header), not any
+  // table — the previous tab's tables satisfy a generic wait before the
+  // lazy MIND chunk has even landed (QA-hardening round 2).
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll('.panel-dev .panel-tab-content table')].some((t) =>
+        t.textContent.includes('half-life d'),
+      ),
+    null,
+    { timeout: 30000 },
+  );
   const mind = await page.evaluate(() => {
     const content = document.querySelector('.panel-dev .panel-tab-content');
     const tables = [...content.querySelectorAll('table')];
@@ -331,7 +357,14 @@ if (!skipped) {
   });
 
   assert.equal(await clickTab(page, 'PERSONA TUNE', '.panel-dev'), 'ok');
-  await page.waitForTimeout(1500);
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll('.panel-dev .panel-tab-content div')].some((d) =>
+        [...d.childNodes].some((nd) => nd.nodeType === 3 && nd.textContent.includes('band: solo length')),
+      ),
+    null,
+    { timeout: 30000 },
+  );
   const bandCount = await page.evaluate(() => {
     const content = document.querySelector('.panel-dev .panel-tab-content');
     return [...content.querySelectorAll('div')].filter((d) =>
