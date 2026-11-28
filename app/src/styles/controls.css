@@ -67,6 +67,16 @@
 .range-stack.range-waiting .range-label {
   text-decoration: none;
 }
+/* #2503 (B25) — a gated row's reason as visible panel text, rendered
+   after the row at full strength (the row itself stays dimmed). */
+.range-reason {
+  display: block;
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  white-space: normal;
+  margin: 1px 0 5px;
+}
 .range-disabled {
   opacity: 0.38;
 }

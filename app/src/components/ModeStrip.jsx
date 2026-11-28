@@ -35,6 +35,17 @@ export function ModeStrip() {
   const toggleArmMode = useStore((s) => s.toggleArmMode);
   const toggleArmMotion = useStore((s) => s.toggleArmMotion);
   const anyArmed = armedMode != null || armedMotion != null;
+  // #2503 (B5) — the detent says THAT an arm stands; this readout says
+  // WHAT stands and when it lands. The arm changes nothing on screen
+  // until the next KINETIC roll, and a first-time user reads the chips
+  // as toggles — so while any arm stands, the strip names the pending
+  // scope in plain text instead of leaving it to a 5px corner tick and
+  // a hover tooltip. Pure readout of the same store state, like the
+  // detent: it stands exactly while the arm stands.
+  const armedNames = [
+    armedMode != null ? LAYOUT_MODES.find((m) => m.id === armedMode)?.name : null,
+    armedMotion != null ? MOTION_MODES.find((m) => m.id === armedMotion)?.name : null,
+  ].filter(Boolean);
 
   return (
     <div className="mode-strip">
@@ -84,6 +95,11 @@ export function ModeStrip() {
           );
         })}
       </div>
+      {anyArmed && (
+        <span className="scope-readout lbl" role="status">
+          next roll: {armedNames.join(' + ')}
+        </span>
+      )}
       {anyArmed && (
         <button
           type="button"

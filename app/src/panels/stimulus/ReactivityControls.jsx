@@ -39,35 +39,40 @@ function ResponsePicker({ value, onChange, disabled, disabledReason }) {
     [hint, disabled && disabledReason ? `Waiting for audio — ${disabledReason}` : null].filter(Boolean).join(' · ') ||
     undefined;
   return (
-    <div style={{ marginBottom: 6, opacity: disabled ? 0.55 : 1 }} title={title}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: '8px',
-          color: 'var(--dim)',
-          letterSpacing: '0.08em',
-          marginBottom: 2,
-        }}
-      >
-        <span className="lbl">response</span>
-        <span>{RESPONSE_LABELS[value] ?? value}</span>
+    <>
+      <div style={{ marginBottom: 6, opacity: disabled ? 0.55 : 1 }} title={title}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: '8px',
+            color: 'var(--dim)',
+            letterSpacing: '0.08em',
+            marginBottom: 2,
+          }}
+        >
+          <span className="lbl">response</span>
+          <span>{RESPONSE_LABELS[value] ?? value}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {BALLISTICS_CURVES.map((c) => (
+            <button
+              key={c}
+              className={`micro-btn ${value === c ? 'active' : ''}`}
+              onClick={() => onChange(c)}
+              disabled={disabled}
+              title={RESPONSE_HINTS[c]}
+              style={value === c ? { background: '#00d9ff', color: '#000', borderColor: '#00d9ff' } : {}}
+            >
+              {RESPONSE_LABELS[c]}
+            </button>
+          ))}
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 4 }}>
-        {BALLISTICS_CURVES.map((c) => (
-          <button
-            key={c}
-            className={`micro-btn ${value === c ? 'active' : ''}`}
-            onClick={() => onChange(c)}
-            disabled={disabled}
-            title={RESPONSE_HINTS[c]}
-            style={value === c ? { background: '#00d9ff', color: '#000', borderColor: '#00d9ff' } : {}}
-          >
-            {RESPONSE_LABELS[c]}
-          </button>
-        ))}
-      </div>
-    </div>
+      {/* #2503 (B25) — the gate's reason as visible text under the
+          picker (outside its dimmed box), like the RangeRow reasons. */}
+      {disabled && disabledReason && <span className="range-reason">Waiting for audio — {disabledReason}</span>}
+    </>
   );
 }
 

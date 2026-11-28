@@ -86,9 +86,18 @@ export function RangeRow({
   // #272: mode-gated controls stay visible but inert, with the reason in the
   // tooltip — a control that silently does nothing is a lie; a disabled one
   // with a reason is a label.
+  // #2503 (B25): the reason ALSO renders as visible text on the row. A
+  // tooltip is hover-only — touch never sees it, and the stress session
+  // filed gating reasons that lived nowhere on the panel. The tooltip
+  // keeps the full composed text; the panel now carries the reason too.
   const title =
     [hint, disabled && disabledReason ? `${disabledLabel} — ${disabledReason}` : null].filter(Boolean).join(' · ') ||
     undefined;
+  const reasonEl = disabled && disabledReason && (
+    <span className="range-reason">
+      {disabledLabel} — {disabledReason}
+    </span>
+  );
 
   const slider = (
     <input
@@ -108,7 +117,15 @@ export function RangeRow({
   );
 
   // The slider alone: the parent owns the label, and there is no lock or typed readout.
-  if (layout === 'bare') return slider;
+  // (#2503: a bare row still speaks its gate reason — no caller pairs
+  // bare with a reason today, but the control must not silently drop it.)
+  if (layout === 'bare')
+    return (
+      <>
+        {slider}
+        {reasonEl}
+      </>
+    );
 
   const lockButton = onToggleLock && (
     <button className={`lock-btn ${locked ? 'locked' : ''}`} onClick={onToggleLock} title={locked ? 'Unlock' : 'Lock'}>
@@ -139,38 +156,47 @@ export function RangeRow({
     </span>
   );
 
+  // The reason renders as a SIBLING of the row, never inside it: the
+  // disabled row dims itself (opacity), and a reason dimmed with it
+  // would be visible in name only.
   // label and readout above the slider
   if (layout === 'stack') {
     return (
-      <div
-        className={`range-stack ${locked ? 'range-locked' : ''} ${disabled ? 'range-disabled range-waiting' : ''}`}
-        data-tone={toneName}
-        title={title}
-      >
-        <div className="range-stack-head">
-          <div className="range-label-group">
-            {lockButton}
-            {labelEl}
+      <>
+        <div
+          className={`range-stack ${locked ? 'range-locked' : ''} ${disabled ? 'range-disabled range-waiting' : ''}`}
+          data-tone={toneName}
+          title={title}
+        >
+          <div className="range-stack-head">
+            <div className="range-label-group">
+              {lockButton}
+              {labelEl}
+            </div>
+            <div className="range-right">{readoutEl}</div>
           </div>
-          <div className="range-right">{readoutEl}</div>
+          {slider}
         </div>
-        {slider}
-      </div>
+        {reasonEl}
+      </>
     );
   }
 
   return (
-    <div
-      className={`range-row ${locked ? 'range-locked' : ''} ${disabled ? 'range-disabled' : ''}`}
-      data-tone={toneName}
-      title={title}
-    >
-      <div className="range-label-group">
-        {lockButton}
-        {labelEl}
+    <>
+      <div
+        className={`range-row ${locked ? 'range-locked' : ''} ${disabled ? 'range-disabled' : ''}`}
+        data-tone={toneName}
+        title={title}
+      >
+        <div className="range-label-group">
+          {lockButton}
+          {labelEl}
+        </div>
+        {slider}
+        <div className="range-right">{readoutEl}</div>
       </div>
-      {slider}
-      <div className="range-right">{readoutEl}</div>
-    </div>
+      {reasonEl}
+    </>
   );
 }

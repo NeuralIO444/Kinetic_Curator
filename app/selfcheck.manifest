@@ -149,6 +149,7 @@ node src/curator/hitBands.selfcheck.mjs
 node src/state/favorites.selfcheck.mjs
 node src/curator/tasteLedger.selfcheck.mjs
 node src/components/rangeRow.selfcheck.mjs
+node src/components/feedbackVisibility.selfcheck.mjs
 node src/hooks/coldOpen.selfcheck.mjs
 node src/hooks/invite.selfcheck.mjs
 node src/components/expandLabel.selfcheck.mjs

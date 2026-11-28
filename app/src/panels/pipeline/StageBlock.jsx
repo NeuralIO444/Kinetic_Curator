@@ -74,6 +74,7 @@ export function StageBlock() {
             key={m}
             type="button"
             className={`chip-btn${mode === m ? ' active' : ''}`}
+            aria-pressed={mode === m}
             onClick={() => pickMode(m)}
           >
             {m === 'preview' ? 'PREVIEW' : m === 'fullscreen' ? 'FULLSCREEN' : 'SYPHON'}
@@ -135,6 +136,7 @@ export function StageBlock() {
                     key={mp}
                     type="button"
                     className={`chip-btn${mapping === mp ? ' active' : ''}`}
+                    aria-pressed={mapping === mp}
                     onClick={() => setMapping(mp)}
                     title={
                       mp === 'fit'
@@ -155,6 +157,7 @@ export function StageBlock() {
                 <button
                   type="button"
                   className={`chip-btn${testPattern ? ' active' : ''}`}
+                  aria-pressed={testPattern}
                   onClick={() => setTestPattern(!testPattern)}
                 >
                   {testPattern ? 'ON' : 'OFF'}
@@ -174,6 +177,7 @@ export function StageBlock() {
             <button
               type="button"
               className={`chip-btn${blackout ? ' active' : ''}`}
+              aria-pressed={blackout}
               onClick={() => setBlackout(!blackout)}
               title="Stage goes black instantly. The UI stays live; toggling back recovers without re-creating the window."
             >
@@ -198,6 +202,7 @@ export function StageBlock() {
               <button
                 type="button"
                 className={`chip-btn${syphonOn ? ' active' : ''}`}
+                aria-pressed={syphonOn}
                 onClick={() => setSyphonOn(!syphonOn)}
               >
                 {syphonOn ? 'ON' : 'OFF'}

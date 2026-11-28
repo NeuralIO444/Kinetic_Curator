@@ -76,6 +76,7 @@ export function BudgetKnob() {
             key={tierId}
             type="button"
             className={`undo-btn ${active ? '' : 'disabled'}`}
+            aria-pressed={active}
             onClick={() => choose(tierId)}
             title={`${getBudgetName(tierId)} — ${preset.description}. ${autoQuality ? 'Governor defends this budget.' : 'Choosing re-arms the governor.'}`}
             style={active ? { borderColor: 'var(--accent)', color: 'var(--accent)', opacity: 1 } : undefined}

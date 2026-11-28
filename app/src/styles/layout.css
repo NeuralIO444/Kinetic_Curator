@@ -952,6 +952,14 @@
   opacity: 0.25;
   cursor: default;
 }
+/* #2503 (B6) — where the 4-chip window sits in the full palette set. */
+.palette-window-pos {
+  flex-shrink: 0;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  white-space: nowrap;
+}
 .palette-sw-viewport {
   display: inline-flex;
   overflow: hidden;

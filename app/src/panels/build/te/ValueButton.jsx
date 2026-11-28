@@ -53,6 +53,11 @@ export function ValueButton({ label, display, title, onOpen, locked, onToggleLoc
           {locked ? '▪' : '▫'}
         </button>
       )}
+      {/* #2503 (B25) — a gated value's reason as visible text under the
+          button row, not only in its tooltip / aria-label. Rendered
+          after the lock pip so the pip keeps its seat beside the
+          button; the reason takes its own full-width line. */}
+      {disabled && disabledReason && <div className="te-value-reason">{disabledReason}</div>}
     </div>
   );
 }
