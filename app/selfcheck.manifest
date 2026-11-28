@@ -107,7 +107,6 @@ node src/state/projectNaming.selfcheck.mjs
 node src/state/poolCitizenship.selfcheck.mjs
 node src/state/shelfPersist.selfcheck.mjs
 node src/state/sessionOnly.selfcheck.mjs
-node src/state/frameLock.selfcheck.mjs
 node src/state/allEraGolden.selfcheck.mjs
 node src/state/recipes.selfcheck.mjs
 node src/state/recipeUrls.selfcheck.mjs
@@ -321,6 +320,7 @@ node src/state/phraseTick.selfcheck.mjs
 node src/state/beatArbiter.selfcheck.mjs
 node src/state/euclid.selfcheck.mjs
 node src/state/showrunner.selfcheck.mjs
+node src/state/frameLockRemoval.selfcheck.mjs
 node src/fx/fxFilters.selfcheck.mjs
 node src/fx/dither.selfcheck.mjs
 node src/fx/stipple.selfcheck.mjs

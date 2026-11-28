@@ -437,11 +437,6 @@ const UI_CONTROLS_1 = Object.freeze([
       source: 'components/MasterBar.jsx',
     },
   ),
-  ctl('transport.frame-lock', 'transport', '30FPS', 'toggle', 'Locks the frame rate to 30 fps.', {
-    channel: store('setFrameLock', ['$toggle']),
-    reads: R('frameLock'),
-    source: 'components/MasterBar.jsx',
-  }),
   ctl(
     'transport.budget',
     'transport',
