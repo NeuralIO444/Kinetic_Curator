@@ -26,6 +26,8 @@ import { VOICE_DECK } from '../data/voiceDeck.js';
 import { assetRecords } from '../data/assetStyle.js';
 import { ASSETS } from '../data/assets/index.js';
 import { mkRng } from '../engine/prng.js';
+import { isCreatureTileId } from '../engine/creatureTileId.js'; // #2544: a dealt creature's tile id shape
+import { isConstructTileId } from '../engine/constructAssembler.js'; // #2544: a dealt construct's tile id shape
 import { pickCurated } from '../curator/curate.js';
 
 const S = () => useStore.getState();
@@ -68,9 +70,14 @@ const snap = () => {
   assert.equal(b.undo, a.undo + 1, 'LOOK = one undo step');
   const look = COMPOSITION_PRESETS.find((p) => p.id === b.lp.composition);
   const pool = Object.keys(S().enabledAssets).filter((k) => S().enabledAssets[k]);
+  // #2544 re-pin (cause: the stage deal, Matt's ruling 2026-11-26 — the LOOK pass now also deals
+  // creature and construct tiles into the mix): the ASSET part of the pool is coherent with the look's
+  // pairing, exactly as before; anything else standing in the pool is a dealt tile, by id shape.
+  const dealtTiles = pool.filter((id) => isCreatureTileId(id) || isConstructTileId(id));
+  const assetPool = pool.filter((id) => !dealtTiles.includes(id));
   assert.ok(
-    pool.every((id) => look.categories.includes(recById.get(id).category)),
-    `LOOK's pool is coherent with ${look.id}'s pairing`,
+    assetPool.every((id) => look.categories.includes(recById.get(id).category)),
+    `LOOK's pool is coherent with ${look.id}'s pairing (${assetPool.length} assets, ${dealtTiles.length} dealt tiles)`,
   );
 
   S().kineticVoicePass();

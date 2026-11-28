@@ -103,6 +103,7 @@ import { resolveBirthPress } from '../../engine/kineticBirths.mjs'; // #2037: KI
 import { birthPopulation, standingBirthHand } from '../../curator/birthLive.mjs'; // #2037: the standing population + the pre-made hand
 import { noteBirth } from '../../curator/birthRecord.mjs'; // #2037: a recording take hears every resolved birth
 import { creatureTile, skeletonFounder } from '../../engine/creatureAssembler.js'; // #2037: a born child's stage tile, built like the bank's
+import { resolveStageDeal } from '../stageKineticDeal.mjs'; // #2544: the stage deal — creatures + construct recipes join the roll
 
 /**
  * #1365 Q2 — an artist's edit builds on the live overrides minus refine's carried `weights`: the weights describe the
@@ -631,6 +632,34 @@ function landBirth(state, commitEnabledAssets) {
 }
 
 /**
+ * #2544 — the deal site of the pool-dealing KINETIC presses (the LOOK pass, the CHAOS roll), landBirth's
+ * sibling: called with the standing state and the press commit's own enabled map, it returns
+ * { stageDealPress } to spread into the same commit — plus, when the deal landed, the dealt creatures as
+ * stage births, the banked construct records and the enabled map carrying their tiles over the pool the
+ * press dealt (Matt's landing ruling, 2026-11-26: the hand joins the roll). ALWAYS IN THE MIX (his
+ * second ruling, same day): there is no gate — every pool-dealing press deals, and the CONSTRUCTS chip
+ * keeps its own pool-leading behaviour, untouched. The counter advances on every such press, landed or
+ * not — it is the deal stream's place in the recorded conversation, session-only like the birth counter.
+ * The pure core (state/stageKineticDeal.mjs) reads the standing stage as the press begins; each dealt
+ * creature is noted to the standing take through birthRecord's tap (via 'deal'), so a kept take banks it
+ * with the take's other births. Fail-closed on the birth site's discipline: any failure inside the deal
+ * leaves the press exactly as it would have been without one.
+ */
+function landStageDeal(state, commitEnabledAssets) {
+  const press = (state.stageDealPress | 0) + 1;
+  const base = { stageDealPress: press };
+  try {
+    const r = resolveStageDeal(state, press, commitEnabledAssets);
+    if (!r) return base;
+    for (const rec of r.creatures) noteBirth({ press, via: 'deal', outcome: 'born', record: rec });
+    const { creatures: _creatures, constructs: _constructs, ...fields } = r; // eslint-disable-line no-unused-vars
+    return { ...base, ...fields };
+  } catch {
+    return base;
+  }
+}
+
+/**
  * #1857 — the narrowing a round's settle opens: the funnel standing at notch 0 (the chapter pool),
  * anchored on the look the round settled with. Null when the settled look is not a chapter member —
  * the dealt look always is (it was dealt from the chapter deck), so null is the honest impossible,
@@ -908,7 +937,16 @@ export const createLayoutSlice = (set) => ({
    */
   kineticBirthPress: 0,
   /**
-   * #2037 — children born on stage by a KINETIC birth and not yet banked: [{ record, tile }]. A
+   * #2544 — pool-dealing KINETIC presses (the LOOK pass, the CHAOS roll) made this session: the stage
+   * deal's stream place, the sibling of kineticBirthPress above. The dealt creatures land in
+   * stageBirths and the dealt constructs in the construct bank, so replay never re-derives a deal from
+   * this either. Session-only, like the birth counter.
+   */
+  stageDealPress: 0,
+  /**
+   * #2037 — children born on stage by a KINETIC birth and not yet banked: [{ record, tile }].
+   * #2544 — creatures dealt to the stage by a pool-dealing press stand here the same way (noted to the
+   * take via 'deal'), under the same law. A
    * stage-born child lives here and only here — its tile rides the resolver pool beside the overlay
    * (gl/liveLoop.mjs, poolWithBirths) for exactly as long as the entry stands — until a kept take
    * banks it through the bank's own door (state/slices/globalSlice.js bankStageBirths), which moves
@@ -2127,7 +2165,14 @@ export const createLayoutSlice = (set) => ({
       // #2037 — the press rolls for a birth too, read from the standing stage as the press began;
       // a born child's tile stands enabled over the pool this roll dealt.
       const finalEnabled = Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets;
-      const birth = landBirth(state, finalEnabled);
+      // #2544 — the roll deals creatures and construct recipes into the mix too (always in the mix):
+      // their tiles stand enabled over the pool this roll dealt, and the birth below reads the stage
+      // with the dealt creatures already standing, so its child is kin to them, never their duplicate.
+      const deal = landStageDeal(state, finalEnabled);
+      const birth = landBirth(
+        deal.stageBirths ? { ...state, stageBirths: deal.stageBirths } : state,
+        deal.enabledAssets || finalEnabled,
+      );
       return {
         ...undo,
         seed,
@@ -2139,7 +2184,10 @@ export const createLayoutSlice = (set) => ({
         poemDeal: poem.poemDeal,
         fieldGateRefusal: poem.fieldGateRefusal,
         fieldReview: poem.fieldReview,
-        enabledAssets: finalEnabled,
+        enabledAssets: deal.enabledAssets || finalEnabled,
+        stageDealPress: deal.stageDealPress,
+        ...(deal.constructRecords ? { constructRecords: deal.constructRecords } : {}),
+        ...(deal.stageBirths ? { stageBirths: deal.stageBirths } : {}),
         kineticBirthPress: birth.kineticBirthPress,
         ...(birth.stageBirths ? { stageBirths: birth.stageBirths, enabledAssets: birth.enabledAssets } : {}),
         kitNote, // #1944 — a kit that dealt nothing is named, never a silent mixed deal
@@ -2204,9 +2252,21 @@ export const createLayoutSlice = (set) => ({
         // implicit in the exits; the next settled round opens a fresh funnel at notch 0).
         kineticNotch: null,
       };
+      // #2544 — the pass deals creatures and construct recipes into the mix too (always in the mix):
+      // their tiles stand enabled over the pool this pass dealt.
+      const passEnabled = Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets;
+      const deal = landStageDeal(state, passEnabled);
+      next.stageDealPress = deal.stageDealPress;
+      if (deal.constructRecords) next.constructRecords = deal.constructRecords;
+      if (deal.stageBirths) next.stageBirths = deal.stageBirths;
+      if (deal.enabledAssets) next.enabledAssets = deal.enabledAssets;
       // #2037 — the press rolls for a birth too, read from the standing stage as the press began;
-      // a born child's tile stands enabled over the pool this pass dealt.
-      const birth = landBirth(state, Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets);
+      // a born child's tile stands enabled over the pool this pass dealt (the dealt creatures above
+      // already stand in that reading, so the child is kin to them, never their duplicate).
+      const birth = landBirth(
+        deal.stageBirths ? { ...state, stageBirths: deal.stageBirths } : state,
+        deal.enabledAssets || passEnabled,
+      );
       next.kineticBirthPress = birth.kineticBirthPress;
       if (birth.stageBirths) {
         next.stageBirths = birth.stageBirths;
