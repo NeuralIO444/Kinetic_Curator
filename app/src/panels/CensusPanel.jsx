@@ -106,27 +106,29 @@ function ShelfSection() {
                 {v.fills.counted} of {v.fills.total} fills in the window · {v.fills.slotsTotal} slots dealt ·{' '}
                 {v.fills.distinctDealt} distinct keeps{v.fills.lastTable ? ` · last table: ${v.fills.lastTable}` : ''}
               </p>
-              <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                <thead>
-                  <tr>
-                    {['rule', 'dealt', 'fills', 'undealt'].map((h) => (
-                      <th key={h} style={cell}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {v.fills.rows.map((r) => (
-                    <tr key={r.rule}>
-                      <td style={cell}>{r.rule}</td>
-                      <td style={cell}>{r.dealt}</td>
-                      <td style={cell}>{r.fillsDealt}</td>
-                      <td style={cell}>{r.undealt}</td>
+              <div className="dev-table-scroll">
+                <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                  <thead>
+                    <tr>
+                      {['rule', 'dealt', 'fills', 'undealt'].map((h) => (
+                        <th key={h} style={cell}>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {v.fills.rows.map((r) => (
+                      <tr key={r.rule}>
+                        <td style={cell}>{r.rule}</td>
+                        <td style={cell}>{r.dealt}</td>
+                        <td style={cell}>{r.fillsDealt}</td>
+                        <td style={cell}>{r.undealt}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
 
@@ -136,27 +138,29 @@ function ShelfSection() {
             {pct(v.neglect.coverage)} · {v.neglect.neverStaged} never staged.
           </p>
           {v.neglect.tail.length > 0 && (
-            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-              <thead>
-                <tr>
-                  {['longest-unstaged', 'kept', 'staged', 'where'].map((h) => (
-                    <th key={h} style={cell}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {v.neglect.tail.map((t) => (
-                  <tr key={t.id}>
-                    <td style={cell}>{t.label}</td>
-                    <td style={cell}>{t.keptAt ? new Date(t.keptAt).toLocaleDateString() : '—'}</td>
-                    <td style={cell}>{t.neverStaged ? 'never' : `${t.stagedCount ?? 0}×`}</td>
-                    <td style={cell}>{t.location === 'app' ? 'collection' : t.location}</td>
+            <div className="dev-table-scroll">
+              <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                <thead>
+                  <tr>
+                    {['longest-unstaged', 'kept', 'staged', 'where'].map((h) => (
+                      <th key={h} style={cell}>
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {v.neglect.tail.map((t) => (
+                    <tr key={t.id}>
+                      <td style={cell}>{t.label}</td>
+                      <td style={cell}>{t.keptAt ? new Date(t.keptAt).toLocaleDateString() : '—'}</td>
+                      <td style={cell}>{t.neverStaged ? 'never' : `${t.stagedCount ?? 0}×`}</td>
+                      <td style={cell}>{t.location === 'app' ? 'collection' : t.location}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
           {v.neglect.tailTotal > v.neglect.tail.length && (
             <p style={{ margin: '2px 0', opacity: 0.75 }}>
@@ -234,29 +238,31 @@ export function CensusPanel() {
       ''
     );
   const cutTable = (rows) => (
-    <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-      <thead>
-        <tr>
-          {['', 'library', 'dealt', 'tray'].map((h) => (
-            <th key={h} style={cell}>
-              {h}
-            </th>
-          ))}
-          <th style={cell} />
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.name}>
-            <td style={cell}>{r.name}</td>
-            <td style={cell}>{r.inLibrary}</td>
-            <td style={cell}>{r.inCandidates}</td>
-            <td style={cell}>{r.inTray}</td>
-            <td style={cell}>{alarmCell(r)}</td>
+    <div className="dev-table-scroll">
+      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <thead>
+          <tr>
+            {['', 'library', 'dealt', 'tray'].map((h) => (
+              <th key={h} style={cell}>
+                {h}
+              </th>
+            ))}
+            <th style={cell} />
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.name}>
+              <td style={cell}>{r.name}</td>
+              <td style={cell}>{r.inLibrary}</td>
+              <td style={cell}>{r.inCandidates}</td>
+              <td style={cell}>{r.inTray}</td>
+              <td style={cell}>{alarmCell(r)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 
   return (
@@ -334,35 +340,37 @@ export function CensusPanel() {
       {runYield && (
         <>
           <h3 style={h3}>EXPLORER YIELD BY CORNER — run {runYield.runId}</h3>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-            <thead>
-              <tr>
-                {['corner', 'candidates', 'finalists', 'yield'].map((h) => (
-                  <th key={h} style={cell}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {runYield.rows.map((r) => (
-                <tr key={r.corner}>
-                  <td style={cell}>{r.label}</td>
-                  <td style={cell}>{r.candidates}</td>
-                  <td style={cell}>{r.finalists}</td>
-                  <td style={cell}>{pct(r.yieldPct)}</td>
+          <div className="dev-table-scroll">
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <thead>
+                <tr>
+                  {['corner', 'candidates', 'finalists', 'yield'].map((h) => (
+                    <th key={h} style={cell}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-              <tr>
-                <td style={cell}>all</td>
-                <td style={cell}>{runYield.totalCandidates}</td>
-                <td style={cell}>{runYield.totalFinalists}</td>
-                <td style={cell}>
-                  {runYield.totalCandidates ? pct(runYield.totalFinalists / runYield.totalCandidates) : '—'}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {runYield.rows.map((r) => (
+                  <tr key={r.corner}>
+                    <td style={cell}>{r.label}</td>
+                    <td style={cell}>{r.candidates}</td>
+                    <td style={cell}>{r.finalists}</td>
+                    <td style={cell}>{pct(r.yieldPct)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td style={cell}>all</td>
+                  <td style={cell}>{runYield.totalCandidates}</td>
+                  <td style={cell}>{runYield.totalFinalists}</td>
+                  <td style={cell}>
+                    {runYield.totalCandidates ? pct(runYield.totalFinalists / runYield.totalCandidates) : '—'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>

@@ -550,6 +550,15 @@
 .panel-dev > .panel-tab-content {
   overflow-y: auto;
 }
+/* #2501 B20 — DEV readout tables (MIND, CENSUS) set their cells nowrap, so
+   a wide table's min-content can exceed the panel; wrapped in this scroll
+   box, the excess scrolls horizontally inside the table's own frame
+   instead of clipping at the panel's right edge with no way to reach it. */
+.dev-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: thin;
+}
 
 /* ─── Stimulus ─── */
 .panel-stimulus {

@@ -56,6 +56,16 @@
   text-overflow: ellipsis;
   max-width: 100%;
 }
+/* #2501 B3 — the DEV panel crowds thirteen tabs into one row: squeezed
+   flex: 1 1 0, their labels ellipsized ("PERSONA…", "CENSU…"). In the DEV
+   panel the tabs now take their label's own width and the row — which
+   already allows overflow-x — scrolls, so every label reads in full. The
+   Shell's own tab strip keeps the equal-share squeeze (six tabs fit). */
+.panel-dev .panel-tab {
+  flex: 0 0 auto;
+  padding-left: 8px;
+  padding-right: 8px;
+}
 /* #248 Phase 1 — drawer trigger (ASSETS): same look as a tab, but not one;
    sits below the tablist, opens an overlay instead of switching content. */
 .panel-drawer-triggers {

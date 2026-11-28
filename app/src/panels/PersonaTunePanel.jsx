@@ -209,13 +209,16 @@ export function PersonaTunePanel() {
                 <NumRow key={leaf.path} path={leaf.path} label={labelOf(leaf)} note={leaf.note} />
               ),
             )}
-            <div style={{ fontSize: 11, color: '#5a6272', padding: '2px 0' }}>
-              band: solo length · step cap · agree / disagree / lay-out odds · heat · answers first — unruled (null),
-              set by the band phase
-            </div>
           </div>
         );
       })}
+      {/* #2501 B21: the band footnote is one standing note for the whole table —
+          it used to repeat verbatim under every seat, reading as seven
+          identical section lines. It stands once, here, with the relations note. */}
+      <div style={{ fontSize: 11, color: '#5a6272', paddingTop: 4 }}>
+        band: solo length · step cap · agree / disagree / lay-out odds · heat · answers first — unruled (null), set by
+        the band phase
+      </div>
       <div style={{ fontSize: 11, color: '#5a6272', paddingTop: 4 }}>
         relations: every seat pair's agreement bias — unruled (null). band: trade rate · max horns per call · bandleader
         cut — unruled (null). Tuning changes how much, never what is allowed: powers, vetoes and laws stay in the
