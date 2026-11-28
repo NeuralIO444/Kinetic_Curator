@@ -20,6 +20,14 @@ import { decisionFeatureNames, DECISION_FEATURES_VERSION, PERSONA_DECISION_KINDS
 import { validateRelationsSection } from '../personas/chemistry.mjs';
 import { queenTimingFeatureNames, QUEEN_TIMING_FEATURES_VERSION } from './queenTimingFeatures.mjs';
 import { voiceFeatureNames, VOICE_FEATURES_VERSION } from './voiceFeatures.mjs';
+import {
+  KDEAL_FEATURES_VERSION,
+  KDEAL_STRATA,
+  creatureFeatureNames,
+  constructFeatureNames,
+  creatureFeatures,
+  constructFeatures,
+} from './kDealFeatures.mjs';
 
 export const TASTE_KIND = 'kc-taste';
 export const TASTE_VERSION = 1;
@@ -197,6 +205,16 @@ export function validateTaste(raw) {
   if (raw.voice != null) {
     const voice = validateVoiceSection(raw.voice);
     if (voice) taste.voice = voice;
+  }
+  // #2551 — the optional kdeal section: one ordering head per stage-K deal stratum (creature,
+  // construct), trained offline on Matt's keep/cut calls on dealt candidates. Same neutralization
+  // law as the personas and voice sections: additive learning over a working instrument, so an
+  // unreadable section neutralizes — the deal runs unordered, exactly as it did before the
+  // section existed. Absent (every pre-#2551 file, and every file until a head is trained) stays
+  // absent, and a taste with no kdeal section validates to exactly the object it always did.
+  if (raw.kdeal != null) {
+    const kdeal = validateKDealSection(raw.kdeal);
+    if (kdeal) taste.kdeal = kdeal;
   }
   return { ok: true, taste };
 }
@@ -402,6 +420,106 @@ export function voiceHeads(taste) {
     if (voiceHeadEarnedIn(e)) out[id] = { version: e.version, head: e.head };
   }
   return Object.keys(out).length ? out : null;
+}
+
+// ─── #2551: the kdeal section — T2 ordering for the stage K deal's strata ────
+//
+// Artifact shape:  kdeal: { <stratum>: { version, kind, head, labeledRows, heldOut, trainedAt,
+// featuresVersion } } — one entry per stratum ('creature' | 'construct'), keyed by the stratum
+// it orders. `version` is the head's own version (stamped into the deals it orders, as the
+// persona heads' versions are stamped into the takes they steer). `heldOut` is the head's
+// held-out Spearman against Matt's label weights from its training run (the A2 earn-in score);
+// `labeledRows` counts the keep/cut rows it trained on.
+
+/** Earn-in, counted in labeled keep/cut rows: a K-deal head orders only with at least this
+ * many of Matt's labeled deal candidates behind it — the one earn-in law's count, restated for
+ * this section's rows (EARN_IN_MIN_LABELED_TURNS is the personas section's name for it). */
+export const KDEAL_MIN_LABELED_ROWS = 200;
+
+/**
+ * Validate a taste.json `kdeal` section. Returns the cleaned section — entries rebuilt from
+ * known fields only, heads validated against their stratum's OWN feature universe
+ * (kDealFeatures.mjs) — or null when the section is unreadable (the caller then neutralizes
+ * it: validateTaste keeps the file, drops the section). All-or-nothing, as for the personas
+ * section: a half-valid section never orders half the deal.
+ */
+export function validateKDealSection(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const universes = { creature: creatureFeatureNames(), construct: constructFeatureNames() };
+  const out = {};
+  for (const [stratum, e] of Object.entries(raw)) {
+    if (!KDEAL_STRATA.includes(stratum)) return null; // the deal has exactly two strata
+    if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+    if (!Number.isInteger(e.version) || e.version < 1) return null;
+    if (e.kind !== stratum) return null; // the entry's kind is its key (one vocabulary)
+    if (!Number.isInteger(e.labeledRows) || e.labeledRows < 0) return null;
+    if (!finite(e.heldOut)) return null;
+    const heldOut = clampedScore(e.heldOut);
+    if (heldOut < -1 || heldOut > 1) return null;
+    // The universe version is REQUIRED, as for persona entries: an unstamped entry is not
+    // silently re-stamped as current.
+    if (e.featuresVersion !== KDEAL_FEATURES_VERSION) return null;
+    const v = validateTreeHeadFor(e.head, universes[stratum]);
+    if (!v.ok) return null;
+    out[stratum] = {
+      version: e.version,
+      kind: stratum,
+      head: v.head,
+      labeledRows: e.labeledRows,
+      heldOut,
+      trainedAt: String(e.trainedAt || ''),
+      featuresVersion: KDEAL_FEATURES_VERSION,
+    };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** Has this stratum's K-deal head earned in? The one earn-in law (A2): ≥200 labeled rows AND
+ * held-out Spearman ≥ HEAD_MIN_FIDELITY (0.3). No experimental switch applies — a below-gate
+ * head never orders, so the deal it would have ordered stays exactly today's unordered deal. */
+export function kDealHeadEarnedIn(entry) {
+  return (
+    !!entry &&
+    Number.isInteger(entry.labeledRows) &&
+    entry.labeledRows >= KDEAL_MIN_LABELED_ROWS &&
+    finite(entry.heldOut) &&
+    entry.heldOut >= HEAD_MIN_FIDELITY
+  );
+}
+
+/**
+ * The diceScorer-shaped ordering scorer for one stratum of the stage K deal
+ * (state/stageKineticDeal.mjs's orderScorers), or null when the taste carries no earned-in
+ * head for that stratum — the caller then deals that stratum unordered, exactly as today.
+ * score(record) is the head's keep-probability over the record's own descriptors
+ * (kDealFeatures.mjs). `meta` carries the T2 stamp trio's provenance — { tasteVersion,
+ * headKind } — so the deal can stamp the records it orders as the crown log stamps crowns.
+ */
+export function makeKDealScorer(taste, stratum) {
+  const entry = taste && taste.kdeal && taste.kdeal[stratum];
+  if (!kDealHeadEarnedIn(entry)) return null;
+  const extract = stratum === 'creature' ? creatureFeatures : stratum === 'construct' ? constructFeatures : null;
+  if (!extract) return null;
+  return {
+    id: `xgb-kdeal-${stratum}-v${entry.version}`,
+    meta: { tasteVersion: taste.version, headKind: entry.head.kind },
+    score(record) {
+      const p = scoreTreeHeadWith(entry.head, extract(record));
+      return Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : 0.5;
+    },
+  };
+}
+
+/**
+ * The ordering bundle for one stage K deal: { creature, construct } with an earned-in scorer
+ * or null per stratum — or null whole when neither stratum has earned in, so the deal runs
+ * exactly as it did before #2551 (resolveStageDeal's default path, byte-identical).
+ */
+export function makeKDealScorers(taste) {
+  if (!taste || !taste.kdeal) return null;
+  const creature = makeKDealScorer(taste, 'creature');
+  const construct = makeKDealScorer(taste, 'construct');
+  return creature || construct ? { creature, construct } : null;
 }
 
 /** Has this personas entry earned in? ≥200 labeled turns AND held-out ≥ HEAD_MIN_FIDELITY (0.3).
