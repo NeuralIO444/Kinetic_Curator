@@ -37,6 +37,18 @@
 //   - constructs take ANY at every stage scope: the construct ladder names STYLES and the stage pill names
 //     widths — there is no honest width→style mapping, so the deal picks a style in play by its own
 //     seeded hash, as the ANY scope does in the WetLab.
+// #2551 (the T2 pattern, extended): a caller may hand in `orderScorers` — one earned-in XGBoost
+// ordering head per stratum (curator/tasteHead.js makeKDealScorers, built from the loaded taste).
+// A stratum with a scorer lands in the head's order: every landed candidate is scored over its
+// own descriptors (curator/kDealFeatures.mjs), stamped with the T2 trio ({ xgbScore, tasteVersion,
+// headKind } — the stamp rides the record into the take's birth log, and the banks' sanitize
+// doors drop it when the record is banked in earnest), and the hand is re-ranked within its
+// stratum only, ties falling to deal order. Ordering is advisory and pure: the same candidates
+// land, with the same tiles — creature tiles are still BUILT in deal order, because a tile is
+// derived from the kin standing when its creature lands; only the landed order changes. A
+// stratum with no scorer (no head, or a head below the A2 earn-in bar — makeKDealScorers
+// returns null whole when neither stratum earned in) lands exactly as it did before #2551,
+// byte for byte.
 import { press as kineticPress, sanitizeScope } from '../deal/kineticEngine.mjs';
 import { creatureAdapter } from '../deal/creatureAdapter.mjs';
 import { constructAdapter, assembleCandidate, CONSTRUCT_ANY } from '../deal/constructAdapter.mjs';
@@ -51,18 +63,49 @@ export function stageDealScopes(startupMode) {
 }
 
 /**
+ * #2551 — re-rank one stratum's landed hand by its ordering head: score every candidate, stamp
+ * its record with the T2 trio, sort by score descending with ties in deal order (the explicit
+ * index fallback — the dice's own last resort). No scorer: the hand is returned untouched, so
+ * an unordered deal is the identical array the deal built. Pure re-ranking — nothing is
+ * filtered, nothing is drawn, the landed set never changes.
+ */
+function orderStratum(items, scorer, recordOf) {
+  if (!scorer || typeof scorer.score !== 'function') return items;
+  const meta = scorer.meta && typeof scorer.meta === 'object' ? scorer.meta : {};
+  const scored = items.map((item, i) => {
+    const rec = recordOf(item);
+    const s = scorer.score(rec);
+    if (rec && typeof rec === 'object') {
+      rec.xgbScore = s;
+      rec.tasteVersion = Number.isInteger(meta.tasteVersion) ? meta.tasteVersion : null;
+      rec.headKind = typeof meta.headKind === 'string' ? meta.headKind : null;
+    }
+    return { item, s, i };
+  });
+  scored.sort((a, b) => b.s - a.s || a.i - b.i);
+  return scored.map((x) => x.item);
+}
+
+/**
  * One stage deal. `state` is the standing store state (read, never written); `pressN` this press's number
  * in the deal stream; `commitEnabledAssets` the enabled map the press is about to commit (the dealt pool).
  * `library` may be handed in by a caller that already built it (the selfcheck does, to deal from nothing);
  * by default it is the stage's own deal library — the library plus the artist's imports, dealt the
  * WetLab's way (panels/wetLabDeal.mjs dealLibrary).
+ * `orderScorers` (#2551) is { creature, construct } — an earned-in ordering scorer per stratum, or
+ * null per stratum / null whole (the default): an unordered stratum lands exactly as it always has.
  *
  * Returns null when nothing landed, else:
  *   { creatures, constructs, stageBirths?, constructRecords?, enabledAssets? }
  * creatures / constructs are the records that landed (the wrapper notes the creatures to the take);
  * the rest are store fields to spread into the press commit, present only when they changed.
  */
-export function resolveStageDeal(state, pressN, commitEnabledAssets, { library: givenLibrary } = {}) {
+export function resolveStageDeal(
+  state,
+  pressN,
+  commitEnabledAssets,
+  { library: givenLibrary, orderScorers = null } = {},
+) {
   const press = sanitizePress(pressN);
   const seed = (state && state.seed) >>> 0;
   const { creatureScope, constructScope } = stageDealScopes(state && state.startupMode);
@@ -90,8 +133,7 @@ export function resolveStageDeal(state, pressN, commitEnabledAssets, { library: 
   for (const r of bank) if (r && r.id) standing.add(r.id);
   for (const b of births) if (b && b.record && b.record.id) standing.add(b.record.id);
   const kin = [...bank, ...births.map((b) => b && b.record).filter(Boolean)];
-  const creatures = [];
-  const newBirths = [];
+  const landed = []; // { record, tile } in deal order — tiles are built in deal order (the header's #2551 note)
   const creatureHand = kineticPress(creatureAdapter, {
     scope: creatureScope,
     seed,
@@ -104,10 +146,12 @@ export function resolveStageDeal(state, pressN, commitEnabledAssets, { library: 
     if (!tile) continue;
     standing.add(rec.id);
     kin.push(rec);
-    newBirths.push({ record: rec, tile });
-    creatures.push(rec);
+    landed.push({ record: rec, tile });
     enable(tile.id);
   }
+  const orderedLanded = orderStratum(landed, orderScorers && orderScorers.creature, (p) => p.record);
+  const creatures = orderedLanded.map((p) => p.record);
+  const newBirths = orderedLanded.map((p) => ({ record: p.record, tile: p.tile }));
 
   // Constructs: recipes from the SHAPE shelf's styles in play (the adapter's gate is the floor law —
   // no style in play is an empty hand, never an error). Each recipe is assembled and banked through the
@@ -123,9 +167,15 @@ export function resolveStageDeal(state, pressN, commitEnabledAssets, { library: 
     press,
     ctx: constructCtx,
   }).hand;
+  // Assemble the whole hand first (deal order), then order the stratum (#2551), then bank in
+  // landed order — assemble-then-bank in deal order is the identical bank sequence the
+  // interleaved loop ran, so an unordered deal banks byte-identically.
+  const assembled = [];
   for (const cand of constructHand) {
     const rec = assembleCandidate(cand, constructCtx);
-    if (!rec) continue;
+    if (rec) assembled.push(rec);
+  }
+  for (const rec of orderStratum(assembled, orderScorers && orderScorers.construct, (r) => r)) {
     const next = bankConstructRecord(constructRecords, rec);
     if (next !== constructRecords) {
       constructRecords = next;

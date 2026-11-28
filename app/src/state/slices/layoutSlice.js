@@ -104,6 +104,7 @@ import { birthPopulation, standingBirthHand } from '../../curator/birthLive.mjs'
 import { noteBirth } from '../../curator/birthRecord.mjs'; // #2037: a recording take hears every resolved birth
 import { creatureTile, skeletonFounder } from '../../engine/creatureAssembler.js'; // #2037: a born child's stage tile, built like the bank's
 import { resolveStageDeal } from '../stageKineticDeal.mjs'; // #2544: the stage deal — creatures + construct recipes join the roll
+import { makeKDealScorers } from '../../curator/tasteHead.js'; // #2551: the loaded taste's earned-in K-deal ordering heads, if any
 
 /**
  * #1365 Q2 — an artist's edit builds on the live overrides minus refine's carried `weights`: the weights describe the
@@ -649,7 +650,10 @@ function landStageDeal(state, commitEnabledAssets) {
   const press = (state.stageDealPress | 0) + 1;
   const base = { stageDealPress: press };
   try {
-    const r = resolveStageDeal(state, press, commitEnabledAssets);
+    // #2551: the taste's earned-in K-deal heads order the strata as they land (null when no head
+    // has earned in — the deal then runs unordered, exactly as before). Built per press from the
+    // loaded taste, the useDiceRoll pattern; the deal's fail-closed try wraps this too.
+    const r = resolveStageDeal(state, press, commitEnabledAssets, { orderScorers: makeKDealScorers(getTaste()) });
     if (!r) return base;
     for (const rec of r.creatures) noteBirth({ press, via: 'deal', outcome: 'born', record: rec });
     const { creatures: _creatures, constructs: _constructs, ...fields } = r; // eslint-disable-line no-unused-vars

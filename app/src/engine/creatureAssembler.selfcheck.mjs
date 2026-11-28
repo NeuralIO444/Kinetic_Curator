@@ -418,6 +418,9 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // banked, through its pool TILE alone. Its suite is a test.
     'state/stageKineticDeal.mjs',
     'state/stageKineticDeal.selfcheck.mjs',
+    // #2551: the K-deal ordering suite — a test: it deals through the stage deal's own core and reads
+    // the standing births back to prove the ordering head's order and stamps; not a stage reader
+    'curator/kDealOrder.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {
