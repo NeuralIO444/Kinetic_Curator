@@ -3007,7 +3007,7 @@ export const UI_CONTROLS_6 = Object.freeze([
     'dev',
     'UNITS — run / make unit',
     'button',
-    'Runs the unit harness or makes a unit through the dev server.',
+    'Runs the unit harness through the dev server, or drafts a unit template you save as a file.',
     {
       family: true,
       stress: 'skip',

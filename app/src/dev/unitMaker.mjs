@@ -27,6 +27,16 @@ test('#${n} ${title}', () => {
   };
 }
 
+// The one line MAKE answers with. Making a unit writes nothing — in any
+// build — so the press says what did happen: a draft, the name it wants,
+// and that saving it is the reader's move. A press that answered with
+// silence was A18 (#2496): the draft for the pre-filled values was already
+// on screen, so an unchanged template read as a dead button.
+export function unitMadeLine(made) {
+  if (!made || !made.file) return '';
+  return `drafted ${made.file} — nothing was written; save the template under that name and CI runs the file you save`;
+}
+
 export function pushUnitCheck(name, ok, detail = '') {
   const row = { name, ok: !!ok, detail, t: Date.now() };
   if (typeof globalThis.window !== 'undefined') {

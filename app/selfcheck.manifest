@@ -587,6 +587,7 @@ node src/panels/shelfView.selfcheck.mjs
 node qa/units.selfcheck.mjs
 node qa/trio.selfcheck.mjs
 node src/dev/unitMaker.selfcheck.mjs
+node src/dev/unitMadeLine.selfcheck.mjs
 node src/gl/nodePhase.selfcheck.mjs
 node src/data/light.pool.selfcheck.mjs
 node src/gl/shapeDither.selfcheck.mjs
