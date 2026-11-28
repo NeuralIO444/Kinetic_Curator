@@ -11,9 +11,9 @@
 //       ceiling buttons expose their pressed state (aria-pressed).
 //   B24 The spectrum-marks mapping explains itself as visible text
 //       under its buttons, not only in their tooltips.
-//   B25 Gating reasons (RangeRow / ModeRow / ValueButton) render as
-//       visible panel text when the control is disabled, not only in
-//       the tooltip / aria-label.
+//   B25 Gating reasons (RangeRow / ModeRow / ValueButton, and the
+//       STIMULI response picker) render as visible panel text when the
+//       control is disabled, not only in the tooltip / aria-label.
 // These pins are source-shape + one pure-helper behaviour block, in the
 // house style of topbarLegibility: they fail on the pre-#2503 tree for
 // exactly the filed reasons.
@@ -91,6 +91,16 @@ ok('B6: PaletteStrip renders browse keys and a position readout over the chip wi
     /browse && browse\.id === palette\.id \? browse\.start : null/,
     'a browse window is valid only for the palette it was stepped on — a new active palette re-follows the roll',
   );
+  assert.match(
+    paletteStrip,
+    /const activeOffWindow = canBrowse && \(activeIndex < winStart \|\| activeIndex >= winStart \+ visible\.length\)/,
+    'the strip knows when browsing has moved the window off the active chip',
+  );
+  assert.match(
+    paletteStrip,
+    /activeOffWindow && <> · up: \{palette\.name\}<\/>/,
+    'while the active chip is off-window, the readout names the palette that is up (#952 — the strip never hides which palette the roll has on stage)',
+  );
   assert.match(layoutCss, /\.palette-window-pos \{/, 'the readout has a seat in the strip styles');
 });
 
@@ -122,14 +132,14 @@ ok('B24: SpectrumMarks renders the standing mapping’s hint as visible text', (
 });
 
 // ── B25: gating reasons render on the panel ──────────────────────────────
-ok('B25: RangeRow renders its disabled reason as visible text (row + stack)', () => {
+ok('B25: RangeRow renders its disabled reason as visible text (row + stack + bare)', () => {
   assert.match(rangeRow, /className="range-reason"/, 'the reason element exists');
   assert.match(
     rangeRow,
     /\{disabledLabel\} — \{disabledReason\}/,
     'the visible text is the same composed reason the tooltip carries',
   );
-  assert.equal((rangeRow.match(/\{reasonEl\}/g) || []).length, 2, 'both the row and stack layouts render it');
+  assert.equal((rangeRow.match(/\{reasonEl\}/g) || []).length, 3, 'the row, stack and bare layouts all render it');
   assert.match(controlsCss, /\.range-reason \{/, 'the reason has a seat in the control styles');
 });
 
@@ -144,7 +154,20 @@ ok('B25: ValueButton renders its disabled reason as visible text', () => {
     /disabled && disabledReason && <div className="te-value-reason">\{disabledReason\}<\/div>/,
     'the reason stands under the button while gated',
   );
+  assert.ok(
+    valueButton.indexOf('te-value-reason') > valueButton.indexOf('te-lock'),
+    'the reason renders after the lock pip, so the pip keeps its seat beside the button',
+  );
   assert.match(panelsCss, /\.te-mode-reason \{/, 'the reason lines have a seat in the panel styles');
+});
+
+ok('B25: the STIMULI response picker renders its waiting-for-audio reason as visible text', () => {
+  const reactivity = read('../panels/stimulus/ReactivityControls.jsx');
+  assert.match(
+    reactivity,
+    /disabled && disabledReason && <span className="range-reason">Waiting for audio — \{disabledReason\}<\/span>/,
+    'the picker speaks its gate on the panel, not only in its tooltip',
+  );
 });
 
 ok('B25: the filed gating groups still pass their reasons in', () => {

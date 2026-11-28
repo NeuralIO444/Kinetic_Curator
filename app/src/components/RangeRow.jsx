@@ -117,7 +117,15 @@ export function RangeRow({
   );
 
   // The slider alone: the parent owns the label, and there is no lock or typed readout.
-  if (layout === 'bare') return slider;
+  // (#2503: a bare row still speaks its gate reason — no caller pairs
+  // bare with a reason today, but the control must not silently drop it.)
+  if (layout === 'bare')
+    return (
+      <>
+        {slider}
+        {reasonEl}
+      </>
+    );
 
   const lockButton = onToggleLock && (
     <button className={`lock-btn ${locked ? 'locked' : ''}`} onClick={onToggleLock} title={locked ? 'Unlock' : 'Lock'}>

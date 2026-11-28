@@ -247,14 +247,18 @@ export function PaletteStrip() {
   // #2503 (B6) — the window used to move ONLY when the roll landed
   // elsewhere: no scroll affordance, and keys 1–4 silently remapped to
   // whichever four were visible. The ‹ › keys now step a browse window
-  // over the full set (the position readout names where the window sits),
-  // while the follow window still wins the moment the active palette
-  // changes — browsing never fights the roll about what is up.
+  // over the full set (the position readout names where the window
+  // sits), and the follow window wins again the moment the active
+  // palette changes. Browsing can sit off the active chip — that is
+  // what browsing means — so while it does, the readout names the
+  // palette that is actually up: the strip never leaves the performer
+  // guessing which palette the roll has on stage (#952).
   const [browse, setBrowse] = useState(null); // { id, start } — the stepped window, valid only for the palette it was stepped on
   const browseStart = browse && browse.id === palette.id ? browse.start : null;
   const winStart = browseStart == null ? followStart : clampChipWindowStart(all.length, browseStart, CHIP_CAP);
   const visible = all.slice(winStart, winStart + CHIP_CAP);
   const canBrowse = all.length > CHIP_CAP;
+  const activeOffWindow = canBrowse && (activeIndex < winStart || activeIndex >= winStart + visible.length);
   const stepWindow = (dir) =>
     setBrowse({ id: palette.id, start: clampChipWindowStart(all.length, winStart + dir * CHIP_CAP, CHIP_CAP) });
   const activeChipRef = useRef(null);
@@ -419,6 +423,7 @@ export function PaletteStrip() {
               title="Which palettes the chips above show — keys 1–4 pick from these four"
             >
               {winStart + 1}–{winStart + visible.length} of {all.length}
+              {activeOffWindow && <> · up: {palette.name}</>}
             </span>
           )}
           <span className="palette-controls" style={{ display: 'inline-flex', alignItems: 'center' }}>
