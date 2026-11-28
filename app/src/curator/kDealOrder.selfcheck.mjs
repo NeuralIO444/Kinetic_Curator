@@ -338,11 +338,18 @@ const shelf = VOCAB.slice(0, 2).map((asset) => ({ style: STYLE, asset }));
     [...partCounts].sort((a, b) => b - a),
     'constructs land in the head’s order',
   );
+  for (const rec of ordered.constructs) {
+    assert.equal(rec.xgbScore, rec.parts.length, `${rec.id}: the construct stamp carries the score`);
+    assert.equal(rec.tasteVersion, 7, `${rec.id}: the construct stamp carries the taste version`);
+    assert.equal(rec.headKind, 'xgboost-trees', `${rec.id}: the construct stamp carries the head kind`);
+  }
   assert.deepEqual(
     ordered.constructRecords.map((c) => c.id),
     ordered.constructs.map((c) => c.id),
     'the bank takes the constructs in landed order',
   );
+  for (const rec of ordered.constructRecords)
+    assert.ok(!('xgbScore' in rec), `${rec.id}: the banked copy is stamp-free — the bank's door rebuilds the record`);
   assert.deepEqual(
     Object.keys(ordered.enabledAssets).sort(),
     Object.keys(plain.enabledAssets).sort(),
