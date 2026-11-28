@@ -2,7 +2,14 @@
 // Mixable sets keep the 4-state LED chip (#733): three stepped pips under
 // the label, tap cycles off → 1 → 2 → 3 → off.
 import { useStore } from '../../state/store.js';
-import { SHAPE_SETS, MIXABLE_SHAPE_IDS, SHAPE_MIX_MAX, isShapeSetActive, liveShapeLevels } from '../../data/voices.js';
+import {
+  SHAPE_SETS,
+  MIXABLE_SHAPE_IDS,
+  SHAPE_MIX_MAX,
+  isShapeSetActive,
+  liveShapeLevels,
+  shapeMixRefusalLine,
+} from '../../data/voices.js';
 import { emit, Events } from '../../composition/eventBus.js';
 
 export function ShapesShelf() {
@@ -11,6 +18,11 @@ export function ShapesShelf() {
     useStore((s) => s.enabledAssets),
   );
   const enabledAssets = useStore((s) => s.enabledAssets);
+  // #2495 — a fifth chip refused at the cap names itself under the matrix.
+  const refusalLine = shapeMixRefusalLine(
+    useStore((s) => s.shapeMixRefusal),
+    shapeLevels,
+  );
 
   // TeaMatrix is single-select; the shelf is multi-select with LED levels,
   // so it renders its own grid on the same te-cell language.
@@ -48,6 +60,11 @@ export function ShapesShelf() {
           );
         })}
       </div>
+      {refusalLine && (
+        <div className="shapes-refusal" role="status">
+          {refusalLine}
+        </div>
+      )}
     </div>
   );
 }

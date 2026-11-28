@@ -107,6 +107,7 @@ node src/state/projectNaming.selfcheck.mjs
 node src/state/poolCitizenship.selfcheck.mjs
 node src/state/shelfPersist.selfcheck.mjs
 node src/state/sessionOnly.selfcheck.mjs
+node src/state/frameLock.selfcheck.mjs
 node src/state/allEraGolden.selfcheck.mjs
 node src/state/recipes.selfcheck.mjs
 node src/state/recipeUrls.selfcheck.mjs
@@ -168,6 +169,7 @@ node src/components/dishFluidChip.selfcheck.mjs
 node src/components/genomeTimeline.selfcheck.mjs
 node src/components/genomeMaterial.selfcheck.mjs
 node src/components/lineageTree.selfcheck.mjs
+node src/components/lineageThirdParent.selfcheck.mjs
 node src/components/strandBank.selfcheck.mjs
 node src/components/cultivate.selfcheck.mjs
 node src/components/cultivatePress.selfcheck.mjs
@@ -384,6 +386,7 @@ node src/gl/squash.selfcheck.mjs
 node src/gl/audioRoutes.selfcheck.mjs
 node src/gl/patternAudio.selfcheck.mjs
 node src/gl/stimuliAuto.selfcheck.mjs
+node src/panels/stimulus/modMatrixDepth.selfcheck.mjs
 node src/gl/beatClock.selfcheck.mjs
 node src/state/rollScope.selfcheck.mjs
 node src/gl/hueAudio.selfcheck.mjs
@@ -527,6 +530,7 @@ node src/curator/candidateTray.selfcheck.mjs
 node src/curator/shelf.selfcheck.mjs
 node src/curator/shelfPrefs.selfcheck.mjs
 node src/curator/shelfFill.selfcheck.mjs
+node src/curator/shelfSamePlate.selfcheck.mjs
 node src/curator/shelfDisk.selfcheck.mjs
 node src/curator/censusReadout.selfcheck.mjs
 node src/curator/shelfCensus.selfcheck.mjs
@@ -572,6 +576,7 @@ node src/gl/gateWeave.selfcheck.mjs
 node src/state/stubMix.selfcheck.mjs
 node src/state/layoutPress.selfcheck.mjs
 node src/state/shapeMix.selfcheck.mjs
+node src/state/shapeMixRefusal.selfcheck.mjs
 node scripts/runSelfcheck.selfcheck.mjs
 node qa/report.selfcheck.mjs
 node qa/review.selfcheck.mjs
@@ -583,6 +588,7 @@ node src/panels/shelfView.selfcheck.mjs
 node qa/units.selfcheck.mjs
 node qa/trio.selfcheck.mjs
 node src/dev/unitMaker.selfcheck.mjs
+node src/dev/unitMadeLine.selfcheck.mjs
 node src/gl/nodePhase.selfcheck.mjs
 node src/data/light.pool.selfcheck.mjs
 node src/gl/shapeDither.selfcheck.mjs

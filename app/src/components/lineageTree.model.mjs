@@ -157,7 +157,10 @@ export function nodeDeltas(record, nodeId) {
           valueText: geneValueText(pg),
           matches: sameValue(pg.value, g.value),
         }
-      : { id: pid, retained: !!list, value: null, valueText: null, matches: false };
+      : // retention is per gene, not per entry: an entry that does not hold this gene retained nothing
+        // for it — the same fact as a parent with no entry at all — so the line names it ('not retained')
+        // instead of standing a null where the parent's value should read.
+        { id: pid, retained: false, value: null, valueText: null, matches: false };
   };
   // mutation entries are the selected creature's own data (its lineage) — an ancestor's were never summarized
   const mutations = isSelf && record.lineage ? record.lineage.mutations : [];
