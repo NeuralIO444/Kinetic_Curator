@@ -23,23 +23,13 @@ const state = {
   fps: 24,
   renderScale: 0.5,
   assetThin: true,
-  frameLock: true,
   perfTier1: true,
   slowRender: true,
   perfClampOverride: { count: 90, mirror: false },
   stageTimings: { kernel: 12.5 },
 };
 const doc = serializeProject(state);
-for (const key of [
-  'fps',
-  'renderScale',
-  'assetThin',
-  'frameLock',
-  'perfTier1',
-  'slowRender',
-  'perfClampOverride',
-  'stageTimings',
-]) {
+for (const key of ['fps', 'renderScale', 'assetThin', 'perfTier1', 'slowRender', 'perfClampOverride', 'stageTimings']) {
   assert.ok(!(key in doc), `showrunner key leaked into project doc: ${key}`);
 }
 const round = parseProject(JSON.parse(JSON.stringify(doc)));

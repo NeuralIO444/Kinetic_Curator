@@ -392,7 +392,7 @@ export const createGlobalSlice = (set, get) => ({
    * #2482, recover <= the measured display max (displayMaxFps below):
    * a recover the screen can never reach is the same trap through the
    * other door. Both laws live in governorThresholds.mjs.
-   * Session-only, never serialized (machine-specific, like frameLock).
+   * Session-only, never serialized (machine-specific, like displayMaxFps).
    * Live-overridable from the dev-only GOV TUNE panel.
    */
   governorShedFps: 28,
@@ -410,14 +410,6 @@ export const createGlobalSlice = (set, get) => ({
    * never serialized — it is this tab's hardware, not the project.
    */
   displayMaxFps: null,
-  /**
-   * Showrunner frame-lock show mode: a USER choice, not a degradation.
-   * When on, the life/breathing tick (the dominant per-frame re-render
-   * driver) is gated to ~30Hz — a locked 30fps reads smoother than a
-   * fluctuating 40–60 and halves React render work. Never auto-cleared.
-   * Never serialized (it is a machine-specific choice, not composition).
-   */
-  frameLock: false,
   /**
    * Live-GL context health (#263): 'ok' | 'lost' | 'restoring'.
    *   'lost'      — the GPU context went down (webglcontextlost); the live
@@ -927,7 +919,6 @@ export const createGlobalSlice = (set, get) => ({
       if (pair.shedFps === state.governorShedFps && pair.recoverFps === state.governorRecoverFps) return {};
       return { governorShedFps: pair.shedFps, governorRecoverFps: pair.recoverFps };
     }),
-  setFrameLock: (on) => set({ frameLock: !!on }),
   /** Live-GL context health signal (#263) — one of 'ok' | 'lost' | 'restoring'. */
   setGlContext: (v) => set({ glContext: v === 'lost' ? 'lost' : v === 'restoring' ? 'restoring' : 'ok' }),
   /**

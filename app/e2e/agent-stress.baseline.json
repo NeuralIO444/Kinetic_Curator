@@ -25,7 +25,6 @@
     "topbar.roll-scope-clear": "pass",
     "topbar.help-dialog": "skip",
     "transport.run": "pass",
-    "transport.frame-lock": "pass",
     "transport.budget": "pass",
     "transport.undo": "pass",
     "transport.redo": "pass",

@@ -29,10 +29,8 @@ export function MasterBar() {
     isRecording: s.isRecording,
     persistStatus: s.persistStatus,
     tuningSessionOnly: s.tuningSessionOnly,
-    frameLock: s.frameLock,
     bootNotice: s.bootNotice,
     setBootNotice: s.setBootNotice,
-    setFrameLock: s.setFrameLock,
     audioDenied: s.audioDenied,
     audioLost: s.audioLost,
     glContext: s.glContext,
@@ -47,7 +45,6 @@ export function MasterBar() {
     quality = 'balanced',
     persistStatus = 'ok',
     tuningSessionOnly = false,
-    frameLock = false,
     audioDenied = false,
     audioLost = null,
     glContext = 'ok',
@@ -249,15 +246,6 @@ export function MasterBar() {
             {q.budget || q.label}
           </span>
         </div>
-
-        <button
-          className={`undo-btn ${frameLock ? '' : 'disabled'}`}
-          onClick={() => state.setFrameLock(!frameLock)}
-          title="Frame-lock show mode: gate the UI life tick to a locked 30fps."
-          style={{ fontSize: '10px', letterSpacing: '0.06em' }}
-        >
-          30FPS{frameLock ? '' : ' · OFF'}
-        </button>
 
         <BudgetKnob />
 
