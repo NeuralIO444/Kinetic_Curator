@@ -1,9 +1,12 @@
 // Palette strip chip window (#952) — pure, wall-clock-free.
 //
 // The strip shows a fixed number of chips (CHIP_CAP), but the KIN roll can
-// land on any of the 37 system palettes plus saved user palettes. The window
-// slides so the active palette is always one of the visible chips: the strip
-// can never disagree with the roll about which palette is up.
+// land on any of the 37 system palettes plus saved user palettes. The follow
+// window slides so the active palette is always one of the visible chips:
+// the strip can never disagree with the roll about which palette is up.
+// (#2503 adds a performer browse window over the same range — while it
+// sits off the active chip, the strip's readout names the palette that
+// is up, so the honesty above holds for the surface as a whole.)
 //
 // Behavior: while the active palette sits inside the head window the strip
 // is stable (first `cap` chips, as before). Once the roll lands past it, the

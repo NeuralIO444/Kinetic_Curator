@@ -254,6 +254,14 @@ export function PaletteStrip() {
   // palette that is actually up: the strip never leaves the performer
   // guessing which palette the roll has on stage (#952).
   const [browse, setBrowse] = useState(null); // { id, start } — the stepped window, valid only for the palette it was stepped on
+  // The follow window wins the moment the active palette changes: drop the
+  // stepped window outright (render-phase adjustment), so a palette the
+  // roll later RETURNS to re-follows instead of reviving a stale browse.
+  const [prevPaletteId, setPrevPaletteId] = useState(palette.id);
+  if (palette.id !== prevPaletteId) {
+    setPrevPaletteId(palette.id);
+    setBrowse(null);
+  }
   const browseStart = browse && browse.id === palette.id ? browse.start : null;
   const winStart = browseStart == null ? followStart : clampChipWindowStart(all.length, browseStart, CHIP_CAP);
   const visible = all.slice(winStart, winStart + CHIP_CAP);
