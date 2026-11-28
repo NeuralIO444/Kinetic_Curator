@@ -109,12 +109,47 @@
   background: var(--panel-2);
   border-top: 1px solid var(--line-2);
   height: 38px;
+  /* #2501 B1: the bar is a fixed 38px row of the app grid — it may not grow
+     the column past the window (the .app minmax(0, 1fr) rule's lesson). */
+  min-width: 0;
 }
 .master-left,
 .master-right {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+/* #2501 B1 — the window's right edge is a wall (body overflow-x is hidden),
+   so a crowded left cluster used to push REC/TAKE/RUN off-screen and cut
+   them silently. Now the left cluster takes only what the transport leaves
+   and compresses inside itself: the transport never shrinks, controls never
+   shrink, the LOIS pill's ticker slot and the status pills give first. */
+.master-left {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.master-right {
+  flex: 0 0 auto;
+}
+.master-left > :not(.lois-pill):not(.status-pill) {
+  flex-shrink: 0;
+}
+.master-left .status-pill {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* #2501 B1 — as the window narrows, meter labels go before values do:
+   every meter's full read stays one hover away on its title. */
+@media (max-width: 1500px) {
+  .master-left {
+    gap: 6px;
+  }
+  .master-left .meter-label {
+    display: none;
+  }
 }
 .tally-light {
   display: flex;
@@ -394,7 +429,7 @@
   height: 18px;
   box-sizing: border-box;
   padding: 0 6px;
-  flex: 0 0 168px;
+  flex: 0 1 168px;
   border: 1px solid #1a1a1a;
   background: #1a1a1a;
   font-size: 10px;
@@ -403,6 +438,10 @@
   font-family: "Arial Narrow", "Helvetica Neue", Impact, sans-serif;
   white-space: nowrap;
   overflow: hidden;
+  /* #2501 B1: in a crowded master bar the pill gives width back (the
+     flex-shrink in its flex shorthand above) — its ticker slot inside is
+     already built to scroll/ellipsize the line. */
+  min-width: 100px;
 }
 .lois-pill[data-tone="ink"] {
   color: #6b655c;
@@ -597,6 +636,12 @@
 .tape-click {
   display: inline-block;
   animation: tape-click 0.4s ease-out;
+  /* #2501 B1: a long shed-stage name ellipsizes inside the tape pill
+     instead of widening it into its neighbours. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 @keyframes tape-click {
   0% {
@@ -972,6 +1017,17 @@
   font-size: 9px;
   letter-spacing: 0.05em;
   height: 20px;
+}
+/* #2501 B26 — the build line is the footer's one identifying read: it steps
+   up from --dimmer to --dim, and the hash — the only build identifier —
+   carries full ink and weight so it can be spotted at a glance. */
+.footer-build {
+  color: var(--dim);
+  font-size: 10px;
+}
+.footer-hash {
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .micro-btn {

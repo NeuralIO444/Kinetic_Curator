@@ -31,22 +31,24 @@ function Conducting() {
         {t.owned.length ? t.owned.join(', ') : 'none'}
         {t.pending ? ` · waiting for bar ${t.pending.landBar}: ${t.pending.desc}` : ''}
       </p>
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-        <tbody>
-          {t.log.length === 0 && (
-            <tr>
-              <td style={cell}>nothing yet</td>
-            </tr>
-          )}
-          {t.log.map((e, i) => (
-            <tr key={i}>
-              <td style={cell}>bar {e.landBar ?? e.bar}</td>
-              <td style={cell}>{e.status === 'applied' ? 'applied' : `dropped: ${e.reason}`}</td>
-              <td style={cell}>{e.desc}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="dev-table-scroll">
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <tbody>
+            {t.log.length === 0 && (
+              <tr>
+                <td style={cell}>nothing yet</td>
+              </tr>
+            )}
+            {t.log.map((e, i) => (
+              <tr key={i}>
+                <td style={cell}>bar {e.landBar ?? e.bar}</td>
+                <td style={cell}>{e.status === 'applied' ? 'applied' : `dropped: ${e.reason}`}</td>
+                <td style={cell}>{e.desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -69,49 +71,53 @@ function Story() {
           ? ` · grudges: ${s.grudges.map((g) => `${g.topic} ×${g.count}${g.promoted ? ' (named)' : ''}`).join(', ')}`
           : ''}
       </p>
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-        <thead>
-          <tr>
-            {['regard', 'mood', 'standing', 'as OVERLAP reads it', 'as COVER reads it'].map((h) => (
-              <th key={h} style={cell}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(([label, v, key]) => (
-            <tr key={label}>
-              <td style={cell}>{label}</td>
-              <td style={cell}>{fmt(v.mood)}</td>
-              <td style={cell}>{fmt(v.standing)}</td>
-              <td style={cell}>{fmt(s.believed.davis[key])}</td>
-              <td style={cell}>{fmt(s.believed.lois[key])}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-        <tbody>
-          {s.beats.length === 0 && (
+      <div className="dev-table-scroll">
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <thead>
             <tr>
-              <td style={cell}>no beats yet — a quiet room is a valid scene</td>
+              {['regard', 'mood', 'standing', 'as OVERLAP reads it', 'as COVER reads it'].map((h) => (
+                <th key={h} style={cell}>
+                  {h}
+                </th>
+              ))}
             </tr>
-          )}
-          {s.beats.map((b, i) => (
-            <tr key={i}>
-              <td style={cell}>bar {b.bar}</td>
-              <td style={cell}>{b.kind}</td>
-              <td style={cell}>{b.persona === 'lois' ? 'cover' : b.persona === 'davis' ? 'overlap' : b.persona}</td>
-              <td style={cell}>
-                {b.form || ''}
-                {b.topic ? ` · ${b.topic}` : ''}
-                {b.loreFact ? ` · ${b.loreFact}` : ''}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map(([label, v, key]) => (
+              <tr key={label}>
+                <td style={cell}>{label}</td>
+                <td style={cell}>{fmt(v.mood)}</td>
+                <td style={cell}>{fmt(v.standing)}</td>
+                <td style={cell}>{fmt(s.believed.davis[key])}</td>
+                <td style={cell}>{fmt(s.believed.lois[key])}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="dev-table-scroll">
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <tbody>
+            {s.beats.length === 0 && (
+              <tr>
+                <td style={cell}>no beats yet — a quiet room is a valid scene</td>
+              </tr>
+            )}
+            {s.beats.map((b, i) => (
+              <tr key={i}>
+                <td style={cell}>bar {b.bar}</td>
+                <td style={cell}>{b.kind}</td>
+                <td style={cell}>{b.persona === 'lois' ? 'cover' : b.persona === 'davis' ? 'overlap' : b.persona}</td>
+                <td style={cell}>
+                  {b.form || ''}
+                  {b.topic ? ` · ${b.topic}` : ''}
+                  {b.loreFact ? ` · ${b.loreFact}` : ''}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -138,38 +144,50 @@ export function MindPanel() {
           ? `${r.moonPhase} moon (${Math.round(r.illumination * 100)}% lit), ${r.season}`
           : 'none this session (no modulation)'}
       </p>
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-        <thead>
-          <tr>
-            {['', 'score', 'tier', 'level', 'cool', 'next at', 'sign', 'tempo', 'intensity', 'half-life d', 'last'].map(
-              (h) => (
+      <div className="dev-table-scroll">
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <thead>
+            <tr>
+              {[
+                '',
+                'score',
+                'tier',
+                'level',
+                'cool',
+                'next at',
+                'sign',
+                'tempo',
+                'intensity',
+                'half-life d',
+                'last',
+              ].map((h) => (
                 <th key={h} style={cell}>
                   {h}
                 </th>
-              ),
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {view.rows.map((row) => (
-            <tr key={row.label}>
-              <td style={cell}>{row.label}</td>
-              <td style={cell}>{fmt(row.score)}</td>
-              <td style={cell}>{row.tier}</td>
-              <td style={cell}>{fmt(row.level)}</td>
-              <td style={cell}>{row.cool ? 'cooling' : ''}</td>
-              <td style={cell}>{row.next ?? 'top'}</td>
-              <td style={cell}>
-                {row.sign} {row.born}
-              </td>
-              <td style={cell}>{fmt(row.temperament.tempo * row.mod.tempo)}</td>
-              <td style={cell}>{fmt(row.temperament.intensity * row.mod.intensity)}</td>
-              <td style={cell}>{fmt(row.halfLifeDays)}</td>
-              <td style={cell}>{row.moved}</td>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {view.rows.map((row) => (
+              <tr key={row.label}>
+                <td style={cell}>{row.label}</td>
+                <td style={cell}>{fmt(row.score)}</td>
+                <td style={cell}>{row.tier}</td>
+                <td style={cell}>{fmt(row.level)}</td>
+                <td style={cell}>{row.cool ? 'cooling' : ''}</td>
+                <td style={cell}>{row.next ?? 'top'}</td>
+                <td style={cell}>
+                  {row.sign} {row.born}
+                </td>
+                <td style={cell}>{fmt(row.temperament.tempo * row.mod.tempo)}</td>
+                <td style={cell}>{fmt(row.temperament.intensity * row.mod.intensity)}</td>
+                <td style={cell}>{fmt(row.halfLifeDays)}</td>
+                <td style={cell}>{row.moved}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <details style={{ marginTop: 10 }}>
         <summary>the numbers</summary>
         <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11 }}>

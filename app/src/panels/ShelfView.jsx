@@ -205,7 +205,14 @@ export function ShelfView() {
             role="listitem"
             key={cell.keepId}
             className={`shelf-slot${aimedSlot === cell.n - 1 ? ' aimed' : ''}${cell.onDeck ? ' on-deck' : ''}`}
-            title={cell.onDeck ? 'on the deck — this slot refuses swaps' : 'aim a swap at this slot'}
+            title={
+              /* #2501 B8: the label ellipsizes in the slot, so the slot's own
+                 tooltip names the keep first — hovering anywhere on the slot
+                 reads the full label, not just the swap hint. */
+              cell.onDeck
+                ? `${cell.label} — on the deck — this slot refuses swaps`
+                : `${cell.label} — aim a swap at this slot`
+            }
             onClick={() => setAimedSlot(aimedSlot === cell.n - 1 ? null : cell.n - 1)}
           >
             <span className="shelf-slot-top">
@@ -289,7 +296,8 @@ export function ShelfView() {
         const reason = rowReason(row);
         const tag = rowLocationTag(row);
         return (
-          <div key={row.id} className={`shelf-row${row.tier === 'stage' ? ' is-stage' : ''}`}>
+          /* #2501 B8: the row's tooltip names the keep, as the label's does */
+          <div key={row.id} className={`shelf-row${row.tier === 'stage' ? ' is-stage' : ''}`} title={row.label}>
             <span className="shelf-row-main">
               <span className="shelf-row-label" title={row.label}>
                 {rowIdentity(row)}

@@ -835,8 +835,9 @@ function AppInner() {
       {DEBUG_TRAILGRID && <TrailGridReadout />}
       {DEBUG_STATS && <TrailReadout />}
       <footer className="footer-bar">
-        <span>
-          KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}
+        <span className="footer-build">
+          KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build{' '}
+          <span className="footer-hash">{import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           {state.layoutParams.mode} · seed:{state.seed.toString(16)}
