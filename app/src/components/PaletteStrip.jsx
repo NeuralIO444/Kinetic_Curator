@@ -4,7 +4,7 @@ import { useStore } from '../state/store.js';
 import { useHotkeys } from '../hooks/useHotkeys.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { SCHEME_IDS } from '../engine/harmony.js';
-import { chipWindowStart } from './paletteChipWindow.mjs';
+import { chipWindowStart, clampChipWindowStart } from './paletteChipWindow.mjs';
 import { paletteTasteFit, fitLevel } from './paletteTasteFit.mjs';
 import { getTaste } from '../curator/tasteStore.js';
 import { tasteLevel } from '../curator/topbarTaste.mjs';
@@ -243,8 +243,20 @@ export function PaletteStrip() {
   // visible: highlight + name in the readout, tracking every KIN tap.
   const all = palettes || [];
   const activeIndex = all.findIndex((p) => p.id === palette.id);
-  const winStart = chipWindowStart(all.length, activeIndex, CHIP_CAP);
+  const followStart = chipWindowStart(all.length, activeIndex, CHIP_CAP);
+  // #2503 (B6) — the window used to move ONLY when the roll landed
+  // elsewhere: no scroll affordance, and keys 1–4 silently remapped to
+  // whichever four were visible. The ‹ › keys now step a browse window
+  // over the full set (the position readout names where the window sits),
+  // while the follow window still wins the moment the active palette
+  // changes — browsing never fights the roll about what is up.
+  const [browse, setBrowse] = useState(null); // { id, start } — the stepped window, valid only for the palette it was stepped on
+  const browseStart = browse && browse.id === palette.id ? browse.start : null;
+  const winStart = browseStart == null ? followStart : clampChipWindowStart(all.length, browseStart, CHIP_CAP);
   const visible = all.slice(winStart, winStart + CHIP_CAP);
+  const canBrowse = all.length > CHIP_CAP;
+  const stepWindow = (dir) =>
+    setBrowse({ id: palette.id, start: clampChipWindowStart(all.length, winStart + dir * CHIP_CAP, CHIP_CAP) });
   const activeChipRef = useRef(null);
 
   useEffect(() => {
@@ -374,9 +386,41 @@ export function PaletteStrip() {
               {colorMode}
             </button>
           </span>
+          {canBrowse && (
+            <button
+              type="button"
+              className="palette-nav-btn"
+              title="Previous palettes"
+              aria-label="Previous palettes"
+              disabled={winStart <= 0}
+              onClick={() => stepWindow(-1)}
+            >
+              ‹
+            </button>
+          )}
           <div className="palette-chip-track" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
             {chips}
           </div>
+          {canBrowse && (
+            <button
+              type="button"
+              className="palette-nav-btn"
+              title="Next palettes"
+              aria-label="Next palettes"
+              disabled={winStart >= all.length - CHIP_CAP}
+              onClick={() => stepWindow(1)}
+            >
+              ›
+            </button>
+          )}
+          {canBrowse && (
+            <span
+              className="palette-window-pos lbl"
+              title="Which palettes the chips above show — keys 1–4 pick from these four"
+            >
+              {winStart + 1}–{winStart + visible.length} of {all.length}
+            </span>
+          )}
           <span className="palette-controls" style={{ display: 'inline-flex', alignItems: 'center' }}>
             <span className="palette-switch-label lbl">palette</span>
             <button

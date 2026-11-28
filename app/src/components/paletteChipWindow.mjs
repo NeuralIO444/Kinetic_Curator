@@ -14,3 +14,16 @@ export function chipWindowStart(count, activeIndex, cap) {
   if (!Number.isFinite(activeIndex) || activeIndex < 0) return 0;
   return Math.min(Math.max(0, activeIndex - cap + 1), count - cap);
 }
+
+// #2503 (B6) — the performer's own browse position over the same window.
+// The follow window above only ever moves when the roll lands elsewhere;
+// the strip's ‹ › keys step this clamp instead, so every palette is
+// reachable without rolling. A browse start is just a start: clamped to
+// the same legal range the follow window uses, 0 whenever the whole set
+// fits or the inputs are degenerate.
+export function clampChipWindowStart(count, start, cap) {
+  if (!Number.isFinite(count) || !Number.isFinite(cap) || cap <= 0) return 0;
+  if (count <= cap) return 0;
+  if (!Number.isFinite(start)) return 0;
+  return Math.min(Math.max(0, Math.floor(start)), count - cap);
+}

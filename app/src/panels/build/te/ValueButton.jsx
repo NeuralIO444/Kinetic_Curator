@@ -38,6 +38,9 @@ export function ValueButton({ label, display, title, onOpen, locked, onToggleLoc
         <span className="te-value-label">{label}</span>
         <span className="te-value-display">{display}</span>
       </button>
+      {/* #2503 (B25) — a gated value's reason as visible text under the
+          button, not only in its tooltip / aria-label. */}
+      {disabled && disabledReason && <div className="te-value-reason">{disabledReason}</div>}
       {onToggleLock && (
         <button
           type="button"

@@ -105,6 +105,15 @@
   border-left: 5px solid transparent;
   pointer-events: none;
 }
+/* #2503 (B5) — the standing arm, named in plain text on the strip:
+   what is pinned and the fact that it lands on the next roll. */
+.scope-readout {
+  flex-shrink: 0;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  white-space: nowrap;
+}
 .scope-clear {
   padding: 2px 6px;
   background: transparent;
@@ -3376,8 +3385,18 @@ details.ds-dev > summary:hover {
 /* Amber value button: label left, live readout right, lock pip. */
 .te-value {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   align-items: stretch;
+}
+/* #2503 (B25) — gated reasons as visible panel text (ModeRow + ValueButton). */
+.te-value-reason,
+.te-mode-reason {
+  flex-basis: 100%;
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  padding: 1px 2px 0;
 }
 .te-value-btn {
   flex: 1 1 auto;
@@ -3492,6 +3511,7 @@ details.ds-dev > summary:hover {
    block's compact size. */
 .te-mode-block {
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   flex: 1 1 auto;
@@ -4053,6 +4073,13 @@ details.ds-dev > summary:hover {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 4px;
+  margin-bottom: 6px;
+}
+/* #2503 (B24) — the standing spectrum mapping's behaviour, on the panel. */
+.stim-spectrum-map-hint {
+  font-size: 9px;
+  line-height: 1.45;
+  color: var(--dim);
   margin-bottom: 6px;
 }
 

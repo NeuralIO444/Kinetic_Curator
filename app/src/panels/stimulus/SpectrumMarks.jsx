@@ -44,6 +44,14 @@ export function SpectrumMarks({ layoutParams }) {
           </button>
         ))}
       </div>
+      {/* #2503 (B24) — what the picked mapping does, as visible text.
+          The explanation used to live only in the buttons' tooltips, and
+          with the amounts at 0 a map change moves nothing on the meter or
+          the stage — the pick read as a dead click. The readout names the
+          standing mapping's behaviour on the panel, updating with the
+          pick, so the state change has feedback even before any amount
+          is raised. */}
+      <div className="stim-spectrum-map-hint">{MAP_HINT[map]}</div>
       {AMOUNTS.map((a) => {
         const v = layoutParams[a.key] ?? 0;
         return (

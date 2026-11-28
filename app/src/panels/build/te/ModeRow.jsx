@@ -85,6 +85,11 @@ export function ModeRow({
     if (Number.isFinite(value) && value !== 0 && (value < 0 ? -1 : 1) !== s) onSelect(-value);
   };
 
+  // #2503 (B25) — a gated row's reason as visible text under the row,
+  // not only in the readout's tooltip / aria-label. Both seats render
+  // it; the block seat wraps it onto its own line (flex-basis 100%).
+  const reasonEl = disabled && disabledReason && <div className="te-mode-reason">{disabledReason}</div>;
+
   if (variant === 'block') {
     // The block-editor seat: label · sign · modes · exact readout on one
     // line (the .fx-param / .strata-composite flex rows the sliders sat
@@ -132,6 +137,7 @@ export function ModeRow({
         >
           {display}
         </button>
+        {reasonEl}
       </div>
     );
   }
@@ -177,6 +183,7 @@ export function ModeRow({
         value={state ? state.id : undefined}
         onChange={pickMode}
       />
+      {reasonEl}
     </div>
   );
 }
